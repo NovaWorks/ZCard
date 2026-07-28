@@ -22,6 +22,21 @@ class CategoryResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = '商品';
 
+    public static function getNavigationLabel(): string
+    {
+        return '分类管理';
+    }
+
+    public static function getModelLabel(): string
+    {
+        return '分类';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return '分类';
+    }
+
     public static function form(Schema $schema): Schema
     {
         return CategoryForm::configure($schema);

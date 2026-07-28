@@ -35,6 +35,10 @@ class AdminPanelProvider extends PanelProvider
                 'danger' => '#ef4444',
             ])
             ->sidebarCollapsibleOnDesktop()
+            ->navigationGroups([
+                '商品',
+                '系统',
+            ])
             ->plugins([
                 \BezhanSalleh\FilamentShield\FilamentShieldPlugin::make()
                     ->navigationGroup('系统')

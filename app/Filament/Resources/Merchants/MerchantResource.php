@@ -24,6 +24,21 @@ class MerchantResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = '系统';
 
+    public static function getNavigationLabel(): string
+    {
+        return '商户管理';
+    }
+
+    public static function getModelLabel(): string
+    {
+        return '商户';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return '商户';
+    }
+
     public static function form(Schema $schema): Schema
     {
         return MerchantForm::configure($schema);

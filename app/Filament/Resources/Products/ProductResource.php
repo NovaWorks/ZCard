@@ -25,6 +25,21 @@ class ProductResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = '商品';
 
+    public static function getNavigationLabel(): string
+    {
+        return '商品管理';
+    }
+
+    public static function getModelLabel(): string
+    {
+        return '商品';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return '商品';
+    }
+
     public static function form(Schema $schema): Schema
     {
         return ProductForm::configure($schema);

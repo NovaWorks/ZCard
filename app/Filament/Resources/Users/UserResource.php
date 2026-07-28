@@ -24,6 +24,21 @@ class UserResource extends Resource
 
     protected static string|\UnitEnum|null $navigationGroup = '系统';
 
+    public static function getNavigationLabel(): string
+    {
+        return '用户管理';
+    }
+
+    public static function getModelLabel(): string
+    {
+        return '用户';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return '用户';
+    }
+
     public static function form(Schema $schema): Schema
     {
         return UserForm::configure($schema);
