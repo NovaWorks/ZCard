@@ -6,14 +6,12 @@ use App\Filament\Widgets\LatestOrdersWidget;
 use App\Filament\Widgets\SalesChartWidget;
 use App\Filament\Widgets\ShopStatsWidget;
 use Filament\Pages\Dashboard as BaseDashboard;
-use Filament\Widgets\AccountWidget;
 
 class Dashboard extends BaseDashboard
 {
     public function getWidgets(): array
     {
         return [
-            AccountWidget::class,
             ShopStatsWidget::class,
             SalesChartWidget::class,
             LatestOrdersWidget::class,
