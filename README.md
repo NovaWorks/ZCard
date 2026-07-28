@@ -1,58 +1,89 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# ZCard
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+> 现代化、插件制虚拟发卡 / 个人店铺系统。Laravel 13 + Filament v5 + Vue3。
+>
+> 核心差异化：**现代技术栈 + 真插件系统 + 极致插件开发体验**。
 
-## About Laravel
+## 快速启动（开发环境）
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
-
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+需要：Docker、Node 22、pnpm。（PHP/MySQL/Redis 走 Docker，无需本机安装。）
 
 ```bash
-composer require laravel/boost --dev
+# 1. 起后端容器（首次构建镜像约 1-3 分钟）
+./vendor/bin/sail up -d
 
-php artisan boost:install
+# 2. 初始化系统（迁移 + RBAC + 默认商户 + 超管账号）
+./vendor/bin/sail artisan zcard:install
+#    命令行会打印一个随机 8 位初始密码；首次登录强制改密
+
+# 3. 后台
+#    访问 http://localhost:8092/admin ，用 install 打印的邮箱密码登录
+#    （admin@zcard.local + 打印的密码）
+
+# 4. 前台
+cd storefront && pnpm install && pnpm dev
+#    访问 http://localhost:5173
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+## 默认端口
 
-## Contributing
+| 服务 | 地址 |
+|---|---|
+| Laravel 应用 | http://localhost:8092 |
+| Filament 后台 | http://localhost:8092/admin |
+| 前台商城 (dev) | http://localhost:5173 |
+| MySQL | localhost:3307 |
+| Redis | localhost:6380 |
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+> 端口可在 `.env` 的 `APP_PORT` / `FORWARD_DB_PORT` / `FORWARD_REDIS_PORT` 调整（默认避开本机已占用的 80/3306/6379）。
 
-## Code of Conduct
+## 常用命令
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+| 命令 | 说明 |
+|---|---|
+| `./vendor/bin/sail up -d` | 起容器（后台） |
+| `./vendor/bin/sail artisan migrate` | 跑迁移 |
+| `./vendor/bin/sail artisan zcard:install` | 系统初始化（幂等） |
+| `./vendor/bin/sail test` | 跑测试 |
+| `./vendor/bin/sail composer xxx` | 容器内 composer |
+| `./vendor/bin/sail artisan tinker` | tinker |
+| `cd storefront && pnpm dev` | 前台 dev server |
+| `cd storefront && pnpm build` | 前台构建 |
 
-## Security Vulnerabilities
+## 项目结构
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```
+ZCard/
+├── app/                        Laravel 后端
+│   ├── Console/Commands/InstallCommand.php     zcard:install 初始化
+│   ├── Filament/Resources/      后台 CRUD（User, Merchant）
+│   ├── Http/Middleware/ForcePasswordChange.php 首次登录强制改密
+│   ├── Models/                  数据模型（12 张业务表）
+│   └── Support/CardCipher.php   卡密应用层加密 + sha256 去重
+├── database/migrations/         数据库迁移
+├── storefront/                  Vue3 前台（独立工程）
+├── plugins/example-plugin/      插件骨架占位（Phase 2 生效）
+└── config/zcard.php             ZCard 配置 + 功能开关
+```
 
-## License
+## 技术栈
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- **后端**：PHP 8.3+ · Laravel 13 · Filament v5 · spatie/laravel-permission · filament-shield · MySQL 8 · Redis
+- **前台**：Vue 3 · Vite · Tailwind CSS v4 · Pinia · Vue Router · axios
+
+## 阶段说明
+
+当前为 **Phase 0（地基）**：
+- ✅ Laravel + Sail 开发环境
+- ✅ 核心 schema（用户/商户/商品/卡密/订单/支付/发货快照/配置）
+- ✅ RBAC（super_admin / merchant / user）+ zcard:install 初始化 + 首次改密
+- ✅ Filament 后台骨架 + 主题（设计图配色）
+- ✅ 前台 Vue3 工程骨架 + API 联调
+- ✅ 卡密加密 + 导入批次表（为 Phase 1 大量导入铺路）
+
+**下一阶段（Phase 1）**：商品管理、卡密导入、订单状态机、收银台、内置支付通道、自动发货。
+**Phase 2**：插件系统 Hook 总线、安装/启停生命周期。
+
+---
+
+*开源协议待定（见开发计划 §6.3）。*
