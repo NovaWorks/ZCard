@@ -1,36 +1,56 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { getHealth, type HealthResp } from '@/api/health'
+import { ref, watch, onMounted } from 'vue'
+import { useSettingsStore } from '@/stores/settings'
+import { useProductsStore } from '@/stores/products'
+import CategoryNav from '@/components/CategoryNav.vue'
+import ViewSwitcher from '@/components/ViewSwitcher.vue'
+import ProductCard from '@/components/ProductCard.vue'
+import HotTags from '@/components/HotTags.vue'
 
-const health = ref<HealthResp | null>(null)
-const err = ref('')
-onMounted(async () => {
-  try {
-    health.value = await getHealth()
-  } catch (e) {
-    err.value = 'API 未连通（确保 Laravel 已启动）'
-  }
-})
+const settings = useSettingsStore()
+const products = useProductsStore()
+const category = ref<number | null>(null)
+const order = ref('')
+
+async function load() {
+  await settings.load()
+  await products.fetch({
+    category: category.value ?? undefined,
+    order: order.value || undefined,
+  })
+}
+onMounted(load)
+watch(category, load)
+
+const gridClass = (cols: number) => `grid gap-3 p-4 grid-cols-${cols} md:grid-cols-${cols}`
 </script>
 
 <template>
-  <div class="max-w-6xl mx-auto px-4 py-10">
-    <div class="rounded-card bg-white shadow-card p-8 mb-6">
-      <h1 class="text-3xl font-bold text-ink mb-2">ZCard 商城</h1>
-      <p class="text-ink-muted">现代化、插件制虚拟发卡系统（Phase 0 骨架）</p>
-      <div class="mt-4 flex gap-3 flex-wrap">
-        <span class="px-3 py-1 rounded-field bg-primary text-white text-sm">主色 #2563EB</span>
-        <span class="px-3 py-1 rounded-field bg-success text-white text-sm">成功</span>
-        <span class="px-3 py-1 rounded-field bg-warning text-white text-sm">警告</span>
-        <span class="px-3 py-1 rounded-field bg-danger text-white text-sm">危险</span>
-        <span class="px-3 py-1 rounded-field bg-accent text-white text-sm">点缀</span>
-      </div>
+  <div>
+    <!-- 热门标签 -->
+    <div class="max-w-6xl mx-auto px-4">
+      <HotTags v-if="settings.config?.show_hot_tags" :ids="settings.config?.hot_tag_categories || []" />
     </div>
-    <div class="rounded-card bg-surface-subtle p-6 text-ink-soft">
-      API 健康检查：
-      <span v-if="health" class="text-success font-mono">{{ health.status }} · {{ health.time }}</span>
-      <span v-else-if="err" class="text-danger">{{ err }}</span>
-      <span v-else class="text-ink-muted">检测中…</span>
+
+    <div class="flex max-w-6xl mx-auto">
+      <!-- 分类导航 + 列表 -->
+      <CategoryNav v-if="settings.config" v-model="category" :style="settings.config.category_nav_style" />
+      <div class="flex-1">
+        <div class="flex justify-between items-center p-3">
+          <span class="text-sm text-ink-soft">全部商品</span>
+          <ViewSwitcher />
+        </div>
+        <div v-if="settings.config?.list_default_view && settings.effectiveView !== 'list'"
+          :class="gridClass(settings.config?.grid_columns || 4)">
+          <ProductCard v-for="p in products.list" :key="p.id" :product="p" />
+        </div>
+        <div v-else class="max-w-3xl mx-auto px-4">
+          <ProductCard v-for="p in products.list" :key="p.id" :product="p" />
+        </div>
+        <div v-if="!products.loading && !products.list.length" class="text-center text-ink-muted py-20">
+          暂无商品(请先在后台添加商品)
+        </div>
+      </div>
     </div>
   </div>
 </template>

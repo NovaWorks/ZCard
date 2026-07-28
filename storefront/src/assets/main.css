@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* safelist 动态列数(grid-cols-3/4/5 由配置驱动) */
+@source inline("grid-cols-3 grid-cols-4 grid-cols-5");
+
 /*
  * ZCard 前台设计 token（spec §5）：浅色、主色蓝 #2563EB。
  * Tailwind v4 用 @theme 定义，生成对应 utility 类（bg-primary / text-ink / rounded-card 等）。
