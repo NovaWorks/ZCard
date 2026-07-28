@@ -11,7 +11,6 @@ use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Widgets\AccountWidget;
-use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -29,15 +28,14 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->brandName('ZCard')
-            // 设计图配色（spec §5）：浅色、主色蓝 #2563EB
+            // 主色亮蓝 #009EF7（P1-A.1）；darkMode 默认启用，右上角自动渲染明暗切换按钮
             ->colors([
-                'primary' => '#2563EB',
-                'success' => '#10B981',
-                'warning' => '#F59E0B',
-                'danger' => '#EF4444',
+                'primary' => '#009EF7',
+                'success' => '#16a34a',
+                'warning' => '#d97706',
+                'danger' => '#ef4444',
             ])
-            // 强制浅色模式（不跟随系统暗色，与设计图一致）
-            ->darkMode(false)
+            ->sidebarCollapsibleOnDesktop()
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
@@ -47,7 +45,6 @@ class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
                 AccountWidget::class,
-                FilamentInfoWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
