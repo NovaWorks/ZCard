@@ -25,3 +25,8 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# ZCard
+/docs/
+/storefront/node_modules/
+/storefront/dist/
