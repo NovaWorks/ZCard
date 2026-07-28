@@ -1,5 +1,16 @@
 /*
- * ZCard Filament 自定义主题层。
- * 设计图 token（spec §5）：浅色、主色 #2563EB、圆角 8px、卡片背景 #F9FAFB。
- * Phase 0 仅占位；后续微调（圆角、阴影、卡片底色）写在这里，不动 Filament 核心。
+ * ZCard Filament 主题微调。
+ * 主色 #009EF7 已由 AdminPanelProvider colors 配置驱动。
+ * 此处做卡片圆角/阴影等轻量打磨。
  */
+
+/* 统计卡圆角与阴影增强 */
+.fi-widget {
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* 侧栏导航项圆角 */
+.fi-sidebar-nav-item {
+    border-radius: 8px;
+}
