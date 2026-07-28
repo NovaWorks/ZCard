@@ -26,7 +26,7 @@ class StorefrontSettings extends Page implements HasForms
 
     public static function getNavigationGroup(): string | \UnitEnum | null
     {
-        return '设置';
+        return '系统';
     }
 
     public static function getNavigationSort(): ?int
