@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\CardController;
+use App\Http\Controllers\Api\CardImportController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\ProductController;
@@ -14,6 +16,16 @@ Route::get('/products', [ProductController::class, 'index'])->name('api.products
 Route::get('/products/featured', [ProductController::class, 'featured'])->name('api.products.featured');
 Route::get('/products/{slug}', [ProductController::class, 'show'])->name('api.products.show');
 Route::get('/settings/storefront', [StorefrontSettingsController::class, 'show'])->name('api.settings.storefront');
+
+// 卡密导入与库存(管理类,需 Sanctum token)— API-first:Filament 和 API 共用 Service 层
+Route::middleware('auth:sanctum')->prefix('cards')->group(function () {
+    Route::post('/import', [CardImportController::class, 'import'])->name('api.cards.import');
+    Route::get('/import-status/{id}', [CardImportController::class, 'status'])->name('api.cards.import-status');
+    Route::post('/import/{id}/revoke', [CardImportController::class, 'revoke'])->name('api.cards.revoke');
+    Route::get('/export/{productId}', [CardController::class, 'export'])->name('api.cards.export');
+});
+Route::middleware('auth:sanctum')->get('/products/{id}/stock', [CardController::class, 'stock'])->name('api.products.stock');
+Route::middleware('auth:sanctum')->get('/cards', [CardController::class, 'index'])->name('api.cards.index');
 
 Route::get('/user', function (Request $request) {
     return $request->user();
