@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/*
+ * ZCard 前台设计 token（spec §5）：浅色、主色蓝 #2563EB。
+ * Tailwind v4 用 @theme 定义，生成对应 utility 类（bg-primary / text-ink / rounded-card 等）。
+ */
+@theme {
+  --color-primary: #2563eb;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-accent: #8b5cf6;
+
+  --color-ink: #111827;
+  --color-ink-soft: #374151;
+  --color-ink-muted: #6b7280;
+
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f9fafb;
+
+  --radius-card: 8px;
+  --radius-field: 4px;
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: var(--color-ink);
+  background-color: var(--color-surface);
+}
