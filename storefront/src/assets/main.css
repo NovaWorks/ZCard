@@ -8,7 +8,7 @@
  * Tailwind v4 用 @theme 定义，生成对应 utility 类（bg-primary / text-ink / rounded-card 等）。
  */
 @theme {
-  --color-primary: #2563eb;
+  --color-primary: #009EF7;
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
