@@ -36,6 +36,12 @@ class AdminPanelProvider extends PanelProvider
                 'danger' => '#ef4444',
             ])
             ->sidebarCollapsibleOnDesktop()
+            ->plugins([
+                \BezhanSalleh\FilamentShield\FilamentShieldPlugin::make()
+                    ->navigationGroup('系统')
+                    ->navigationIcon('heroicon-o-shield-check')
+                    ->navigationLabel('角色权限'),
+            ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
