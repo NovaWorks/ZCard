@@ -1,0 +1,16 @@
+{
+    "id": "example-plugin",
+    "name": "示例插件",
+    "version": "0.1.0",
+    "description": "ZCard 示例插件骨架。Phase 0 仅占位，Phase 2 插件系统生效后才会被加载。",
+    "author": "ZCard",
+    "homepage": "",
+    "min_app_version": "1.0.0",
+    "hooks": {
+        "order.paid": "App\\Plugins\\ExamplePlugin\\Hooks::onOrderPaid"
+    },
+    "permissions": [
+        {"name": "example.view", "display": "查看示例插件"}
+    ],
+    "config": []
+}
