@@ -8,6 +8,7 @@ import { RouterLink } from 'vue-router'
       <RouterLink to="/" class="text-xl font-bold text-primary">ZCard</RouterLink>
       <nav class="space-x-4 text-ink-soft">
         <RouterLink to="/">首页</RouterLink>
+        <RouterLink to="/orders/query">订单查询</RouterLink>
         <RouterLink to="/login">登录</RouterLink>
         <RouterLink to="/register">注册</RouterLink>
       </nav>
