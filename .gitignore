@@ -30,4 +30,7 @@ Thumbs.db
 /docs/
 /storefront/node_modules/
 /storefront/dist/
+/sysadmin/node_modules/
+/sysadmin/dist/
+/public/admin/
 /.superpowers/

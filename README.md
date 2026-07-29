@@ -30,7 +30,8 @@ cd storefront && pnpm install && pnpm dev
 | 服务 | 地址 |
 |---|---|
 | Laravel 应用 | http://localhost:8092 |
-| Filament 后台 | http://localhost:8092/admin |
+| **后台管理系统(art-design-pro)** | **http://localhost:8092/admin/** |
+| Filament 后台(开发期CRUD) | http://localhost:8092/filament |
 | 前台商城 (dev) | http://localhost:5173 |
 | MySQL | localhost:3307 |
 | Redis | localhost:6380 |
@@ -49,6 +50,9 @@ cd storefront && pnpm install && pnpm dev
 | `./vendor/bin/sail artisan tinker` | tinker |
 | `cd storefront && pnpm dev` | 前台 dev server |
 | `cd storefront && pnpm build` | 前台构建 |
+| `cd sysadmin && pnpm install` | 后台管理系统装依赖 |
+| `cd sysadmin && pnpm dev` | 后台 dev server(:3006) |
+| `cd sysadmin && pnpm build` | 后台编译到 `public/admin/` |
 
 ## 项目结构
 

@@ -24,7 +24,7 @@ class AdminPanelProvider extends PanelProvider
         return $panel
             ->default()
             ->id('admin')
-            ->path('admin')
+            ->path('filament')
             ->login()
             ->brandName('ZCard')
             // 主色亮蓝 #009EF7（P1-A.1）；darkMode 默认启用，右上角自动渲染明暗切换按钮
