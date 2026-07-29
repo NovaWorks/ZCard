@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { getProduct, type Product } from '@/api/products'
+import { getProductReviews, type ReviewItem } from '@/api/reviews'
 import { useSettingsStore } from '@/stores/settings'
 
 const route = useRoute()
@@ -12,11 +13,24 @@ const selectedSku = ref<number | null>(null)
 const qty = ref(1)
 const currentImg = ref(0)
 
+// 真实 + 虚拟合并评价(由后端 getProductRating 合并)
+const reviewRating = ref(0)
+const reviewCount = ref(0)
+const reviewList = ref<ReviewItem[]>([])
+
 onMounted(async () => {
   try {
     product.value = await getProduct(route.params.id as string)
     selectedSku.value = product.value.skus?.[0]?.id ?? null
   } catch (e) { err.value = '商品不存在' }
+
+  // 拉取合并评价(真实 + 虚拟)
+  try {
+    const data = await getProductReviews(route.params.id as string)
+    reviewRating.value = data.rating || 0
+    reviewCount.value = data.count || 0
+    reviewList.value = data.list || []
+  } catch (e) { /* 评价加载失败不阻塞页面 */ }
 })
 
 const price = computed(() => {
@@ -25,7 +39,7 @@ const price = computed(() => {
   return sku ? sku.price : product.value.price
 })
 const fmt = (fen: number) => (fen / 100).toFixed(2)
-const reviews = computed(() => product.value?.virtual_reviews || {})
+const fmtDate = (d: string | null) => d ? String(d).slice(0, 10) : ''
 function buy() {
   alert(`P1-C 收银台即将开放\n已选: SKU#${selectedSku.value} × ${qty.value}`)
 }
@@ -67,8 +81,8 @@ function buy() {
 
         <!-- 评分汇总 -->
         <div class="flex border-t border-b border-gray-100 py-3 my-3 text-center text-xs text-ink-muted">
-          <div class="flex-1 border-r border-gray-100"><span class="block text-sm font-bold text-ink">{{ reviews.rating || '—' }}</span>评分</div>
-          <div class="flex-1 border-r border-gray-100"><span class="block text-sm font-bold text-ink">{{ reviews.count || 0 }}</span>评价</div>
+          <div class="flex-1 border-r border-gray-100"><span class="block text-sm font-bold text-ink">{{ reviewRating || '—' }}</span>评分</div>
+          <div class="flex-1 border-r border-gray-100"><span class="block text-sm font-bold text-ink">{{ reviewCount || 0 }}</span>评价</div>
           <div class="flex-1 border-r border-gray-100"><span class="block text-sm font-bold text-red-500">{{ product.sales }}</span>已售</div>
           <div class="flex-1"><span class="block text-sm font-bold text-ink">{{ product.stock }}</span>库存</div>
         </div>
@@ -120,12 +134,18 @@ function buy() {
       <div class="text-xs text-ink-soft leading-relaxed border rounded-card p-4 bg-white whitespace-pre-wrap">{{ product.description || '暂无描述' }}</div>
     </div>
 
-    <!-- 虚拟评论(若 show_reviews) -->
-    <div v-if="settings.config?.show_reviews && reviews.list?.length" class="mt-4 border-t-4 border-gray-50 pt-4">
-      <h2 class="text-sm font-bold mb-2 border-l-2 border-primary pl-2">用户评价</h2>
-      <div v-for="(r, i) in reviews.list" :key="i" class="flex gap-2 py-3 border-b border-gray-50 text-xs">
+    <!-- 用户评价(真实 + 虚拟,若 show_reviews) -->
+    <div v-if="settings.config?.show_reviews && reviewList.length" class="mt-4 border-t-4 border-gray-50 pt-4">
+      <h2 class="text-sm font-bold mb-2 border-l-2 border-primary pl-2">用户评价 <span class="text-ink-muted font-normal">({{ reviewCount }})</span></h2>
+      <div v-for="r in reviewList" :key="r.id" class="flex gap-2 py-3 border-b border-gray-50 text-xs">
         <div class="w-7 h-7 rounded-full bg-blue-100 text-primary flex items-center justify-center font-bold flex-shrink-0">{{ (r.name || '匿')[0] }}</div>
-        <div><div class="font-semibold text-ink">{{ r.name || '匿名用户' }} <span class="text-orange-400">{{ '★'.repeat(r.rating || 5) }}</span></div><div class="text-ink-muted mt-1">{{ r.content }}</div></div>
+        <div class="min-w-0">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-semibold text-ink">{{ r.name || '匿名用户' }} <span class="text-orange-400">{{ '★'.repeat(r.rating || 5) }}</span></span>
+            <span v-if="r.created_at" class="text-ink-muted text-[10px] flex-shrink-0">{{ fmtDate(r.created_at) }}</span>
+          </div>
+          <div class="text-ink-muted mt-1">{{ r.content }}</div>
+        </div>
       </div>
     </div>
   </div>

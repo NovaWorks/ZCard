@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\CardImportController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\StorefrontSettingsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -26,7 +27,14 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::get('/categories', [CategoryController::class, 'index'])->name('api.categories');
 Route::get('/products', [ProductController::class, 'index'])->name('api.products');
 Route::get('/products/featured', [ProductController::class, 'featured'])->name('api.products.featured');
+
+// 评价:商品评价列表(必须在 /products/{slug} 之前注册才能匹配)
+Route::get('/products/{slug}/reviews', [ReviewController::class, 'productReviews'])->name('api.reviews.product');
+
 Route::get('/products/{slug}', [ProductController::class, 'show'])->name('api.products.show');
+
+// 提交评价(需登录)
+Route::middleware('auth:sanctum')->post('/reviews', [ReviewController::class, 'store'])->name('api.reviews.store');
 Route::get('/settings/storefront', [StorefrontSettingsController::class, 'show'])->name('api.settings.storefront');
 
 // 卡密导入与库存(管理类,需 Sanctum token)— API-first:Filament 和 API 共用 Service 层
