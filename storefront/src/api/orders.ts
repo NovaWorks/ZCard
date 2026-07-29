@@ -4,7 +4,7 @@ export interface CreatedOrder {
   order_no: string; amount: number; status: string
 }
 export interface OrderDetail {
-  order_no: string; status: string; product_name?: string
+  order_no: string; status: string; product_name?: string; product_cover?: string | null
   quantity: number; amount: number; cards: string[]
   created_at: string; paid_at?: string
 }
@@ -18,3 +18,5 @@ export const mockPay = (orderNo: string) =>
 
 export const queryOrder = (params: { contact: string; order_no: string; password?: string }) =>
   request.get<unknown, OrderDetail>('/orders/query', { params })
+
+export const getMyOrders = () => request.get<unknown, OrderDetail[]>('/orders/mine')

@@ -19,6 +19,7 @@ async function logout() {
         <RouterLink to="/">首页</RouterLink>
         <RouterLink to="/orders/query">订单查询</RouterLink>
         <template v-if="authStore.isLoggedIn">
+          <RouterLink to="/orders/mine" class="text-ink">我的订单</RouterLink>
           <span class="text-ink">{{ authStore.user?.username }}</span>
           <button @click="logout" class="text-primary">退出</button>
         </template>

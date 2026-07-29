@@ -178,6 +178,28 @@ class OrderService
         ];
     }
 
+    /** 我的订单(登录用户的历史订单) */
+    public function myOrders(int $userId): array
+    {
+        $orders = \App\Models\Order::where('user_id', $userId)
+            ->with(['product:id,name,cover', 'orderDeliveries:id,order_id,card_content'])
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get();
+
+        return $orders->map(fn ($o) => [
+            'order_no' => $o->order_no,
+            'product_name' => $o->product?->name,
+            'product_cover' => $o->product?->cover,
+            'quantity' => $o->quantity,
+            'amount' => $o->amount,
+            'status' => $o->status,
+            'created_at' => $o->created_at?->toDateTimeString(),
+            'paid_at' => $o->paid_at?->toDateTimeString(),
+            'cards' => $o->orderDeliveries?->map(fn ($d) => $d->card_content)->toArray() ?? [],
+        ])->toArray();
+    }
+
     private function generateOrderNo(): string
     {
         return 'ORD' . now()->format('YmdHis') . strtoupper(Str::random(6));

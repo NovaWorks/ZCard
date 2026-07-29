@@ -76,4 +76,9 @@ class OrderController extends Controller
 
         return response()->json($service->getOrderDetail($order));
     }
+
+    public function myOrders(Request $request, OrderService $service): JsonResponse
+    {
+        return response()->json($service->myOrders($request->user()->id));
+    }
 }

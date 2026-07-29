@@ -13,6 +13,7 @@ const router = createRouter({
         { path: 'checkout', name: 'checkout', component: () => import('@/views/Checkout.vue') },
         { path: 'pay/:orderNo', name: 'pay', component: () => import('@/views/Pay.vue') },
         { path: 'orders/query', name: 'order-query', component: () => import('@/views/OrderQuery.vue') },
+        { path: 'orders/mine', name: 'my-orders', component: () => import('@/views/MyOrders.vue') },
         { path: 'login', name: 'login', component: () => import('@/views/Login.vue') },
         { path: 'register', name: 'register', component: () => import('@/views/Register.vue') },
       ],

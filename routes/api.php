@@ -22,6 +22,7 @@ Route::post('/auth/login', [AuthController::class, 'login'])->name('api.auth.log
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
     Route::get('/auth/me', [AuthController::class, 'me'])->name('api.auth.me');
+    Route::get('/orders/mine', [OrderController::class, 'myOrders'])->name('api.orders.mine');
 });
 
 Route::get('/categories', [CategoryController::class, 'index'])->name('api.categories');
