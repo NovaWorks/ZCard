@@ -25,6 +25,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/orders/mine', [OrderController::class, 'myOrders'])->name('api.orders.mine');
 });
 
+// 后台管理 API(Sanctum token)
+use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
+
+Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
+    Route::apiResource('products', AdminProductController::class);
+});
+
 Route::get('/categories', [CategoryController::class, 'index'])->name('api.categories');
 Route::get('/products', [ProductController::class, 'index'])->name('api.products');
 Route::get('/products/featured', [ProductController::class, 'featured'])->name('api.products.featured');

@@ -1,0 +1,60 @@
+/**
+ * 商品管理 API（ZCard Admin）
+ *
+ * 后端 /api/admin/products，Sanctum 鉴权。
+ * 金额一律以「分」为单位，前端展示需 / 100 转为元。
+ */
+import request from '@/utils/http'
+
+/** 商品实体 */
+export interface Product {
+  id: number
+  name: string
+  slug: string
+  category_id: number | null
+  category?: { id: number; name: string }
+  price: number // 分
+  stock?: number
+  status: number
+  is_featured: boolean
+  virtual_sales: number
+  stock_type: string
+  delivery_mode: string
+  sort: number
+  created_at: string
+}
+
+/** Laravel paginate 返回结构（部分字段） */
+export interface ProductPage {
+  data: Product[]
+  current_page: number
+  total: number
+  last_page: number
+  per_page: number
+}
+
+/** 列表查询参数 */
+export interface ProductListParams {
+  page?: number
+  pageSize?: number
+  keyword?: string
+  status?: number
+}
+
+/** 获取商品列表 */
+export const getProducts = (params: ProductListParams) =>
+  request.get<ProductPage>({ url: '/admin/products', params })
+
+/** 获取单个商品 */
+export const getProduct = (id: number) => request.get<Product>({ url: `/admin/products/${id}` })
+
+/** 新增商品 */
+export const createProduct = (data: Partial<Product>) =>
+  request.post<Product>({ url: '/admin/products', data })
+
+/** 更新商品 */
+export const updateProduct = (id: number, data: Partial<Product>) =>
+  request.put<Product>({ url: `/admin/products/${id}`, data })
+
+/** 删除商品 */
+export const deleteProduct = (id: number) => request.del<void>({ url: `/admin/products/${id}` })
