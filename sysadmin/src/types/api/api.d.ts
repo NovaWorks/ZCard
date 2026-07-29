@@ -62,25 +62,28 @@ declare namespace Api {
 
   /** 认证类型 */
   namespace Auth {
-    /** 登录参数 */
+    /** 登录参数（ZCard 使用 email 登录） */
     interface LoginParams {
-      userName: string
+      email: string
       password: string
     }
 
-    /** 登录响应 */
+    /** 登录响应（ZCard Sanctum: 直接返回 { token, user }） */
     interface LoginResponse {
       token: string
-      refreshToken: string
+      user: UserInfo
     }
 
-    /** 用户信息 */
+    /** 用户信息（ZCard: { id, username, email, balance }） */
     interface UserInfo {
-      buttons: string[]
-      roles: string[]
-      userId: number
-      userName: string
+      id: number
+      username: string
       email: string
+      balance?: number | string
+      /** 角色列表（用于路由权限，ZCard 管理后台默认管理员） */
+      roles?: string[]
+      /** 按钮级权限（ZCard 暂未启用，保留可选） */
+      buttons?: string[]
       avatar?: string
     }
   }

@@ -1,41 +1,93 @@
-<!-- 工作台页面 -->
+<!-- 工作台 - 欢迎页 -->
 <template>
-  <div>
-    <CardList></CardList>
-
-    <ElRow :gutter="20">
-      <ElCol :sm="24" :md="12" :lg="10">
-        <ActiveUser />
-      </ElCol>
-      <ElCol :sm="24" :md="12" :lg="14">
-        <SalesOverview />
-      </ElCol>
-    </ElRow>
-
-    <ElRow :gutter="20">
-      <ElCol :sm="24" :md="24" :lg="12">
-        <NewUser />
-      </ElCol>
-      <ElCol :sm="24" :md="12" :lg="6">
-        <Dynamic />
-      </ElCol>
-      <ElCol :sm="24" :md="12" :lg="6">
-        <TodoList />
-      </ElCol>
-    </ElRow>
-
-    <AboutProject />
+  <div class="p-2">
+    <ElCard class="welcome-card" shadow="never">
+      <div class="welcome-inner">
+        <div class="welcome-icon">
+          <ArtSvgIcon icon="ri:bank-card-2-line" style="font-size: 56px" />
+        </div>
+        <div class="welcome-text">
+          <h1 class="welcome-title">ZCard 管理后台</h1>
+          <p class="welcome-sub">
+            {{ greeting }}，{{ displayName }}，欢迎回来。
+          </p>
+          <p class="welcome-tip">系统统计模块正在搭建中，敬请期待。</p>
+        </div>
+      </div>
+    </ElCard>
   </div>
 </template>
 
 <script setup lang="ts">
-  import CardList from './modules/card-list.vue'
-  import ActiveUser from './modules/active-user.vue'
-  import SalesOverview from './modules/sales-overview.vue'
-  import NewUser from './modules/new-user.vue'
-  import Dynamic from './modules/dynamic-stats.vue'
-  import TodoList from './modules/todo-list.vue'
-  import AboutProject from './modules/about-project.vue'
+  import { computed } from 'vue'
+  import { useUserStore } from '@/store/modules/user'
 
   defineOptions({ name: 'Console' })
+
+  const userStore = useUserStore()
+
+  const displayName = computed(() => userStore.info?.username || '管理员')
+
+  // 根据当前时间给出问候语
+  const greeting = computed(() => {
+    const h = new Date().getHours()
+    if (h < 6) return '凌晨好'
+    if (h < 9) return '早上好'
+    if (h < 12) return '上午好'
+    if (h < 14) return '中午好'
+    if (h < 17) return '下午好'
+    if (h < 19) return '傍晚好'
+    return '晚上好'
+  })
 </script>
+
+<style lang="scss" scoped>
+  .welcome-card {
+    border-radius: 12px;
+  }
+
+  .welcome-inner {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 24px 8px;
+  }
+
+  .welcome-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 96px;
+    height: 96px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--main-color, #409eff);
+    color: #fff;
+  }
+
+  .welcome-title {
+    margin: 0 0 8px;
+    font-size: 26px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .welcome-sub {
+    margin: 0 0 6px;
+    font-size: 15px;
+    color: var(--art-gray-700, #666);
+  }
+
+  .welcome-tip {
+    margin: 0;
+    font-size: 13px;
+    color: var(--art-gray-500, #999);
+  }
+
+  @media (max-width: 640px) {
+    .welcome-inner {
+      flex-direction: column;
+      text-align: center;
+    }
+  }
+</style>

@@ -140,6 +140,7 @@
       "user": "普通用户"
     },
     "placeholder": {
+      "email": "请输入邮箱",
       "username": "请输入账号",
       "password": "请输入密码",
       "slider": "请拖动滑块完成验证"

@@ -42,6 +42,10 @@ import { setPageTitle } from '@/utils/router'
 import { resetRouterState } from '@/router/guards/beforeEach'
 import { useMenuStore } from './menu'
 import { StorageConfig } from '@/utils/storage/storage-config'
+import { fetchLogin as fetchLoginApi, fetchGetUserInfo, fetchLogout } from '@/api/auth'
+
+/** 退出登录重入保护，避免 401 级联调用 logout 接口造成循环 */
+let isLoggingOut = false
 
 /**
  * 用户状态管理
@@ -62,10 +66,8 @@ export const useUserStore = defineStore(
     const info = ref<Partial<Api.Auth.UserInfo>>({})
     // 搜索历史记录
     const searchHistory = ref<AppRouteRecord[]>([])
-    // 访问令牌
+    // 访问令牌（ZCard Sanctum Bearer token，无刷新令牌）
     const accessToken = ref('')
-    // 刷新令牌
-    const refreshToken = ref('')
 
     // 计算属性：获取用户信息
     const getUserInfo = computed(() => info.value)
@@ -124,55 +126,88 @@ export const useUserStore = defineStore(
     }
 
     /**
-     * 设置令牌
+     * 设置访问令牌（ZCard Sanctum，无刷新令牌）
      * @param newAccessToken 访问令牌
-     * @param newRefreshToken 刷新令牌（可选）
      */
-    const setToken = (newAccessToken: string, newRefreshToken?: string) => {
+    const setToken = (newAccessToken: string) => {
       accessToken.value = newAccessToken
-      if (newRefreshToken) {
-        refreshToken.value = newRefreshToken
-      }
+    }
+
+    /**
+     * 登录（ZCard: POST /auth/login，使用 email + password）
+     * 成功后存储 token 并写入用户信息
+     * @param email 邮箱
+     * @param password 密码
+     */
+    const login = async (email: string, password: string) => {
+      const { token, user } = await fetchLoginApi({ email, password })
+      if (!token) throw new Error('Login failed - no token received')
+      accessToken.value = token
+      isLogin.value = true
+      info.value = user
+      return user
+    }
+
+    /**
+     * 拉取并刷新当前用户信息（ZCard: GET /auth/me）
+     */
+    const fetchUserInfo = async () => {
+      const data = await fetchGetUserInfo()
+      info.value = data
+      return data
     }
 
     /**
      * 退出登录
-     * 清空所有用户相关状态并跳转到登录页
+     * 调用 ZCard 注销接口，清空所有用户相关状态并跳转到登录页
      * 如果是同一账号重新登录，保留工作台标签页
      */
-    const logOut = () => {
-      // 保存当前用户 ID，用于下次登录时判断是否为同一用户
-      const currentUserId = info.value.userId
-      if (currentUserId) {
-        localStorage.setItem(StorageConfig.LAST_USER_ID_KEY, String(currentUserId))
-      }
+    const logOut = async () => {
+      // 重入保护：避免 401 级联触发多次 logout
+      if (isLoggingOut) return
+      isLoggingOut = true
 
-      // 清空用户信息
-      info.value = {}
-      // 重置登录状态
-      isLogin.value = false
-      // 重置锁屏状态
-      isLock.value = false
-      // 清空锁屏密码
-      lockPassword.value = ''
-      // 清空访问令牌
-      accessToken.value = ''
-      // 清空刷新令牌
-      refreshToken.value = ''
-      // 注意：不清空工作台标签页，等下次登录时根据用户判断
-      // 移除iframe路由缓存
-      sessionStorage.removeItem('iframeRoutes')
-      // 清空主页路径
-      useMenuStore().setHomePath('')
-      // 重置路由状态
-      resetRouterState(500)
-      // 跳转到登录页，携带当前路由作为 redirect 参数
-      const currentRoute = router.currentRoute.value
-      const redirect = currentRoute.path !== '/login' ? currentRoute.fullPath : undefined
-      router.push({
-        name: 'Login',
-        query: redirect ? { redirect } : undefined
-      })
+      try {
+        // 调用后端注销当前 Sanctum token（失败不阻塞本地清理）
+        try {
+          if (accessToken.value) await fetchLogout()
+        } catch (e) {
+          console.warn('[userStore] logout api failed:', e)
+        }
+
+        // 保存当前用户 ID，用于下次登录时判断是否为同一用户
+        const currentUserId = info.value.id
+        if (currentUserId) {
+          localStorage.setItem(StorageConfig.LAST_USER_ID_KEY, String(currentUserId))
+        }
+
+        // 清空用户信息
+        info.value = {}
+        // 重置登录状态
+        isLogin.value = false
+        // 重置锁屏状态
+        isLock.value = false
+        // 清空锁屏密码
+        lockPassword.value = ''
+        // 清空访问令牌
+        accessToken.value = ''
+        // 注意：不清空工作台标签页，等下次登录时根据用户判断
+        // 移除iframe路由缓存
+        sessionStorage.removeItem('iframeRoutes')
+        // 清空主页路径
+        useMenuStore().setHomePath('')
+        // 重置路由状态
+        resetRouterState(500)
+        // 跳转到登录页，携带当前路由作为 redirect 参数
+        const currentRoute = router.currentRoute.value
+        const redirect = currentRoute.path !== '/login' ? currentRoute.fullPath : undefined
+        router.push({
+          name: 'Login',
+          query: redirect ? { redirect } : undefined
+        })
+      } finally {
+        isLoggingOut = false
+      }
     }
 
     /**
@@ -182,7 +217,7 @@ export const useUserStore = defineStore(
      */
     const checkAndClearWorktabs = () => {
       const lastUserId = localStorage.getItem(StorageConfig.LAST_USER_ID_KEY)
-      const currentUserId = info.value.userId
+      const currentUserId = info.value.id
 
       // 无法获取当前用户 ID，跳过检查
       if (!currentUserId) return
@@ -211,7 +246,6 @@ export const useUserStore = defineStore(
       info,
       searchHistory,
       accessToken,
-      refreshToken,
       getUserInfo,
       getSettingState,
       getWorktabState,
@@ -222,6 +256,8 @@ export const useUserStore = defineStore(
       setLockStatus,
       setLockPassword,
       setToken,
+      login,
+      fetchUserInfo,
       logOut,
       checkAndClearWorktabs
     }

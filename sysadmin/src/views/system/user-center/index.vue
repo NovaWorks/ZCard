@@ -9,7 +9,7 @@
             class="relative z-10 w-20 h-20 mt-30 mx-auto object-cover border-2 border-white rounded-full"
             src="@imgs/user/avatar.webp"
           />
-          <h2 class="mt-5 text-xl font-normal">{{ userInfo.userName }}</h2>
+          <h2 class="mt-5 text-xl font-normal">{{ userInfo.username }}</h2>
           <p class="mt-5 text-sm">专注于用户体验跟视觉设计</p>
 
           <div class="w-75 mx-auto mt-7.5 text-left">

@@ -140,6 +140,7 @@
       "user": "User"
     },
     "placeholder": {
+      "email": "Please enter your email",
       "username": "Please enter your account",
       "password": "Please enter your password",
       "slider": "Please slide to verify"
