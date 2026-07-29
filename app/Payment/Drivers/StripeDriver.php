@@ -1,0 +1,112 @@
+<?php
+
+namespace App\Payment\Drivers;
+
+use App\Models\Order;
+use App\Payment\Contracts\PaymentDriver;
+use App\Payment\PaymentResult;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\URL;
+use Stripe\Checkout\Session;
+use Stripe\Stripe;
+use Stripe\Webhook;
+
+class StripeDriver implements PaymentDriver
+{
+    /**
+     * 安全构建命名路由 URL；若路由尚未定义则回退到当前请求 URL。
+     */
+    protected function namedUrl(string $name, array $params = []): string
+    {
+        if (app('router')->has($name)) {
+            return route($name, $params, false);
+        }
+
+        return URL::current();
+    }
+
+    public function pay(Order $order, array $config): PaymentResult
+    {
+        Stripe::setApiKey($config['secret_key'] ?? '');
+
+        $session = Session::create([
+            'payment_method_types' => ['card'],
+            'line_items' => [[
+                'price_data' => [
+                    'currency' => strtolower($config['currency'] ?? 'usd'),
+                    'product_data' => [
+                        'name' => $order->order_no,
+                    ],
+                    'unit_amount' => (int) round((float) $order->amount * 100),
+                ],
+                'quantity' => 1,
+            ]],
+            'mode' => 'payment',
+            'client_reference_id' => $order->order_no,
+            'success_url' => $this->namedUrl('payment.return', ['code' => 'stripe']) . '?session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url' => $this->namedUrl('payment.cancel', ['code' => 'stripe']),
+        ]);
+
+        return PaymentResult::redirect($session->url);
+    }
+
+    public function verifyCallback(Request $request, array $config): ?array
+    {
+        $signature = $request->header('Stripe-Signature') ?: '';
+        $payload = $request->getContent();
+
+        try {
+            $event = Webhook::constructEvent(
+                $payload,
+                $signature,
+                $config['webhook_secret'] ?? ''
+            );
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if (($event->type ?? null) !== 'checkout.session.completed') {
+            return null;
+        }
+
+        $session = $event->data->object ?? null;
+        if (!$session) {
+            return null;
+        }
+
+        $amount = isset($session->amount_total)
+            ? bcdiv((string) $session->amount_total, '100', 2)
+            : null;
+
+        return [
+            'channel_order_no' => $session->payment_intent ?? $session->id,
+            'out_trade_no' => $session->client_reference_id ?? null,
+            'amount' => $amount,
+            'raw' => $session->toArray(),
+        ];
+    }
+
+    public function getConfigFields(): array
+    {
+        return [
+            'secret_key' => [
+                'label' => 'Secret Key (sk_live_... 或 sk_test_...)',
+                'type' => 'text',
+                'required' => true,
+            ],
+            'webhook_secret' => [
+                'label' => 'Webhook Signing Secret (whsec_...)',
+                'type' => 'text',
+                'required' => true,
+            ],
+        ];
+    }
+
+    public function getInfo(): array
+    {
+        return [
+            'name' => 'Stripe',
+            'icon' => '💳',
+        ];
+    }
+}

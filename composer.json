@@ -12,7 +12,9 @@
         "laravel/framework": "^13.8",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
-        "spatie/laravel-permission": "^8.0"
+        "spatie/laravel-permission": "^8.0",
+        "stripe/stripe-php": "^21.0",
+        "yansongda/laravel-pay": "^3.7"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
