@@ -41,4 +41,10 @@ class Card extends Model
     {
         return CardCipher::decrypt($this->content);
     }
+
+    /** 查看明文(同 plainContent,语义别名供 Filament modal 用) */
+    public function decryptedContent(): string
+    {
+        return $this->plainContent();
+    }
 }
