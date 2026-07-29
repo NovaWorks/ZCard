@@ -34,6 +34,13 @@ Route::post('/orders', [OrderController::class, 'create'])->name('api.orders.cre
 Route::post('/orders/{orderNo}/mock-pay', [OrderController::class, 'mockPay'])->name('api.orders.mock-pay');
 Route::get('/orders/query', [OrderController::class, 'query'])->name('api.orders.query');
 
+// 支付(游客 + 回调,不需 auth)
+use App\Http\Controllers\Api\PaymentController;
+
+Route::get('/payments/channels', [PaymentController::class, 'channels'])->name('api.payments.channels');
+Route::post('/payments/create', [PaymentController::class, 'create'])->name('api.payments.create');
+Route::post('/payments/callback/{channel}', [PaymentController::class, 'callback'])->name('api.payments.callback');
+
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
