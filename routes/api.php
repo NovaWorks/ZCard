@@ -11,6 +11,18 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class)->name('api.health');
 
+// 前台认证(游客,不需 auth)
+use App\Http\Controllers\Api\AuthController;
+
+Route::post('/auth/register', [AuthController::class, 'register'])->name('api.auth.register');
+Route::post('/auth/login', [AuthController::class, 'login'])->name('api.auth.login');
+
+// 需登录
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
+    Route::get('/auth/me', [AuthController::class, 'me'])->name('api.auth.me');
+});
+
 Route::get('/categories', [CategoryController::class, 'index'])->name('api.categories');
 Route::get('/products', [ProductController::class, 'index'])->name('api.products');
 Route::get('/products/featured', [ProductController::class, 'featured'])->name('api.products.featured');
