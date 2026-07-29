@@ -14,4 +14,8 @@ app.use(router)
 const settingsStore = useSettingsStore(pinia)
 settingsStore.load()
 
+import { useAuthStore } from './stores/auth'
+const authStore = useAuthStore(pinia)
+authStore.fetchUser()
+
 app.mount('#app')

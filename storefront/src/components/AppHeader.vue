@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+
+const router = useRouter()
+const authStore = useAuthStore()
+
+async function logout() {
+  await authStore.logout()
+  router.push('/')
+}
 </script>
 
 <template>
@@ -9,8 +18,14 @@ import { RouterLink } from 'vue-router'
       <nav class="space-x-4 text-ink-soft">
         <RouterLink to="/">首页</RouterLink>
         <RouterLink to="/orders/query">订单查询</RouterLink>
-        <RouterLink to="/login">登录</RouterLink>
-        <RouterLink to="/register">注册</RouterLink>
+        <template v-if="authStore.isLoggedIn">
+          <span class="text-ink">{{ authStore.user?.username }}</span>
+          <button @click="logout" class="text-primary">退出</button>
+        </template>
+        <template v-else>
+          <RouterLink to="/login">登录</RouterLink>
+          <RouterLink to="/register">注册</RouterLink>
+        </template>
       </nav>
     </div>
   </header>
