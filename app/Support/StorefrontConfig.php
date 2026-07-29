@@ -30,6 +30,8 @@ class StorefrontConfig
             'hot_tag_categories' => [],
             'order_query_password' => true,
             'trade_captcha' => true,
+            'order_close_minutes' => 15,
+            'contact_type' => 'email',
         ];
     }
 
