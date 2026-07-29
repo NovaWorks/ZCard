@@ -27,6 +27,13 @@ Route::middleware('auth:sanctum')->prefix('cards')->group(function () {
 Route::middleware('auth:sanctum')->get('/products/{id}/stock', [CardController::class, 'stock'])->name('api.products.stock');
 Route::middleware('auth:sanctum')->get('/cards', [CardController::class, 'index'])->name('api.cards.index');
 
+// 订单(游客,不需 auth)— API-first:前台和后台都调 OrderService
+use App\Http\Controllers\Api\OrderController;
+
+Route::post('/orders', [OrderController::class, 'create'])->name('api.orders.create');
+Route::post('/orders/{orderNo}/mock-pay', [OrderController::class, 'mockPay'])->name('api.orders.mock-pay');
+Route::get('/orders/query', [OrderController::class, 'query'])->name('api.orders.query');
+
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
