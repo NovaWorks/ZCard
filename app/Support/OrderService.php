@@ -144,11 +144,11 @@ class OrderService
             return null;
         }
 
-        // 若开启查询密码,验证
+        // 若开启查询密码,且本订单有密码,才验证(订单无密码则跳过)
         $needPassword = StorefrontConfig::get('order_query_password');
         if ($needPassword) {
             $storedHash = $order->extra['query_password'] ?? null;
-            if (! $storedHash || ! Hash::check($password ?? '', $storedHash)) {
+            if ($storedHash && ! Hash::check($password ?? '', $storedHash)) {
                 return null; // 密码错,视为查不到
             }
         }
