@@ -333,7 +333,8 @@
         <!-- 可编辑字段 -->
         <ElForm :model="editData" label-width="100px">
           <ElFormItem :label="t('zcard.card.cardType')">
-            <ElInput v-model="editData.card_type" :placeholder="t('zcard.card.cardTypePlaceholder')" />
+            <ElTag v-if="editData.card_type" type="info" effect="plain" size="small">{{ editData.card_type }}</ElTag>
+            <span v-else class="text-gray-400 text-sm">-</span>
           </ElFormItem>
           <ElFormItem :label="t('zcard.card.note')">
             <ElInput v-model="editData.note" type="textarea" :rows="2" :placeholder="t('zcard.card.notePlaceholder')" />
@@ -343,12 +344,6 @@
           </ElFormItem>
           <ElFormItem :label="t('zcard.card.draftCost')">
             <ElInputNumber v-model="editData.draft_cost" :min="0" :precision="2" :step="0.5" style="width: 180px" />
-          </ElFormItem>
-          <ElFormItem :label="t('zcard.card.status')">
-            <ElSelect v-model="editData.status" style="width: 180px">
-              <ElOption :label="t('zcard.card.statusUnused')" value="unused" />
-              <ElOption :label="t('zcard.card.statusDisabled')" value="disabled" />
-            </ElSelect>
           </ElFormItem>
         </ElForm>
       </div>
