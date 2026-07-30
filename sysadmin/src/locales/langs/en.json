@@ -422,7 +422,21 @@
       "updated": "Updated",
       "deleteTitle": "Delete Product",
       "deleteConfirm": "Delete product \"{name}\"?",
-      "all": "All"
+      "all": "All",
+      "stats": {
+        "total": "Total Products",
+        "active": "Active",
+        "inactive": "Inactive",
+        "featured": "Featured",
+        "totalStock": "Available Stock",
+        "totalOrders": "Total Orders",
+        "paidOrders": "Paid"
+      },
+      "batchActivate": "Batch Activate",
+      "batchDeactivate": "Batch Deactivate",
+      "batchDelete": "Batch Delete",
+      "batchSuccess": "Operation successful",
+      "selectFirst": "Please select products first"
     },
     "category": {
       "title": "Categories",

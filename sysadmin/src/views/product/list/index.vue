@@ -1,6 +1,23 @@
 <!-- 商品列表 - 后台管理 -->
 <template>
   <div class="product-page art-full-height">
+    <!-- 统计面板 -->
+    <ElRow :gutter="16" class="stats-row">
+      <ElCol v-for="card in statCards" :key="card.key" :xs="12" :sm="8" :md="4">
+        <div class="stat-card" :class="card.cls">
+          <div class="stat-icon">
+            <ElIcon :size="28">
+              <component :is="card.icon" />
+            </ElIcon>
+          </div>
+          <div class="stat-body">
+            <div class="stat-number">{{ card.value }}</div>
+            <div class="stat-label">{{ t(`zcard.product.stats.${card.label}`) }}</div>
+          </div>
+        </div>
+      </ElCol>
+    </ElRow>
+
     <ElCard class="art-table-card" shadow="never">
       <!-- 搜索栏 -->
       <div class="search-bar">
@@ -27,13 +44,50 @@
         </ElForm>
       </div>
 
-      <!-- 表格头部 -->
+      <!-- 表格头部：新增 + 批量操作 -->
       <div class="table-header">
         <ElButton type="primary" @click="openCreate">{{ t('zcard.product.add') }}</ElButton>
+        <ElButtonGroup class="ml-2">
+          <ElButton
+            type="success"
+            :disabled="selectedIds.length === 0"
+            :loading="batchLoading"
+            @click="handleBatch('activate')"
+          >
+            {{ t('zcard.product.batchActivate') }}
+          </ElButton>
+          <ElButton
+            type="warning"
+            :disabled="selectedIds.length === 0"
+            :loading="batchLoading"
+            @click="handleBatch('deactivate')"
+          >
+            {{ t('zcard.product.batchDeactivate') }}
+          </ElButton>
+          <ElButton
+            type="danger"
+            :disabled="selectedIds.length === 0"
+            :loading="batchLoading"
+            @click="handleBatch('delete')"
+          >
+            {{ t('zcard.product.batchDelete') }}
+          </ElButton>
+        </ElButtonGroup>
+        <span v-if="selectedIds.length" class="selection-count">
+          {{ t('zcard.product.stats.total') }}: {{ selectedIds.length }}
+        </span>
       </div>
 
       <!-- 表格 -->
-      <ElTable v-loading="loading" :data="tableData" border stripe style="width: 100%">
+      <ElTable
+        v-loading="loading"
+        :data="tableData"
+        border
+        stripe
+        style="width: 100%"
+        @selection-change="handleSelectionChange"
+      >
+        <ElTableColumn type="selection" width="50" />
         <ElTableColumn prop="id" :label="t('zcard.common.id')" width="80" />
         <ElTableColumn :label="t('zcard.product.cover')" width="90" align="center">
           <template #default="{ row }">
@@ -64,11 +118,15 @@
             {{ row.stock ?? 0 }}
           </template>
         </ElTableColumn>
-        <ElTableColumn :label="t('zcard.product.status')" width="100" align="center">
+        <ElTableColumn :label="t('zcard.product.status')" width="110" align="center">
           <template #default="{ row }">
-            <ElTag :type="row.status ? 'success' : 'info'" effect="light">
-              {{ row.status ? t('zcard.product.statusOn') : t('zcard.product.statusOff') }}
-            </ElTag>
+            <ElSwitch
+              :model-value="!!row.status"
+              :active-value="true"
+              :inactive-value="false"
+              :loading="row._statusLoading"
+              @change="(val) => handleStatusToggle(row, !!val)"
+            />
           </template>
         </ElTableColumn>
         <ElTableColumn :label="t('zcard.product.isFeatured')" width="100" align="center">
@@ -417,6 +475,15 @@
 <script setup lang="ts">
   import type { FormInstance, FormRules, UploadFile, UploadRequestOptions } from 'element-plus'
   import { ElMessage, ElMessageBox } from 'element-plus'
+  import {
+    Goods,
+    CircleCheck,
+    CircleClose,
+    Star,
+    Box,
+    Wallet,
+    Document
+  } from '@element-plus/icons-vue'
   import { Plus } from '@element-plus/icons-vue'
   import { useI18n } from 'vue-i18n'
   import {
@@ -424,7 +491,10 @@
     createProduct,
     updateProduct,
     deleteProduct,
-    type Product
+    getProductStats,
+    batchAction,
+    type Product,
+    type ProductStats
   } from '@/api/products'
   import { uploadImage } from '@/api/upload'
   import {
@@ -514,7 +584,7 @@
         keyword: searchForm.keyword,
         status: searchForm.status
       })
-      tableData.value = res.data || []
+      tableData.value = (res.data || []).map((p) => ({ ...p, _statusLoading: false }))
       pagination.total = res.total || 0
     } catch {
       tableData.value = []
@@ -536,6 +606,104 @@
     searchForm.status = undefined
     pagination.page = 1
     fetchData()
+  }
+
+  /** 统计数据 */
+  const stats = ref<ProductStats>({
+    total: 0,
+    active: 0,
+    inactive: 0,
+    featured: 0,
+    total_stock: 0,
+    total_orders: 0,
+    paid_orders: 0
+  })
+
+  /** 加载统计数据 */
+  const fetchStats = async () => {
+    try {
+      const res = await getProductStats()
+      stats.value = { ...stats.value, ...res }
+    } catch {
+      // 错误消息由 http 拦截器统一提示
+    }
+  }
+
+  /** 统计卡片配置 */
+  const statCards = computed(() => [
+    { key: 'total', label: 'total', value: stats.value.total, icon: Goods, cls: 'stat-total' },
+    { key: 'active', label: 'active', value: stats.value.active, icon: CircleCheck, cls: 'stat-active' },
+    { key: 'inactive', label: 'inactive', value: stats.value.inactive, icon: CircleClose, cls: 'stat-inactive' },
+    { key: 'featured', label: 'featured', value: stats.value.featured, icon: Star, cls: 'stat-featured' },
+    { key: 'totalStock', label: 'totalStock', value: stats.value.total_stock, icon: Box, cls: 'stat-stock' },
+    { key: 'paidOrders', label: 'paidOrders', value: stats.value.paid_orders, icon: Wallet, cls: 'stat-paid' }
+  ])
+
+  /** 批量选择 */
+  const selectedIds = ref<number[]>([])
+  const batchLoading = ref(false)
+
+  /** 选择变更 */
+  const handleSelectionChange = (rows: Product[]) => {
+    selectedIds.value = rows.map((r) => r.id)
+  }
+
+  /** 批量操作 */
+  const handleBatch = (action: 'activate' | 'deactivate' | 'delete') => {
+    if (!selectedIds.value.length) {
+      ElMessage.warning(t('zcard.product.selectFirst'))
+      return
+    }
+    const actionLabel =
+      action === 'activate'
+        ? t('zcard.product.batchActivate')
+        : action === 'deactivate'
+          ? t('zcard.product.batchDeactivate')
+          : t('zcard.product.batchDelete')
+    ElMessageBox.confirm(
+      `${actionLabel} (${selectedIds.value.length})?`,
+      t('zcard.common.tips'),
+      {
+        confirmButtonText: t('zcard.common.ok'),
+        cancelButtonText: t('zcard.common.cancel'),
+        type: action === 'delete' ? 'warning' : 'info'
+      }
+    )
+      .then(async () => {
+        batchLoading.value = true
+        try {
+          await batchAction([...selectedIds.value], action)
+          ElMessage.success(t('zcard.product.batchSuccess'))
+          selectedIds.value = []
+          fetchData()
+          fetchStats()
+        } catch {
+          // 错误消息由 http 拦截器统一提示
+        } finally {
+          batchLoading.value = false
+        }
+      })
+      .catch(() => {
+        // 用户取消
+      })
+  }
+
+  /** 行内状态切换 */
+  const handleStatusToggle = async (row: Product & { _statusLoading?: boolean }, val: boolean) => {
+    const newStatus = val ? 1 : 0
+    const oldStatus = row.status
+    row.status = newStatus
+    if (!row._statusLoading) row._statusLoading = true
+    try {
+      await updateProduct(row.id, { status: newStatus })
+      ElMessage.success(t('zcard.product.batchSuccess'))
+      fetchStats()
+    } catch {
+      // 失败回滚
+      row.status = oldStatus
+    } finally {
+      row._statusLoading = false
+    }
   }
 
   /** 弹窗相关 */
@@ -886,6 +1054,7 @@
       }
       dialogVisible.value = false
       fetchData()
+      fetchStats()
     } catch {
       // 错误消息由 http 拦截器统一提示
     } finally {
@@ -905,6 +1074,7 @@
           await deleteProduct(row.id)
           ElMessage.success(t('zcard.common.deleteSuccess'))
           fetchData()
+          fetchStats()
         } catch {
           // 错误消息由 http 拦截器统一提示
         }
@@ -914,9 +1084,13 @@
       })
   }
 
+  // 暴露给模板使用的图标(避免 lint 未使用告警)
+  void Document
+
   onMounted(() => {
     loadCategories()
     fetchData()
+    fetchStats()
   })
 </script>
 
@@ -924,6 +1098,107 @@
   .product-page {
     display: flex;
     flex-direction: column;
+  }
+
+  .stats-row {
+    margin-bottom: 16px;
+  }
+
+  .stat-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 18px;
+    border-radius: 10px;
+    background: var(--el-bg-color);
+    border: 1px solid var(--el-border-color-lighter);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    height: 100%;
+    transition:
+      transform 0.2s,
+      box-shadow 0.2s;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .stat-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .stat-number {
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--el-text-color-primary);
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: var(--el-text-color-secondary);
+      margin-top: 2px;
+    }
+  }
+
+  .stat-total .stat-icon {
+    background: rgba(64, 158, 255, 0.12);
+    color: #409eff;
+  }
+
+  .stat-total .stat-number {
+    color: #409eff;
+  }
+
+  .stat-active .stat-icon {
+    background: rgba(103, 194, 58, 0.12);
+    color: #67c23a;
+  }
+
+  .stat-active .stat-number {
+    color: #67c23a;
+  }
+
+  .stat-inactive .stat-icon {
+    background: rgba(144, 147, 153, 0.12);
+    color: #909399;
+  }
+
+  .stat-inactive .stat-number {
+    color: #909399;
+  }
+
+  .stat-featured .stat-icon {
+    background: rgba(230, 162, 60, 0.12);
+    color: #e6a23c;
+  }
+
+  .stat-featured .stat-number {
+    color: #e6a23c;
+  }
+
+  .stat-stock .stat-icon {
+    background: rgba(144, 89, 233, 0.12);
+    color: #9059e9;
+  }
+
+  .stat-stock .stat-number {
+    color: #9059e9;
+  }
+
+  .stat-paid .stat-icon {
+    background: rgba(245, 108, 108, 0.12);
+    color: #f56c6c;
+  }
+
+  .stat-paid .stat-number {
+    color: #f56c6c;
   }
 
   .search-bar {
@@ -934,6 +1209,12 @@
     display: flex;
     align-items: center;
     margin-bottom: 16px;
+
+    .selection-count {
+      margin-left: 12px;
+      color: var(--el-text-color-secondary);
+      font-size: 13px;
+    }
   }
 
   .pagination-bar {

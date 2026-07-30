@@ -99,4 +99,48 @@ class ProductController extends Controller
 
         return response()->json(null, 204);
     }
+
+    /** 商品统计面板 */
+    public function stats(): JsonResponse
+    {
+        return response()->json([
+            'total' => Product::count(),
+            'active' => Product::where('status', 1)->count(),
+            'inactive' => Product::where('status', 0)->count(),
+            'featured' => Product::where('is_featured', true)->count(),
+            'total_stock' => \App\Models\Card::where('status', 'unused')->count(),
+            'total_orders' => \App\Models\Order::count(),
+            'paid_orders' => \App\Models\Order::where('status', 'paid')->count(),
+        ]);
+    }
+
+    /** 批量操作(上架/下架/删除) */
+    public function batch(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'integer',
+            'action' => 'required|in:activate,deactivate,delete',
+        ]);
+
+        $ids = $data['ids'];
+        $action = $data['action'];
+
+        switch ($action) {
+            case 'activate':
+                Product::whereIn('id', $ids)->update(['status' => 1]);
+                $msg = '上架成功';
+                break;
+            case 'deactivate':
+                Product::whereIn('id', $ids)->update(['status' => 0]);
+                $msg = '下架成功';
+                break;
+            case 'delete':
+                Product::whereIn('id', $ids)->delete();
+                $msg = '删除成功';
+                break;
+        }
+
+        return response()->json(['message' => $msg, 'affected' => count($ids)]);
+    }
 }

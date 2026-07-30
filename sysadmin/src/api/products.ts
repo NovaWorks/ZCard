@@ -65,3 +65,24 @@ export const updateProduct = (id: number, data: Partial<Product>) =>
 
 /** 删除商品 */
 export const deleteProduct = (id: number) => request.del<void>({ url: `/admin/products/${id}` })
+
+/** 商品统计数据 */
+export interface ProductStats {
+  total: number
+  active: number
+  inactive: number
+  featured: number
+  total_stock: number
+  total_orders: number
+  paid_orders: number
+}
+
+/** 获取商品统计 */
+export const getProductStats = () => request.get<ProductStats>({ url: '/admin/products/stats' })
+
+/** 批量操作商品 */
+export const batchAction = (ids: number[], action: 'activate' | 'deactivate' | 'delete') =>
+  request.post<{ message: string; affected: number }>({
+    url: '/admin/products/batch',
+    data: { ids, action }
+  })

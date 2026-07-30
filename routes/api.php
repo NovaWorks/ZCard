@@ -39,6 +39,8 @@ use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::apiResource('products', AdminProductController::class);
+    Route::get('products/stats', [AdminProductController::class, 'stats']);
+    Route::post('products/batch', [AdminProductController::class, 'batch']);
     Route::get('products/{productId}/skus', [AdminProductSkuController::class, 'index']);
     Route::post('products/skus', [AdminProductSkuController::class, 'store']);
     Route::put('products/skus/{id}', [AdminProductSkuController::class, 'update']);

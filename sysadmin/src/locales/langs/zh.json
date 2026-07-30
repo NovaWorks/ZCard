@@ -422,7 +422,21 @@
       "updated": "更新成功",
       "deleteTitle": "删除商品",
       "deleteConfirm": "确定要删除商品「{name}」吗?",
-      "all": "全部"
+      "all": "全部",
+      "stats": {
+        "total": "总商品",
+        "active": "已上架",
+        "inactive": "未上架",
+        "featured": "推荐商品",
+        "totalStock": "可用库存",
+        "totalOrders": "总订单",
+        "paidOrders": "已支付"
+      },
+      "batchActivate": "批量上架",
+      "batchDeactivate": "批量下架",
+      "batchDelete": "批量删除",
+      "batchSuccess": "操作成功",
+      "selectFirst": "请先选择商品"
     },
     "category": {
       "title": "分类管理",
