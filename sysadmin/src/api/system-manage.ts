@@ -1,23 +1,16 @@
+/**
+ * 后端控制模式的菜单 API（ZCard Admin）
+ *
+ * 仅用于后端控制模式下的菜单获取，前端控制模式（默认）不会调用。
+ * 用户管理已迁移至 src/api/users.ts。
+ */
 import request from '@/utils/http'
 import { AppRouteRecord } from '@/types/router'
 
-// 获取用户列表
-export function fetchGetUserList(params: Api.SystemManage.UserSearchParams) {
-  return request.get<Api.SystemManage.UserList>({
-    url: '/api/user/list',
-    params
-  })
-}
-
-// 获取角色列表
-export function fetchGetRoleList(params: Api.SystemManage.RoleSearchParams) {
-  return request.get<Api.SystemManage.RoleList>({
-    url: '/api/role/list',
-    params
-  })
-}
-
-// 获取菜单列表
+/**
+ * 获取菜单列表（后端控制模式使用）
+ * @returns 菜单路由树
+ */
 export function fetchGetMenuList() {
   return request.get<AppRouteRecord[]>({
     url: '/api/v3/system/menus'
