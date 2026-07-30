@@ -686,7 +686,10 @@
       "cardTypeGeneral": "General Card",
       "cardTypeAccount": "Account/Pre-sale",
       "accountFormatHint": "One per line, separated by ║ : Card Content ║ Preview Info ║ Premium(optional) ║ Cost(optional)",
-      "accountFormatExample": "Example: account:test--pass:123 ║ US 12 months ║ 20 ║ 8"
+      "accountFormatExample": "Example: account:test--pass:123 ║ US 12 months ║ 20 ║ 8",
+      "dedup": "Deduplicate",
+      "dedupHint": "Skip duplicate cards within the same product",
+      "copySuccess": "Copied successfully"
     },
     "user": {
       "title": "Users",

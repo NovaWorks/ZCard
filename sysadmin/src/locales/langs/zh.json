@@ -686,7 +686,10 @@
       "cardTypeGeneral": "普通卡密",
       "cardTypeAccount": "账号/预售",
       "accountFormatHint": "一行一个，使用 ║ 分隔：卡密本体 ║ 预告信息 ║ 加价金额(可选) ║ 加价成本(可选)",
-      "accountFormatExample": "示例：账号:test--密码:123 ║ 美区12个月 ║ 20 ║ 8"
+      "accountFormatExample": "示例：账号:test--密码:123 ║ 美区12个月 ║ 20 ║ 8",
+      "dedup": "导入去重",
+      "dedupHint": "开启后，同一商品内重复的卡密不会再次入库",
+      "copySuccess": "复制成功"
     },
     "user": {
       "title": "用户管理",

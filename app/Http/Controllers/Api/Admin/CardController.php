@@ -71,6 +71,7 @@ class CardController extends Controller
             'delimiter'  => 'nullable|string',
             'note'       => 'nullable|string|max:255',
             'card_type'  => 'nullable|string|max:20',
+            'dedup'      => 'nullable|boolean',
         ]);
 
         $import = app(CardImportService::class)->import(
@@ -83,6 +84,7 @@ class CardController extends Controller
                 'source'    => 'admin_api',
                 'note'      => $data['note'] ?? null,
                 'card_type' => $data['card_type'] ?? null,
+                'dedup'     => $request->boolean('dedup'),
             ]
         );
 

@@ -143,9 +143,12 @@
           >
             <ElTableColumn type="selection" width="45" />
             <ElTableColumn prop="id" :label="t('zcard.common.id')" width="80" />
-            <ElTableColumn :label="t('zcard.card.cardContent')" min-width="200" show-overflow-tooltip>
+            <ElTableColumn :label="t('zcard.card.cardContent')" min-width="200" align="center" show-overflow-tooltip>
               <template #default="{ row }">
-                <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--el-color-primary);">{{ row.content_preview || '-' }}</code>
+                <code
+                  style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--el-color-primary); cursor: pointer;"
+                  @click="copyText(row.content_preview || ''); ElMessage.success(t('zcard.card.copySuccess'))"
+                >{{ row.content_preview || '-' }}</code>
               </template>
             </ElTableColumn>
             <ElTableColumn :label="t('zcard.card.product')" min-width="160" show-overflow-tooltip>
@@ -331,6 +334,10 @@
             <div class="account-example">{{ t('zcard.card.accountFormatExample') }}</div>
           </div>
           <div v-else class="form-help">{{ t('zcard.card.lineCount', { n: importLineCount }) }}</div>
+        </ElFormItem>
+        <ElFormItem :label="t('zcard.card.dedup')">
+          <ElSwitch v-model="importForm.dedup" />
+          <span class="ml-2 text-xs text-gray-400">{{ t('zcard.card.dedupHint') }}</span>
         </ElFormItem>
       </ElForm>
       <template #footer>
@@ -816,7 +823,8 @@
     card_type: '',
     note: '',
     contents: '',
-    import_kind: 'general' as 'general' | 'account'
+    import_kind: 'general' as 'general' | 'account',
+    dedup: false
   })
 
   const importRules = computed<FormRules>(() => ({
@@ -853,7 +861,8 @@
         product_id: importForm.product_id as number,
         contents: importForm.contents,
         card_type: importForm.import_kind === 'account' ? 'account' : (importForm.card_type || undefined),
-        note: importForm.note || undefined
+        note: importForm.note || undefined,
+        dedup: importForm.dedup
       })
       ElMessage.success(
         t('zcard.card.importResult', {

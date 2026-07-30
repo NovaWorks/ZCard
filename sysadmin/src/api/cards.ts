@@ -93,6 +93,8 @@ export interface ImportCardsPayload {
   card_type?: string
   /** 备注，可选 */
   note?: string
+  /** 是否去重（默认 false） */
+  dedup?: boolean
 }
 
 /** 导入卡密响应 */

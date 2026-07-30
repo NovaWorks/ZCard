@@ -88,7 +88,10 @@ class CardImportService
     {
         $productId = $import->product_id;
         $importId = $import->id;
-        $dedup = (bool) Product::query()->whereKey($productId)->value('dedup');
+        // dedup: 优先用 options 覆盖,否则用商品设置
+        $dedup = array_key_exists('dedup', $options)
+            ? (bool) $options['dedup']
+            : (bool) Product::query()->whereKey($productId)->value('dedup');
 
         // 可选的统一字段(导入时给本批每条卡密打上)
         $note = $options['note'] ?? null;
