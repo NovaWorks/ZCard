@@ -83,6 +83,13 @@ class ProductController extends Controller
                 'virtual_reviews' => $p->virtual_reviews,
                 'min_order' => $p->min_order, 'max_order' => $p->max_order,
                 'stock_type' => $p->stock_type, 'delivery_mode' => $p->delivery_mode,
+                'control_config' => $p->control_config ?? [],
+                'member_price' => $p->member_price,
+                'contact_type' => $p->contact_type ?? 'email',
+                'only_user' => (bool) $p->only_user,
+                'send_email' => (bool) $p->send_email,
+                'leave_message' => $p->leave_message,
+                'purchase_limit' => $p->purchase_limit ?? 0,
             ]);
         }
         return $data;
