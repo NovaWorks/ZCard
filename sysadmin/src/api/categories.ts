@@ -6,7 +6,7 @@ export interface Category {
   slug: string
   parent_id: number | null
   sort: number
-  status: number
+  status: number | boolean
   children?: Category[]
 }
 
