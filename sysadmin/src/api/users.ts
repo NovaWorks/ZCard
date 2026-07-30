@@ -15,6 +15,14 @@ export interface User {
   balance: number
   status: number
   roles: string[]
+  phone?: string | null
+  qq?: string | null
+  avatar?: string | null
+  points?: number
+  pid?: number
+  group_id?: number
+  login_ip?: string | null
+  last_login_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -28,11 +36,21 @@ export interface UserPage {
   per_page: number
 }
 
+/** 用户统计数据 */
+export interface UserStats {
+  total: number
+  active: number
+  disabled: number
+  todayNew: number
+}
+
 /** 列表查询参数 */
 export interface UserListParams {
   page?: number
   pageSize?: number
   keyword?: string
+  status?: number
+  group_id?: number
 }
 
 /** 新增/编辑表单 */
@@ -42,11 +60,21 @@ export interface UserForm {
   password?: string
   roles: string[]
   status?: number
+  phone?: string
+  qq?: string
+  avatar?: string
+  points?: number
+  pid?: number
+  group_id?: number
+  balance?: number
 }
 
 /** 获取用户列表 */
 export const getUsers = (params: UserListParams) =>
   request.get<UserPage>({ url: '/admin/users', params })
+
+/** 获取用户统计 */
+export const getUserStats = () => request.get<UserStats>({ url: '/admin/users/stats' })
 
 /** 获取用户详情 */
 export const getUser = (id: number) => request.get<User>({ url: `/admin/users/${id}` })

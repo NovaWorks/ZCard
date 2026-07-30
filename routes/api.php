@@ -52,6 +52,8 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::get('categories/all', [AdminCategoryController::class, 'all']);
 
     // 用户管理(CRUD + 角色分配)
+    // stats 必须在 apiResource 之前注册，否则会被 GET /users/{user} 当作参数吃掉。
+    Route::get('users/stats', [AdminUserController::class, 'stats']);
     Route::apiResource('users', AdminUserController::class);
 
     // 会员等级(user_groups)管理

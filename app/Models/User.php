@@ -17,6 +17,7 @@ use Spatie\Permission\Traits\HasRoles;
 #[Fillable([
     'username', 'name', 'email', 'password', 'status',
     'balance', 'password_changed_at', 'last_login_at',
+    'phone', 'qq', 'avatar', 'points', 'pid', 'group_id', 'login_ip',
 ])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser
@@ -41,5 +42,15 @@ class User extends Authenticatable implements FilamentUser
             'password_changed_at' => 'datetime',
             'last_login_at' => 'datetime',
         ];
+    }
+
+    public function userGroup()
+    {
+        return $this->belongsTo(UserGroup::class, 'group_id');
+    }
+
+    public function parent()
+    {
+        return $this->belongsTo(self::class, 'pid');
     }
 }
