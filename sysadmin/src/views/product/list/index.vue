@@ -138,6 +138,20 @@
             ¥{{ formatPrice(row.price) }}
           </template>
         </ElTableColumn>
+        <ElTableColumn :label="t('zcard.product.premiumCost')" width="150" align="center">
+          <template #default="{ row }">
+            <div class="price-pair">
+              <span>
+                {{ t('zcard.product.draftPremiumShort') }}:
+                ¥{{ formatPrice(row.draft_premium ?? 0) }}
+              </span>
+              <span class="price-pair-cost">
+                {{ t('zcard.product.factoryPriceShort') }}:
+                ¥{{ formatPrice(row.factory_price ?? 0) }}
+              </span>
+            </div>
+          </template>
+        </ElTableColumn>
         <ElTableColumn :label="t('zcard.product.stock')" width="100" align="center">
           <template #default="{ row }">
             {{ row.stock ?? 0 }}
@@ -292,6 +306,30 @@
               <span class="form-hint">{{ t('zcard.product.priceUnit') }}</span>
             </ElFormItem>
 
+            <ElFormItem :label="t('zcard.product.draftPremium')">
+              <ElInputNumber
+                v-model="formData.draftPremiumYuan"
+                :min="0"
+                :precision="2"
+                :step="0.5"
+                controls-position="right"
+                style="width: 220px"
+              />
+              <span class="form-hint">{{ t('zcard.product.draftPremiumHint') }}</span>
+            </ElFormItem>
+
+            <ElFormItem :label="t('zcard.product.factoryPrice')">
+              <ElInputNumber
+                v-model="formData.factoryPriceYuan"
+                :min="0"
+                :precision="2"
+                :step="0.5"
+                controls-position="right"
+                style="width: 220px"
+              />
+              <span class="form-hint">{{ t('zcard.product.factoryPriceHint') }}</span>
+            </ElFormItem>
+
             <ElFormItem :label="t('zcard.product.virtualSales')">
               <ElInputNumber
                 v-model="formData.virtual_sales"
@@ -415,6 +453,11 @@
                 <ElRadio value="status">{{ t('zcard.product.deliveryStatus') }}</ElRadio>
                 <ElRadio value="delete">{{ t('zcard.product.deliveryDelete') }}</ElRadio>
               </ElRadioGroup>
+            </ElFormItem>
+
+            <ElFormItem :label="t('zcard.product.dedup')">
+              <ElSwitch v-model="formData.dedup" />
+              <span class="form-hint">{{ t('zcard.product.dedupHint') }}</span>
             </ElFormItem>
 
             <ElFormItem :label="t('zcard.product.deliveryMessage')">
@@ -957,6 +1000,8 @@
     description: string
     cover: string
     priceYuan: number
+    factoryPriceYuan: number
+    draftPremiumYuan: number
     stock_type: string
     stock_visible: boolean
     delivery_mode: string
@@ -975,6 +1020,7 @@
     purchase_limit: number
     hide: boolean
     level_disable: boolean
+    dedup: boolean
   }
 
   const createEmptyForm = (): ProductForm => ({
@@ -984,6 +1030,8 @@
     description: '',
     cover: '',
     priceYuan: 0,
+    factoryPriceYuan: 0,
+    draftPremiumYuan: 0,
     stock_type: 'card',
     stock_visible: true,
     delivery_mode: 'status',
@@ -1000,7 +1048,8 @@
     only_user: false,
     purchase_limit: 0,
     hide: false,
-    level_disable: false
+    level_disable: false,
+    dedup: true
   })
 
   const formData = reactive<ProductForm>(createEmptyForm())
@@ -1320,6 +1369,8 @@
       description: row.description || '',
       cover: row.cover || '',
       priceYuan: Number(((Number(row.price) || 0) / 100).toFixed(2)),
+      factoryPriceYuan: Number(((Number(row.factory_price) || 0) / 100).toFixed(2)),
+      draftPremiumYuan: Number(((Number(row.draft_premium) || 0) / 100).toFixed(2)),
       stock_type: row.stock_type || 'card',
       stock_visible: row.stock_visible !== false,
       delivery_mode: row.delivery_mode || 'status',
@@ -1357,7 +1408,10 @@
         only_user: !!detail.only_user,
         purchase_limit: Number(detail.purchase_limit) || 0,
         hide: !!detail.hide,
-        level_disable: !!detail.level_disable
+        level_disable: !!detail.level_disable,
+        dedup: detail.dedup !== false,
+        factoryPriceYuan: Number(((Number(detail.factory_price) || 0) / 100).toFixed(2)),
+        draftPremiumYuan: Number(((Number(detail.draft_premium) || 0) / 100).toFixed(2))
       })
       // 详情图重新回填(详情接口可能更全)
       const detailImgs = Array.isArray(detail.images) ? detail.images : []
@@ -1435,6 +1489,8 @@
       cover: formData.cover || undefined,
       images: galleryUrls.value.length ? galleryUrls.value : undefined,
       price: Math.round(formData.priceYuan * 100),
+      factory_price: Math.round(formData.factoryPriceYuan * 100),
+      draft_premium: Math.round(formData.draftPremiumYuan * 100),
       stock_type: formData.stock_type,
       stock_visible: formData.stock_visible,
       delivery_mode: formData.delivery_mode,
@@ -1452,6 +1508,7 @@
       purchase_limit: formData.purchase_limit,
       hide: formData.hide,
       level_disable: formData.level_disable,
+      dedup: formData.dedup,
       control_config: serializeControls()
     }
     if (memberPrice) payload.member_price = memberPrice
@@ -1635,6 +1692,19 @@
     display: flex;
     justify-content: flex-end;
     margin-top: 16px;
+  }
+
+  .price-pair {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--el-color-success);
+  }
+
+  .price-pair-cost {
+    color: var(--el-text-color-secondary);
   }
 
   .product-form {

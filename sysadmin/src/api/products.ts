@@ -14,6 +14,8 @@ export interface Product {
   category_id: number | null
   category?: { id: number; name: string }
   price: number // 分
+  factory_price?: number // 分
+  draft_premium?: number // 分
   description?: string | null
   cover?: string | null
   images?: string[] | null
@@ -28,6 +30,7 @@ export interface Product {
   sort: number
   min_order?: number | null
   max_order?: number | null
+  dedup?: boolean
   created_at: string
 }
 

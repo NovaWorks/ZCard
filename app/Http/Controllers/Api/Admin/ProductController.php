@@ -47,6 +47,8 @@ class ProductController extends Controller
             'images' => 'nullable|array',
             'images.*' => 'nullable|string',
             'price' => 'required|integer|min:0',
+            'factory_price' => 'nullable|integer|min:0',
+            'draft_premium' => 'nullable|integer|min:0',
             'member_price' => 'nullable|array',
             'stock_type' => 'nullable|string|in:card,url,code',
             'stock_visible' => 'boolean',
@@ -65,6 +67,7 @@ class ProductController extends Controller
             'purchase_limit' => 'nullable|integer|min:0',
             'hide' => 'boolean',
             'level_disable' => 'boolean',
+            'dedup' => 'boolean',
             'sort' => 'nullable|integer',
             'status' => 'boolean',
         ]);
@@ -105,6 +108,8 @@ class ProductController extends Controller
             'images' => 'nullable|array',
             'images.*' => 'nullable|string',
             'price' => 'sometimes|integer|min:0',
+            'factory_price' => 'nullable|integer|min:0',
+            'draft_premium' => 'nullable|integer|min:0',
             'member_price' => 'nullable|array',
             'stock_type' => 'nullable|string|in:card,url,code',
             'stock_visible' => 'boolean',
@@ -123,6 +128,7 @@ class ProductController extends Controller
             'purchase_limit' => 'nullable|integer|min:0',
             'hide' => 'boolean',
             'level_disable' => 'boolean',
+            'dedup' => 'boolean',
             'sort' => 'nullable|integer',
             'status' => 'boolean',
         ]);

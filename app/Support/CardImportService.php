@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Card;
 use App\Models\CardImport;
+use App\Models\Product;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -82,11 +83,12 @@ class CardImportService
         $import->update(['status' => 'completed']);
     }
 
-    /** 处理一块(1000 条):去重加密 + 批量插入 */
+    /** 处理一块(1000 条):按商品设置决定是否去重，然后加密并批量插入 */
     public function processChunk(CardImport $import, array $chunk, array $options = []): void
     {
         $productId = $import->product_id;
         $importId = $import->id;
+        $dedup = (bool) Product::query()->whereKey($productId)->value('dedup');
 
         // 可选的统一字段(导入时给本批每条卡密打上)
         $note = $options['note'] ?? null;
@@ -98,12 +100,15 @@ class CardImportService
             $hashes[$i] = CardCipher::hash($plain);
         }
 
-        // 批量查已存在的 (product_id, hash)
-        $existing = DB::table('cards')
-            ->where('product_id', $productId)
-            ->whereIn('content_hash', array_values($hashes))
-            ->pluck('content_hash')
-            ->flip();
+        // 仅在商品启用去重时查询历史卡密；关闭时允许相同内容重复入库。
+        $existing = collect();
+        if ($dedup) {
+            $existing = DB::table('cards')
+                ->where('product_id', $productId)
+                ->whereIn('content_hash', array_values($hashes))
+                ->pluck('content_hash')
+                ->flip();
+        }
 
         $toInsert = [];
         $success = 0;
@@ -112,17 +117,20 @@ class CardImportService
         $seenInChunk = []; // 本块内已见的 hash(防块内重复)
         foreach ($chunk as $i => $plain) {
             $hash = $hashes[$i];
-            if ($existing->has($hash) || isset($seenInChunk[$hash])) {
+            if ($dedup && ($existing->has($hash) || isset($seenInChunk[$hash]))) {
                 $failed++;
                 $errors[] = ['line' => $i, 'reason' => 'duplicate'];
                 continue;
             }
-            $seenInChunk[$hash] = true;
+            if ($dedup) {
+                $seenInChunk[$hash] = true;
+            }
             $toInsert[] = [
                 'product_id' => $productId,
                 'import_id' => $importId,
                 'content' => CardCipher::encrypt($plain),
                 'content_hash' => $hash,
+                'dedup_hash' => $dedup ? $hash : null,
                 'status' => Card::STATUS_UNUSED,
                 'note' => $note,
                 'card_type' => $cardType,
@@ -132,9 +140,15 @@ class CardImportService
             $success++;
         }
 
-        // 批量插入(insertOrIgnore 走唯一索引兜底防并发)
+        // 唯一索引继续兜底并发导入；去重关闭时 dedup_hash=NULL，允许相同内容重复。
         if ($toInsert) {
-            DB::table('cards')->insertOrIgnore($toInsert);
+            $inserted = DB::table('cards')->insertOrIgnore($toInsert);
+            if ($inserted < $success) {
+                $skipped = $success - $inserted;
+                $success = $inserted;
+                $failed += $skipped;
+                $errors[] = ['line' => null, 'reason' => 'concurrent_duplicate', 'count' => $skipped];
+            }
         }
 
         // 累加统计

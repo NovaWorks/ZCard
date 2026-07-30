@@ -13,13 +13,14 @@ class Product extends Model
 
     protected $fillable = [
         'merchant_id', 'category_id', 'name', 'slug', 'description', 'price',
+        'factory_price', 'draft_premium',
         'member_price', 'cover', 'images', 'stock_type', 'stock_visible',
         'control_config', 'delivery_mode', 'sort', 'status',
         // P1-A 新增
         'is_featured', 'virtual_sales', 'virtual_reviews', 'min_order', 'max_order',
         // 商品扩展字段
         'contact_type', 'send_email', 'delivery_message', 'leave_message',
-        'only_user', 'purchase_limit', 'hide', 'level_disable',
+        'only_user', 'purchase_limit', 'hide', 'level_disable', 'dedup',
     ];
 
     protected function casts(): array
@@ -29,12 +30,15 @@ class Product extends Model
             'images' => 'array',
             'control_config' => 'array',
             'virtual_reviews' => 'array',
+            'factory_price' => 'integer',
+            'draft_premium' => 'integer',
             'stock_visible' => 'boolean',
             'is_featured' => 'boolean',
             'send_email' => 'boolean',
             'only_user' => 'boolean',
             'hide' => 'boolean',
             'level_disable' => 'boolean',
+            'dedup' => 'boolean',
         ];
     }
 

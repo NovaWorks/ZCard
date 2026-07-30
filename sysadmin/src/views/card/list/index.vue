@@ -158,12 +158,19 @@
             </ElTableColumn>
             <ElTableColumn :label="t('zcard.card.status')" width="120" align="center">
               <template #default="{ row }">
-                <ElTooltip :content="statusTooltip(row.status)" placement="top">
+                <ElTag :type="statusTagType(row.status)" effect="plain" size="small">
+                  {{ statusLabel(row.status) }}
+                </ElTag>
+              </template>
+            </ElTableColumn>
+            <ElTableColumn :label="t('zcard.card.disabledSwitch')" width="110" align="center">
+              <template #default="{ row }">
+                <ElTooltip :content="disabledTooltip(row.status)" placement="top">
                   <ElSwitch
-                    :model-value="isStatusEnabled(row.status)"
+                    :model-value="row.status === 'disabled'"
                     :disabled="row.status === 'used'"
                     :loading="row._statusLoading"
-                    @change="(val) => handleStatusToggle(row, val)"
+                    @change="(val) => handleDisabledToggle(row, val)"
                   />
                 </ElTooltip>
               </template>
@@ -504,36 +511,31 @@
     return map[s] || 'info'
   }
 
-  /** 状态开关：unused/locked/used 视为 ON（已启用/有效），disabled 视为 OFF */
-  const isStatusEnabled = (s: CardStatus): boolean => s === 'unused' || s === 'locked' || s === 'used'
-
-  /** 状态开关 hover 提示文案 */
-  const statusTooltip = (s: CardStatus): string => {
+  /** 是否禁用开关的 hover 提示文案 */
+  const disabledTooltip = (s: CardStatus): string => {
     const base = statusLabel(s)
     if (s === 'used') {
       return `${base} - ${t('zcard.common.confirm') === '确定' ? '已售出，不可切换' : 'Sold, cannot toggle'}`
     }
     if (s === 'disabled') {
-      return `${base} - ${t('zcard.common.confirm') === '确定' ? '点击启用' : 'Click to enable'}`
+      return `${base} - ${t('zcard.common.confirm') === '确定' ? '关闭开关以启用' : 'Turn off to enable'}`
     }
-    return `${base} - ${t('zcard.common.confirm') === '确定' ? '点击禁用' : 'Click to disable'}`
+    return `${base} - ${t('zcard.common.confirm') === '确定' ? '打开开关以禁用' : 'Turn on to disable'}`
   }
 
-  /** 表格内状态切换（switch） */
-  const handleStatusToggle = async (row: Card, val: boolean | string | number) => {
-    const enabled = Boolean(val)
+  /** 表格内独立的“是否禁用”切换 */
+  const handleDisabledToggle = async (row: Card, val: boolean | string | number) => {
+    const disabled = Boolean(val)
     ;(row as any)._statusLoading = true
     try {
-      if (enabled) {
-        // 从 disabled 切到启用
-        await enableCards([row.id])
-        row.status = 'unused'
-        ElMessage.success(t('zcard.card.disabled') && t('zcard.common.confirm') === '确定' ? '已启用' : 'Enabled')
-      } else {
-        // 从 unused/locked 切到禁用
+      if (disabled) {
         await disableCards([row.id])
         row.status = 'disabled'
         ElMessage.success(t('zcard.card.disabled'))
+      } else {
+        await enableCards([row.id])
+        row.status = 'unused'
+        ElMessage.success(t('zcard.card.enabled'))
       }
       fetchStats()
     } catch {
