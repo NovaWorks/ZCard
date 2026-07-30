@@ -1,7 +1,7 @@
 import { AppRouteRecord } from '@/types/router'
 import { dashboardRoutes } from './dashboard'
 import { productRoutes } from './product'
-import { categoryRoutes } from './category'
+import categoryRoutes from './category'
 import { orderRoutes } from './order'
 import { cardRoutes } from './card'
 import { userRoutes } from './user'
