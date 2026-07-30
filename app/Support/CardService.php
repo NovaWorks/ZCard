@@ -122,12 +122,36 @@ class CardService
         }
     }
 
-    /** 批量禁用 */
+    /** 批量禁用(unused → disabled) */
     public function disable(array $cardIds): int
     {
         return Card::whereIn('id', $cardIds)
-            ->whereIn('status', [Card::STATUS_UNUSED])
+            ->whereIn('status', [Card::STATUS_UNUSED, Card::STATUS_LOCKED])
             ->update(['status' => Card::STATUS_DISABLED]);
+    }
+
+    /** 批量启用(disabled → unused) */
+    public function enable(array $cardIds): int
+    {
+        return Card::whereIn('id', $cardIds)
+            ->where('status', Card::STATUS_DISABLED)
+            ->update(['status' => Card::STATUS_UNUSED]);
+    }
+
+    /** 批量锁定(unused → locked) */
+    public function lock(array $cardIds): int
+    {
+        return Card::whereIn('id', $cardIds)
+            ->where('status', Card::STATUS_UNUSED)
+            ->update(['status' => Card::STATUS_LOCKED, 'locked_at' => now()]);
+    }
+
+    /** 批量解锁(locked → unused) */
+    public function unlock(array $cardIds): int
+    {
+        return Card::whereIn('id', $cardIds)
+            ->where('status', Card::STATUS_LOCKED)
+            ->update(['status' => Card::STATUS_UNUSED, 'locked_at' => null]);
     }
 
     /**

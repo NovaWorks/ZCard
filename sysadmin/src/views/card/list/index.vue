@@ -34,6 +34,7 @@
                   clearable
                   filterable
                   style="width: 220px"
+                  @change="handleSearch"
                 >
                   <ElOption
                     v-for="p in products"
@@ -49,6 +50,7 @@
                   :placeholder="t('zcard.card.allStatus')"
                   clearable
                   style="width: 140px"
+                  @change="handleSearch"
                 >
                   <ElOption :label="t('zcard.card.statusUnused')" value="unused" />
                   <ElOption :label="t('zcard.card.statusLocked')" value="locked" />
@@ -61,6 +63,7 @@
                   v-model="searchForm.card_type"
                   clearable
                   style="width: 150px"
+                  @change="handleSearch"
                 />
               </ElFormItem>
               <ElFormItem :label="t('zcard.card.note')">
@@ -68,6 +71,7 @@
                   v-model="searchForm.note"
                   clearable
                   style="width: 150px"
+                  @change="handleSearch"
                 />
               </ElFormItem>
               <ElFormItem :label="t('zcard.card.dateRange')">
@@ -78,6 +82,7 @@
                   :start-placeholder="t('zcard.card.dateRange')"
                   :end-placeholder="t('zcard.card.dateRange')"
                   style="width: 260px"
+                  @change="handleSearch"
                 />
               </ElFormItem>
               <ElFormItem>
@@ -92,6 +97,22 @@
             <ElButton type="primary" @click="openImport">{{ t('zcard.card.import') }}</ElButton>
             <ElButton :loading="exporting" @click="handleExport">
               {{ t('zcard.card.exportFiltered') }}
+            </ElButton>
+            <ElButton
+              type="warning"
+              :disabled="selectedIds.length === 0"
+              @click="handleBatchLock"
+            >
+              {{ t('zcard.card.lockSelected') }}
+              <span v-if="selectedIds.length">({{ selectedIds.length }})</span>
+            </ElButton>
+            <ElButton
+              type="success"
+              :disabled="selectedIds.length === 0"
+              @click="handleBatchUnlock"
+            >
+              {{ t('zcard.card.unlockSelected') }}
+              <span v-if="selectedIds.length">({{ selectedIds.length }})</span>
             </ElButton>
             <ElButton
               type="warning"
@@ -135,11 +156,16 @@
                 <span v-else class="text-muted">-</span>
               </template>
             </ElTableColumn>
-            <ElTableColumn :label="t('zcard.card.status')" width="100" align="center">
+            <ElTableColumn :label="t('zcard.card.status')" width="120" align="center">
               <template #default="{ row }">
-                <ElTag :type="statusTagType(row.status)" effect="light">
-                  {{ statusLabel(row.status) }}
-                </ElTag>
+                <ElTooltip :content="statusTooltip(row.status)" placement="top">
+                  <ElSwitch
+                    :model-value="isStatusEnabled(row.status)"
+                    :disabled="row.status === 'used'"
+                    :loading="row._statusLoading"
+                    @change="(val) => handleStatusToggle(row, val)"
+                  />
+                </ElTooltip>
               </template>
             </ElTableColumn>
             <ElTableColumn :label="t('zcard.card.premiumCost')" width="130" align="center">
@@ -283,6 +309,12 @@
             :placeholder="t('zcard.card.notePlaceholder')"
           />
         </ElFormItem>
+        <ElFormItem :label="t('zcard.card.cardType')" prop="import_kind">
+          <ElRadioGroup v-model="importForm.import_kind">
+            <ElRadio value="general">{{ t('zcard.card.cardTypeGeneral') }}</ElRadio>
+            <ElRadio value="account">{{ t('zcard.card.cardTypeAccount') }}</ElRadio>
+          </ElRadioGroup>
+        </ElFormItem>
         <ElFormItem :label="t('zcard.card.content')" prop="contents">
           <ElInput
             v-model="importForm.contents"
@@ -290,7 +322,11 @@
             :rows="10"
             :placeholder="t('zcard.card.importPlaceholder')"
           />
-          <div class="form-help">{{ t('zcard.card.lineCount', { n: importLineCount }) }}</div>
+          <div v-if="importForm.import_kind === 'account'" class="form-help account-hint">
+            <div>{{ t('zcard.card.accountFormatHint') }}</div>
+            <div class="account-example">{{ t('zcard.card.accountFormatExample') }}</div>
+          </div>
+          <div v-else class="form-help">{{ t('zcard.card.lineCount', { n: importLineCount }) }}</div>
         </ElFormItem>
       </ElForm>
       <template #footer>
@@ -350,9 +386,29 @@
 
       <template #footer>
         <div style="display: flex; justify-content: space-between; width: 100%">
-          <ElButton type="danger" :icon="Delete" @click="handleDeleteFromEdit">
-            {{ t('zcard.card.deleteCard') }}
-          </ElButton>
+          <div style="display: flex; gap: 8px">
+            <ElButton
+              v-if="editData.status === 'unused'"
+              type="warning"
+              :icon="Lock"
+              :loading="editLocking"
+              @click="handleLockFromEdit"
+            >
+              {{ t('zcard.card.lock') }}
+            </ElButton>
+            <ElButton
+              v-else-if="editData.status === 'locked'"
+              type="success"
+              :icon="Unlock"
+              :loading="editLocking"
+              @click="handleUnlockFromEdit"
+            >
+              {{ t('zcard.card.unlock') }}
+            </ElButton>
+            <ElButton type="danger" :icon="Delete" @click="handleDeleteFromEdit">
+              {{ t('zcard.card.deleteCard') }}
+            </ElButton>
+          </div>
           <div>
             <ElButton @click="editDrawerVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
             <ElButton type="primary" :loading="editSubmitting" @click="handleSaveEdit">
@@ -368,13 +424,16 @@
 <script setup lang="ts">
   import type { FormInstance, FormRules } from 'element-plus'
   import { ElMessage, ElMessageBox } from 'element-plus'
-  import { Lock, Delete } from '@element-plus/icons-vue'
+  import { Lock, Unlock, Delete } from '@element-plus/icons-vue'
   import { useI18n } from 'vue-i18n'
   import {
     getCards,
     getCardStats,
     importCards,
     disableCards,
+    enableCards,
+    lockCards,
+    unlockCards,
     deleteCards,
     exportCards,
     revealCard,
@@ -443,6 +502,45 @@
       disabled: 'danger'
     }
     return map[s] || 'info'
+  }
+
+  /** 状态开关：unused/locked/used 视为 ON（已启用/有效），disabled 视为 OFF */
+  const isStatusEnabled = (s: CardStatus): boolean => s === 'unused' || s === 'locked' || s === 'used'
+
+  /** 状态开关 hover 提示文案 */
+  const statusTooltip = (s: CardStatus): string => {
+    const base = statusLabel(s)
+    if (s === 'used') {
+      return `${base} - ${t('zcard.common.confirm') === '确定' ? '已售出，不可切换' : 'Sold, cannot toggle'}`
+    }
+    if (s === 'disabled') {
+      return `${base} - ${t('zcard.common.confirm') === '确定' ? '点击启用' : 'Click to enable'}`
+    }
+    return `${base} - ${t('zcard.common.confirm') === '确定' ? '点击禁用' : 'Click to disable'}`
+  }
+
+  /** 表格内状态切换（switch） */
+  const handleStatusToggle = async (row: Card, val: boolean | string | number) => {
+    const enabled = Boolean(val)
+    ;(row as any)._statusLoading = true
+    try {
+      if (enabled) {
+        // 从 disabled 切到启用
+        await enableCards([row.id])
+        row.status = 'unused'
+        ElMessage.success(t('zcard.card.disabled') && t('zcard.common.confirm') === '确定' ? '已启用' : 'Enabled')
+      } else {
+        // 从 unused/locked 切到禁用
+        await disableCards([row.id])
+        row.status = 'disabled'
+        ElMessage.success(t('zcard.card.disabled'))
+      }
+      fetchStats()
+    } catch {
+      // 拦截器处理；状态保持不变
+    } finally {
+      ;(row as any)._statusLoading = false
+    }
   }
 
   /** 商品列表 */
@@ -603,6 +701,46 @@
       .catch(() => {})
   }
 
+  /** 批量锁定（仅对未使用卡密生效） */
+  const handleBatchLock = () => {
+    if (selectedIds.value.length === 0) {
+      ElMessage.warning(t('zcard.card.selectFirst'))
+      return
+    }
+    const ids = selection.value.filter((c) => c.status === 'unused').map((c) => c.id)
+    if (ids.length === 0) {
+      ElMessage.warning(t('zcard.common.confirm') === '确定' ? '没有可锁定的未使用卡密' : 'No unused cards to lock')
+      return
+    }
+    lockCards(ids)
+      .then((res) => {
+        ElMessage.success(t('zcard.card.lockSuccess') + ` (${res.locked})`)
+        fetchData()
+        fetchStats()
+      })
+      .catch(() => {})
+  }
+
+  /** 批量解锁（仅对锁定卡密生效） */
+  const handleBatchUnlock = () => {
+    if (selectedIds.value.length === 0) {
+      ElMessage.warning(t('zcard.card.selectFirst'))
+      return
+    }
+    const ids = selection.value.filter((c) => c.status === 'locked').map((c) => c.id)
+    if (ids.length === 0) {
+      ElMessage.warning(t('zcard.common.confirm') === '确定' ? '没有可解锁的锁定卡密' : 'No locked cards to unlock')
+      return
+    }
+    unlockCards(ids)
+      .then((res) => {
+        ElMessage.success(t('zcard.card.unlockSuccess') + ` (${res.unlocked})`)
+        fetchData()
+        fetchStats()
+      })
+      .catch(() => {})
+  }
+
   /** 删除单条 */
   const handleDelete = (row: Card) => {
     ElMessageBox.confirm(t('zcard.card.deleteOneConfirm', { id: row.id }), t('zcard.card.deleteTitle'), {
@@ -678,7 +816,8 @@
     product_id: undefined as number | undefined,
     card_type: '',
     note: '',
-    contents: ''
+    contents: '',
+    import_kind: 'general' as 'general' | 'account'
   })
 
   const importRules = computed<FormRules>(() => ({
@@ -697,6 +836,7 @@
     importForm.card_type = searchForm.card_type || ''
     importForm.note = ''
     importForm.contents = ''
+    importForm.import_kind = 'general'
     importVisible.value = true
   }
 
@@ -713,7 +853,7 @@
       const res = await importCards({
         product_id: importForm.product_id as number,
         contents: importForm.contents,
-        card_type: importForm.card_type || undefined,
+        card_type: importForm.import_kind === 'account' ? 'account' : (importForm.card_type || undefined),
         note: importForm.note || undefined
       })
       ElMessage.success(
@@ -737,6 +877,7 @@
   const editDrawerVisible = ref(false)
   const editLoading = ref(false)
   const editSubmitting = ref(false)
+  const editLocking = ref(false)
   const editData = ref<{
     id: number; content: string; status: string; note: string; card_type: string
     draft_premium: number; draft_cost: number; product_name: string; order_no: string
@@ -815,6 +956,38 @@
         ElMessage.error(t('zcard.common.operationFailed'))
       }
     }).catch(() => {})
+  }
+
+  /** 从编辑抽屉锁定当前卡密 */
+  const handleLockFromEdit = async () => {
+    editLocking.value = true
+    try {
+      await lockCards([editData.value.id])
+      ElMessage.success(t('zcard.card.lockSuccess'))
+      editData.value.status = 'locked'
+      fetchData()
+      fetchStats()
+    } catch {
+      ElMessage.error(t('zcard.common.operationFailed'))
+    } finally {
+      editLocking.value = false
+    }
+  }
+
+  /** 从编辑抽屉解锁当前卡密 */
+  const handleUnlockFromEdit = async () => {
+    editLocking.value = true
+    try {
+      await unlockCards([editData.value.id])
+      ElMessage.success(t('zcard.card.unlockSuccess'))
+      editData.value.status = 'unused'
+      fetchData()
+      fetchStats()
+    } catch {
+      ElMessage.error(t('zcard.common.operationFailed'))
+    } finally {
+      editLocking.value = false
+    }
   }
 
   onMounted(() => {
@@ -962,6 +1135,16 @@
     margin-top: 4px;
     font-size: 12px;
     color: var(--el-text-color-secondary);
+  }
+
+  .account-hint {
+    line-height: 1.6;
+
+    .account-example {
+      margin-top: 4px;
+      font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
+      color: var(--el-color-primary);
+    }
   }
 
   /* 明文弹窗 */

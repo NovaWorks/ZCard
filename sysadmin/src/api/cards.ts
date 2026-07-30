@@ -139,9 +139,21 @@ export const importCards = (data: ImportCardsPayload) => {
   })
 }
 
-/** 禁用卡密 */
+/** 禁用卡密(unused/locked → disabled) */
 export const disableCards = (ids: number[]) =>
   request.post<{ disabled: number }>({ url: '/admin/cards/disable', data: { ids } })
+
+/** 启用卡密(disabled → unused) */
+export const enableCards = (ids: number[]) =>
+  request.post<{ enabled: number }>({ url: '/admin/cards/enable', data: { ids } })
+
+/** 锁定卡密(unused → locked) */
+export const lockCards = (ids: number[]) =>
+  request.post<{ locked: number }>({ url: '/admin/cards/lock', data: { ids } })
+
+/** 解锁卡密(locked → unused) */
+export const unlockCards = (ids: number[]) =>
+  request.post<{ unlocked: number }>({ url: '/admin/cards/unlock', data: { ids } })
 
 /** 批量删除卡密（只删 unused/disabled） */
 export const deleteCards = (ids: number[]) =>

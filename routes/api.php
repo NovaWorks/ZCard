@@ -71,6 +71,9 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::get('cards', [AdminCardController::class, 'index']);
     Route::post('cards/import', [AdminCardController::class, 'import']);
     Route::post('cards/disable', [AdminCardController::class, 'disable']);
+    Route::post('cards/enable', [AdminCardController::class, 'enable']);
+    Route::post('cards/lock', [AdminCardController::class, 'lock']);
+    Route::post('cards/unlock', [AdminCardController::class, 'unlock']);
     Route::post('cards/destroy', [AdminCardController::class, 'destroy']);
     Route::get('cards/import-batches', [AdminCardController::class, 'importBatches']);
 

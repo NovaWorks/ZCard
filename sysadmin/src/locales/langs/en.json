@@ -665,7 +665,17 @@
       "deleteCard": "Delete Card",
       "deleteConfirmTitle": "Are you sure?",
       "deleteConfirmMsg": "You are about to delete this card. This action cannot be undone!",
-      "deleteConfirmBtn": "Delete"
+      "deleteConfirmBtn": "Delete",
+      "lock": "Lock",
+      "unlock": "Unlock",
+      "lockSelected": "Lock Selected",
+      "unlockSelected": "Unlock Selected",
+      "lockSuccess": "Locked successfully",
+      "unlockSuccess": "Unlocked successfully",
+      "cardTypeGeneral": "General Card",
+      "cardTypeAccount": "Account/Pre-sale",
+      "accountFormatHint": "One per line, separated by ║ : Card Content ║ Preview Info ║ Premium(optional) ║ Cost(optional)",
+      "accountFormatExample": "Example: account:test--pass:123 ║ US 12 months ║ 20 ║ 8"
     },
     "user": {
       "title": "Users",

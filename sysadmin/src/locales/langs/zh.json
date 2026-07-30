@@ -665,7 +665,17 @@
       "deleteCard": "删除卡密",
       "deleteConfirmTitle": "您确定吗？",
       "deleteConfirmMsg": "您正在进行删除卡密操作，此操作无法撤销！",
-      "deleteConfirmBtn": "确定删除"
+      "deleteConfirmBtn": "确定删除",
+      "lock": "锁定",
+      "unlock": "解锁",
+      "lockSelected": "锁定选中",
+      "unlockSelected": "解锁选中",
+      "lockSuccess": "锁定成功",
+      "unlockSuccess": "解锁成功",
+      "cardTypeGeneral": "普通卡密",
+      "cardTypeAccount": "账号/预售",
+      "accountFormatHint": "一行一个，使用 ║ 分隔：卡密本体 ║ 预告信息 ║ 加价金额(可选) ║ 加价成本(可选)",
+      "accountFormatExample": "示例：账号:test--密码:123 ║ 美区12个月 ║ 20 ║ 8"
     },
     "user": {
       "title": "用户管理",

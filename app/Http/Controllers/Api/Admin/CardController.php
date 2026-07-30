@@ -97,8 +97,29 @@ class CardController extends Controller
         ]);
 
         $count = app(CardService::class)->disable($data['ids']);
-
         return response()->json(['disabled' => $count]);
+    }
+
+    public function enable(Request $request): JsonResponse
+    {
+        $data = $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer|exists:cards,id']);
+        $count = app(CardService::class)->enable($data['ids']);
+        return response()->json(['enabled' => $count]);
+    }
+
+    public function lock(Request $request): JsonResponse
+    {
+        $data = $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer|exists:cards,id']);
+        $count = app(CardService::class)->lock($data['ids']);
+        return response()->json(['locked' => $count]);
+    }
+
+    public function unlock(Request $request): JsonResponse
+    {
+        $data = $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer|exists:cards,id']);
+        $count = app(CardService::class)->unlock($data['ids']);
+        return response()->json(['unlocked' => $count]);
+    }
     }
 
     /** 批量删除(只删 unused/disabled,保护锁定中/已售出) */
