@@ -120,7 +120,6 @@ class CardController extends Controller
         $count = app(CardService::class)->unlock($data['ids']);
         return response()->json(['unlocked' => $count]);
     }
-    }
 
     /** 批量删除(只删 unused/disabled,保护锁定中/已售出) */
     public function destroy(Request $request): JsonResponse
