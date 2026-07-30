@@ -6,7 +6,7 @@ export const categoryRoutes: AppRouteRecord = {
   component: '/index/index',
   redirect: '/category/list',
   meta: {
-    title: '分类管理',
+    title: 'menus.category.title',
     icon: 'ri:price-tag-3-line',
     roles: ['R_SUPER', 'R_ADMIN']
   },
@@ -16,7 +16,7 @@ export const categoryRoutes: AppRouteRecord = {
       name: 'CategoryList',
       component: '/category/list',
       meta: {
-        title: '分类列表',
+        title: 'menus.category.list',
         roles: ['R_SUPER', 'R_ADMIN']
       }
     }

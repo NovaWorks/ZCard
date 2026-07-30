@@ -337,6 +337,38 @@
       "document": "Document",
       "liteVersion": "Lite Version",
       "oldVersion": "v2.6.1 Version"
+    },
+    "product": {
+      "title": "Products",
+      "list": "Product List"
+    },
+    "category": {
+      "title": "Categories",
+      "list": "Category List"
+    },
+    "order": {
+      "title": "Orders",
+      "list": "Order List"
+    },
+    "card": {
+      "title": "Cards",
+      "list": "Card List"
+    },
+    "user": {
+      "title": "Users",
+      "list": "User List"
+    },
+    "member": {
+      "title": "Member Levels",
+      "level": "Level Management"
+    },
+    "payment": {
+      "title": "Payment",
+      "list": "Payment Channels"
+    },
+    "setting": {
+      "title": "Settings",
+      "index": "General Settings"
     }
   },
   "table": {

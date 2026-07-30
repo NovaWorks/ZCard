@@ -6,7 +6,7 @@ export const orderRoutes: AppRouteRecord = {
   component: '/index/index',
   redirect: '/order/list',
   meta: {
-    title: '订单管理',
+    title: 'menus.order.title',
     icon: 'ri:file-list-3-line',
     roles: ['R_SUPER', 'R_ADMIN']
   },
@@ -16,7 +16,7 @@ export const orderRoutes: AppRouteRecord = {
       name: 'OrderList',
       component: '/order/list',
       meta: {
-        title: '订单列表',
+        title: 'menus.order.list',
         icon: 'ri:list-check',
         keepAlive: true
       }

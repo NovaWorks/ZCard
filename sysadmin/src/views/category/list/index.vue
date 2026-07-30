@@ -105,16 +105,16 @@ onMounted(loadData)
       </el-button>
     </div>
 
-    <!-- 树形表格 -->
+    <!-- 树形表格(可展开/收起) -->
     <el-table
       v-loading="loading"
       :data="list"
       row-key="id"
       border
-      default-expand-all
       :tree-props="{ children: 'children' }"
+      :default-expand-all="false"
     >
-      <el-table-column prop="name" :label="t('zcard.category.name')" min-width="200" />
+      <el-table-column prop="name" :label="t('zcard.category.name')" min-width="240" />
       <el-table-column prop="slug" :label="t('zcard.category.slug')" min-width="150" />
       <el-table-column prop="sort" :label="t('zcard.category.sort')" width="80" align="center" />
       <el-table-column :label="t('zcard.category.status')" width="100" align="center">

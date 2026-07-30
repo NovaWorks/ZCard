@@ -6,7 +6,7 @@ export const productRoutes: AppRouteRecord = {
   component: '/index/index',
   redirect: '/product/list',
   meta: {
-    title: '商品管理',
+    title: 'menus.product.title',
     icon: 'ri:shopping-bag-3-line',
     roles: ['R_SUPER', 'R_ADMIN']
   },
@@ -16,7 +16,7 @@ export const productRoutes: AppRouteRecord = {
       name: 'ProductList',
       component: '/product/list',
       meta: {
-        title: '商品列表',
+        title: 'menus.product.list',
         icon: 'ri:list-check',
         keepAlive: true
       }

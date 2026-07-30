@@ -6,7 +6,7 @@ export const cardRoutes: AppRouteRecord = {
   component: '/index/index',
   redirect: '/card/list',
   meta: {
-    title: '卡密管理',
+    title: 'menus.card.title',
     icon: 'ri:bank-card-line',
     roles: ['R_SUPER', 'R_ADMIN']
   },
@@ -16,7 +16,7 @@ export const cardRoutes: AppRouteRecord = {
       name: 'CardList',
       component: '/card/list',
       meta: {
-        title: '卡密列表',
+        title: 'menus.card.list',
         icon: 'ri:list-check',
         keepAlive: true
       }

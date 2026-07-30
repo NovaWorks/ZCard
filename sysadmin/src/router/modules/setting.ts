@@ -6,7 +6,7 @@ export const settingRoutes: AppRouteRecord = {
   component: '/index/index',
   redirect: '/settingmgt/index',
   meta: {
-    title: '店铺设置',
+    title: 'menus.setting.title',
     icon: 'ri:settings-line',
     roles: ['R_SUPER', 'R_ADMIN']
   },
@@ -16,8 +16,7 @@ export const settingRoutes: AppRouteRecord = {
       name: 'SettingIndex',
       component: '/setting/index',
       meta: {
-        title: '店铺设置',
-        icon: 'ri:settings-3-line',
+        title: 'menus.setting.index',
         keepAlive: false
       }
     }

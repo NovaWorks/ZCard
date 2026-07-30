@@ -6,7 +6,7 @@ export const memberRoutes: AppRouteRecord = {
   component: '/index/index',
   redirect: '/member/level',
   meta: {
-    title: '会员等级',
+    title: 'menus.member.title',
     icon: 'ri:vip-crown-line',
     roles: ['R_SUPER', 'R_ADMIN']
   },
@@ -16,7 +16,7 @@ export const memberRoutes: AppRouteRecord = {
       name: 'MemberLevel',
       component: '/member/level',
       meta: {
-        title: '等级管理',
+        title: 'menus.member.level',
         roles: ['R_SUPER', 'R_ADMIN']
       }
     }

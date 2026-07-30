@@ -6,7 +6,7 @@ export const userRoutes: AppRouteRecord = {
   component: '/index/index',
   redirect: '/usermgt/list',
   meta: {
-    title: '用户管理',
+    title: 'menus.user.title',
     icon: 'ri:user-line',
     roles: ['R_SUPER', 'R_ADMIN']
   },
@@ -16,7 +16,7 @@ export const userRoutes: AppRouteRecord = {
       name: 'UserList',
       component: '/user/list',
       meta: {
-        title: '用户列表',
+        title: 'menus.user.list',
         icon: 'ri:list-check',
         keepAlive: true
       }

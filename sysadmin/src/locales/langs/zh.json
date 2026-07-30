@@ -337,6 +337,38 @@
       "document": "官方文档",
       "liteVersion": "精简版本",
       "oldVersion": "v2.6.1 版本"
+    },
+    "product": {
+      "title": "商品管理",
+      "list": "商品列表"
+    },
+    "category": {
+      "title": "分类管理",
+      "list": "分类列表"
+    },
+    "order": {
+      "title": "订单管理",
+      "list": "订单列表"
+    },
+    "card": {
+      "title": "卡密管理",
+      "list": "卡密列表"
+    },
+    "user": {
+      "title": "用户管理",
+      "list": "用户列表"
+    },
+    "member": {
+      "title": "会员等级",
+      "level": "等级管理"
+    },
+    "payment": {
+      "title": "支付设置",
+      "list": "支付通道"
+    },
+    "setting": {
+      "title": "店铺设置",
+      "index": "基本设置"
     }
   },
   "table": {
