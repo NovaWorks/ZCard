@@ -308,7 +308,7 @@
         <ElDescriptions :column="1" border size="small" class="mb-4">
           <ElDescriptionsItem :label="t('zcard.common.id')">{{ editData.id }}</ElDescriptionsItem>
           <ElDescriptionsItem :label="t('zcard.card.status')">
-            <ElTag :type="statusTagType(editData.status)" size="small">{{ statusLabel(editData.status) }}</ElTag>
+            <ElTag :type="statusTagType(editData.status as CardStatus)" size="small">{{ statusLabel(editData.status as CardStatus) }}</ElTag>
           </ElDescriptionsItem>
           <ElDescriptionsItem :label="t('zcard.product.title')">{{ editData.product_name || '-' }}</ElDescriptionsItem>
           <ElDescriptionsItem v-if="editData.order_no" :label="t('zcard.card.relatedOrder')">
