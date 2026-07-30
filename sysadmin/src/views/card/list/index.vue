@@ -143,7 +143,12 @@
           >
             <ElTableColumn type="selection" width="45" />
             <ElTableColumn prop="id" :label="t('zcard.common.id')" width="80" />
-            <ElTableColumn :label="t('zcard.card.product')" min-width="180" show-overflow-tooltip>
+            <ElTableColumn :label="t('zcard.card.cardContent')" min-width="200" show-overflow-tooltip>
+              <template #default="{ row }">
+                <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--el-color-primary);">{{ row.content_preview || '-' }}</code>
+              </template>
+            </ElTableColumn>
+            <ElTableColumn :label="t('zcard.card.product')" min-width="160" show-overflow-tooltip>
               <template #default="{ row }">
                 {{ row.product?.name || `#${row.product_id}` }}
               </template>
@@ -209,18 +214,10 @@
                 </div>
               </template>
             </ElTableColumn>
-            <ElTableColumn :label="t('zcard.common.actions')" width="200" fixed="right" align="center">
+            <ElTableColumn :label="t('zcard.common.actions')" width="150" fixed="right" align="center">
               <template #default="{ row }">
                 <ElButton link type="primary" @click="openEdit(row)">
                   {{ t('zcard.card.editCard') }}
-                </ElButton>
-                <ElButton
-                  v-if="row.status === 'unused'"
-                  link
-                  type="warning"
-                  @click="handleDisable(row)"
-                >
-                  {{ t('zcard.card.disable') }}
                 </ElButton>
                 <ElButton
                   v-if="row.status === 'unused' || row.status === 'disabled'"

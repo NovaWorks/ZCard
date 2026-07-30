@@ -22,7 +22,6 @@ class CardController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        // 安全:不返回 content(明文卡密)。前端管理只看状态/来源/类型/备注。
         $query = Card::query()
             ->select([
                 'id', 'product_id', 'status', 'note', 'card_type',
@@ -40,6 +39,15 @@ class CardController extends Controller
 
         $cards = $query->orderByDesc('id')
             ->paginate($request->integer('pageSize', 15));
+
+        // 追加密钥内容预览(前30字符)
+        $cards->getCollection()->transform(function ($card) {
+            $plain = $card->plainContent();
+            $card->content_preview = mb_strlen($plain) > 30
+                ? mb_substr($plain, 0, 30) . '...'
+                : $plain;
+            return $card;
+        });
 
         return response()->json($cards);
     }

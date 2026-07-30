@@ -11,12 +11,14 @@ import { useUserStore } from '@/store/modules/user'
 /** 卡密状态 */
 export type CardStatus = 'unused' | 'locked' | 'used' | 'disabled'
 
-/** 卡密实体（列表用，不含明文） */
+/** 卡密实体 */
 export interface Card {
   id: number
   product_id: number
   product?: { id: number; name: string }
   status: CardStatus
+  /** 卡密内容预览(前30字符) */
+  content_preview?: string
   /** 备注 */
   note?: string | null
   /** 卡密类型，如 月卡/周卡 */
