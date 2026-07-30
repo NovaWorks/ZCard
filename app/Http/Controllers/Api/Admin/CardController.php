@@ -26,7 +26,7 @@ class CardController extends Controller
             ->select([
                 'id', 'product_id', 'status', 'note', 'card_type',
                 'owner_id', 'draft_premium', 'draft_cost',
-                'order_id', 'import_id', 'content_hash',
+                'order_id', 'import_id', 'content', 'content_hash',
                 'locked_at', 'used_at', 'created_at', 'updated_at',
             ])
             ->with([
