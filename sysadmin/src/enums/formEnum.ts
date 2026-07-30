@@ -7,7 +7,7 @@
  * - 表格尺寸枚举（默认、紧凑、宽松）
  *
  * @module enums/formEnum
- * @author Art Design Pro Team
+ * @author ZCard Team
  */
 
 // 页面类型

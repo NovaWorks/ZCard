@@ -28,7 +28,7 @@
  * - 支持跨版本数据迁移
  *
  * @module store/modules/setting
- * @author Art Design Pro Team
+ * @author ZCard Team
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'

@@ -30,7 +30,7 @@
  * 5. 异常时提示用户并执行登出
  *
  * @module utils/storage/storage
- * @author Art Design Pro Team
+ * @author ZCard Team
  */
 import { router } from '@/router'
 import { useUserStore } from '@/store/modules/user'

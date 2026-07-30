@@ -46,7 +46,7 @@
  * ```
  *
  * @module useChart
- * @author Art Design Pro Team
+ * @author ZCard Team
  */
 
 import { echarts, type EChartsOption } from '@/plugins/echarts'

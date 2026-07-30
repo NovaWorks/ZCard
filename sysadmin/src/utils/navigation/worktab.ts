@@ -19,7 +19,7 @@
  * - 多标签页导航系统
  *
  * @module utils/navigation/worktab
- * @author Art Design Pro Team
+ * @author ZCard Team
  */
 import { useWorktabStore } from '@/store/modules/worktab'
 import { RouteLocationNormalized } from 'vue-router'

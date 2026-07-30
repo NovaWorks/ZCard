@@ -19,7 +19,7 @@
  * - 错误日志收集和上报
  *
  * @module utils/http/error
- * @author Art Design Pro Team
+ * @author ZCard Team
  */
 import { AxiosError } from 'axios'
 import { ApiStatus } from './status'

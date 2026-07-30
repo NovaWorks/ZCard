@@ -12,7 +12,7 @@
  * 4. 智能适配 - 无额外元素时自动使用 100% 高度
  *
  * @module useTableHeight
- * @author Art Design Pro Team
+ * @author ZCard Team
  */
 
 import { computed, type Ref } from 'vue'

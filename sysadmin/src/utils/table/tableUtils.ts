@@ -36,7 +36,7 @@
  * - createErrorHandler: 生成错误处理器
  *
  * @module utils/table/tableUtils
- * @author Art Design Pro Team
+ * @author ZCard Team
  */
 
 import type { ApiResponse } from './tableCache'

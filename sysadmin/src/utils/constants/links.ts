@@ -3,7 +3,7 @@
  * 集中管理便于维护和更新链接地址
  *
  * @module utils/constants/links
- * @author Art Design Pro Team
+ * @author ZCard Team
  */
 export const WEB_LINKS = {
   // Github 主页

@@ -34,7 +34,7 @@
  * - 自定义：通过 color 参数指定任意颜色
  *
  * @module directives/ripple
- * @author Art Design Pro Team
+ * @author ZCard Team
  */
 
 import type { App, Directive, DirectiveBinding } from 'vue'

@@ -28,7 +28,7 @@
  * ```
  *
  * @module useTheme
- * @author Art Design Pro Team
+ * @author ZCard Team
  */
 
 import { useSettingStore } from '@/store/modules/setting'

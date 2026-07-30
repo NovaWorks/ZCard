@@ -24,7 +24,7 @@
  * 例如：sys-v1.0.0-user, sys-v1.0.0-setting
  *
  * @module utils/storage/storage-config
- * @author Art Design Pro Team
+ * @author ZCard Team
  */
 export class StorageConfig {
   /** 当前应用版本 */

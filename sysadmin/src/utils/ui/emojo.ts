@@ -8,7 +8,7 @@
  * ElMessage.error(`${EmojiText[500]} 图片上传失败`)
  *
  * @module utils/ui/emojo
- * @author Art Design Pro Team
+ * @author ZCard Team
  */
 
 // macos 用户 按 shift + 6 可以唤出更多表情……

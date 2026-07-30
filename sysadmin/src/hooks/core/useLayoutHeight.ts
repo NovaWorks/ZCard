@@ -13,7 +13,7 @@
  * 5. 自动查找模式 - 提供通过 ID 自动查找元素的便捷方式
  *
  * @module useLayoutHeight
- * @author Art Design Pro Team
+ * @author ZCard Team
  */
 
 import { ref, computed, watch, onMounted } from 'vue'

@@ -4,7 +4,7 @@
  * 负责动态加载 Vue 组件
  *
  * @module router/core/ComponentLoader
- * @author Art Design Pro Team
+ * @author ZCard Team
  */
 
 import { h } from 'vue'

@@ -25,7 +25,7 @@
  * - 自动计算最大扩散半径
  *
  * @module utils/theme/animation
- * @author Art Design Pro Team
+ * @author ZCard Team
  */
 import { useCommon } from '@/hooks/core/useCommon'
 import { useTheme } from '@/hooks/core/useTheme'

@@ -26,7 +26,7 @@
  * - 提供便捷的显示/隐藏方法
  *
  * @module utils/ui/loading
- * @author Art Design Pro Team
+ * @author ZCard Team
  */
 import { fourDotsSpinnerSvg } from '@/assets/svg/loading'
 
