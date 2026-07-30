@@ -14,13 +14,20 @@ export interface Product {
   category_id: number | null
   category?: { id: number; name: string }
   price: number // 分
+  description?: string | null
+  cover?: string | null
+  images?: string[] | null
+  member_price?: Record<string, number> | null
   stock?: number
   status: number
   is_featured: boolean
   virtual_sales: number
   stock_type: string
+  stock_visible?: boolean
   delivery_mode: string
   sort: number
+  min_order?: number | null
+  max_order?: number | null
   created_at: string
 }
 

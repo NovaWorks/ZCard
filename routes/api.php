@@ -32,11 +32,18 @@ use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\PaymentChannelController as AdminPaymentChannelController;
 use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
+use App\Http\Controllers\Api\Admin\ProductSkuController as AdminProductSkuController;
 use App\Http\Controllers\Api\Admin\SettingController as AdminSettingController;
+use App\Http\Controllers\Api\Admin\UploadController as AdminUploadController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::apiResource('products', AdminProductController::class);
+    Route::get('products/{productId}/skus', [AdminProductSkuController::class, 'index']);
+    Route::post('products/skus', [AdminProductSkuController::class, 'store']);
+    Route::put('products/skus/{id}', [AdminProductSkuController::class, 'update']);
+    Route::delete('products/skus/{id}', [AdminProductSkuController::class, 'destroy']);
+    Route::post('upload/image', [AdminUploadController::class, 'image']);
     Route::apiResource('categories', AdminCategoryController::class)->except(['show']);
     Route::get('categories/all', [AdminCategoryController::class, 'all']);
 
