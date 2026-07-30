@@ -46,6 +46,9 @@ export interface ProductListParams {
   pageSize?: number
   keyword?: string
   status?: number
+  category_id?: number
+  is_featured?: number
+  stock_type?: string
 }
 
 /** 获取商品列表 */
