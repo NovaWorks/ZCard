@@ -1,19 +1,24 @@
-import type { RouteRecordRaw } from 'vue-router'
+import { AppRouteRecord } from '@/types/router'
 
-const layout = () => import('@/views/index/index.vue')
-
-export default {
+export const categoryRoutes: AppRouteRecord = {
+  name: 'Category',
   path: '/category',
-  name: 'category',
   component: '/index/index',
   redirect: '/category/list',
-  meta: { title: '分类管理', icon: 'ri:price-tag-3-line' },
+  meta: {
+    title: '分类管理',
+    icon: 'ri:price-tag-3-line',
+    roles: ['R_SUPER', 'R_ADMIN']
+  },
   children: [
     {
       path: 'list',
       name: 'CategoryList',
       component: '/category/list',
-      meta: { title: '分类列表' }
+      meta: {
+        title: '分类列表',
+        roles: ['R_SUPER', 'R_ADMIN']
+      }
     }
   ]
-} as RouteRecordRaw
+}
