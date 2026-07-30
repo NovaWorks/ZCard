@@ -38,9 +38,10 @@ use App\Http\Controllers\Api\Admin\UploadController as AdminUploadController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
-    Route::apiResource('products', AdminProductController::class);
+    // stats/batch 必须在 apiResource 之前(否则 stats 被当成 {product} 参数)
     Route::get('products/stats', [AdminProductController::class, 'stats']);
     Route::post('products/batch', [AdminProductController::class, 'batch']);
+    Route::apiResource('products', AdminProductController::class);
     Route::get('products/{productId}/skus', [AdminProductSkuController::class, 'index']);
     Route::post('products/skus', [AdminProductSkuController::class, 'store']);
     Route::put('products/skus/{id}', [AdminProductSkuController::class, 'update']);
