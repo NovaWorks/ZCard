@@ -263,13 +263,39 @@
               <span class="form-hint">{{ t('zcard.product.priceUnit') }}</span>
             </ElFormItem>
 
+            <!-- 会员等级价格(可视化编辑) -->
             <ElFormItem :label="t('zcard.product.memberPrice')">
-              <ElInput
-                v-model="memberPriceText"
-                :placeholder="t('zcard.product.memberPricePlaceholder')"
-                style="width: 100%"
-              />
-              <span class="form-hint">{{ t('zcard.product.memberPriceHint') }}</span>
+              <div style="width: 100%">
+                <div class="mb-2 flex items-center justify-between">
+                  <span class="form-hint">{{ t('zcard.product.memberPriceHint') }}</span>
+                  <ElButton type="primary" size="small" plain @click="addMemberLevel">
+                    {{ t('zcard.product.addMemberLevel') }}
+                  </ElButton>
+                </div>
+                <ElTable :data="memberLevels" border size="small" style="width: 100%" v-if="memberLevels.length">
+                  <ElTableColumn :label="t('zcard.product.levelName')" min-width="150">
+                    <template #default="{ row }">
+                      <ElInput v-model="row.label" size="small" :placeholder="t('zcard.product.levelNamePlaceholder')" />
+                    </template>
+                  </ElTableColumn>
+                  <ElTableColumn :label="t('zcard.product.levelPrice')" width="180">
+                    <template #default="{ row }">
+                      <ElInputNumber v-model="row.priceYuan" :min="0" :precision="2" :step="1" size="small" style="width: 140px" />
+                      <span class="ml-1 text-xs text-gray-400">¥</span>
+                    </template>
+                  </ElTableColumn>
+                  <ElTableColumn :label="t('zcard.common.actions')" width="80" align="center">
+                    <template #default="{ $index }">
+                      <ElButton type="danger" link size="small" @click="memberLevels.splice($index, 1)">
+                        {{ t('zcard.common.delete') }}
+                      </ElButton>
+                    </template>
+                  </ElTableColumn>
+                </ElTable>
+                <div v-else class="text-center text-gray-400 text-sm py-4">
+                  {{ t('zcard.product.memberPriceEmpty') }}
+                </div>
+              </div>
             </ElFormItem>
 
             <ElFormItem :label="t('zcard.product.virtualSales')">
@@ -894,6 +920,36 @@
 
   const formData = reactive<ProductForm>(createEmptyForm())
   const memberPriceText = ref('')
+  const memberLevels = ref<{ label: string; key: string; priceYuan: number }[]>([])
+
+  const addMemberLevel = () => {
+    const idx = memberLevels.value.length + 1
+    memberLevels.value.push({ label: `VIP${idx}`, key: `level${idx}`, priceYuan: 0 })
+  }
+
+  const serializeMemberPrice = () => {
+    const result: Record<string, number> = {}
+    for (const lv of memberLevels.value) {
+      if (lv.key && lv.priceYuan >= 0) {
+        result[lv.key] = Math.round(lv.priceYuan * 100)
+      }
+    }
+    return Object.keys(result).length ? result : undefined
+  }
+
+  const parseMemberPrice = (mp: Record<string, number> | null | undefined) => {
+    memberLevels.value = []
+    if (!mp || typeof mp !== 'object') return
+    let idx = 1
+    for (const [key, val] of Object.entries(mp)) {
+      memberLevels.value.push({
+        label: key.replace(/^level/, 'VIP') || `VIP${idx}`,
+        key,
+        priceYuan: Number(val) / 100
+      })
+      idx++
+    }
+  }
   const virtualReviewsText = ref('')
   const controlList = ref<ControlRow[]>([])
 
@@ -1131,7 +1187,7 @@
     activeTab.value = 'basic'
     actualStock.value = 0
     Object.assign(formData, createEmptyForm())
-    memberPriceText.value = ''
+    memberLevels.value = []
     virtualReviewsText.value = ''
     controlList.value = []
     galleryUrls.value = []
@@ -1165,9 +1221,9 @@
     })
     // 会员价 JSON 文本回填
     if (row.member_price && typeof row.member_price === 'object') {
-      memberPriceText.value = JSON.stringify(row.member_price)
+      parseMemberPrice(row.member_price)
     } else {
-      memberPriceText.value = ''
+      memberLevels.value = []
     }
     // 详情图回填
     const imgs = Array.isArray(row.images) ? row.images : []
@@ -1199,7 +1255,7 @@
       }
       // 会员价回填
       if (detail.member_price && typeof detail.member_price === 'object') {
-        memberPriceText.value = JSON.stringify(detail.member_price)
+        parseMemberPrice(detail.member_price)
       }
       // 控件回填
       hydrateControls(detail.control_config)
@@ -1219,7 +1275,7 @@
   const resetForm = () => {
     formRef.value?.resetFields()
     Object.assign(formData, createEmptyForm())
-    memberPriceText.value = ''
+    memberLevels.value = []
     virtualReviewsText.value = ''
     controlList.value = []
     galleryUrls.value = []
@@ -1238,23 +1294,8 @@
       return
     }
 
-    // 解析会员价 JSON(可选)
-    let memberPrice: Record<string, number> | undefined
-    const mpText = memberPriceText.value.trim()
-    if (mpText) {
-      try {
-        const parsed = JSON.parse(mpText)
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          memberPrice = parsed as Record<string, number>
-        } else {
-          ElMessage.error(t('zcard.product.memberPriceInvalid'))
-          return
-        }
-      } catch {
-        ElMessage.error(t('zcard.product.memberPriceInvalid'))
-        return
-      }
-    }
+    // 会员价(从可视化等级表序列化)
+    const memberPrice = serializeMemberPrice()
 
     // 解析虚拟评价 JSON(可选)
     let virtualReviews: Record<string, unknown> | undefined
@@ -1265,11 +1306,11 @@
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
           virtualReviews = parsed as Record<string, unknown>
         } else {
-          ElMessage.error(t('zcard.product.memberPriceInvalid'))
+          ElMessage.error(t('zcard.product.virtualReviewsHint'))
           return
         }
       } catch {
-        ElMessage.error(t('zcard.product.memberPriceInvalid'))
+        ElMessage.error(t('zcard.product.virtualReviewsHint'))
         return
       }
     }

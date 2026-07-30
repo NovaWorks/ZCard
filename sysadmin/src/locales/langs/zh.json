@@ -48,11 +48,20 @@
   "setting": {
     "menuType": {
       "title": "菜单布局",
-      "list": ["垂直", "水平", "混合", "双列"]
+      "list": [
+        "垂直",
+        "水平",
+        "混合",
+        "双列"
+      ]
     },
     "theme": {
       "title": "主题风格",
-      "list": ["浅色", "深色", "系统"]
+      "list": [
+        "浅色",
+        "深色",
+        "系统"
+      ]
     },
     "menu": {
       "title": "菜单风格"
@@ -62,11 +71,17 @@
     },
     "box": {
       "title": "盒子样式",
-      "list": ["边框", "阴影"]
+      "list": [
+        "边框",
+        "阴影"
+      ]
     },
     "container": {
       "title": "容器宽度",
-      "list": ["铺满", "定宽"]
+      "list": [
+        "铺满",
+        "定宽"
+      ]
     },
     "basics": {
       "title": "基础配置",
@@ -112,8 +127,14 @@
   "notice": {
     "title": "通知",
     "btnRead": "标为已读",
-    "bar": ["通知", "消息", "代办"],
-    "text": ["暂无"],
+    "bar": [
+      "通知",
+      "消息",
+      "代办"
+    ],
+    "text": [
+      "暂无"
+    ],
     "viewAll": "查看全部"
   },
   "worktab": {
@@ -391,7 +412,7 @@
       "featuredShort": "推荐",
       "featuredPlain": "普通",
       "show": "显示",
-      "hide": "隐藏",
+      "hide": "隐藏商品",
       "slugPlaceholder": "留空则自动生成",
       "memberPricePlaceholder": "JSON,如 {\"level1\":800}",
       "memberPriceOptional": "可选,第三阶段功能",
@@ -464,7 +485,6 @@
       "contactEmail": "邮箱",
       "contactPhone": "手机号",
       "contactNone": "无",
-      "hide": "隐藏商品",
       "hideHint": "不在前台展示",
       "levelDisable": "禁用折扣",
       "virtualReviews": "虚拟评价",
@@ -473,7 +493,12 @@
       "controlTypeText": "文本",
       "controlTypeEmail": "邮箱",
       "controlTypeTextarea": "多行文本",
-      "controlTypeSelect": "下拉选择"
+      "controlTypeSelect": "下拉选择",
+      "addMemberLevel": "添加等级",
+      "levelName": "等级名称",
+      "levelNamePlaceholder": "如 VIP1",
+      "levelPrice": "价格(元)",
+      "memberPriceEmpty": "暂无会员等级，点击上方按钮添加"
     },
     "category": {
       "title": "分类管理",

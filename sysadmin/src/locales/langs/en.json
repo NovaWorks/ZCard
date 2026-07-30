@@ -48,11 +48,20 @@
   "setting": {
     "menuType": {
       "title": "Menu Layout",
-      "list": ["Vertical", "Horizontal", "Mixed", "Dual"]
+      "list": [
+        "Vertical",
+        "Horizontal",
+        "Mixed",
+        "Dual"
+      ]
     },
     "theme": {
       "title": "Theme Style",
-      "list": ["Light", "Dark", "System"]
+      "list": [
+        "Light",
+        "Dark",
+        "System"
+      ]
     },
     "menu": {
       "title": "Menu Style"
@@ -62,11 +71,17 @@
     },
     "box": {
       "title": "Box Style",
-      "list": ["Border", "Shadow"]
+      "list": [
+        "Border",
+        "Shadow"
+      ]
     },
     "container": {
       "title": "Container Width",
-      "list": ["Full", "Boxed"]
+      "list": [
+        "Full",
+        "Boxed"
+      ]
     },
     "basics": {
       "title": "Basic Config",
@@ -112,8 +127,14 @@
   "notice": {
     "title": "Notice",
     "btnRead": "Mark as read",
-    "bar": ["Notice", "Message", "Todo"],
-    "text": ["No"],
+    "bar": [
+      "Notice",
+      "Message",
+      "Todo"
+    ],
+    "text": [
+      "No"
+    ],
     "viewAll": "View all"
   },
   "worktab": {
@@ -391,7 +412,7 @@
       "featuredShort": "Featured",
       "featuredPlain": "Normal",
       "show": "Show",
-      "hide": "Hide",
+      "hide": "Hide Product",
       "slugPlaceholder": "Leave blank to auto-generate",
       "memberPricePlaceholder": "JSON, e.g. {\"level1\":800}",
       "memberPriceOptional": "Optional, Phase 3",
@@ -464,7 +485,6 @@
       "contactEmail": "Email",
       "contactPhone": "Phone",
       "contactNone": "None",
-      "hide": "Hide Product",
       "hideHint": "Not shown on storefront",
       "levelDisable": "Disable Discounts",
       "virtualReviews": "Virtual Reviews",
@@ -473,7 +493,12 @@
       "controlTypeText": "Text",
       "controlTypeEmail": "Email",
       "controlTypeTextarea": "Textarea",
-      "controlTypeSelect": "Select"
+      "controlTypeSelect": "Select",
+      "addMemberLevel": "Add Level",
+      "levelName": "Level Name",
+      "levelNamePlaceholder": "e.g. VIP1",
+      "levelPrice": "Price (Y)",
+      "memberPriceEmpty": "No levels, click above to add"
     },
     "category": {
       "title": "Categories",
