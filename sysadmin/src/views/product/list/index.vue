@@ -32,20 +32,16 @@
             />
           </ElFormItem>
           <ElFormItem :label="t('zcard.category.title')">
-            <ElSelect
+            <ElTreeSelect
               v-model="searchForm.category_id"
+              :data="categoryTreeData"
               :placeholder="t('zcard.product.all')"
               clearable
-              filterable
-              style="width: 160px"
-            >
-              <ElOption
-                v-for="c in flatCategoriesForSearch"
-                :key="c.id"
-                :label="c.label"
-                :value="c.id"
-              />
-            </ElSelect>
+              check-strictly
+              :props="{ label: 'name', value: 'id', children: 'children' }"
+              node-key="id"
+              style="width: 200px"
+            />
           </ElFormItem>
           <ElFormItem :label="t('zcard.product.featured')">
             <ElSelect v-model="searchForm.is_featured" :placeholder="t('zcard.product.all')" clearable style="width: 120px">
@@ -739,6 +735,9 @@
   /** 搜索栏用的扁平分类(带缩进前缀) */
   const flatCategoriesForSearch = ref<{ id: number; label: string }[]>([])
 
+  /** 搜索栏用的树形分类数据(供 ElTreeSelect) */
+  const categoryTreeData = ref<Category[]>([])
+
   /** 扁平化分类树(带层级缩进) */
   const flattenCategoriesWithIndent = (tree: Category[], depth = 0): { id: number; label: string }[] => {
     const result: { id: number; label: string }[] = []
@@ -758,9 +757,11 @@
       const tree = await getAllCategories()
       categories.value = flattenCategoriesWithIndent(tree || []).map((c) => ({ id: c.id, name: c.label }))
       flatCategoriesForSearch.value = flattenCategoriesWithIndent(tree || [])
+      categoryTreeData.value = tree || []
     } catch {
       categories.value = []
       flatCategoriesForSearch.value = []
+      categoryTreeData.value = []
     }
   }
 
