@@ -17,6 +17,9 @@ class Product extends Model
         'control_config', 'delivery_mode', 'sort', 'status',
         // P1-A 新增
         'is_featured', 'virtual_sales', 'virtual_reviews', 'min_order', 'max_order',
+        // 商品扩展字段
+        'contact_type', 'send_email', 'delivery_message', 'leave_message',
+        'only_user', 'purchase_limit', 'hide', 'level_disable',
     ];
 
     protected function casts(): array
@@ -28,6 +31,10 @@ class Product extends Model
             'virtual_reviews' => 'array',
             'stock_visible' => 'boolean',
             'is_featured' => 'boolean',
+            'send_email' => 'boolean',
+            'only_user' => 'boolean',
+            'hide' => 'boolean',
+            'level_disable' => 'boolean',
         ];
     }
 
