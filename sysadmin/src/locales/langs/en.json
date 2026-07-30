@@ -498,7 +498,11 @@
       "levelName": "Level Name",
       "levelNamePlaceholder": "Select member level",
       "levelPrice": "Price (Y)",
-      "memberPriceEmpty": "No levels, click above to add"
+      "memberPriceEmpty": "No levels, click above to add",
+      "memberPriceTab": "Member Price",
+      "memberPriceTabHint": "Set exclusive price for each member level. Leave 0 to use retail price (with level discount).",
+      "levelDiscount": "Discount",
+      "levelDiscountUnit": "x off"
     },
     "category": {
       "title": "Categories",

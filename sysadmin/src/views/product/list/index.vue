@@ -267,55 +267,6 @@
               <span class="form-hint">{{ t('zcard.product.priceUnit') }}</span>
             </ElFormItem>
 
-            <!-- 会员等级价格(可视化编辑) -->
-            <ElFormItem :label="t('zcard.product.memberPrice')">
-              <div style="width: 100%">
-                <div class="mb-2 flex items-center justify-between">
-                  <span class="form-hint">{{ t('zcard.product.memberPriceHint') }}</span>
-                  <ElButton type="primary" size="small" plain @click="addMemberLevel">
-                    {{ t('zcard.product.addMemberLevel') }}
-                  </ElButton>
-                </div>
-                <ElTable :data="memberLevels" border size="small" style="width: 100%" v-if="memberLevels.length">
-                  <ElTableColumn :label="t('zcard.product.levelName')" min-width="150">
-                    <template #default="{ row }">
-                      <ElSelect
-                        :model-value="row.group_id"
-                        size="small"
-                        style="width: 100%"
-                        :placeholder="t('zcard.product.levelNamePlaceholder')"
-                        @change="(val: number | null) => onLevelGroupChange(row, val)"
-                      >
-                        <ElOption
-                          v-for="g in userGroups"
-                          :key="g.id"
-                          :label="g.name"
-                          :value="g.id"
-                          :disabled="usedGroupIds.has(g.id) && g.id !== row.group_id"
-                        />
-                      </ElSelect>
-                    </template>
-                  </ElTableColumn>
-                  <ElTableColumn :label="t('zcard.product.levelPrice')" width="180">
-                    <template #default="{ row }">
-                      <ElInputNumber v-model="row.priceYuan" :min="0" :precision="2" :step="1" size="small" style="width: 140px" />
-                      <span class="ml-1 text-xs text-gray-400">¥</span>
-                    </template>
-                  </ElTableColumn>
-                  <ElTableColumn :label="t('zcard.common.actions')" width="80" align="center">
-                    <template #default="{ $index }">
-                      <ElButton type="danger" link size="small" @click="memberLevels.splice($index, 1)">
-                        {{ t('zcard.common.delete') }}
-                      </ElButton>
-                    </template>
-                  </ElTableColumn>
-                </ElTable>
-                <div v-else class="text-center text-gray-400 text-sm py-4">
-                  {{ t('zcard.product.memberPriceEmpty') }}
-                </div>
-              </div>
-            </ElFormItem>
-
             <ElFormItem :label="t('zcard.product.virtualSales')">
               <ElInputNumber
                 v-model="formData.virtual_sales"
@@ -600,6 +551,46 @@
             <ElFormItem :label="t('zcard.product.levelDisable')">
               <ElSwitch v-model="formData.level_disable" />
             </ElFormItem>
+          </ElTabPane>
+
+          <!-- Tab: 会员等级价格 -->
+          <ElTabPane :label="t('zcard.product.memberPriceTab')" name="memberPrice">
+            <ElAlert
+              type="info"
+              :closable="false"
+              :title="t('zcard.product.memberPriceTabHint')"
+              class="mb-3"
+            />
+            <ElTable :data="memberLevels" border size="small" style="width: 100%">
+              <ElTableColumn :label="t('zcard.product.levelName')" min-width="140">
+                <template #default="{ row }">
+                  <ElTag size="small" effect="light" :type="row.group_id === 1 ? 'info' : 'warning'">
+                    {{ row.label }}
+                  </ElTag>
+                </template>
+              </ElTableColumn>
+              <ElTableColumn :label="t('zcard.product.levelPrice')" width="200">
+                <template #default="{ row }">
+                  <ElInputNumber
+                    v-model="row.priceYuan"
+                    :min="0"
+                    :precision="2"
+                    :step="1"
+                    size="small"
+                    style="width: 160px"
+                  />
+                  <span class="ml-1 text-xs text-gray-400">¥</span>
+                </template>
+              </ElTableColumn>
+              <ElTableColumn :label="t('zcard.product.levelDiscount')" width="120">
+                <template #default="{ row }">
+                  <span v-if="row.priceYuan > 0 && formData.priceYuan > 0" class="text-xs text-green-600">
+                    {{ (row.priceYuan / formData.priceYuan * 10).toFixed(1) }}{{ t('zcard.product.levelDiscountUnit') }}
+                  </span>
+                  <span v-else class="text-xs text-gray-400">-</span>
+                </template>
+              </ElTableColumn>
+            </ElTable>
           </ElTabPane>
         </ElTabs>
 
@@ -995,44 +986,28 @@
     return userGroups.value.find((g) => g.id === id)?.name || ''
   }
 
-  const addMemberLevel = () => {
-    const next = userGroups.value.find((g) => !usedGroupIds.value.has(g.id))
-    memberLevels.value.push({
-      group_id: next ? next.id : null,
-      label: next ? next.name : '',
-      priceYuan: 0
+  /** 默认展示所有会员等级，用已保存的 member_price 填充价格 */
+  const populateMemberLevels = (mp: Record<string, number> | null | undefined) => {
+    memberLevels.value = userGroups.value.map((g) => {
+      const savedKey = `group_${g.id}`
+      const legacyKey = `level${g.id}`
+      const savedPrice = (mp && (mp[savedKey] ?? mp[legacyKey])) || 0
+      return {
+        group_id: g.id,
+        label: g.name,
+        priceYuan: Number(savedPrice) > 0 ? Number(savedPrice) / 100 : 0
+      }
     })
-  }
-
-  /** 改变等级选择时同步 label */
-  const onLevelGroupChange = (lv: MemberLevel, id: number | null) => {
-    lv.group_id = id
-    lv.label = groupName(id)
   }
 
   const serializeMemberPrice = () => {
     const result: Record<string, number> = {}
     for (const lv of memberLevels.value) {
-      if (lv.group_id !== null && lv.priceYuan >= 0) {
+      if (lv.group_id !== null && lv.priceYuan > 0) {
         result[`group_${lv.group_id}`] = Math.round(lv.priceYuan * 100)
       }
     }
     return Object.keys(result).length ? result : undefined
-  }
-
-  const parseMemberPrice = (mp: Record<string, number> | null | undefined) => {
-    memberLevels.value = []
-    if (!mp || typeof mp !== 'object') return
-    for (const [key, val] of Object.entries(mp)) {
-      // 兼容旧格式 group_<id> 与 level<N>
-      const match = key.match(/^group_(\d+)$/)
-      const groupId = match ? Number(match[1]) : null
-      memberLevels.value.push({
-        group_id: groupId,
-        label: groupName(groupId) || key,
-        priceYuan: Number(val) / 100
-      })
-    }
   }
   const virtualReviewsText = ref('')
   const controlList = ref<ControlRow[]>([])
@@ -1271,7 +1246,7 @@
     activeTab.value = 'basic'
     actualStock.value = 0
     Object.assign(formData, createEmptyForm())
-    memberLevels.value = []
+    populateMemberLevels(null)
     virtualReviewsText.value = ''
     controlList.value = []
     galleryUrls.value = []
@@ -1311,14 +1286,14 @@
     galleryFileList.value = imgs.map((url, i) => ({ name: `image-${i}`, url }))
     controlList.value = []
     virtualReviewsText.value = ''
-    memberLevels.value = []
+    populateMemberLevels(null)
     actualStock.value = row.stock ?? 0
     drawerVisible.value = true
 
     // 先确保会员等级列表已加载,再回填会员价(label 解析依赖 group 名称)
     await loadUserGroups()
     if (row.member_price && typeof row.member_price === 'object') {
-      parseMemberPrice(row.member_price)
+      populateMemberLevels(row.member_price)
     }
 
     // 拉详情补全新字段 + SKU + 控件
@@ -1342,7 +1317,7 @@
       }
       // 会员价回填(详情优先)
       if (detail.member_price && typeof detail.member_price === 'object') {
-        parseMemberPrice(detail.member_price)
+        populateMemberLevels(detail.member_price)
       }
       // 控件回填
       hydrateControls(detail.control_config)
@@ -1362,7 +1337,7 @@
   const resetForm = () => {
     formRef.value?.resetFields()
     Object.assign(formData, createEmptyForm())
-    memberLevels.value = []
+    populateMemberLevels(null)
     virtualReviewsText.value = ''
     controlList.value = []
     galleryUrls.value = []

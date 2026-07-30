@@ -498,7 +498,11 @@
       "levelName": "等级名称",
       "levelNamePlaceholder": "选择会员等级",
       "levelPrice": "价格(元)",
-      "memberPriceEmpty": "暂无会员等级，点击上方按钮添加"
+      "memberPriceEmpty": "暂无会员等级，点击上方按钮添加",
+      "memberPriceTab": "会员等级价格",
+      "memberPriceTabHint": "为每个会员等级设置专属价格，留0则使用商品原价（按等级折扣计算）",
+      "levelDiscount": "相当于折扣",
+      "levelDiscountUnit": "折"
     },
     "category": {
       "title": "分类管理",
