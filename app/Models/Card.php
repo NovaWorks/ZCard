@@ -16,6 +16,7 @@ class Card extends Model
     protected $fillable = [
         'product_id', 'import_id', 'content', 'content_hash',
         'status', 'order_id', 'locked_at', 'used_at',
+        'note', 'card_type', 'owner_id', 'draft_premium', 'draft_cost',
     ];
 
     protected function casts(): array
@@ -34,6 +35,12 @@ class Card extends Model
     public function import(): BelongsTo
     {
         return $this->belongsTo(CardImport::class);
+    }
+
+    /** 关联订单(只读,展示 order_no) */
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class, 'order_id');
     }
 
     /** 取明文卡密（解密） */

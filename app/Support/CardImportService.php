@@ -17,6 +17,13 @@ class CardImportService
 
     /**
      * 导入入口:解析 + 决定同步/队列,返回 CardImport 批次。
+     *
+     * options 支持:
+     * - format: 'single'|'multi'
+     * - delimiter: string|null
+     * - source: string
+     * - note: string|null     每条卡密统一打备注
+     * - card_type: string|null 每条卡密统一卡密类型(如月卡)
      */
     public function import(int $productId, int $operatorId, string $rawInput, array $options = []): CardImport
     {
@@ -39,7 +46,7 @@ class CardImportService
         }
 
         if ($total <= self::THRESHOLD_QUEUE) {
-            $this->processSync($import, $cards);
+            $this->processSync($import, $cards, $options);
         } else {
             $tmpFile = $this->storeTempInput($rawInput, $import->id);
             \App\Jobs\ImportCardsJob::dispatch($import->id, $tmpFile, $options);
@@ -67,19 +74,23 @@ class CardImportService
     }
 
     /** 同步处理(≤5000):分块跑完 */
-    public function processSync(CardImport $import, array $cards): void
+    public function processSync(CardImport $import, array $cards, array $options = []): void
     {
         foreach (array_chunk($cards, 1000) as $chunk) {
-            $this->processChunk($import, $chunk);
+            $this->processChunk($import, $chunk, $options);
         }
         $import->update(['status' => 'completed']);
     }
 
     /** 处理一块(1000 条):去重加密 + 批量插入 */
-    public function processChunk(CardImport $import, array $chunk): void
+    public function processChunk(CardImport $import, array $chunk, array $options = []): void
     {
         $productId = $import->product_id;
         $importId = $import->id;
+
+        // 可选的统一字段(导入时给本批每条卡密打上)
+        $note = $options['note'] ?? null;
+        $cardType = $options['card_type'] ?? null;
 
         // 算所有 hash
         $hashes = [];
@@ -113,6 +124,8 @@ class CardImportService
                 'content' => CardCipher::encrypt($plain),
                 'content_hash' => $hash,
                 'status' => Card::STATUS_UNUSED,
+                'note' => $note,
+                'card_type' => $cardType,
                 'created_at' => now(),
                 'updated_at' => now(),
             ];

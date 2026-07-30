@@ -62,9 +62,14 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::post('orders/{id}/close', [AdminOrderController::class, 'close']);
 
     // 卡密管理(不含明文,安全)
+    // 注意:静态路由(export/stats/destroy)必须先于资源式 cards 注册,
+    // 否则会被 GET /cards/{id} 这种带参数的解析吃掉。
+    Route::get('cards/export', [AdminCardController::class, 'export']);
+    Route::get('cards/stats', [AdminCardController::class, 'stats']);
     Route::get('cards', [AdminCardController::class, 'index']);
     Route::post('cards/import', [AdminCardController::class, 'import']);
     Route::post('cards/disable', [AdminCardController::class, 'disable']);
+    Route::post('cards/destroy', [AdminCardController::class, 'destroy']);
     Route::get('cards/import-batches', [AdminCardController::class, 'importBatches']);
 
     // 支付通道配置
