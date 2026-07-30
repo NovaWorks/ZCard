@@ -711,6 +711,26 @@
       "gAfternoon": "Good afternoon",
       "gEvening": "Good evening",
       "gNight": "Good night"
+    },
+    "member": {
+      "introTitle": "Member Level Management",
+      "introDesc": "Set up member levels and discounts. Users auto-upgrade when cumulative recharge reaches the threshold.",
+      "title": "Member Levels",
+      "add": "Add Level",
+      "edit": "Edit Level",
+      "name": "Level Name",
+      "namePlaceholder": "e.g. Regular, VIP1",
+      "nameRequired": "Please enter level name",
+      "discount": "Discount",
+      "discountExample": "This level gets {d}x off",
+      "noDiscount": "Full price (no discount)",
+      "minRecharge": "Upgrade Threshold",
+      "minRechargeHint": "Users auto-upgrade when cumulative recharge reaches this amount",
+      "sort": "Sort",
+      "status": "Status",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "deleteConfirm": "Delete level \"{name}\"?"
     }
   }
 }

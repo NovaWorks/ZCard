@@ -5,6 +5,7 @@ import { categoryRoutes } from './category'
 import { orderRoutes } from './order'
 import { cardRoutes } from './card'
 import { userRoutes } from './user'
+import { memberRoutes } from './member'
 import { paymentRoutes } from './payment'
 import { settingRoutes } from './setting'
 
@@ -18,6 +19,7 @@ export const routeModules: AppRouteRecord[] = [
   orderRoutes,
   cardRoutes,
   userRoutes,
+  memberRoutes,
   paymentRoutes,
   settingRoutes
 ]

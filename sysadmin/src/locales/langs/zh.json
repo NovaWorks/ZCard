@@ -711,6 +711,26 @@
       "gAfternoon": "下午好",
       "gEvening": "傍晚好",
       "gNight": "晚上好"
+    },
+    "member": {
+      "introTitle": "会员等级管理",
+      "introDesc": "设置会员等级和折扣，用户累计充值达到条件后自动升级。等级折扣影响商品价格。",
+      "title": "会员等级",
+      "add": "新增等级",
+      "edit": "编辑等级",
+      "name": "等级名称",
+      "namePlaceholder": "如：普通会员、VIP1",
+      "nameRequired": "请输入等级名称",
+      "discount": "折扣",
+      "discountExample": "该等级享受 {d} 折优惠",
+      "noDiscount": "原价（无折扣）",
+      "minRecharge": "升级条件(累计充值)",
+      "minRechargeHint": "用户累计充值达到此金额后自动升级到该等级",
+      "sort": "排序",
+      "status": "状态",
+      "enabled": "启用",
+      "disabled": "禁用",
+      "deleteConfirm": "确认删除等级「{name}」？"
     }
   }
 }
