@@ -689,7 +689,13 @@
       "accountFormatExample": "示例：账号:test--密码:123 ║ 美区12个月 ║ 20 ║ 8",
       "dedup": "导入去重",
       "dedupHint": "开启后，同一商品内重复的卡密不会再次入库",
-      "copySuccess": "复制成功"
+      "copySuccess": "复制成功",
+      "markSold": "标记已售",
+      "markSoldConfirm": "确认将选中卡密标记为已出售？此操作不可撤销。",
+      "markSoldSuccess": "标记成功",
+      "uploadFile": "上传文件",
+      "uploadTip": "支持 txt/csv，每行一个卡密；或",
+      "downloadTemplate": "下载模板"
     },
     "user": {
       "title": "用户管理",

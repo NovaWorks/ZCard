@@ -115,6 +115,13 @@
               <span v-if="selectedIds.length">({{ selectedIds.length }})</span>
             </ElButton>
             <ElButton
+              type="info"
+              :disabled="!selectedIds.length"
+              @click="handleBatchMarkSold"
+            >
+              {{ t('zcard.card.markSold') }}
+            </ElButton>
+            <ElButton
               type="warning"
               :disabled="selectedIds.length === 0"
               @click="handleBatchDisable"
@@ -147,7 +154,7 @@
               <template #default="{ row }">
                 <code
                   style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--el-color-primary); cursor: pointer;"
-                  @click="copyText(row.content_preview || ''); ElMessage.success(t('zcard.card.copySuccess'))"
+                  @click="copyText(row.content_preview || '')"
                 >{{ row.content_preview || '-' }}</code>
               </template>
             </ElTableColumn>
@@ -221,6 +228,14 @@
               <template #default="{ row }">
                 <ElButton link type="primary" @click="openEdit(row)">
                   {{ t('zcard.card.editCard') }}
+                </ElButton>
+                <ElButton
+                  v-if="row.status === 'unused' || row.status === 'locked' || row.status === 'disabled'"
+                  link
+                  type="info"
+                  @click="handleMarkSold(row)"
+                >
+                  {{ t('zcard.card.markSold') }}
                 </ElButton>
                 <ElButton
                   v-if="row.status === 'unused' || row.status === 'disabled'"
@@ -323,6 +338,26 @@
           </ElRadioGroup>
         </ElFormItem>
         <ElFormItem :label="t('zcard.card.content')" prop="contents">
+          <ElUpload
+            :auto-upload="false"
+            :limit="1"
+            accept=".txt,.csv"
+            :on-change="handleFileChange"
+            :on-remove="handleFileRemove"
+          >
+            <ElButton type="primary" plain>
+              <ElIcon class="mr-1"><Upload /></ElIcon>
+              {{ t('zcard.card.uploadFile') }}
+            </ElButton>
+            <template #tip>
+              <div class="el-upload__tip">
+                {{ t('zcard.card.uploadTip') }}
+                <ElButton link type="primary" size="small" @click="downloadTemplate">
+                  {{ t('zcard.card.downloadTemplate') }}
+                </ElButton>
+              </div>
+            </template>
+          </ElUpload>
           <ElInput
             v-model="importForm.contents"
             type="textarea"
@@ -435,7 +470,7 @@
 <script setup lang="ts">
   import type { FormInstance, FormRules } from 'element-plus'
   import { ElMessage, ElMessageBox } from 'element-plus'
-  import { Lock, Unlock, Delete } from '@element-plus/icons-vue'
+  import { Lock, Unlock, Delete, Upload } from '@element-plus/icons-vue'
   import { useI18n } from 'vue-i18n'
   import {
     getCards,
@@ -445,6 +480,7 @@
     enableCards,
     lockCards,
     unlockCards,
+    markCardsSold,
     deleteCards,
     exportCards,
     revealCard,
@@ -747,6 +783,28 @@
       .catch(() => {})
   }
 
+  /** 批量标记为已售 */
+  const handleBatchMarkSold = async () => {
+    try {
+      await ElMessageBox.confirm(t('zcard.card.markSoldConfirm'), t('zcard.common.tips'), { type: 'warning' })
+      await markCardsSold(selectedIds.value)
+      ElMessage.success(t('zcard.card.markSoldSuccess'))
+      fetchData()
+      fetchStats()
+    } catch {}
+  }
+
+  /** 单条标记为已售 */
+  const handleMarkSold = async (row: Card) => {
+    try {
+      await ElMessageBox.confirm(t('zcard.card.markSoldConfirm'), t('zcard.common.tips'), { type: 'warning' })
+      await markCardsSold([row.id])
+      ElMessage.success(t('zcard.card.markSoldSuccess'))
+      fetchData()
+      fetchStats()
+    } catch {}
+  }
+
   /** 删除单条 */
   const handleDelete = (row: Card) => {
     ElMessageBox.confirm(t('zcard.card.deleteOneConfirm', { id: row.id }), t('zcard.card.deleteTitle'), {
@@ -845,6 +903,32 @@
     importForm.contents = ''
     importForm.import_kind = 'general'
     importVisible.value = true
+  }
+
+  /** 文件选择：读取文本写入 contents */
+  const handleFileChange = (file: any) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      importForm.contents = e.target?.result as string
+    }
+    reader.readAsText(file.raw)
+  }
+
+  /** 文件移除：清空 contents */
+  const handleFileRemove = () => {
+    importForm.contents = ''
+  }
+
+  /** 下载导入模板 */
+  const downloadTemplate = () => {
+    const content = '卡密1\n卡密2\n卡密3'
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'card-import-template.txt'
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const handleImport = async () => {

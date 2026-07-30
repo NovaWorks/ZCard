@@ -689,7 +689,13 @@
       "accountFormatExample": "Example: account:test--pass:123 ║ US 12 months ║ 20 ║ 8",
       "dedup": "Deduplicate",
       "dedupHint": "Skip duplicate cards within the same product",
-      "copySuccess": "Copied successfully"
+      "copySuccess": "Copied successfully",
+      "markSold": "Mark Sold",
+      "markSoldConfirm": "Mark selected cards as sold? This cannot be undone.",
+      "markSoldSuccess": "Marked successfully",
+      "uploadFile": "Upload File",
+      "uploadTip": "Supports txt/csv, one card per line; or",
+      "downloadTemplate": "Download Template"
     },
     "user": {
       "title": "Users",

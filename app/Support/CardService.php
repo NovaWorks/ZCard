@@ -154,6 +154,14 @@ class CardService
             ->update(['status' => Card::STATUS_UNUSED, 'locked_at' => null]);
     }
 
+    /** 将卡密标记为已出售(unused/locked/disabled → used) */
+    public function markAsSold(array $cardIds): int
+    {
+        return Card::whereIn('id', $cardIds)
+            ->whereIn('status', [Card::STATUS_UNUSED, Card::STATUS_LOCKED, Card::STATUS_DISABLED])
+            ->update(['status' => Card::STATUS_USED, 'used_at' => now()]);
+    }
+
     /**
      * 批量删除卡密。
      * 安全策略:只允许删除 unused / disabled 状态的卡密,锁定中/已使用的不删。

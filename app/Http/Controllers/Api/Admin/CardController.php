@@ -131,6 +131,14 @@ class CardController extends Controller
         return response()->json(['unlocked' => $count]);
     }
 
+    /** 将卡密标记为已出售 */
+    public function markSold(Request $request): JsonResponse
+    {
+        $data = $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer|exists:cards,id']);
+        $count = app(CardService::class)->markAsSold($data['ids']);
+        return response()->json(['sold' => $count]);
+    }
+
     /** 批量删除(只删 unused/disabled,保护锁定中/已售出) */
     public function destroy(Request $request): JsonResponse
     {

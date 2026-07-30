@@ -159,6 +159,10 @@ export const lockCards = (ids: number[]) =>
 export const unlockCards = (ids: number[]) =>
   request.post<{ unlocked: number }>({ url: '/admin/cards/unlock', data: { ids } })
 
+/** 标记为已出售(unused/locked/disabled → used) */
+export const markCardsSold = (ids: number[]) =>
+  request.post<{ sold: number }>({ url: '/admin/cards/mark-sold', data: { ids } })
+
 /** 批量删除卡密（只删 unused/disabled） */
 export const deleteCards = (ids: number[]) =>
   request.post<{ deleted: number }>({ url: '/admin/cards/destroy', data: { ids } })
