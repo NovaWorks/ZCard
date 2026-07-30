@@ -502,7 +502,9 @@
       "memberPriceTab": "会员等级价格",
       "memberPriceTabHint": "为每个会员等级设置专属价格，留0则使用商品原价（按等级折扣计算）",
       "levelDiscount": "相当于折扣",
-      "levelDiscountUnit": "折"
+      "levelDiscountUnit": "折",
+      "featuredYes": "已推荐",
+      "featuredNo": "未推荐"
     },
     "category": {
       "title": "分类管理",

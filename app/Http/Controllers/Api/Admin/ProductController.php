@@ -18,8 +18,17 @@ class ProductController extends Controller
         if ($search = $request->input('keyword')) {
             $query->where('name', 'like', "%{$search}%");
         }
-        if ($status = $request->input('status')) {
-            $query->where('status', $status);
+        if ($request->has('status') && $request->input('status') !== null) {
+            $query->where('status', $request->input('status'));
+        }
+        if ($categoryId = $request->input('category_id')) {
+            $query->where('category_id', $categoryId);
+        }
+        if ($request->has('is_featured') && $request->input('is_featured') !== null) {
+            $query->where('is_featured', $request->boolean('is_featured'));
+        }
+        if ($stockType = $request->input('stock_type')) {
+            $query->where('stock_type', $stockType);
         }
 
         $products = $query->orderByDesc('id')->paginate($request->input('pageSize', 15));

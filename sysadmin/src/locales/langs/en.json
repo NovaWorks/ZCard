@@ -502,7 +502,9 @@
       "memberPriceTab": "Member Price",
       "memberPriceTabHint": "Set exclusive price for each member level. Leave 0 to use retail price (with level discount).",
       "levelDiscount": "Discount",
-      "levelDiscountUnit": "x off"
+      "levelDiscountUnit": "x off",
+      "featuredYes": "Featured",
+      "featuredNo": "Not Featured"
     },
     "category": {
       "title": "Categories",

@@ -27,14 +27,43 @@
               v-model="searchForm.keyword"
               :placeholder="t('zcard.product.searchPlaceholder')"
               clearable
-              style="width: 220px"
+              style="width: 180px"
               @keyup.enter="handleSearch"
             />
           </ElFormItem>
+          <ElFormItem :label="t('zcard.category.title')">
+            <ElSelect
+              v-model="searchForm.category_id"
+              :placeholder="t('zcard.product.all')"
+              clearable
+              filterable
+              style="width: 160px"
+            >
+              <ElOption
+                v-for="c in flatCategoriesForSearch"
+                :key="c.id"
+                :label="c.label"
+                :value="c.id"
+              />
+            </ElSelect>
+          </ElFormItem>
+          <ElFormItem :label="t('zcard.product.featured')">
+            <ElSelect v-model="searchForm.is_featured" :placeholder="t('zcard.product.all')" clearable style="width: 120px">
+              <ElOption :label="t('zcard.product.featuredYes')" :value="1" />
+              <ElOption :label="t('zcard.product.featuredNo')" :value="0" />
+            </ElSelect>
+          </ElFormItem>
           <ElFormItem :label="t('zcard.product.status')">
-            <ElSelect v-model="searchForm.status" :placeholder="t('zcard.product.all')" clearable style="width: 140px">
+            <ElSelect v-model="searchForm.status" :placeholder="t('zcard.product.all')" clearable style="width: 120px">
               <ElOption :label="t('zcard.product.statusOn')" :value="1" />
               <ElOption :label="t('zcard.product.statusOff')" :value="0" />
+            </ElSelect>
+          </ElFormItem>
+          <ElFormItem :label="t('zcard.product.stockType')">
+            <ElSelect v-model="searchForm.stock_type" :placeholder="t('zcard.product.all')" clearable style="width: 120px">
+              <ElOption :label="t('zcard.product.stockCard')" value="card" />
+              <ElOption :label="t('zcard.product.stockUrl')" value="url" />
+              <ElOption :label="t('zcard.product.stockCode')" value="code" />
             </ElSelect>
           </ElFormItem>
           <ElFormItem>
@@ -690,24 +719,36 @@
   })
 
   /** 搜索表单 */
-  const searchForm = reactive<{ keyword?: string; status?: number }>({
+  const searchForm = reactive<{
+    keyword?: string
+    status?: number
+    category_id?: number
+    is_featured?: number
+    stock_type?: string
+  }>({
     keyword: undefined,
-    status: undefined
+    status: undefined,
+    category_id: undefined,
+    is_featured: undefined,
+    stock_type: undefined
   })
 
   /** 分类列表(扁平化后供下拉使用) */
   const categories = ref<{ id: number; name: string }[]>([])
 
-  /** 扁平化分类树 */
-  const flattenCategories = (tree: Category[]): { id: number; name: string }[] => {
-    const result: { id: number; name: string }[] = []
-    const walk = (nodes: Category[]) => {
+  /** 搜索栏用的扁平分类(带缩进前缀) */
+  const flatCategoriesForSearch = ref<{ id: number; label: string }[]>([])
+
+  /** 扁平化分类树(带层级缩进) */
+  const flattenCategoriesWithIndent = (tree: Category[], depth = 0): { id: number; label: string }[] => {
+    const result: { id: number; label: string }[] = []
+    const walk = (nodes: Category[], d: number) => {
       nodes.forEach((node) => {
-        result.push({ id: node.id, name: node.name })
-        if (node.children?.length) walk(node.children)
+        result.push({ id: node.id, label: '— '.repeat(d) + node.name })
+        if (node.children?.length) walk(node.children, d + 1)
       })
     }
-    walk(tree)
+    walk(tree, depth)
     return result
   }
 
@@ -715,9 +756,11 @@
   const loadCategories = async () => {
     try {
       const tree = await getAllCategories()
-      categories.value = flattenCategories(tree || [])
+      categories.value = flattenCategoriesWithIndent(tree || []).map((c) => ({ id: c.id, name: c.label }))
+      flatCategoriesForSearch.value = flattenCategoriesWithIndent(tree || [])
     } catch {
       categories.value = []
+      flatCategoriesForSearch.value = []
     }
   }
 
@@ -729,7 +772,10 @@
         page: pagination.page,
         pageSize: pagination.pageSize,
         keyword: searchForm.keyword,
-        status: searchForm.status
+        status: searchForm.status,
+        category_id: searchForm.category_id,
+        is_featured: searchForm.is_featured,
+        stock_type: searchForm.stock_type
       })
       tableData.value = (res.data || []).map((p) => ({
         ...p,
@@ -755,6 +801,9 @@
   const handleReset = () => {
     searchForm.keyword = undefined
     searchForm.status = undefined
+    searchForm.category_id = undefined
+    searchForm.is_featured = undefined
+    searchForm.stock_type = undefined
     pagination.page = 1
     fetchData()
   }
