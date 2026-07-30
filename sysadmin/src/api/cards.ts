@@ -147,6 +147,14 @@ export const disableCards = (ids: number[]) =>
 export const deleteCards = (ids: number[]) =>
   request.post<{ deleted: number }>({ url: '/admin/cards/destroy', data: { ids } })
 
+/** 查看单条卡密明文(管理员核对) */
+export const revealCard = (id: number) =>
+  request.get<{ id: number; content: string; status: string; note: string | null; card_type: string | null; draft_premium: number; draft_cost: number; owner_id: number; product_name: string | null; order_no: string | null; created_at: string; used_at: string | null }>({ url: `/admin/cards/${id}/reveal` })
+
+/** 编辑卡密(更新备注/类型/成本/加价/状态) */
+export const updateCard = (id: number, data: Partial<{ note: string; card_type: string; draft_premium: number; draft_cost: number; status: string }>) =>
+  request.put({ url: `/admin/cards/${id}`, data })
+
 /**
  * 导出筛选后的卡密为 CSV（明文）。
  * 直接用 axios 取 blob，避免被 JSON transformResponse 处理；自动带上 Sanctum token。

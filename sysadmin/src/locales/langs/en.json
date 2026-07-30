@@ -655,10 +655,13 @@
       "exportFailed": "Export failed",
       "selectFirst": "Please select cards first",
       "premiumCost": "Premium/Cost",
-      "cardTypePlaceholder": "e.g. Monthly, Weekly, Daily",
-      "notePlaceholder": "Note (optional)",
+      "cardTypePlaceholder": "e.g. Monthly/Weekly",
+      "notePlaceholder": "Enter note",
       "dateRange": "Import Date",
-      "to": "to"
+      "to": "to",
+      "cardContent": "Card Content",
+      "revealFailed": "Failed to retrieve",
+      "editCard": "Edit Card"
     },
     "user": {
       "title": "Users",

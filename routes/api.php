@@ -66,6 +66,8 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     // 否则会被 GET /cards/{id} 这种带参数的解析吃掉。
     Route::get('cards/export', [AdminCardController::class, 'export']);
     Route::get('cards/stats', [AdminCardController::class, 'stats']);
+    Route::get('cards/{id}/reveal', [AdminCardController::class, 'reveal']);
+    Route::put('cards/{id}', [AdminCardController::class, 'update']);
     Route::get('cards', [AdminCardController::class, 'index']);
     Route::post('cards/import', [AdminCardController::class, 'import']);
     Route::post('cards/disable', [AdminCardController::class, 'disable']);

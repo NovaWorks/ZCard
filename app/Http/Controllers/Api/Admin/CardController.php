@@ -179,4 +179,41 @@ class CardController extends Controller
             'date_to'    => $request->input('date_to'),
         ];
     }
+
+    /**
+     * 查看单条卡密明文(管理员核对用)。
+     */
+    public function reveal(int $id): JsonResponse
+    {
+        $card = Card::with(['product:id,name', 'order:id,order_no'])->findOrFail($id);
+        return response()->json([
+            'id' => $card->id,
+            'content' => $card->plainContent(),
+            'status' => $card->status,
+            'note' => $card->note,
+            'card_type' => $card->card_type,
+            'draft_premium' => $card->draft_premium,
+            'draft_cost' => $card->draft_cost,
+            'owner_id' => $card->owner_id,
+            'product_name' => $card->product?->name,
+            'order_no' => $card->order?->order_no,
+            'created_at' => $card->created_at,
+            'used_at' => $card->used_at,
+        ]);
+    }
+
+    /** 编辑卡密(更新备注/类型/成本/加价) */
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $card = Card::findOrFail($id);
+        $data = $request->validate([
+            'note' => 'nullable|string|max:255',
+            'card_type' => 'nullable|string|max:20',
+            'draft_premium' => 'nullable|numeric|min:0',
+            'draft_cost' => 'nullable|numeric|min:0',
+            'status' => 'nullable|string|in:unused,locked,used,disabled',
+        ]);
+        $card->update($data);
+        return response()->json($card->fresh());
+    }
 }

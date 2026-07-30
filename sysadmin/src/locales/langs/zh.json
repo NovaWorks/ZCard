@@ -655,10 +655,13 @@
       "exportFailed": "导出失败",
       "selectFirst": "请先选择要操作的卡密",
       "premiumCost": "加价/成本",
-      "cardTypePlaceholder": "如：月卡、周卡、天卡",
-      "notePlaceholder": "备注信息（可选）",
+      "cardTypePlaceholder": "如:月卡/周卡",
+      "notePlaceholder": "输入备注信息",
       "dateRange": "入库时间",
-      "to": "至"
+      "to": "至",
+      "cardContent": "卡密内容",
+      "revealFailed": "获取失败",
+      "editCard": "编辑卡密"
     },
     "user": {
       "title": "用户管理",

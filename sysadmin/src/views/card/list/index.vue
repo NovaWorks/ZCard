@@ -178,8 +178,8 @@
             </ElTableColumn>
             <ElTableColumn :label="t('zcard.common.actions')" width="200" fixed="right" align="center">
               <template #default="{ row }">
-                <ElButton link type="primary" @click="openPlaintext(row)">
-                  {{ t('zcard.card.viewPlaintext') }}
+                <ElButton link type="primary" @click="openEdit(row)">
+                  {{ t('zcard.card.editCard') }}
                 </ElButton>
                 <ElButton
                   v-if="row.status === 'unused'"
@@ -301,39 +301,65 @@
       </template>
     </ElDialog>
 
-    <!-- 查看明文弹窗（前端无解密，仅展示 hash + 加密提示） -->
-    <ElDialog v-model="plaintextVisible" :title="t('zcard.card.viewPlaintext')" width="480px">
-      <div v-if="currentCard" class="plaintext-box">
-        <div class="plaintext-row">
-          <span class="plaintext-label">{{ t('zcard.common.id') }}</span>
-          <span>{{ currentCard.id }}</span>
-        </div>
-        <div class="plaintext-row">
-          <span class="plaintext-label">{{ t('zcard.card.encryptedHint') }}</span>
-          <ElTag type="warning" effect="plain" size="small">
-            <ElIcon><Lock /></ElIcon>
-          </ElTag>
-        </div>
-        <div class="plaintext-row">
-          <span class="plaintext-label">{{ t('zcard.card.contentHash') }}</span>
-          <code class="hash-code">{{ hashPreview(currentCard.content_hash) }}</code>
-          <ElButton
-            v-if="currentCard.content_hash"
-            link
-            type="primary"
-            @click="copyText(currentCard.content_hash)"
-          >
-            {{ t('zcard.common.confirm') === '确定' ? '复制' : 'Copy' }}
-          </ElButton>
-        </div>
-        <div class="plaintext-row">
-          <span class="plaintext-label">{{ t('zcard.card.status') }}</span>
-          <ElTag :type="statusTagType(currentCard.status)" effect="light">
-            {{ statusLabel(currentCard.status) }}
-          </ElTag>
-        </div>
+    <!-- 编辑卡密抽屉 -->
+    <ElDrawer v-model="editDrawerVisible" :title="t('zcard.card.editCard')" size="450px" direction="rtl">
+      <div v-loading="editLoading" class="px-2">
+        <!-- 只读信息区 -->
+        <ElDescriptions :column="1" border size="small" class="mb-4">
+          <ElDescriptionsItem :label="t('zcard.common.id')">{{ editData.id }}</ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('zcard.card.status')">
+            <ElTag :type="statusTagType(editData.status)" size="small">{{ statusLabel(editData.status) }}</ElTag>
+          </ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('zcard.product.title')">{{ editData.product_name || '-' }}</ElDescriptionsItem>
+          <ElDescriptionsItem v-if="editData.order_no" :label="t('zcard.card.relatedOrder')">
+            {{ editData.order_no }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('zcard.card.createTime')">{{ editData.created_at }}</ElDescriptionsItem>
+          <ElDescriptionsItem v-if="editData.used_at" :label="t('zcard.card.sellTime')">{{ editData.used_at }}</ElDescriptionsItem>
+        </ElDescriptions>
+
+        <!-- 卡密明文(只读+复制) -->
+        <ElFormItem :label="t('zcard.card.cardContent')">
+          <div class="w-full">
+            <pre class="content-readonly">{{ editData.content }}</pre>
+            <ElButton type="primary" link size="small" class="mt-1" @click="copyText(editData.content)">
+              {{ t('zcard.common.confirm') === '确定' ? '复制卡密' : 'Copy Card' }}
+            </ElButton>
+          </div>
+        </ElFormItem>
+
+        <ElDivider />
+
+        <!-- 可编辑字段 -->
+        <ElForm :model="editData" label-width="100px">
+          <ElFormItem :label="t('zcard.card.cardType')">
+            <ElInput v-model="editData.card_type" :placeholder="t('zcard.card.cardTypePlaceholder')" />
+          </ElFormItem>
+          <ElFormItem :label="t('zcard.card.note')">
+            <ElInput v-model="editData.note" type="textarea" :rows="2" :placeholder="t('zcard.card.notePlaceholder')" />
+          </ElFormItem>
+          <ElFormItem :label="t('zcard.card.draftPremium')">
+            <ElInputNumber v-model="editData.draft_premium" :min="0" :precision="2" :step="0.5" style="width: 180px" />
+          </ElFormItem>
+          <ElFormItem :label="t('zcard.card.draftCost')">
+            <ElInputNumber v-model="editData.draft_cost" :min="0" :precision="2" :step="0.5" style="width: 180px" />
+          </ElFormItem>
+          <ElFormItem :label="t('zcard.card.status')">
+            <ElSelect v-model="editData.status" style="width: 180px">
+              <ElOption :label="t('zcard.card.statusUnused')" value="unused" />
+              <ElOption :label="t('zcard.card.statusDisabled')" value="disabled" />
+            </ElSelect>
+          </ElFormItem>
+        </ElForm>
       </div>
-    </ElDialog>
+
+      <template #footer>
+        <ElButton @click="editDrawerVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
+        <ElButton type="primary" :loading="editSubmitting" @click="handleSaveEdit">
+          {{ t('zcard.common.save') }}
+        </ElButton>
+      </template>
+    </ElDrawer>
   </div>
 </template>
 
@@ -349,6 +375,8 @@
     disableCards,
     deleteCards,
     exportCards,
+    revealCard,
+    updateCard,
     getImportBatches,
     type Card,
     type CardStatus,
@@ -703,12 +731,64 @@
     }
   }
 
-  /** 查看明文弹窗（前端不解密，只展示 hash + 加密提示） */
-  const plaintextVisible = ref(false)
-  const currentCard = ref<Card | null>(null)
-  const openPlaintext = (row: Card) => {
-    currentCard.value = row
-    plaintextVisible.value = true
+  /** 编辑卡密抽屉 */
+  const editDrawerVisible = ref(false)
+  const editLoading = ref(false)
+  const editSubmitting = ref(false)
+  const editData = ref<{
+    id: number; content: string; status: string; note: string; card_type: string
+    draft_premium: number; draft_cost: number; product_name: string; order_no: string
+    created_at: string; used_at: string
+  }>({
+    id: 0, content: '', status: '', note: '', card_type: '',
+    draft_premium: 0, draft_cost: 0, product_name: '', order_no: '',
+    created_at: '', used_at: ''
+  })
+
+  const openEdit = async (row: Card) => {
+    editDrawerVisible.value = true
+    editLoading.value = true
+    try {
+      const res = await revealCard(row.id)
+      editData.value = {
+        id: res.id,
+        content: res.content,
+        status: res.status,
+        note: res.note || '',
+        card_type: res.card_type || '',
+        draft_premium: Number(res.draft_premium) || 0,
+        draft_cost: Number(res.draft_cost) || 0,
+        product_name: res.product_name || '',
+        order_no: res.order_no || '',
+        created_at: res.created_at || '',
+        used_at: res.used_at || ''
+      }
+    } catch {
+      ElMessage.error(t('zcard.card.revealFailed'))
+      editDrawerVisible.value = false
+    } finally {
+      editLoading.value = false
+    }
+  }
+
+  const handleSaveEdit = async () => {
+    editSubmitting.value = true
+    try {
+      await updateCard(editData.value.id, {
+        note: editData.value.note,
+        card_type: editData.value.card_type,
+        draft_premium: editData.value.draft_premium,
+        draft_cost: editData.value.draft_cost,
+        status: editData.value.status
+      })
+      ElMessage.success(t('zcard.common.saveSuccess'))
+      editDrawerVisible.value = false
+      fetchData()
+    } catch {
+      ElMessage.error(t('zcard.common.operationFailed'))
+    } finally {
+      editSubmitting.value = false
+    }
   }
 
   onMounted(() => {
@@ -878,12 +958,37 @@
     }
   }
 
-  .hash-code {
-    font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
-    font-size: 12px;
+  .plaintext-content {
     background: var(--el-fill-color-light);
-    padding: 2px 8px;
-    border-radius: 4px;
+    border-radius: 8px;
+    padding: 12px;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    .content-text {
+      font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
+      font-size: 14px;
+      color: var(--el-color-primary);
+      word-break: break-all;
+      white-space: pre-wrap;
+      margin: 0;
+      width: 100%;
+    }
+  }
+
+  .content-readonly {
+    font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
+    font-size: 13px;
+    color: var(--el-color-primary);
+    background: var(--el-fill-color-light);
+    padding: 10px 12px;
+    border-radius: 6px;
     word-break: break-all;
+    white-space: pre-wrap;
+    margin: 0;
+    max-height: 200px;
+    overflow-y: auto;
   }
 </style>
