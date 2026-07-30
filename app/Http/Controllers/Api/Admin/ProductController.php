@@ -72,7 +72,15 @@ class ProductController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        return response()->json(Product::with(['skus', 'category'])->findOrFail($id));
+        $product = Product::with(['skus', 'category'])->findOrFail($id);
+
+        $userGroups = \App\Models\UserGroup::where('status', true)
+            ->orderBy('sort')
+            ->get(['id', 'name']);
+
+        return response()->json(
+            array_merge($product->toArray(), ['user_groups' => $userGroups])
+        );
     }
 
     public function update(Request $request, int $id): JsonResponse

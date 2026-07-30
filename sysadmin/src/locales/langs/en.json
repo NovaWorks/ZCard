@@ -496,7 +496,7 @@
       "controlTypeSelect": "Select",
       "addMemberLevel": "Add Level",
       "levelName": "Level Name",
-      "levelNamePlaceholder": "e.g. VIP1",
+      "levelNamePlaceholder": "Select member level",
       "levelPrice": "Price (Y)",
       "memberPriceEmpty": "No levels, click above to add"
     },

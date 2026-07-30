@@ -496,7 +496,7 @@
       "controlTypeSelect": "下拉选择",
       "addMemberLevel": "添加等级",
       "levelName": "等级名称",
-      "levelNamePlaceholder": "如 VIP1",
+      "levelNamePlaceholder": "选择会员等级",
       "levelPrice": "价格(元)",
       "memberPriceEmpty": "暂无会员等级，点击上方按钮添加"
     },

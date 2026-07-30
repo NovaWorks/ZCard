@@ -86,3 +86,13 @@ export const batchAction = (ids: number[], action: 'activate' | 'deactivate' | '
     url: '/admin/products/batch',
     data: { ids, action }
   })
+
+/** 会员等级(user_groups)实体(用于会员价编辑器下拉) */
+export interface UserGroup {
+  id: number
+  name: string
+}
+
+/** 获取启用的会员等级列表 */
+export const getUserGroups = () =>
+  request.get<UserGroup[]>({ url: '/admin/user-groups' })

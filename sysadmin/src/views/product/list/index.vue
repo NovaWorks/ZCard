@@ -129,11 +129,15 @@
             />
           </template>
         </ElTableColumn>
-        <ElTableColumn :label="t('zcard.product.isFeatured')" width="100" align="center">
+        <ElTableColumn :label="t('zcard.product.featured')" width="100" align="center">
           <template #default="{ row }">
-            <ElTag :type="row.is_featured ? 'warning' : 'info'" effect="plain">
-              {{ row.is_featured ? t('zcard.product.featured') : '-' }}
-            </ElTag>
+            <ElSwitch
+              :model-value="!!row.is_featured"
+              :active-value="true"
+              :inactive-value="false"
+              :loading="row._featuredLoading"
+              @change="(val) => handleFeaturedToggle(row, !!val)"
+            />
           </template>
         </ElTableColumn>
         <ElTableColumn :label="t('zcard.product.sort')" width="90" align="center" prop="sort" />
@@ -275,7 +279,21 @@
                 <ElTable :data="memberLevels" border size="small" style="width: 100%" v-if="memberLevels.length">
                   <ElTableColumn :label="t('zcard.product.levelName')" min-width="150">
                     <template #default="{ row }">
-                      <ElInput v-model="row.label" size="small" :placeholder="t('zcard.product.levelNamePlaceholder')" />
+                      <ElSelect
+                        :model-value="row.group_id"
+                        size="small"
+                        style="width: 100%"
+                        :placeholder="t('zcard.product.levelNamePlaceholder')"
+                        @change="(val: number | null) => onLevelGroupChange(row, val)"
+                      >
+                        <ElOption
+                          v-for="g in userGroups"
+                          :key="g.id"
+                          :label="g.name"
+                          :value="g.id"
+                          :disabled="usedGroupIds.has(g.id) && g.id !== row.group_id"
+                        />
+                      </ElSelect>
                     </template>
                   </ElTableColumn>
                   <ElTableColumn :label="t('zcard.product.levelPrice')" width="180">
@@ -635,8 +653,10 @@
     deleteProduct,
     getProductStats,
     batchAction,
+    getUserGroups,
     type Product,
-    type ProductStats
+    type ProductStats,
+    type UserGroup
   } from '@/api/products'
   import { getAllCategories, type Category } from '@/api/categories'
   import { uploadImage } from '@/api/upload'
@@ -720,7 +740,11 @@
         keyword: searchForm.keyword,
         status: searchForm.status
       })
-      tableData.value = (res.data || []).map((p) => ({ ...p, _statusLoading: false }))
+      tableData.value = (res.data || []).map((p) => ({
+        ...p,
+        _statusLoading: false,
+        _featuredLoading: false
+      }))
       pagination.total = res.total || 0
     } catch {
       tableData.value = []
@@ -842,6 +866,26 @@
     }
   }
 
+  /** 行内推荐切换 */
+  const handleFeaturedToggle = async (
+    row: Product & { _featuredLoading?: boolean },
+    val: boolean
+  ) => {
+    const oldFeatured = row.is_featured
+    row.is_featured = val
+    if (!row._featuredLoading) row._featuredLoading = true
+    try {
+      await updateProduct(row.id, { is_featured: val })
+      ElMessage.success(t('zcard.product.batchSuccess'))
+      fetchStats()
+    } catch {
+      // 失败回滚
+      row.is_featured = oldFeatured
+    } finally {
+      row._featuredLoading = false
+    }
+  }
+
   /** 抽屉相关 */
   const drawerVisible = ref(false)
   const drawerType = ref<'create' | 'edit'>('create')
@@ -920,18 +964,57 @@
 
   const formData = reactive<ProductForm>(createEmptyForm())
   const memberPriceText = ref('')
-  const memberLevels = ref<{ label: string; key: string; priceYuan: number }[]>([])
+  /** 会员等级价格行:group_id 关联到 user_groups,label 为只读名称 */
+  interface MemberLevel {
+    group_id: number | null
+    label: string
+    priceYuan: number
+  }
+  const memberLevels = ref<MemberLevel[]>([])
+  /** 可用会员等级列表(从后端 user_groups 加载) */
+  const userGroups = ref<UserGroup[]>([])
+
+  /** 当前已选过的 group_id,用于下拉过滤 */
+  const usedGroupIds = computed(() =>
+    new Set(memberLevels.value.map((lv) => lv.group_id).filter((id) => id !== null))
+  )
+
+  /** 加载会员等级列表 */
+  const loadUserGroups = async () => {
+    try {
+      const list = await getUserGroups()
+      userGroups.value = list || []
+    } catch {
+      userGroups.value = []
+    }
+  }
+
+  /** 根据 group_id 取名称 */
+  const groupName = (id: number | null): string => {
+    if (id === null) return ''
+    return userGroups.value.find((g) => g.id === id)?.name || ''
+  }
 
   const addMemberLevel = () => {
-    const idx = memberLevels.value.length + 1
-    memberLevels.value.push({ label: `VIP${idx}`, key: `level${idx}`, priceYuan: 0 })
+    const next = userGroups.value.find((g) => !usedGroupIds.value.has(g.id))
+    memberLevels.value.push({
+      group_id: next ? next.id : null,
+      label: next ? next.name : '',
+      priceYuan: 0
+    })
+  }
+
+  /** 改变等级选择时同步 label */
+  const onLevelGroupChange = (lv: MemberLevel, id: number | null) => {
+    lv.group_id = id
+    lv.label = groupName(id)
   }
 
   const serializeMemberPrice = () => {
     const result: Record<string, number> = {}
     for (const lv of memberLevels.value) {
-      if (lv.key && lv.priceYuan >= 0) {
-        result[lv.key] = Math.round(lv.priceYuan * 100)
+      if (lv.group_id !== null && lv.priceYuan >= 0) {
+        result[`group_${lv.group_id}`] = Math.round(lv.priceYuan * 100)
       }
     }
     return Object.keys(result).length ? result : undefined
@@ -940,14 +1023,15 @@
   const parseMemberPrice = (mp: Record<string, number> | null | undefined) => {
     memberLevels.value = []
     if (!mp || typeof mp !== 'object') return
-    let idx = 1
     for (const [key, val] of Object.entries(mp)) {
+      // 兼容旧格式 group_<id> 与 level<N>
+      const match = key.match(/^group_(\d+)$/)
+      const groupId = match ? Number(match[1]) : null
       memberLevels.value.push({
-        label: key.replace(/^level/, 'VIP') || `VIP${idx}`,
-        key,
+        group_id: groupId,
+        label: groupName(groupId) || key,
         priceYuan: Number(val) / 100
       })
-      idx++
     }
   }
   const virtualReviewsText = ref('')
@@ -1194,6 +1278,8 @@
     galleryFileList.value = []
     skuList.value = []
     drawerVisible.value = true
+    // 后台异步加载会员等级(供会员价下拉使用)
+    loadUserGroups()
   }
 
   /** 打开编辑抽屉 */
@@ -1219,20 +1305,21 @@
       sort: Number(row.sort) || 0,
       status: row.status
     })
-    // 会员价 JSON 文本回填
-    if (row.member_price && typeof row.member_price === 'object') {
-      parseMemberPrice(row.member_price)
-    } else {
-      memberLevels.value = []
-    }
     // 详情图回填
     const imgs = Array.isArray(row.images) ? row.images : []
     galleryUrls.value = [...imgs]
     galleryFileList.value = imgs.map((url, i) => ({ name: `image-${i}`, url }))
     controlList.value = []
     virtualReviewsText.value = ''
+    memberLevels.value = []
     actualStock.value = row.stock ?? 0
     drawerVisible.value = true
+
+    // 先确保会员等级列表已加载,再回填会员价(label 解析依赖 group 名称)
+    await loadUserGroups()
+    if (row.member_price && typeof row.member_price === 'object') {
+      parseMemberPrice(row.member_price)
+    }
 
     // 拉详情补全新字段 + SKU + 控件
     try {
@@ -1253,7 +1340,7 @@
         galleryUrls.value = [...detailImgs]
         galleryFileList.value = detailImgs.map((url, i) => ({ name: `image-${i}`, url }))
       }
-      // 会员价回填
+      // 会员价回填(详情优先)
       if (detail.member_price && typeof detail.member_price === 'object') {
         parseMemberPrice(detail.member_price)
       }

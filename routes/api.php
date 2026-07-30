@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\Admin\ProductSkuController as AdminProductSkuContro
 use App\Http\Controllers\Api\Admin\SettingController as AdminSettingController;
 use App\Http\Controllers\Api\Admin\UploadController as AdminUploadController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Api\Admin\UserGroupController as AdminUserGroupController;
 
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     // stats/batch 必须在 apiResource 之前(否则 stats 被当成 {product} 参数)
@@ -52,6 +53,9 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
 
     // 用户管理(CRUD + 角色分配)
     Route::apiResource('users', AdminUserController::class);
+
+    // 会员等级(user_groups)管理
+    Route::apiResource('user-groups', AdminUserGroupController::class)->only(['index', 'store', 'update', 'destroy']);
 
     // 订单管理(只读列表/详情 + 手动关单)
     Route::apiResource('orders', AdminOrderController::class)->only(['index', 'show']);
