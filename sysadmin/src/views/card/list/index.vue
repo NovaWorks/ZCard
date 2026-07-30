@@ -4,14 +4,14 @@
     <ElCard class="art-table-card" shadow="never">
       <!-- 标签页：卡密 / 导入批次 -->
       <ElTabs v-model="activeTab" class="page-tabs">
-        <ElTabPane label="卡密列表" name="cards">
+        <ElTabPane :label="t('zcard.card.list')" name="cards">
           <!-- 搜索栏 -->
           <div class="search-bar">
             <ElForm :inline="true" :model="searchForm" @submit.prevent>
-              <ElFormItem label="商品">
+              <ElFormItem :label="t('zcard.card.product')">
                 <ElSelect
                   v-model="searchForm.product_id"
-                  placeholder="全部"
+                  :placeholder="t('zcard.card.allProducts')"
                   clearable
                   filterable
                   style="width: 220px"
@@ -24,58 +24,58 @@
                   />
                 </ElSelect>
               </ElFormItem>
-              <ElFormItem label="状态">
+              <ElFormItem :label="t('zcard.card.status')">
                 <ElSelect
                   v-model="searchForm.status"
-                  placeholder="全部"
+                  :placeholder="t('zcard.card.allStatus')"
                   clearable
                   style="width: 140px"
                 >
-                  <ElOption label="未使用" value="unused" />
-                  <ElOption label="锁定" value="locked" />
-                  <ElOption label="已使用" value="used" />
-                  <ElOption label="禁用" value="disabled" />
+                  <ElOption :label="t('zcard.card.statusUnused')" value="unused" />
+                  <ElOption :label="t('zcard.card.statusLocked')" value="locked" />
+                  <ElOption :label="t('zcard.card.statusUsed')" value="used" />
+                  <ElOption :label="t('zcard.card.statusDisabled')" value="disabled" />
                 </ElSelect>
               </ElFormItem>
               <ElFormItem>
-                <ElButton type="primary" @click="handleSearch">搜索</ElButton>
-                <ElButton @click="handleReset">重置</ElButton>
+                <ElButton type="primary" @click="handleSearch">{{ t('zcard.common.search') }}</ElButton>
+                <ElButton @click="handleReset">{{ t('zcard.common.reset') }}</ElButton>
               </ElFormItem>
             </ElForm>
           </div>
 
           <!-- 操作栏 -->
           <div class="table-header">
-            <ElButton type="primary" @click="openImport">导入卡密</ElButton>
+            <ElButton type="primary" @click="openImport">{{ t('zcard.card.import') }}</ElButton>
           </div>
 
           <!-- 表格 -->
           <ElTable v-loading="loading" :data="tableData" border stripe style="width: 100%">
-            <ElTableColumn prop="id" label="ID" width="80" />
-            <ElTableColumn label="商品" min-width="180" show-overflow-tooltip>
+            <ElTableColumn prop="id" :label="t('zcard.common.id')" width="80" />
+            <ElTableColumn :label="t('zcard.card.product')" min-width="180" show-overflow-tooltip>
               <template #default="{ row }">
                 {{ row.product?.name || `#${row.product_id}` }}
               </template>
             </ElTableColumn>
-            <ElTableColumn label="卡密内容" min-width="240" show-overflow-tooltip>
+            <ElTableColumn :label="t('zcard.card.content')" min-width="240" show-overflow-tooltip>
               <template #default="{ row }">
                 <span class="card-content">{{ maskContent(row.content) }}</span>
               </template>
             </ElTableColumn>
-            <ElTableColumn label="状态" width="100" align="center">
+            <ElTableColumn :label="t('zcard.card.status')" width="100" align="center">
               <template #default="{ row }">
                 <ElTag :type="statusTagType(row.status)" effect="light">
                   {{ statusLabel(row.status) }}
                 </ElTag>
               </template>
             </ElTableColumn>
-            <ElTableColumn label="来源" width="120" align="center">
+            <ElTableColumn :label="t('zcard.card.source')" width="120" align="center">
               <template #default="{ row }">{{ row.source || '-' }}</template>
             </ElTableColumn>
-            <ElTableColumn label="导入时间" width="170" align="center">
+            <ElTableColumn :label="t('zcard.card.importTime')" width="170" align="center">
               <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
             </ElTableColumn>
-            <ElTableColumn label="操作" width="120" fixed="right" align="center">
+            <ElTableColumn :label="t('zcard.common.actions')" width="120" fixed="right" align="center">
               <template #default="{ row }">
                 <ElButton
                   v-if="row.status === 'unused'"
@@ -83,7 +83,7 @@
                   link
                   @click="handleDisable(row)"
                 >
-                  禁用
+                  {{ t('zcard.card.disable') }}
                 </ElButton>
                 <span v-else class="text-muted">-</span>
               </template>
@@ -105,36 +105,36 @@
           </div>
         </ElTabPane>
 
-        <ElTabPane label="导入批次" name="batches">
+        <ElTabPane :label="t('zcard.card.importBatch')" name="batches">
           <ElTable
             v-loading="batchLoading"
             :data="batches"
             border
             stripe
             style="width: 100%"
-            empty-text="暂无导入批次"
+            :empty-text="t('zcard.card.noBatch')"
           >
-            <ElTableColumn prop="id" label="批次ID" width="90" />
-            <ElTableColumn label="商品" min-width="180" show-overflow-tooltip>
+            <ElTableColumn prop="id" :label="t('zcard.card.batchId')" width="90" />
+            <ElTableColumn :label="t('zcard.card.product')" min-width="180" show-overflow-tooltip>
               <template #default="{ row }">
                 {{ row.product?.name || `#${row.product_id}` }}
               </template>
             </ElTableColumn>
-            <ElTableColumn prop="total" label="总数" width="90" align="center" />
-            <ElTableColumn prop="success_count" label="成功" width="90" align="center">
+            <ElTableColumn prop="total" :label="t('zcard.card.batchTotal')" width="90" align="center" />
+            <ElTableColumn prop="success_count" :label="t('zcard.card.batchSuccess')" width="90" align="center">
               <template #default="{ row }">
                 <span class="text-success">{{ row.success_count }}</span>
               </template>
             </ElTableColumn>
-            <ElTableColumn prop="fail_count" label="失败" width="90" align="center">
+            <ElTableColumn prop="fail_count" :label="t('zcard.card.batchFailed')" width="90" align="center">
               <template #default="{ row }">
                 <span :class="row.fail_count ? 'text-danger' : ''">{{ row.fail_count }}</span>
               </template>
             </ElTableColumn>
-            <ElTableColumn label="来源" width="120" align="center">
+            <ElTableColumn :label="t('zcard.card.source')" width="120" align="center">
               <template #default="{ row }">{{ row.source || '-' }}</template>
             </ElTableColumn>
-            <ElTableColumn label="导入时间" width="170" align="center">
+            <ElTableColumn :label="t('zcard.card.importTime')" width="170" align="center">
               <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
             </ElTableColumn>
           </ElTable>
@@ -143,12 +143,12 @@
     </ElCard>
 
     <!-- 导入卡密弹窗 -->
-    <ElDialog v-model="importVisible" title="导入卡密" width="600px" destroy-on-close>
+    <ElDialog v-model="importVisible" :title="t('zcard.card.import')" width="600px" destroy-on-close>
       <ElForm ref="importFormRef" :model="importForm" :rules="importRules" label-width="90px">
-        <ElFormItem label="商品" prop="product_id">
+        <ElFormItem :label="t('zcard.card.product')" prop="product_id">
           <ElSelect
             v-model="importForm.product_id"
-            placeholder="请选择商品"
+            :placeholder="t('zcard.card.productRequired')"
             filterable
             style="width: 100%"
           >
@@ -160,19 +160,19 @@
             />
           </ElSelect>
         </ElFormItem>
-        <ElFormItem label="卡密内容" prop="contents">
+        <ElFormItem :label="t('zcard.card.content')" prop="contents">
           <ElInput
             v-model="importForm.contents"
             type="textarea"
             :rows="10"
-            placeholder="每行一条卡密，自动去重并忽略空行"
+            :placeholder="t('zcard.card.importPlaceholder')"
           />
-          <div class="form-help">当前共 {{ importLineCount }} 行</div>
+          <div class="form-help">{{ t('zcard.card.lineCount', { n: importLineCount }) }}</div>
         </ElFormItem>
       </ElForm>
       <template #footer>
-        <ElButton @click="importVisible = false">取消</ElButton>
-        <ElButton type="primary" :loading="importing" @click="handleImport">开始导入</ElButton>
+        <ElButton @click="importVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
+        <ElButton type="primary" :loading="importing" @click="handleImport">{{ t('zcard.card.startImport') }}</ElButton>
       </template>
     </ElDialog>
   </div>
@@ -181,6 +181,7 @@
 <script setup lang="ts">
   import type { FormInstance, FormRules } from 'element-plus'
   import { ElMessage, ElMessageBox } from 'element-plus'
+  import { useI18n } from 'vue-i18n'
   import {
     getCards,
     importCards,
@@ -193,6 +194,8 @@
   import { getProducts, type Product } from '@/api/products'
 
   defineOptions({ name: 'CardList' })
+
+  const { t } = useI18n()
 
   /** 时间格式化 */
   const formatTime = (iso: string | null): string => {
@@ -214,10 +217,10 @@
 
   const statusLabel = (s: CardStatus): string => {
     const map: Record<CardStatus, string> = {
-      unused: '未使用',
-      locked: '锁定',
-      used: '已使用',
-      disabled: '禁用'
+      unused: t('zcard.card.statusUnused'),
+      locked: t('zcard.card.statusLocked'),
+      used: t('zcard.card.statusUsed'),
+      disabled: t('zcard.card.statusDisabled')
     }
     return map[s] || s
   }
@@ -315,15 +318,15 @@
 
   /** 禁用卡密 */
   const handleDisable = (row: Card) => {
-    ElMessageBox.confirm(`确定要禁用该卡密（ID: ${row.id}）吗？`, '禁用卡密', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
+    ElMessageBox.confirm(t('zcard.card.disableOneConfirm', { id: row.id }), t('zcard.card.disableTitle'), {
+      confirmButtonText: t('zcard.common.ok'),
+      cancelButtonText: t('zcard.common.cancel'),
       type: 'warning'
     })
       .then(async () => {
         try {
           await disableCards([row.id])
-          ElMessage.success('已禁用')
+          ElMessage.success(t('zcard.card.disabled'))
           fetchData()
         } catch (e) {
           // 拦截器处理
@@ -343,10 +346,10 @@
     contents: ''
   })
 
-  const importRules: FormRules = {
-    product_id: [{ required: true, message: '请选择商品', trigger: 'change' }],
-    contents: [{ required: true, message: '请输入卡密内容', trigger: 'blur' }]
-  }
+  const importRules = computed<FormRules>(() => ({
+    product_id: [{ required: true, message: t('zcard.card.productRequired'), trigger: 'change' }],
+    contents: [{ required: true, message: t('zcard.card.contentRequired'), trigger: 'blur' }]
+  }))
 
   const importLineCount = computed(() => {
     const text = (importForm.contents || '').trim()
@@ -375,7 +378,7 @@
         contents: importForm.contents
       })
       ElMessage.success(
-        `导入完成：成功 ${res.success_count ?? 0} 条，失败 ${res.fail_count ?? 0} 条`
+        t('zcard.card.importResult', { success: res.success_count ?? 0, failed: res.fail_count ?? 0 })
       )
       importVisible.value = false
       fetchData()

@@ -5,36 +5,36 @@
       <!-- 搜索栏 -->
       <div class="search-bar">
         <ElForm :inline="true" :model="searchForm" @submit.prevent>
-          <ElFormItem label="关键词">
+          <ElFormItem :label="t('zcard.user.searchKeyword')">
             <ElInput
               v-model="searchForm.keyword"
-              placeholder="用户名 / 邮箱"
+              :placeholder="t('zcard.user.searchPlaceholder')"
               clearable
               style="width: 240px"
               @keyup.enter="handleSearch"
             />
           </ElFormItem>
           <ElFormItem>
-            <ElButton type="primary" @click="handleSearch">搜索</ElButton>
-            <ElButton @click="handleReset">重置</ElButton>
+            <ElButton type="primary" @click="handleSearch">{{ t('zcard.common.search') }}</ElButton>
+            <ElButton @click="handleReset">{{ t('zcard.common.reset') }}</ElButton>
           </ElFormItem>
         </ElForm>
       </div>
 
       <!-- 操作栏 -->
       <div class="table-header">
-        <ElButton type="primary" @click="openCreate">新增用户</ElButton>
+        <ElButton type="primary" @click="openCreate">{{ t('zcard.user.add') }}</ElButton>
       </div>
 
       <!-- 表格 -->
       <ElTable v-loading="loading" :data="tableData" border stripe style="width: 100%">
-        <ElTableColumn prop="id" label="ID" width="80" />
-        <ElTableColumn prop="username" label="用户名" min-width="140" show-overflow-tooltip />
-        <ElTableColumn prop="email" label="邮箱" min-width="200" show-overflow-tooltip />
-        <ElTableColumn label="余额" width="120" align="right">
+        <ElTableColumn prop="id" :label="t('zcard.common.id')" width="80" />
+        <ElTableColumn prop="username" :label="t('zcard.user.username')" min-width="140" show-overflow-tooltip />
+        <ElTableColumn prop="email" :label="t('zcard.user.email')" min-width="200" show-overflow-tooltip />
+        <ElTableColumn :label="t('zcard.user.balance')" width="120" align="right">
           <template #default="{ row }">¥{{ formatPrice(row.balance) }}</template>
         </ElTableColumn>
-        <ElTableColumn label="角色" width="180" align="center">
+        <ElTableColumn :label="t('zcard.user.roles')" width="180" align="center">
           <template #default="{ row }">
             <ElTag
               v-for="r in row.roles || []"
@@ -48,20 +48,20 @@
             <span v-if="!row.roles || row.roles.length === 0" class="text-muted">-</span>
           </template>
         </ElTableColumn>
-        <ElTableColumn label="状态" width="100" align="center">
+        <ElTableColumn :label="t('zcard.user.status')" width="100" align="center">
           <template #default="{ row }">
             <ElTag :type="row.status ? 'success' : 'danger'" effect="light">
-              {{ row.status ? '正常' : '禁用' }}
+              {{ row.status ? t('zcard.user.statusNormal') : t('zcard.user.statusDisabled') }}
             </ElTag>
           </template>
         </ElTableColumn>
-        <ElTableColumn label="注册时间" width="170" align="center">
+        <ElTableColumn :label="t('zcard.user.registerTime')" width="170" align="center">
           <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
         </ElTableColumn>
-        <ElTableColumn label="操作" width="160" fixed="right" align="center">
+        <ElTableColumn :label="t('zcard.common.actions')" width="160" fixed="right" align="center">
           <template #default="{ row }">
-            <ElButton type="primary" link @click="openEdit(row)">编辑</ElButton>
-            <ElButton type="danger" link @click="handleDelete(row)">删除</ElButton>
+            <ElButton type="primary" link @click="openEdit(row)">{{ t('zcard.common.edit') }}</ElButton>
+            <ElButton type="danger" link @click="handleDelete(row)">{{ t('zcard.common.delete') }}</ElButton>
           </template>
         </ElTableColumn>
       </ElTable>
@@ -90,45 +90,45 @@
       @closed="resetForm"
     >
       <ElForm ref="formRef" :model="formData" :rules="formRules" label-width="90px">
-        <ElFormItem label="用户名" prop="username">
-          <ElInput v-model="formData.username" placeholder="请输入用户名" maxlength="60" />
+        <ElFormItem :label="t('zcard.user.username')" prop="username">
+          <ElInput v-model="formData.username" :placeholder="t('zcard.user.usernameRequired')" maxlength="60" />
         </ElFormItem>
-        <ElFormItem label="邮箱" prop="email">
-          <ElInput v-model="formData.email" placeholder="请输入邮箱" maxlength="150" />
+        <ElFormItem :label="t('zcard.user.email')" prop="email">
+          <ElInput v-model="formData.email" :placeholder="t('zcard.user.emailRequired')" maxlength="150" />
         </ElFormItem>
-        <ElFormItem label="密码" :prop="dialogType === 'create' ? 'password' : undefined">
+        <ElFormItem :label="t('zcard.user.password')" :prop="dialogType === 'create' ? 'password' : undefined">
           <ElInput
             v-model="formData.password"
             type="password"
             show-password
-            :placeholder="dialogType === 'create' ? '请输入密码' : '留空则不修改密码'"
+            :placeholder="dialogType === 'create' ? t('zcard.user.passwordCreatePlaceholder') : t('zcard.user.passwordEditPlaceholder')"
           />
         </ElFormItem>
-        <ElFormItem label="角色" prop="roles">
+        <ElFormItem :label="t('zcard.user.roles')" prop="roles">
           <ElSelect
             v-model="formData.roles"
             multiple
-            placeholder="请选择角色"
+            :placeholder="t('zcard.user.rolesRequired')"
             style="width: 100%"
           >
-            <ElOption label="超级管理员" value="super_admin" />
-            <ElOption label="商户" value="merchant" />
-            <ElOption label="用户" value="user" />
+            <ElOption :label="t('zcard.user.roleSuperAdmin')" value="super_admin" />
+            <ElOption :label="t('zcard.user.roleMerchant')" value="merchant" />
+            <ElOption :label="t('zcard.user.roleUser')" value="user" />
           </ElSelect>
         </ElFormItem>
-        <ElFormItem label="状态">
+        <ElFormItem :label="t('zcard.user.status')">
           <ElSwitch
             v-model="formData.status"
             :active-value="1"
             :inactive-value="0"
-            active-text="正常"
-            inactive-text="禁用"
+            :active-text="t('zcard.user.statusActiveText')"
+            :inactive-text="t('zcard.user.statusInactiveText')"
           />
         </ElFormItem>
       </ElForm>
       <template #footer>
-        <ElButton @click="dialogVisible = false">取消</ElButton>
-        <ElButton type="primary" :loading="submitting" @click="handleSubmit">确定</ElButton>
+        <ElButton @click="dialogVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
+        <ElButton type="primary" :loading="submitting" @click="handleSubmit">{{ t('zcard.common.ok') }}</ElButton>
       </template>
     </ElDialog>
   </div>
@@ -137,6 +137,7 @@
 <script setup lang="ts">
   import type { FormInstance, FormRules } from 'element-plus'
   import { ElMessage, ElMessageBox } from 'element-plus'
+  import { useI18n } from 'vue-i18n'
   import {
     getUsers,
     createUser,
@@ -146,6 +147,8 @@
   } from '@/api/users'
 
   defineOptions({ name: 'UserList' })
+
+  const { t } = useI18n()
 
   const formatPrice = (fen: number): string => ((Number(fen) || 0) / 100).toFixed(2)
 
@@ -161,9 +164,9 @@
 
   const roleLabel = (r: string): string => {
     const map: Record<string, string> = {
-      super_admin: '超级管理员',
-      merchant: '商户',
-      user: '用户'
+      super_admin: t('zcard.user.roleSuperAdmin'),
+      merchant: t('zcard.user.roleMerchant'),
+      user: t('zcard.user.roleUser')
     }
     return map[r] || r
   }
@@ -221,7 +224,7 @@
   const editId = ref<number | null>(null)
   const formRef = ref<FormInstance>()
 
-  const dialogTitle = computed(() => (dialogType.value === 'create' ? '新增用户' : '编辑用户'))
+  const dialogTitle = computed(() => (dialogType.value === 'create' ? t('zcard.user.add') : t('zcard.user.edit')))
 
   interface UserFormState {
     username: string
@@ -241,15 +244,15 @@
 
   const formData = reactive<UserFormState>(createEmptyForm())
 
-  const formRules: FormRules = {
-    username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  const formRules = computed<FormRules>(() => ({
+    username: [{ required: true, message: t('zcard.user.usernameRequired'), trigger: 'blur' }],
     email: [
-      { required: true, message: '请输入邮箱', trigger: 'blur' },
-      { type: 'email', message: '邮箱格式不正确', trigger: 'blur' }
+      { required: true, message: t('zcard.user.emailRequired'), trigger: 'blur' },
+      { type: 'email', message: t('zcard.user.emailInvalid'), trigger: 'blur' }
     ],
-    password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-    roles: [{ required: true, message: '请选择角色', trigger: 'change' }]
-  }
+    password: [{ required: true, message: t('zcard.user.passwordRequired'), trigger: 'blur' }],
+    roles: [{ required: true, message: t('zcard.user.rolesRequired'), trigger: 'change' }]
+  }))
 
   const openCreate = () => {
     dialogType.value = 'create'
@@ -300,10 +303,10 @@
     try {
       if (dialogType.value === 'create') {
         await createUser(payload)
-        ElMessage.success('新增成功')
+        ElMessage.success(t('zcard.user.created'))
       } else if (editId.value !== null) {
         await updateUser(editId.value, payload)
-        ElMessage.success('更新成功')
+        ElMessage.success(t('zcard.user.modified'))
       }
       dialogVisible.value = false
       fetchData()
@@ -315,15 +318,15 @@
   }
 
   const handleDelete = (row: User) => {
-    ElMessageBox.confirm(`确定要删除用户「${row.username}」吗？`, '删除用户', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
+    ElMessageBox.confirm(t('zcard.user.deleteConfirm', { name: row.username }), t('zcard.user.deleteTitle'), {
+      confirmButtonText: t('zcard.common.ok'),
+      cancelButtonText: t('zcard.common.cancel'),
       type: 'warning'
     })
       .then(async () => {
         try {
           await deleteUser(row.id)
-          ElMessage.success('删除成功')
+          ElMessage.success(t('zcard.common.deleteSuccess'))
           fetchData()
         } catch (e) {
           // 拦截器处理

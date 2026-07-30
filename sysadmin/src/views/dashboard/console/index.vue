@@ -7,11 +7,11 @@
           <ArtSvgIcon icon="ri:bank-card-2-line" style="font-size: 56px" />
         </div>
         <div class="welcome-text">
-          <h1 class="welcome-title">ZCard 管理后台</h1>
+          <h1 class="welcome-title">{{ t('zcard.dashboard.title') }}</h1>
           <p class="welcome-sub">
-            {{ greeting }}，{{ displayName }}，欢迎回来。
+            {{ greeting }}，{{ displayName }}，{{ t('zcard.dashboard.welcomeBack') }}。
           </p>
-          <p class="welcome-tip">系统统计模块正在搭建中，敬请期待。</p>
+          <p class="welcome-tip">{{ t('zcard.dashboard.tip') }}</p>
         </div>
       </div>
     </ElCard>
@@ -20,24 +20,27 @@
 
 <script setup lang="ts">
   import { computed } from 'vue'
+  import { useI18n } from 'vue-i18n'
   import { useUserStore } from '@/store/modules/user'
 
   defineOptions({ name: 'Console' })
 
+  const { t } = useI18n()
+
   const userStore = useUserStore()
 
-  const displayName = computed(() => userStore.info?.username || '管理员')
+  const displayName = computed(() => userStore.info?.username || t('zcard.dashboard.admin'))
 
   // 根据当前时间给出问候语
   const greeting = computed(() => {
     const h = new Date().getHours()
-    if (h < 6) return '凌晨好'
-    if (h < 9) return '早上好'
-    if (h < 12) return '上午好'
-    if (h < 14) return '中午好'
-    if (h < 17) return '下午好'
-    if (h < 19) return '傍晚好'
-    return '晚上好'
+    if (h < 6) return t('zcard.dashboard.gDawn')
+    if (h < 9) return t('zcard.dashboard.gMorning')
+    if (h < 12) return t('zcard.dashboard.gForenoon')
+    if (h < 14) return t('zcard.dashboard.gNoon')
+    if (h < 17) return t('zcard.dashboard.gAfternoon')
+    if (h < 19) return t('zcard.dashboard.gEvening')
+    return t('zcard.dashboard.gNight')
   })
 </script>
 

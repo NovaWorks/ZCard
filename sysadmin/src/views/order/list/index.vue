@@ -5,30 +5,30 @@
       <!-- 搜索栏 -->
       <div class="search-bar">
         <ElForm :inline="true" :model="searchForm" @submit.prevent>
-          <ElFormItem label="订单号">
+          <ElFormItem :label="t('zcard.order.orderNo')">
             <ElInput
               v-model="searchForm.keyword"
-              placeholder="请输入订单号"
+              :placeholder="t('zcard.order.searchPlaceholder')"
               clearable
               style="width: 240px"
               @keyup.enter="handleSearch"
             />
           </ElFormItem>
-          <ElFormItem label="状态">
+          <ElFormItem :label="t('zcard.card.status')">
             <ElSelect
               v-model="searchForm.status"
-              placeholder="全部"
+              :placeholder="t('zcard.order.allStatus')"
               clearable
               style="width: 140px"
             >
-              <ElOption label="待支付" value="pending" />
-              <ElOption label="已支付" value="paid" />
-              <ElOption label="已关闭" value="closed" />
+              <ElOption :label="t('zcard.order.statusPending')" value="pending" />
+              <ElOption :label="t('zcard.order.statusPaid')" value="paid" />
+              <ElOption :label="t('zcard.order.statusClosed')" value="closed" />
             </ElSelect>
           </ElFormItem>
           <ElFormItem>
-            <ElButton type="primary" @click="handleSearch">搜索</ElButton>
-            <ElButton @click="handleReset">重置</ElButton>
+            <ElButton type="primary" @click="handleSearch">{{ t('zcard.common.search') }}</ElButton>
+            <ElButton @click="handleReset">{{ t('zcard.common.reset') }}</ElButton>
           </ElFormItem>
         </ElForm>
       </div>
@@ -42,41 +42,41 @@
         style="width: 100%"
         @row-click="openDetail"
       >
-        <ElTableColumn label="订单号" min-width="200">
+        <ElTableColumn :label="t('zcard.order.orderNo')" min-width="200">
           <template #default="{ row }">
             <span class="order-no">{{ row.order_no }}</span>
-            <ElIcon class="copy-icon" title="复制" @click.stop="copyOrderNo(row.order_no)">
+            <ElIcon class="copy-icon" :title="t('zcard.order.copy')" @click.stop="copyOrderNo(row.order_no)">
               <CopyDocument />
             </ElIcon>
           </template>
         </ElTableColumn>
-        <ElTableColumn label="商品名" min-width="180" show-overflow-tooltip>
+        <ElTableColumn :label="t('zcard.order.productName')" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.product?.name || `#${row.product_id}` }}
           </template>
         </ElTableColumn>
-        <ElTableColumn prop="quantity" label="数量" width="80" align="center" />
-        <ElTableColumn label="金额" width="120" align="right">
+        <ElTableColumn prop="quantity" :label="t('zcard.order.quantity')" width="80" align="center" />
+        <ElTableColumn :label="t('zcard.order.amount')" width="120" align="right">
           <template #default="{ row }">¥{{ formatPrice(row.amount) }}</template>
         </ElTableColumn>
-        <ElTableColumn label="状态" width="100" align="center">
+        <ElTableColumn :label="t('zcard.card.status')" width="100" align="center">
           <template #default="{ row }">
             <ElTag :type="statusTagType(row.status)" effect="light">
               {{ statusLabel(row.status) }}
             </ElTag>
           </template>
         </ElTableColumn>
-        <ElTableColumn label="联系方式" min-width="160" show-overflow-tooltip>
+        <ElTableColumn :label="t('zcard.order.contact')" min-width="160" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.contact || row.email || '-' }}
           </template>
         </ElTableColumn>
-        <ElTableColumn label="时间" width="170" align="center">
+        <ElTableColumn :label="t('zcard.order.time')" width="170" align="center">
           <template #default="{ row }">
             {{ formatTime(row.created_at) }}
           </template>
         </ElTableColumn>
-        <ElTableColumn label="操作" width="120" fixed="right" align="center">
+        <ElTableColumn :label="t('zcard.common.actions')" width="120" fixed="right" align="center">
           <template #default="{ row }">
             <ElButton
               v-if="row.status === 'pending'"
@@ -84,7 +84,7 @@
               link
               @click.stop="handleClose(row)"
             >
-              关闭订单
+              {{ t('zcard.order.close') }}
             </ElButton>
             <span v-else class="text-muted">-</span>
           </template>
@@ -107,47 +107,47 @@
     </ElCard>
 
     <!-- 订单详情弹窗 -->
-    <ElDialog v-model="detailVisible" title="订单详情" width="640px" destroy-on-close>
+    <ElDialog v-model="detailVisible" :title="t('zcard.order.detail')" width="640px" destroy-on-close>
       <ElDescriptions v-if="detail" :column="2" border>
-        <ElDescriptionsItem label="订单号">{{ detail.order_no }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="状态">
+        <ElDescriptionsItem :label="t('zcard.order.orderNo')">{{ detail.order_no }}</ElDescriptionsItem>
+        <ElDescriptionsItem :label="t('zcard.card.status')">
           <ElTag :type="statusTagType(detail.status)" effect="light">
             {{ statusLabel(detail.status) }}
           </ElTag>
         </ElDescriptionsItem>
-        <ElDescriptionsItem label="商品">
+        <ElDescriptionsItem :label="t('zcard.order.product')">
           {{ detail.product?.name || `#${detail.product_id}` }}
         </ElDescriptionsItem>
-        <ElDescriptionsItem label="数量">{{ detail.quantity }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="金额">¥{{ formatPrice(detail.amount) }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="联系方式">
+        <ElDescriptionsItem :label="t('zcard.order.quantity')">{{ detail.quantity }}</ElDescriptionsItem>
+        <ElDescriptionsItem :label="t('zcard.order.amount')">¥{{ formatPrice(detail.amount) }}</ElDescriptionsItem>
+        <ElDescriptionsItem :label="t('zcard.order.contact')">
           {{ detail.contact || detail.email || '-' }}
         </ElDescriptionsItem>
-        <ElDescriptionsItem label="创建时间">{{ formatTime(detail.created_at) }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="支付时间">
+        <ElDescriptionsItem :label="t('zcard.order.createTime')">{{ formatTime(detail.created_at) }}</ElDescriptionsItem>
+        <ElDescriptionsItem :label="t('zcard.order.paidTime')">
           {{ detail.paid_at ? formatTime(detail.paid_at) : '-' }}
         </ElDescriptionsItem>
       </ElDescriptions>
 
       <template v-if="detail && detail.status === 'paid'">
-        <div class="detail-section-title">卡密发货</div>
+        <div class="detail-section-title">{{ t('zcard.order.cards') }}</div>
         <ElTable
           :data="detail.deliveries || []"
           border
           stripe
           size="small"
-          empty-text="暂无发货记录"
+          :empty-text="t('zcard.order.noDelivery')"
         >
           <ElTableColumn type="index" label="#" width="50" align="center" />
-          <ElTableColumn prop="content" label="卡密内容" min-width="280" show-overflow-tooltip />
-          <ElTableColumn label="发货时间" width="170" align="center">
+          <ElTableColumn prop="content" :label="t('zcard.order.cardContent')" min-width="280" show-overflow-tooltip />
+          <ElTableColumn :label="t('zcard.order.deliveryTime')" width="170" align="center">
             <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
           </ElTableColumn>
         </ElTable>
       </template>
 
       <template #footer>
-        <ElButton @click="detailVisible = false">关闭</ElButton>
+        <ElButton @click="detailVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
       </template>
     </ElDialog>
   </div>
@@ -156,6 +156,7 @@
 <script setup lang="ts">
   import { CopyDocument } from '@element-plus/icons-vue'
   import { ElMessage, ElMessageBox } from 'element-plus'
+  import { useI18n } from 'vue-i18n'
   import {
     getOrders,
     getOrder,
@@ -165,6 +166,8 @@
   } from '@/api/orders'
 
   defineOptions({ name: 'OrderList' })
+
+  const { t } = useI18n()
 
   /** 金额分 -> 元(两位小数) */
   const formatPrice = (fen: number): string => ((Number(fen) || 0) / 100).toFixed(2)
@@ -183,9 +186,9 @@
   /** 状态文案 */
   const statusLabel = (s: OrderStatus): string => {
     const map: Record<OrderStatus, string> = {
-      pending: '待支付',
-      paid: '已支付',
-      closed: '已关闭'
+      pending: t('zcard.order.statusPending'),
+      paid: t('zcard.order.statusPaid'),
+      closed: t('zcard.order.statusClosed')
     }
     return map[s] || s
   }
@@ -253,23 +256,23 @@
   const copyOrderNo = async (orderNo: string) => {
     try {
       await navigator.clipboard.writeText(orderNo)
-      ElMessage.success('已复制订单号')
+      ElMessage.success(t('zcard.order.copied'))
     } catch (e) {
-      ElMessage.warning('复制失败，请手动复制')
+      ElMessage.warning(t('zcard.order.copyFailed'))
     }
   }
 
   /** 关闭订单 */
   const handleClose = (row: Order) => {
-    ElMessageBox.confirm(`确定要关闭订单「${row.order_no}」吗？`, '关闭订单', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
+    ElMessageBox.confirm(t('zcard.order.closeOrderConfirm', { no: row.order_no }), t('zcard.order.closeTitle'), {
+      confirmButtonText: t('zcard.common.ok'),
+      cancelButtonText: t('zcard.common.cancel'),
       type: 'warning'
     })
       .then(async () => {
         try {
           await closeOrder(row.id)
-          ElMessage.success('订单已关闭')
+          ElMessage.success(t('zcard.order.closed'))
           fetchData()
         } catch (e) {
           // 错误提示由拦截器统一处理

@@ -18,22 +18,22 @@
             <div class="channel-code">{{ channel.code }}</div>
           </div>
           <ElTag :type="channel.enabled ? 'success' : 'info'" effect="light">
-            {{ channel.enabled ? '已启用' : '未启用' }}
+            {{ channel.enabled ? t('zcard.payment.enabled') : t('zcard.payment.disabled') }}
           </ElTag>
         </div>
 
         <div class="channel-actions">
-          <ElButton type="primary" plain @click="openConfig(channel)">配置</ElButton>
+          <ElButton type="primary" plain @click="openConfig(channel)">{{ t('zcard.payment.config') }}</ElButton>
         </div>
       </ElCard>
 
-      <div v-if="!loading && channels.length === 0" class="empty-state">暂无支付渠道</div>
+      <div v-if="!loading && channels.length === 0" class="empty-state">{{ t('zcard.payment.empty') }}</div>
     </div>
 
     <!-- 配置弹窗 -->
     <ElDialog
       v-model="configVisible"
-      :title="currentChannel ? `配置 - ${currentChannel.name}` : '配置'"
+      :title="currentChannel ? t('zcard.payment.configTitle', { name: currentChannel.name }) : t('zcard.payment.config')"
       width="560px"
       destroy-on-close
     >
@@ -43,8 +43,8 @@
         label-width="140px"
         class="config-form"
       >
-        <ElFormItem label="启用状态">
-          <ElSwitch v-model="configForm.enabled" active-text="启用" inactive-text="停用" />
+        <ElFormItem :label="t('zcard.payment.enabledLabel')">
+          <ElSwitch v-model="configForm.enabled" :active-text="t('zcard.payment.enable')" :inactive-text="t('zcard.payment.disable')" />
         </ElFormItem>
 
         <ElFormItem
@@ -66,7 +66,7 @@
           <ElSelect
             v-else-if="field.type === 'select'"
             v-model="configForm.values[field.key]"
-            placeholder="请选择"
+            :placeholder="t('zcard.payment.selectPlaceholder')"
             style="width: 100%"
           >
             <ElOption
@@ -94,8 +94,8 @@
         </ElFormItem>
       </ElForm>
       <template #footer>
-        <ElButton @click="configVisible = false">取消</ElButton>
-        <ElButton type="primary" :loading="saving" @click="handleSave">保存</ElButton>
+        <ElButton @click="configVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
+        <ElButton type="primary" :loading="saving" @click="handleSave">{{ t('zcard.payment.save') }}</ElButton>
       </template>
     </ElDialog>
   </div>
@@ -104,6 +104,7 @@
 <script setup lang="ts">
   import { Wallet } from '@element-plus/icons-vue'
   import { ElMessage } from 'element-plus'
+  import { useI18n } from 'vue-i18n'
   import {
     getChannels,
     updateChannel,
@@ -113,6 +114,8 @@
   } from '@/api/payment'
 
   defineOptions({ name: 'PaymentList' })
+
+  const { t } = useI18n()
 
   /** 渠道列表 */
   const loading = ref(false)
@@ -176,7 +179,7 @@
         enabled: configForm.enabled,
         config: { ...configForm.values }
       })
-      ElMessage.success('保存成功')
+      ElMessage.success(t('zcard.payment.saved'))
       configVisible.value = false
       fetchChannels()
     } catch (e) {

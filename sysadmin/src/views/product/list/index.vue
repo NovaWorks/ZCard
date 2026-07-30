@@ -1,41 +1,41 @@
-<!-- 商品列表 - 后台管理 (商品名/Product Name) -->
+<!-- 商品列表 - 后台管理 -->
 <template>
   <div class="product-page art-full-height">
     <ElCard class="art-table-card" shadow="never">
       <!-- 搜索栏 -->
       <div class="search-bar">
         <ElForm :inline="true" :model="searchForm" @submit.prevent>
-          <ElFormItem label="商品名 (Name)">
+          <ElFormItem :label="t('zcard.product.name')">
             <ElInput
               v-model="searchForm.keyword"
-              placeholder="请输入商品名"
+              :placeholder="t('zcard.product.searchPlaceholder')"
               clearable
               style="width: 220px"
               @keyup.enter="handleSearch"
             />
           </ElFormItem>
-          <ElFormItem label="状态 (Status)">
-            <ElSelect v-model="searchForm.status" placeholder="全部" clearable style="width: 140px">
-              <ElOption label="上架 (On)" :value="1" />
-              <ElOption label="下架 (Off)" :value="0" />
+          <ElFormItem :label="t('zcard.product.status')">
+            <ElSelect v-model="searchForm.status" :placeholder="t('zcard.product.all')" clearable style="width: 140px">
+              <ElOption :label="t('zcard.product.statusOn')" :value="1" />
+              <ElOption :label="t('zcard.product.statusOff')" :value="0" />
             </ElSelect>
           </ElFormItem>
           <ElFormItem>
-            <ElButton type="primary" @click="handleSearch">搜索 (Search)</ElButton>
-            <ElButton @click="handleReset">重置 (Reset)</ElButton>
+            <ElButton type="primary" @click="handleSearch">{{ t('zcard.common.search') }}</ElButton>
+            <ElButton @click="handleReset">{{ t('zcard.common.reset') }}</ElButton>
           </ElFormItem>
         </ElForm>
       </div>
 
       <!-- 表格头部 -->
       <div class="table-header">
-        <ElButton type="primary" @click="openCreate">新增商品 (New Product)</ElButton>
+        <ElButton type="primary" @click="openCreate">{{ t('zcard.product.add') }}</ElButton>
       </div>
 
       <!-- 表格 -->
       <ElTable v-loading="loading" :data="tableData" border stripe style="width: 100%">
-        <ElTableColumn prop="id" label="ID" width="80" />
-        <ElTableColumn label="封面 (Cover)" width="90" align="center">
+        <ElTableColumn prop="id" :label="t('zcard.common.id')" width="80" />
+        <ElTableColumn :label="t('zcard.product.cover')" width="90" align="center">
           <template #default="{ row }">
             <ElImage
               v-if="row.cover"
@@ -48,41 +48,41 @@
             <span v-else style="color: #c0c4cc">-</span>
           </template>
         </ElTableColumn>
-        <ElTableColumn prop="name" label="商品名 (Name)" min-width="200" show-overflow-tooltip />
-        <ElTableColumn label="分类 (Category)" width="140">
+        <ElTableColumn prop="name" :label="t('zcard.product.name')" min-width="200" show-overflow-tooltip />
+        <ElTableColumn :label="t('zcard.product.category')" width="140">
           <template #default="{ row }">
             {{ row.category?.name || '-' }}
           </template>
         </ElTableColumn>
-        <ElTableColumn label="价格 (Price)" width="120" align="right">
+        <ElTableColumn :label="t('zcard.product.priceShort')" width="120" align="right">
           <template #default="{ row }">
             ¥{{ formatPrice(row.price) }}
           </template>
         </ElTableColumn>
-        <ElTableColumn label="库存 (Stock)" width="100" align="center">
+        <ElTableColumn :label="t('zcard.product.stock')" width="100" align="center">
           <template #default="{ row }">
             {{ row.stock ?? 0 }}
           </template>
         </ElTableColumn>
-        <ElTableColumn label="状态 (Status)" width="100" align="center">
+        <ElTableColumn :label="t('zcard.product.status')" width="100" align="center">
           <template #default="{ row }">
             <ElTag :type="row.status ? 'success' : 'info'" effect="light">
-              {{ row.status ? '上架' : '下架' }}
+              {{ row.status ? t('zcard.product.statusOn') : t('zcard.product.statusOff') }}
             </ElTag>
           </template>
         </ElTableColumn>
-        <ElTableColumn label="推荐 (Featured)" width="100" align="center">
+        <ElTableColumn :label="t('zcard.product.isFeatured')" width="100" align="center">
           <template #default="{ row }">
             <ElTag :type="row.is_featured ? 'warning' : 'info'" effect="plain">
-              {{ row.is_featured ? '推荐' : '-' }}
+              {{ row.is_featured ? t('zcard.product.featured') : '-' }}
             </ElTag>
           </template>
         </ElTableColumn>
-        <ElTableColumn label="排序 (Sort)" width="90" align="center" prop="sort" />
-        <ElTableColumn label="操作 (Actions)" width="160" fixed="right" align="center">
+        <ElTableColumn :label="t('zcard.product.sort')" width="90" align="center" prop="sort" />
+        <ElTableColumn :label="t('zcard.common.actions')" width="160" fixed="right" align="center">
           <template #default="{ row }">
-            <ElButton type="primary" link @click="openEdit(row)">编辑 (Edit)</ElButton>
-            <ElButton type="danger" link @click="handleDelete(row)">删除 (Delete)</ElButton>
+            <ElButton type="primary" link @click="openEdit(row)">{{ t('zcard.common.edit') }}</ElButton>
+            <ElButton type="danger" link @click="handleDelete(row)">{{ t('zcard.common.delete') }}</ElButton>
           </template>
         </ElTableColumn>
       </ElTable>
@@ -119,24 +119,24 @@
         class="product-form"
       >
         <!-- 基本信息 -->
-        <div class="section-title">基本信息 (Basic Info)</div>
+        <div class="section-title">{{ t('zcard.product.basicInfo') }}</div>
 
-        <ElFormItem label="商品名 (Name)" prop="name">
-          <ElInput v-model="formData.name" placeholder="请输入商品名" maxlength="150" />
+        <ElFormItem :label="t('zcard.product.name')" prop="name">
+          <ElInput v-model="formData.name" :placeholder="t('zcard.product.searchPlaceholder')" maxlength="150" />
         </ElFormItem>
 
-        <ElFormItem label="Slug">
+        <ElFormItem :label="t('zcard.product.slug')">
           <ElInput
             v-model="formData.slug"
-            placeholder="留空则自动生成 (Leave blank to auto-generate)"
+            :placeholder="t('zcard.product.slugPlaceholder')"
             maxlength="150"
           />
         </ElFormItem>
 
-        <ElFormItem label="分类 (Category)">
+        <ElFormItem :label="t('zcard.product.category')">
           <ElSelect
             v-model="formData.category_id"
-            placeholder="请选择分类"
+            :placeholder="t('zcard.product.category')"
             clearable
             filterable
             style="width: 100%"
@@ -150,21 +150,21 @@
           </ElSelect>
         </ElFormItem>
 
-        <ElFormItem label="商品描述 (Description)">
+        <ElFormItem :label="t('zcard.product.description')">
           <ElInput
             v-model="formData.description"
             type="textarea"
             :rows="5"
-            placeholder="请输入商品描述"
+            :placeholder="t('zcard.product.description')"
             maxlength="2000"
             show-word-limit
           />
         </ElFormItem>
 
         <!-- 价格与库存 -->
-        <div class="section-title">价格与库存 (Pricing & Stock)</div>
+        <div class="section-title">{{ t('zcard.product.pricing') }}</div>
 
-        <ElFormItem label="价格(元) (Price)" prop="priceYuan">
+        <ElFormItem :label="t('zcard.product.price')" prop="priceYuan">
           <ElInputNumber
             v-model="formData.priceYuan"
             :min="0"
@@ -173,35 +173,35 @@
             controls-position="right"
             style="width: 220px"
           />
-          <span class="form-hint">单位:元 (Unit: Yuan)</span>
+          <span class="form-hint">{{ t('zcard.product.priceUnit') }}</span>
         </ElFormItem>
 
-        <ElFormItem label="会员价 (Member Price)">
+        <ElFormItem :label="t('zcard.product.memberPrice')">
           <ElInput
             v-model="memberPriceText"
-            placeholder='JSON,如 {"level1":800} (Phase 3)'
+            :placeholder="t('zcard.product.memberPricePlaceholder')"
             style="width: 100%"
           />
-          <span class="form-hint">可选,第三阶段功能 (Optional, Phase 3)</span>
+          <span class="form-hint">{{ t('zcard.product.memberPriceOptional') }}</span>
         </ElFormItem>
 
-        <ElFormItem label="库存类型 (Stock Type)">
+        <ElFormItem :label="t('zcard.product.stockType')">
           <ElSelect v-model="formData.stock_type" style="width: 100%">
-            <ElOption label="卡密 (Card)" value="card" />
-            <ElOption label="链接 (URL)" value="url" />
-            <ElOption label="兑换码 (Code)" value="code" />
+            <ElOption :label="t('zcard.product.stockCard')" value="card" />
+            <ElOption :label="t('zcard.product.stockUrl')" value="url" />
+            <ElOption :label="t('zcard.product.stockCode')" value="code" />
           </ElSelect>
         </ElFormItem>
 
-        <ElFormItem label="显示库存 (Show Stock)">
+        <ElFormItem :label="t('zcard.product.stockVisible')">
           <ElSwitch v-model="formData.stock_visible" />
-          <span class="ml-2">{{ formData.stock_visible ? '显示' : '隐藏' }}</span>
+          <span class="ml-2">{{ formData.stock_visible ? t('zcard.product.show') : t('zcard.product.hide') }}</span>
         </ElFormItem>
 
         <!-- 图片 -->
-        <div class="section-title">图片 (Images)</div>
+        <div class="section-title">{{ t('zcard.product.imagesSection') }}</div>
 
-        <ElFormItem label="封面图 (Cover)">
+        <ElFormItem :label="t('zcard.product.cover')">
           <ElUpload
             :show-file-list="false"
             :http-request="handleCoverUpload"
@@ -211,20 +211,20 @@
             <div v-if="formData.cover" class="cover-preview">
               <ElImage :src="formData.cover" fit="cover" class="cover-img" />
               <div class="cover-mask">
-                <span>点击替换 (Replace)</span>
+                <span>{{ t('zcard.product.coverReplace') }}</span>
               </div>
             </div>
             <div v-else class="cover-placeholder">
               <ElIcon class="upload-icon"><Plus /></ElIcon>
-              <span>点击上传 (Click to upload)</span>
+              <span>{{ t('zcard.product.coverUpload') }}</span>
             </div>
           </ElUpload>
           <ElButton v-if="formData.cover" link type="danger" class="ml-2" @click="formData.cover = ''">
-            移除 (Remove)
+            {{ t('zcard.product.coverRemove') }}
           </ElButton>
         </ElFormItem>
 
-        <ElFormItem label="详情图 (Gallery)">
+        <ElFormItem :label="t('zcard.product.images')">
           <ElUpload
             :file-list="galleryFileList"
             list-type="picture-card"
@@ -236,14 +236,14 @@
           >
             <ElIcon class="upload-icon"><Plus /></ElIcon>
           </ElUpload>
-          <span class="form-hint">可上传多张 (Multiple allowed)</span>
+          <span class="form-hint">{{ t('zcard.product.galleryHint') }}</span>
         </ElFormItem>
 
         <!-- SKU 管理 -->
         <div v-if="dialogType === 'edit' && editId !== null" class="section-title">
-          SKU 管理 (SKU Management)
+          {{ t('zcard.product.skuManage') }}
           <ElButton type="primary" size="small" class="ml-2" @click="addSkuRow">
-            新增 SKU (Add)
+            {{ t('zcard.product.skuAdd') }}
           </ElButton>
         </div>
 
@@ -253,13 +253,13 @@
           class="sku-form-item"
         >
           <ElTable :data="skuList" border size="small" style="width: 100%">
-            <ElTableColumn label="名称 (Name)" min-width="140">
+            <ElTableColumn :label="t('zcard.product.name')" min-width="140">
               <template #default="{ row }">
-                <ElInput v-if="row._editing" v-model="row.name" placeholder="SKU 名称" size="small" />
+                <ElInput v-if="row._editing" v-model="row.name" :placeholder="t('zcard.product.skuNamePlaceholder')" size="small" />
                 <span v-else>{{ row.name }}</span>
               </template>
             </ElTableColumn>
-            <ElTableColumn label="价格(元) (Price)" width="130">
+            <ElTableColumn :label="t('zcard.product.price')" width="130">
               <template #default="{ row }">
                 <ElInputNumber
                   v-if="row._editing"
@@ -274,17 +274,17 @@
                 <span v-else>¥{{ formatPrice(row.price) }}</span>
               </template>
             </ElTableColumn>
-            <ElTableColumn label="库存类型 (Stock Type)" width="140">
+            <ElTableColumn :label="t('zcard.product.stockType')" width="140">
               <template #default="{ row }">
                 <ElSelect v-if="row._editing" v-model="row.stock_type" size="small" style="width: 110px">
-                  <ElOption label="卡密 (Card)" value="card" />
-                  <ElOption label="链接 (URL)" value="url" />
-                  <ElOption label="兑换码 (Code)" value="code" />
+                  <ElOption :label="t('zcard.product.stockCard')" value="card" />
+                  <ElOption :label="t('zcard.product.stockUrl')" value="url" />
+                  <ElOption :label="t('zcard.product.stockCode')" value="code" />
                 </ElSelect>
                 <span v-else>{{ stockTypeLabel(row.stock_type) }}</span>
               </template>
             </ElTableColumn>
-            <ElTableColumn label="排序 (Sort)" width="110">
+            <ElTableColumn :label="t('zcard.product.sort')" width="110">
               <template #default="{ row }">
                 <ElInputNumber
                   v-if="row._editing"
@@ -298,67 +298,67 @@
                 <span v-else>{{ row.sort ?? 0 }}</span>
               </template>
             </ElTableColumn>
-            <ElTableColumn label="状态 (Status)" width="90" align="center">
+            <ElTableColumn :label="t('zcard.product.status')" width="90" align="center">
               <template #default="{ row }">
                 <ElSwitch v-if="row._editing" v-model="row.status" size="small" />
                 <ElTag v-else :type="row.status ? 'success' : 'info'" effect="plain" size="small">
-                  {{ row.status ? '启用' : '禁用' }}
+                  {{ row.status ? t('zcard.category.statusOn') : t('zcard.category.statusOff') }}
                 </ElTag>
               </template>
             </ElTableColumn>
-            <ElTableColumn label="操作 (Actions)" width="170" align="center" fixed="right">
+            <ElTableColumn :label="t('zcard.common.actions')" width="170" align="center" fixed="right">
               <template #default="{ row, $index }">
                 <template v-if="row._editing">
                   <ElButton type="primary" link size="small" @click="saveSkuRow(row)">
-                    保存 (Save)
+                    {{ t('zcard.common.save') }}
                   </ElButton>
                   <ElButton link size="small" @click="cancelSkuRow(row, $index)">
-                    取消 (Cancel)
+                    {{ t('zcard.common.cancel') }}
                   </ElButton>
                 </template>
                 <template v-else>
                   <ElButton type="primary" link size="small" @click="editSkuRow(row)">
-                    编辑 (Edit)
+                    {{ t('zcard.common.edit') }}
                   </ElButton>
                   <ElButton type="danger" link size="small" @click="deleteSkuRow(row, $index)">
-                    删除 (Delete)
+                    {{ t('zcard.common.delete') }}
                   </ElButton>
                 </template>
               </template>
             </ElTableColumn>
           </ElTable>
           <div v-if="!skuList.length" class="sku-empty">
-            暂无 SKU,点击右上角「新增 SKU」(No SKU yet, click "Add" above)
+            {{ t('zcard.product.skuEmpty') }}
           </div>
         </ElFormItem>
 
         <ElFormItem
           v-else
-          label="SKU 管理 (SKU)"
+          :label="t('zcard.product.skuSection')"
         >
           <ElAlert
             type="info"
             :closable="false"
-            title="保存商品后即可管理 SKU (Save product first to manage SKUs)"
+            :title="t('zcard.product.skuSaveFirst')"
           />
         </ElFormItem>
 
         <!-- 设置 -->
-        <div class="section-title">设置 (Settings)</div>
+        <div class="section-title">{{ t('zcard.product.settings') }}</div>
 
-        <ElFormItem label="发放模式 (Delivery Mode)">
+        <ElFormItem :label="t('zcard.product.deliveryMode')">
           <ElSelect v-model="formData.delivery_mode" style="width: 100%">
-            <ElOption label="标记已发 (status=保留)" value="status" />
-            <ElOption label="发货即删 (delete=物理删除)" value="delete" />
+            <ElOption :label="t('zcard.product.deliveryStatus')" value="status" />
+            <ElOption :label="t('zcard.product.deliveryDelete')" value="delete" />
           </ElSelect>
         </ElFormItem>
 
-        <ElFormItem label="推荐商品 (Featured)">
+        <ElFormItem :label="t('zcard.product.isFeatured')">
           <ElSwitch v-model="formData.is_featured" />
-          <span class="ml-2">{{ formData.is_featured ? '推荐' : '普通' }}</span>
+          <span class="ml-2">{{ formData.is_featured ? t('zcard.product.featured') : t('zcard.product.featuredPlain') }}</span>
         </ElFormItem>
 
-        <ElFormItem label="虚拟销量 (Virtual Sales)">
+        <ElFormItem :label="t('zcard.product.virtualSales')">
           <ElInputNumber
             v-model="formData.virtual_sales"
             :min="0"
@@ -368,7 +368,7 @@
           />
         </ElFormItem>
 
-        <ElFormItem label="最小购买 (Min Order)">
+        <ElFormItem :label="t('zcard.product.minOrder')">
           <ElInputNumber
             v-model="formData.min_order"
             :min="1"
@@ -378,7 +378,7 @@
           />
         </ElFormItem>
 
-        <ElFormItem label="最大购买 (Max Order)">
+        <ElFormItem :label="t('zcard.product.maxOrder')">
           <ElInputNumber
             v-model="formData.max_order"
             :min="0"
@@ -386,10 +386,10 @@
             controls-position="right"
             style="width: 220px"
           />
-          <span class="form-hint">0 = 不限 (0 = unlimited)</span>
+          <span class="form-hint">{{ t('zcard.product.maxOrderHint') }}</span>
         </ElFormItem>
 
-        <ElFormItem label="排序 (Sort)">
+        <ElFormItem :label="t('zcard.product.sort')">
           <ElInputNumber
             v-model="formData.sort"
             :step="1"
@@ -398,16 +398,16 @@
           />
         </ElFormItem>
 
-        <ElFormItem label="状态 (Status)">
+        <ElFormItem :label="t('zcard.product.status')">
           <ElSwitch v-model="formData.status" :active-value="1" :inactive-value="0" />
-          <span class="ml-2">{{ formData.status ? '上架' : '下架' }}</span>
+          <span class="ml-2">{{ formData.status ? t('zcard.product.statusOn') : t('zcard.product.statusOff') }}</span>
         </ElFormItem>
       </ElForm>
 
       <template #footer>
-        <ElButton @click="dialogVisible = false">取消 (Cancel)</ElButton>
+        <ElButton @click="dialogVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
         <ElButton type="primary" :loading="submitting" @click="handleSubmit">
-          确定 (OK)
+          {{ t('zcard.common.ok') }}
         </ElButton>
       </template>
     </ElDialog>
@@ -418,6 +418,7 @@
   import type { FormInstance, FormRules, UploadFile, UploadRequestOptions } from 'element-plus'
   import { ElMessage, ElMessageBox } from 'element-plus'
   import { Plus } from '@element-plus/icons-vue'
+  import { useI18n } from 'vue-i18n'
   import {
     getProducts,
     createProduct,
@@ -437,6 +438,8 @@
 
   defineOptions({ name: 'ProductList' })
 
+  const { t } = useI18n()
+
   interface Category {
     id: number
     name: string
@@ -446,17 +449,17 @@
   /** 金额分 -> 元(两位小数) */
   const formatPrice = (fen: number): string => ((Number(fen) || 0) / 100).toFixed(2)
 
-  /** 库存类型中文标签 */
-  const stockTypeLabel = (t?: string): string => {
-    switch (t) {
+  /** 库存类型标签 */
+  const stockTypeLabel = (type?: string): string => {
+    switch (type) {
       case 'card':
-        return '卡密 (Card)'
+        return t('zcard.product.stockCard')
       case 'url':
-        return '链接 (URL)'
+        return t('zcard.product.stockUrl')
       case 'code':
-        return '兑换码 (Code)'
+        return t('zcard.product.stockCode')
       default:
-        return t || '-'
+        return type || '-'
     }
   }
 
@@ -543,7 +546,7 @@
   const formRef = ref<FormInstance>()
 
   const dialogTitle = computed(() =>
-    dialogType.value === 'create' ? '新增商品 (New Product)' : '编辑商品 (Edit Product)'
+    dialogType.value === 'create' ? t('zcard.product.add') : t('zcard.product.edit')
   )
 
   interface ProductForm {
@@ -585,21 +588,21 @@
   const formData = reactive<ProductForm>(createEmptyForm())
   const memberPriceText = ref('')
 
-  const formRules: FormRules = {
-    name: [{ required: true, message: '请输入商品名 (Name required)', trigger: 'blur' }],
-    priceYuan: [{ required: true, message: '请输入价格 (Price required)', trigger: 'blur' }]
-  }
+  const formRules = computed<FormRules>(() => ({
+    name: [{ required: true, message: t('zcard.product.nameRequired'), trigger: 'blur' }],
+    priceYuan: [{ required: true, message: t('zcard.product.priceRequired'), trigger: 'blur' }]
+  }))
 
   /** 上传前校验 */
   const beforeUpload = (file: File): boolean => {
     const isImage = file.type.startsWith('image/')
     const underLimit = file.size / 1024 / 1024 < 5
     if (!isImage) {
-      ElMessage.error('只能上传图片 (Images only)')
+      ElMessage.error(t('zcard.product.uploadImageOnly'))
       return false
     }
     if (!underLimit) {
-      ElMessage.error('图片大小不能超过 5MB (Max 5MB)')
+      ElMessage.error(t('zcard.product.uploadMaxSize'))
       return false
     }
     return true
@@ -612,7 +615,7 @@
     try {
       const res = await uploadImage(file)
       formData.cover = res.url
-      ElMessage.success('封面上传成功 (Cover uploaded)')
+      ElMessage.success(t('zcard.product.coverUploaded'))
     } catch {
       // 错误消息由 http 拦截器统一提示
     }
@@ -706,7 +709,7 @@
   /** 保存 SKU 行(新增/更新) */
   const saveSkuRow = async (row: SkuRow) => {
     if (!row.name?.trim()) {
-      ElMessage.warning('请输入 SKU 名称 (Name required)')
+      ElMessage.warning(t('zcard.product.skuNameRequired'))
       return
     }
     const payload: Sku = {
@@ -726,7 +729,7 @@
           _isNew: false,
           _editing: false
         })
-        ElMessage.success('SKU 已新增 (SKU added)')
+        ElMessage.success(t('zcard.product.skuAdded'))
       } else {
         const updated = await updateSku(row.id, payload)
         Object.assign(row, updated, {
@@ -734,7 +737,7 @@
           status: !!updated.status,
           _editing: false
         })
-        ElMessage.success('SKU 已更新 (SKU updated)')
+        ElMessage.success(t('zcard.product.skuUpdated'))
       }
     } catch {
       // 错误消息由 http 拦截器统一提示
@@ -743,9 +746,9 @@
 
   /** 删除 SKU 行 */
   const deleteSkuRow = (row: SkuRow, index: number) => {
-    ElMessageBox.confirm(`确定删除 SKU「${row.name}」吗? (Delete this SKU?)`, '删除 SKU', {
-      confirmButtonText: '确定 (OK)',
-      cancelButtonText: '取消 (Cancel)',
+    ElMessageBox.confirm(t('zcard.product.deleteSkuConfirm', { name: row.name }), t('zcard.product.deleteSkuTitle'), {
+      confirmButtonText: t('zcard.common.ok'),
+      cancelButtonText: t('zcard.common.cancel'),
       type: 'warning'
     })
       .then(async () => {
@@ -753,7 +756,7 @@
           try {
             await deleteSku(row.id)
             skuList.value.splice(index, 1)
-            ElMessage.success('SKU 已删除 (SKU deleted)')
+            ElMessage.success(t('zcard.product.skuDeleted'))
           } catch {
             // 错误消息由 http 拦截器统一提示
           }
@@ -843,11 +846,11 @@
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
           memberPrice = parsed as Record<string, number>
         } else {
-          ElMessage.error('会员价 JSON 格式不正确 (Invalid Member Price JSON)')
+          ElMessage.error(t('zcard.product.memberPriceInvalid'))
           return
         }
       } catch {
-        ElMessage.error('会员价 JSON 格式不正确 (Invalid Member Price JSON)')
+        ElMessage.error(t('zcard.product.memberPriceInvalid'))
         return
       }
     }
@@ -876,10 +879,10 @@
     try {
       if (dialogType.value === 'create') {
         await createProduct(payload)
-        ElMessage.success('新增成功 (Created)')
+        ElMessage.success(t('zcard.product.created'))
       } else if (editId.value !== null) {
         await updateProduct(editId.value, payload)
-        ElMessage.success('更新成功 (Updated)')
+        ElMessage.success(t('zcard.product.updated'))
       }
       dialogVisible.value = false
       fetchData()
@@ -892,15 +895,15 @@
 
   /** 删除商品 */
   const handleDelete = (row: Product) => {
-    ElMessageBox.confirm(`确定要删除商品「${row.name}」吗? (Delete product?)`, '删除商品', {
-      confirmButtonText: '确定 (OK)',
-      cancelButtonText: '取消 (Cancel)',
+    ElMessageBox.confirm(t('zcard.product.deleteConfirm', { name: row.name }), t('zcard.product.deleteTitle'), {
+      confirmButtonText: t('zcard.common.ok'),
+      cancelButtonText: t('zcard.common.cancel'),
       type: 'warning'
     })
       .then(async () => {
         try {
           await deleteProduct(row.id)
-          ElMessage.success('删除成功 (Deleted)')
+          ElMessage.success(t('zcard.common.deleteSuccess'))
           fetchData()
         } catch {
           // 错误消息由 http 拦截器统一提示

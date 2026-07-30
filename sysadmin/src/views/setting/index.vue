@@ -5,21 +5,21 @@
       <ElForm :model="form" label-width="140px" class="setting-form">
         <!-- 布局 -->
         <div class="section">
-          <div class="section-title">布局</div>
-          <ElFormItem label="分类导航样式">
+          <div class="section-title">{{ t('zcard.setting.layout') }}</div>
+          <ElFormItem :label="t('zcard.setting.categoryNavStyle')">
             <ElRadioGroup v-model="form.category_nav_style">
-              <ElRadio value="sidebar">侧边栏</ElRadio>
-              <ElRadio value="top">顶部</ElRadio>
-              <ElRadio value="drawer">抽屉</ElRadio>
+              <ElRadio value="sidebar">{{ t('zcard.setting.navSidebar') }}</ElRadio>
+              <ElRadio value="top">{{ t('zcard.setting.navTop') }}</ElRadio>
+              <ElRadio value="drawer">{{ t('zcard.setting.navDrawer') }}</ElRadio>
             </ElRadioGroup>
           </ElFormItem>
-          <ElFormItem label="默认列表视图">
+          <ElFormItem :label="t('zcard.setting.listDefaultView')">
             <ElRadioGroup v-model="form.list_default_view">
-              <ElRadio value="grid">网格</ElRadio>
-              <ElRadio value="list">列表</ElRadio>
+              <ElRadio value="grid">{{ t('zcard.setting.viewGrid') }}</ElRadio>
+              <ElRadio value="list">{{ t('zcard.setting.viewList') }}</ElRadio>
             </ElRadioGroup>
           </ElFormItem>
-          <ElFormItem label="网格列数">
+          <ElFormItem :label="t('zcard.setting.gridColumns')">
             <ElInputNumber
               v-model="form.grid_columns"
               :min="2"
@@ -31,28 +31,28 @@
 
         <!-- 展示项 -->
         <div class="section">
-          <div class="section-title">展示项</div>
-          <ElFormItem label="显示库存">
+          <div class="section-title">{{ t('zcard.setting.displayItems') }}</div>
+          <ElFormItem :label="t('zcard.setting.showStock')">
             <ElSwitch v-model="form.show_stock" />
           </ElFormItem>
-          <ElFormItem label="显示销量">
+          <ElFormItem :label="t('zcard.setting.showSales')">
             <ElSwitch v-model="form.show_sales" />
           </ElFormItem>
-          <ElFormItem label="显示价格">
+          <ElFormItem :label="t('zcard.setting.showPrice')">
             <ElSwitch v-model="form.show_price" />
           </ElFormItem>
-          <ElFormItem label="显示商品描述">
+          <ElFormItem :label="t('zcard.setting.showDescription')">
             <ElSwitch v-model="form.show_description" />
           </ElFormItem>
         </div>
 
         <!-- 首页推荐 -->
         <div class="section">
-          <div class="section-title">首页推荐</div>
-          <ElFormItem label="启用首页推荐">
+          <div class="section-title">{{ t('zcard.setting.featured') }}</div>
+          <ElFormItem :label="t('zcard.setting.showFeatured')">
             <ElSwitch v-model="form.featured_enabled" />
           </ElFormItem>
-          <ElFormItem label="推荐数量">
+          <ElFormItem :label="t('zcard.setting.featuredLimit')">
             <ElInputNumber
               v-model="form.featured_limit"
               :min="1"
@@ -64,27 +64,27 @@
 
         <!-- 热门标签 -->
         <div class="section">
-          <div class="section-title">热门标签</div>
-          <ElFormItem label="启用热门标签">
+          <div class="section-title">{{ t('zcard.setting.hotTags') }}</div>
+          <ElFormItem :label="t('zcard.setting.showHotTags')">
             <ElSwitch v-model="form.hot_tags_enabled" />
           </ElFormItem>
-          <ElFormItem label="热门标签">
+          <ElFormItem :label="t('zcard.setting.hotTags')">
             <ElInput
               v-model="form.hot_tags"
               type="textarea"
               :rows="3"
-              placeholder="多个标签用英文逗号分隔，如：优惠,新品,热销"
+              :placeholder="t('zcard.setting.hotTagsPlaceholder')"
             />
           </ElFormItem>
         </div>
 
         <!-- 下单设置 -->
         <div class="section">
-          <div class="section-title">下单设置</div>
-          <ElFormItem label="允许游客下单">
+          <div class="section-title">{{ t('zcard.setting.checkoutSettings') }}</div>
+          <ElFormItem :label="t('zcard.setting.guestCheckout')">
             <ElSwitch v-model="form.guest_checkout" />
           </ElFormItem>
-          <ElFormItem label="订单超时(分钟)">
+          <ElFormItem :label="t('zcard.setting.orderExpireMinutes')">
             <ElInputNumber
               v-model="form.order_expire_minutes"
               :min="1"
@@ -92,15 +92,15 @@
               controls-position="right"
             />
           </ElFormItem>
-          <ElFormItem label="必填联系方式">
+          <ElFormItem :label="t('zcard.setting.requireContact')">
             <ElSwitch v-model="form.require_contact" />
           </ElFormItem>
         </div>
       </ElForm>
 
       <div class="form-footer">
-        <ElButton @click="loadSettings">重置</ElButton>
-        <ElButton type="primary" :loading="saving" @click="handleSave">保存设置</ElButton>
+        <ElButton @click="loadSettings">{{ t('zcard.common.reset') }}</ElButton>
+        <ElButton type="primary" :loading="saving" @click="handleSave">{{ t('zcard.setting.save') }}</ElButton>
       </div>
     </ElCard>
   </div>
@@ -108,9 +108,12 @@
 
 <script setup lang="ts">
   import { ElMessage } from 'element-plus'
+  import { useI18n } from 'vue-i18n'
   import { getSettings, updateSettings, type Settings } from '@/api/settings'
 
   defineOptions({ name: 'SettingIndex' })
+
+  const { t } = useI18n()
 
   /**
    * 表单结构：所有字段在表单中显式声明，便于渲染。
@@ -218,7 +221,7 @@
       const payload: Settings = { ...raw.value, ...form }
       await updateSettings(payload)
       raw.value = payload
-      ElMessage.success('保存成功')
+      ElMessage.success(t('zcard.setting.saveSuccess'))
     } catch (e) {
       // 拦截器处理
     } finally {
