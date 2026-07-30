@@ -626,7 +626,7 @@
       "batchFailed": "Failed",
       "batchId": "Batch ID",
       "content": "Card Content",
-      "importPlaceholder": "One card per line, duplicates and blank lines are ignored",
+      "importPlaceholder": "One card per line, blank lines ignored. Enable dedup toggle below to skip duplicates",
       "lineCount": "{n} lines",
       "startImport": "Start Import",
       "importResult": "Import finished: {success} succeeded, {failed} failed",

@@ -626,7 +626,7 @@
       "batchFailed": "失败",
       "batchId": "批次ID",
       "content": "卡密内容",
-      "importPlaceholder": "每行一条卡密，自动去重并忽略空行",
+      "importPlaceholder": "每行一条卡密，自动忽略空行。如需去重请开启下方导入去重开关",
       "lineCount": "当前共 {n} 行",
       "startImport": "开始导入",
       "importResult": "导入完成：成功 {success} 条，失败 {failed} 条",
