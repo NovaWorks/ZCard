@@ -1,9 +1,12 @@
 <?php
 
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CardController;
 use App\Http\Controllers\Api\CardImportController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\StorefrontSettingsController;
@@ -13,8 +16,6 @@ use Illuminate\Support\Facades\Route;
 Route::get('/health', HealthController::class)->name('api.health');
 
 // 前台认证(游客,不需 auth)
-use App\Http\Controllers\Api\AuthController;
-
 Route::post('/auth/register', [AuthController::class, 'register'])->name('api.auth.register');
 Route::post('/auth/login', [AuthController::class, 'login'])->name('api.auth.login');
 
@@ -26,10 +27,36 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // 后台管理 API(Sanctum token)
+use App\Http\Controllers\Api\Admin\CardController as AdminCardController;
+use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
+use App\Http\Controllers\Api\Admin\PaymentChannelController as AdminPaymentChannelController;
 use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
+use App\Http\Controllers\Api\Admin\SettingController as AdminSettingController;
+use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::apiResource('products', AdminProductController::class);
+
+    // 用户管理(CRUD + 角色分配)
+    Route::apiResource('users', AdminUserController::class);
+
+    // 订单管理(只读列表/详情 + 手动关单)
+    Route::apiResource('orders', AdminOrderController::class)->only(['index', 'show']);
+    Route::post('orders/{id}/close', [AdminOrderController::class, 'close']);
+
+    // 卡密管理(不含明文,安全)
+    Route::get('cards', [AdminCardController::class, 'index']);
+    Route::post('cards/import', [AdminCardController::class, 'import']);
+    Route::post('cards/disable', [AdminCardController::class, 'disable']);
+    Route::get('cards/import-batches', [AdminCardController::class, 'importBatches']);
+
+    // 支付通道配置
+    Route::apiResource('payment-channels', AdminPaymentChannelController::class)->only(['index', 'update']);
+    Route::get('payment-channels/{id}/config-fields', [AdminPaymentChannelController::class, 'configFields']);
+
+    // 店铺外观配置
+    Route::get('settings', [AdminSettingController::class, 'index']);
+    Route::put('settings', [AdminSettingController::class, 'update']);
 });
 
 Route::get('/categories', [CategoryController::class, 'index'])->name('api.categories');
@@ -56,15 +83,11 @@ Route::middleware('auth:sanctum')->get('/products/{id}/stock', [CardController::
 Route::middleware('auth:sanctum')->get('/cards', [CardController::class, 'index'])->name('api.cards.index');
 
 // 订单(游客,不需 auth)— API-first:前台和后台都调 OrderService
-use App\Http\Controllers\Api\OrderController;
-
 Route::post('/orders', [OrderController::class, 'create'])->name('api.orders.create');
 Route::post('/orders/{orderNo}/mock-pay', [OrderController::class, 'mockPay'])->name('api.orders.mock-pay');
 Route::get('/orders/query', [OrderController::class, 'query'])->name('api.orders.query');
 
 // 支付(游客 + 回调,不需 auth)
-use App\Http\Controllers\Api\PaymentController;
-
 Route::get('/payments/channels', [PaymentController::class, 'channels'])->name('api.payments.channels');
 Route::post('/payments/create', [PaymentController::class, 'create'])->name('api.payments.create');
 Route::post('/payments/callback/{channel}', [PaymentController::class, 'callback'])->name('api.payments.callback');
