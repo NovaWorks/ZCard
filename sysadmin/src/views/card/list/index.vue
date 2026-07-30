@@ -354,10 +354,17 @@
       </div>
 
       <template #footer>
-        <ElButton @click="editDrawerVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
-        <ElButton type="primary" :loading="editSubmitting" @click="handleSaveEdit">
-          {{ t('zcard.common.save') }}
-        </ElButton>
+        <div style="display: flex; justify-content: space-between; width: 100%">
+          <ElButton type="danger" :icon="Delete" @click="handleDeleteFromEdit">
+            {{ t('zcard.card.deleteCard') }}
+          </ElButton>
+          <div>
+            <ElButton @click="editDrawerVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
+            <ElButton type="primary" :loading="editSubmitting" @click="handleSaveEdit">
+              {{ t('zcard.common.save') }}
+            </ElButton>
+          </div>
+        </div>
       </template>
     </ElDrawer>
   </div>
@@ -366,7 +373,7 @@
 <script setup lang="ts">
   import type { FormInstance, FormRules } from 'element-plus'
   import { ElMessage, ElMessageBox } from 'element-plus'
-  import { Lock } from '@element-plus/icons-vue'
+  import { Lock, Delete } from '@element-plus/icons-vue'
   import { useI18n } from 'vue-i18n'
   import {
     getCards,
@@ -789,6 +796,30 @@
     } finally {
       editSubmitting.value = false
     }
+  }
+
+  /** 从编辑抽屉删除当前卡密 */
+  const handleDeleteFromEdit = () => {
+    ElMessageBox.confirm(
+      t('zcard.card.deleteConfirmMsg'),
+      t('zcard.card.deleteConfirmTitle'),
+      {
+        confirmButtonText: t('zcard.card.deleteConfirmBtn'),
+        cancelButtonText: t('zcard.common.cancel'),
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger'
+      }
+    ).then(async () => {
+      try {
+        await deleteCards([editData.value.id])
+        ElMessage.success(t('zcard.common.deleteSuccess'))
+        editDrawerVisible.value = false
+        fetchData()
+        fetchStats()
+      } catch {
+        ElMessage.error(t('zcard.common.operationFailed'))
+      }
+    }).catch(() => {})
   }
 
   onMounted(() => {

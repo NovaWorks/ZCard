@@ -661,7 +661,11 @@
       "to": "to",
       "cardContent": "Card Content",
       "revealFailed": "Failed to retrieve",
-      "editCard": "Edit Card"
+      "editCard": "Edit Card",
+      "deleteCard": "Delete Card",
+      "deleteConfirmTitle": "Are you sure?",
+      "deleteConfirmMsg": "You are about to delete this card. This action cannot be undone!",
+      "deleteConfirmBtn": "Delete"
     },
     "user": {
       "title": "Users",

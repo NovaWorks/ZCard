@@ -661,7 +661,11 @@
       "to": "至",
       "cardContent": "卡密内容",
       "revealFailed": "获取失败",
-      "editCard": "编辑卡密"
+      "editCard": "编辑卡密",
+      "deleteCard": "删除卡密",
+      "deleteConfirmTitle": "您确定吗？",
+      "deleteConfirmMsg": "您正在进行删除卡密操作，此操作无法撤销！",
+      "deleteConfirmBtn": "确定删除"
     },
     "user": {
       "title": "用户管理",
