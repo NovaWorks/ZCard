@@ -5,10 +5,14 @@ const request = axios.create({
   timeout: 10000,
 })
 
-// 请求拦截器：带 token（Phase 1 接入认证后填充）
+// 请求拦截器：带 token + 货币/语言偏好头
 request.interceptors.request.use((config) => {
   const token = localStorage.getItem('zcard_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
+  const cur = localStorage.getItem('zcard_currency')
+  if (cur) config.headers['X-Currency'] = cur
+  const lang = localStorage.getItem('zcard_language')
+  if (lang) config.headers['X-Lang'] = lang
   return config
 })
 
