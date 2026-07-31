@@ -4,31 +4,68 @@
 @source inline("grid-cols-3 grid-cols-4 grid-cols-5");
 
 /*
- * ZCard 前台设计 token（spec §5）：浅色、主色蓝 #2563EB。
- * Tailwind v4 用 @theme 定义，生成对应 utility 类（bg-primary / text-ink / rounded-card 等）。
+ * ZCard 前台设计 token：参考 Material Blue + acg-faka 经典发卡配色。
+ * - 主色: 深邃专业的蓝 #2563EB(比 #2196F3 更克制稳重)
+ * - 价格: 橙红 #FF5722(发卡行业经典,与蓝主色形成强对比,凸显促销)
+ * - 圆角/阴影: 更柔和现代
+ * Tailwind v4 用 @theme 定义,生成对应 utility 类(bg-primary / text-price 等)。
  */
 @theme {
-  --color-primary: #009EF7;
-  --color-success: #10b981;
+  /* ---- 品牌主色 (蓝) ---- */
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-light: #eff6ff;
+  --color-primary-soft: #dbeafe;
+
+  /* ---- 功能色 ---- */
+  --color-success: #16a34a;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
-  --color-accent: #8b5cf6;
 
+  /* ---- 价格强调色 (橙红,发卡经典) ---- */
+  --color-price: #ff5722;
+  --color-price-light: #fff3ed;
+
+  /* ---- 文字层级 ---- */
   --color-ink: #111827;
-  --color-ink-soft: #374151;
-  --color-ink-muted: #6b7280;
+  --color-ink-soft: #4b5563;
+  --color-ink-muted: #9ca3af;
 
+  /* ---- 背景表面 ---- */
   --color-surface: #ffffff;
-  --color-surface-subtle: #f9fafb;
+  --color-surface-subtle: #f5f7fa;
+  --color-border: #e5e7eb;
 
-  --radius-card: 8px;
-  --radius-field: 4px;
+  /* ---- 圆角 (更柔和) ---- */
+  --radius-card: 12px;
+  --radius-field: 8px;
+  --radius-pill: 999px;
 
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.1);
+  /* ---- 阴影 (更柔和有层次) ---- */
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+  --shadow-card-hover: 0 4px 6px -1px rgba(16, 24, 40, 0.08), 0 2px 4px -2px rgba(16, 24, 40, 0.06);
+  --shadow-pop: 0 10px 15px -3px rgba(16, 24, 40, 0.1), 0 4px 6px -4px rgba(16, 24, 40, 0.05);
+
+  /* ---- 字体 ---- */
+  --font-sans: "Inter", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 body {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-sans);
   color: var(--color-ink);
-  background-color: var(--color-surface);
+  background-color: var(--color-surface-subtle);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* 链接过渡 */
+a, button { transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease; }
+
+/* 路由激活态(router-link-active)统一主色 */
+.router-link-active { color: var(--color-primary); }
+
+/* 滚动条美化 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }

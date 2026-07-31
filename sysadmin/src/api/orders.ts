@@ -4,10 +4,10 @@
  * 后端 /api/admin/orders，Sanctum 鉴权。
  * 金额一律以「分」为单位，前端展示需 / 100 转为元。
  */
-import request from '@/utils/http'
+import http from '@/utils/http'
 
-/** 订单状态：pending 待支付 / paid 已支付 / closed 已关闭 */
-export type OrderStatus = 'pending' | 'paid' | 'closed'
+/** 订单状态 */
+export type OrderStatus = 'pending' | 'paid' | 'closed' | 'refunded'
 
 /** 订单实体 */
 export interface Order {
@@ -16,21 +16,23 @@ export interface Order {
   product_id: number
   product?: { id: number; name: string }
   quantity: number
-  /** 金额，单位：分 */
+  sku_name: string | null
   amount: number
+  cost: number
+  payment_channel: string | null
   status: OrderStatus
   contact: string | null
-  email: string | null
   paid_at: string | null
   closed_at: string | null
   created_at: string
   updated_at: string
-  /** 已发货的卡密列表（详情接口返回） */
+  order_deliveries_count: number
+  /** 详情接口返回的发货列表 */
   deliveries?: Array<{
     id: number
-    card_id: number
-    content: string
-    created_at: string
+    card_content: string
+    delivered_mode: string
+    delivered_at: string
   }>
 }
 
@@ -43,21 +45,48 @@ export interface OrderPage {
   per_page: number
 }
 
+/** 统计数据 */
+export interface OrderStats {
+  total_count: number
+  pending_amount: number
+  total_amount: number
+  paid_amount: number
+  refunded_amount: number
+  total_cost: number
+}
+
 /** 列表查询参数 */
 export interface OrderListParams {
   page?: number
   pageSize?: number
   keyword?: string
   status?: OrderStatus
+  payment_channel?: string
+  product_id?: number
+  start_date?: string
+  end_date?: string
+  delivery_status?: 'pending' | 'delivered'
+  user_type?: 'guest' | 'member'
+  create_device?: 'win' | 'mac' | 'ios' | 'android' | 'other'
+  create_ip?: string
 }
 
 /** 获取订单列表 */
 export const getOrders = (params: OrderListParams) =>
-  request.get<OrderPage>({ url: '/admin/orders', params })
+  http.get<OrderPage>({ url: '/admin/orders', params })
 
 /** 获取订单详情 */
-export const getOrder = (id: number) => request.get<Order>({ url: `/admin/orders/${id}` })
+export const getOrder = (id: number) =>
+  http.get<Order>({ url: `/admin/orders/${id}` })
 
 /** 关闭订单 */
 export const closeOrder = (id: number) =>
-  request.post<Order>({ url: `/admin/orders/${id}/close` })
+  http.post<Order>({ url: `/admin/orders/${id}/close` })
+
+/** 统计数据 */
+export const getStats = (params: OrderListParams) =>
+  http.get<OrderStats>({ url: '/admin/orders/stats', params })
+
+/** 清理无用订单 */
+export const clearOrders = () =>
+  http.post<{ cleared: number }>({ url: '/admin/orders/clear' })

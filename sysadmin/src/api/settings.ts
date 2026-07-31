@@ -6,8 +6,8 @@
  */
 import request from '@/utils/http'
 
-/** 设置项（扁平键值对） */
-export type Settings = Record<string, string | number | boolean | null>
+/** 设置项（扁平键值对，值可为标量或数组如 footer_links） */
+export type Settings = Record<string, string | number | boolean | null | any[]>
 
 /** 获取店铺设置 */
 export const getSettings = () => request.get<Settings>({ url: '/admin/settings' })

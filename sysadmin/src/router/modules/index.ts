@@ -1,25 +1,17 @@
 import { AppRouteRecord } from '@/types/router'
 import { dashboardRoutes } from './dashboard'
-import { productRoutes } from './product'
-import { categoryRoutes } from './category'
-import { orderRoutes } from './order'
-import { cardRoutes } from './card'
-import { userRoutes } from './user'
-import { memberRoutes } from './member'
-import { paymentRoutes } from './payment'
-import { settingRoutes } from './setting'
+import { catalogRoutes } from './catalog'
+import { tradeRoutes } from './trade'
+import { customerRoutes } from './customer'
+import { systemRoutes } from './system'
 
 /**
- * 导出所有模块化路由
+ * 菜单分组路由(5 个分组:概览 / 商品中心 / 交易管理 / 用户中心 / 系统设置)
  */
 export const routeModules: AppRouteRecord[] = [
   dashboardRoutes,
-  productRoutes,
-  categoryRoutes,
-  orderRoutes,
-  cardRoutes,
-  userRoutes,
-  memberRoutes,
-  paymentRoutes,
-  settingRoutes
+  catalogRoutes,
+  tradeRoutes,
+  customerRoutes,
+  systemRoutes,
 ]

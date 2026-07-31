@@ -40,18 +40,34 @@
       <ElForm
         v-loading="fieldsLoading"
         :model="configForm"
-        label-width="140px"
+        label-width="auto"
         class="config-form"
       >
         <ElFormItem :label="t('zcard.payment.enabledLabel')">
           <ElSwitch v-model="configForm.enabled" :active-text="t('zcard.payment.enable')" :inactive-text="t('zcard.payment.disable')" />
         </ElFormItem>
 
+        <!-- 回调地址提示 -->
+        <el-alert
+          v-if="callbackUrl"
+          type="info"
+          :closable="false"
+          show-icon
+          class="callback-alert"
+        >
+          <template #title>{{ t('zcard.payment.callbackTitle') }}</template>
+          <div class="callback-url-row">
+            <code>{{ callbackUrl }}</code>
+            <el-button text size="small" @click="copyText(callbackUrl)">{{ t('zcard.payment.copy') }}</el-button>
+          </div>
+          <div class="callback-tip">{{ t('zcard.payment.callbackTip') }}</div>
+        </el-alert>
+
         <ElFormItem
           v-for="field in configFields"
           :key="field.key"
           :label="field.label"
-          :required="field.required"
+          :required="field.required && !(isSensitive(field.key) && currentChannel?.config?.[field.key])"
         >
           <ElSwitch
             v-if="field.type === 'switch'"
@@ -81,16 +97,17 @@
             v-model="configForm.values[field.key]"
             type="textarea"
             :rows="3"
-            :placeholder="field.placeholder"
+            :placeholder="isSensitive(field.key) ? t('zcard.payment.sensitivePlaceholder') : field.placeholder"
           />
           <ElInput
             v-else
             v-model="configForm.values[field.key]"
-            :type="field.type === 'password' ? 'password' : 'text'"
+            :type="isSensitive(field.key) ? 'password' : 'text'"
             show-password
-            :placeholder="field.placeholder"
+            :placeholder="isSensitive(field.key) ? t('zcard.payment.sensitivePlaceholder') : field.placeholder"
           />
           <div v-if="field.help" class="field-help">{{ field.help }}</div>
+          <div v-else-if="isSensitive(field.key)" class="field-help">{{ t('zcard.payment.sensitiveTip') }}</div>
         </ElFormItem>
       </ElForm>
       <template #footer>
@@ -139,28 +156,45 @@
   const saving = ref(false)
   const currentChannel = ref<PaymentChannel | null>(null)
   const configFields = ref<ConfigField[]>([])
+  /** 该通道的异步回调地址 */
+  const callbackUrl = ref('')
 
   const configForm = reactive<{ enabled: boolean; values: Record<string, any> }>({
     enabled: false,
     values: {}
   })
 
+  /** 敏感字段名识别(key/secret/token/password/private 等不回显) */
+  const isSensitive = (key: string) =>
+    /(key|secret|token|password|passwd|private|credential|cert)/i.test(key)
+
   /** 打开配置弹窗：拉取动态字段 + 当前配置 */
   const openConfig = async (channel: PaymentChannel) => {
     currentChannel.value = channel
     configForm.enabled = !!channel.enabled
-    configForm.values = { ...(channel.config || {}) }
     configFields.value = []
+    callbackUrl.value = ''
     configVisible.value = true
 
     fieldsLoading.value = true
     try {
-      const fields = await getConfigFields(channel.id)
+      const result = await getConfigFields(channel.id)
+      const fields = result?.fields ?? []
       configFields.value = Array.isArray(fields) ? fields : []
-      // 用字段默认值补齐缺失项
+      callbackUrl.value = result?.callback_url ?? ''
+
+      // 回填当前配置;敏感字段不回显(置空,留空=保留旧值)
+      const saved = channel.config || {}
+      configForm.values = {}
       configFields.value.forEach((f) => {
-        if (configForm.values[f.key] === undefined && f.default !== undefined) {
+        if (isSensitive(f.key)) {
+          configForm.values[f.key] = '' // 不回显,留空表示保留
+        } else if (saved[f.key] !== undefined) {
+          configForm.values[f.key] = saved[f.key]
+        } else if (f.default !== undefined) {
           configForm.values[f.key] = f.default
+        } else {
+          configForm.values[f.key] = ''
         }
       })
     } catch (e) {
@@ -170,14 +204,33 @@
     }
   }
 
+  /** 复制文本 */
+  const copyText = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      ElMessage.success(t('zcard.payment.copied'))
+    } catch {
+      ElMessage.warning(text)
+    }
+  }
+
   /** 保存配置 */
   const handleSave = async () => {
     if (!currentChannel.value) return
+    // 敏感字段为空时,不回传(保留后端已存值);非空才更新
+    const values: Record<string, any> = {}
+    configFields.value.forEach((f) => {
+      const val = configForm.values[f.key]
+      if (isSensitive(f.key) && (val === '' || val === null || val === undefined)) {
+        return // 留空 = 保留旧值,不传
+      }
+      values[f.key] = val
+    })
     saving.value = true
     try {
       await updateChannel(currentChannel.value.id, {
         enabled: configForm.enabled,
-        config: { ...configForm.values }
+        config: values
       })
       ElMessage.success(t('zcard.payment.saved'))
       configVisible.value = false
@@ -266,6 +319,32 @@
   }
 
   .field-help {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+
+  .callback-alert {
+    margin-bottom: 18px;
+  }
+
+  .callback-url-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+
+    code {
+      flex: 1;
+      padding: 4px 8px;
+      font-size: 12px;
+      word-break: break-all;
+      background: var(--el-fill-color-light);
+      border-radius: 4px;
+    }
+  }
+
+  .callback-tip {
     margin-top: 4px;
     font-size: 12px;
     color: var(--el-text-color-secondary);

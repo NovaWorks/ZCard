@@ -155,8 +155,12 @@
   const { getMenuOpenWidth, menuType, uniqueOpened, dualMenuShowText, menuOpen, getMenuTheme } =
     storeToRefs(settingStore)
 
-  // 组件内部状态
-  const defaultOpenedMenus = ref<string[]>([])
+  // 组件内部状态 — 默认展开所有分组菜单
+  const defaultOpenedMenus = computed(() => {
+    return useMenuStore().menuList
+      .filter((m) => !m.meta.isHide && m.children?.length)
+      .map((m) => m.path)
+  })
   const isMobileMode = ref(false)
   const showMobileModal = ref(false)
 

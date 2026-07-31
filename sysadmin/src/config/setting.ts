@@ -65,8 +65,8 @@ export const SETTING_DEFAULT_CONFIG = {
   watermarkVisible: false,
   /** 是否自动关闭 */
   autoClose: false,
-  /** 是否唯一展开 */
-  uniqueOpened: true,
+  /** 是否唯一展开(改为 false,允许多个分组同时展开) */
+  uniqueOpened: false,
   /** 是否色弱模式 */
   colorWeak: false,
   /** 是否刷新 */

@@ -47,6 +47,14 @@ export const getChannels = () =>
 export const updateChannel = (id: number, data: Partial<PaymentChannel>) =>
   request.put<PaymentChannel>({ url: `/admin/payment-channels/${id}`, data })
 
+/** config-fields 接口返回结构 */
+export interface ConfigFieldsResult {
+  channel_id: number
+  driver: string
+  fields: ConfigField[]
+  callback_url: string
+}
+
 /** 获取渠道动态配置字段 */
 export const getConfigFields = (id: number) =>
-  request.get<ConfigField[]>({ url: `/admin/payment-channels/${id}/config-fields` })
+  request.get<ConfigFieldsResult>({ url: `/admin/payment-channels/${id}/config-fields` })
