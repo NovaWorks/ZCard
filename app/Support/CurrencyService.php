@@ -57,7 +57,7 @@ class CurrencyService
         $convertedYuan = bcmul($yuan, (string) $cur->exchange_rate, 8);
         // 最小单位 = 元 × 10^decimal_places
         $minUnit = bcpow('10', (string) $cur->decimal_places);
-        $amountMin = bcmul($convertedYuan, $minUnit, 0); // 截断到整数分
+        $amountMin = $this->bcRound(bcmul($convertedYuan, $minUnit, 8)); // 四舍五入到整数分
         return [
             'amount' => (int) $amountMin,
             'rate' => (string) $cur->exchange_rate,
@@ -75,10 +75,24 @@ class CurrencyService
         $minUnit = (string) $minUnit;
         $divisor = bcpow('10', (string) $cur->decimal_places);
         $value = bcdiv($minUnit, $divisor, $cur->decimal_places);
-        $formatted = $cur->symbol_position === 'before'
+        $negative = str_starts_with($value, '-');
+        if ($negative) {
+            $value = ltrim($value, '-'); // 去掉负号,稍后前置
+        }
+        $body = $cur->symbol_position === 'before'
             ? $cur->symbol . $value
             : $value . $cur->symbol;
-        return $formatted;
+        return ($negative ? '-' : '') . $body;
+    }
+
+    /** bcmath 四舍五入到整数( bankers-free, half-up ) */
+    private function bcRound(string $value): string
+    {
+        if ($value[0] === '-') {
+            // 负数: -1.5 → -2 (round half away from zero, consistent with PHP round() default for display)
+            return bcsub($value, '0.5', 0);
+        }
+        return bcadd($value, '0.5', 0);
     }
 
     /** 清缓存(管理员改汇率后调用) */
