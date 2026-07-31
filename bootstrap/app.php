@@ -13,7 +13,17 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // API 路由加入 Session 支持(mews/captcha 验证码需要 session 存储)
+        $middleware->api(prepend: [
+            \Illuminate\Session\Middleware\StartSession::class,
+            \App\Http\Middleware\MaintenanceMiddleware::class,
+        ]);
+        // 确保 StatefulApi 域配置存在(Sanctum SPA 认证也需要)
+        $middleware->statefulApi();
+
+        $middleware->alias([
+            'display.currency' => \App\Http\Middleware\ResolveDisplayCurrency::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
