@@ -38,6 +38,7 @@ Route::middleware('auth:sanctum')->group(function () {
 // 后台管理 API(Sanctum token)
 use App\Http\Controllers\Api\Admin\CardController as AdminCardController;
 use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController;
+use App\Http\Controllers\Api\Admin\CurrencyController as AdminCurrencyController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\BillController as AdminBillController;
 use App\Http\Controllers\Api\Admin\CouponController as AdminCouponController;
@@ -120,6 +121,9 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     // 店铺外观配置
     Route::get('settings', [AdminSettingController::class, 'index']);
     Route::put('settings', [AdminSettingController::class, 'update']);
+
+    // 货币管理(CRUD)
+    Route::apiResource('currencies', AdminCurrencyController::class)->except(['show']);
 });
 
 // 公开货币列表(供前台货币切换器,不需要 display.currency 中间件)
