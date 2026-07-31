@@ -18,7 +18,8 @@ class CurrencyModelTest extends TestCase
             'exchange_rate' => '0.14000000', 'is_base' => false, 'is_enabled' => true, 'sort' => 1,
         ]);
         $this->assertSame('USD', $c->code);
-        $this->assertSame('USD', $c->fresh()->code); // string PK 持久化
-        $this->assertFalse($c->fresh()->is_base);
+        $fresh = $c->fresh();
+        $this->assertSame('USD', $fresh->code); // string PK 持久化
+        $this->assertFalse($fresh->is_base);
     }
 }

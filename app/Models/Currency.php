@@ -18,11 +18,14 @@ class Currency extends Model
         'exchange_rate', 'is_base', 'is_enabled', 'sort',
     ];
 
-    protected $casts = [
-        'decimal_places' => 'integer',
-        'exchange_rate' => 'decimal:8',
-        'is_base' => 'boolean',
-        'is_enabled' => 'boolean',
-        'sort' => 'integer',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'decimal_places' => 'integer',
+            'exchange_rate' => 'decimal:8',
+            'is_base' => 'boolean',
+            'is_enabled' => 'boolean',
+            'sort' => 'integer',
+        ];
+    }
 }
