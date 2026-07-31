@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { getCurrencies, type CurrencyListResponse } from '@/api/currency'
 import type { CurrencyInfo } from '@/utils/money'
+import i18n from '@/locales'
 
 export const usePreferencesStore = defineStore('preferences', {
   state: () => ({
@@ -36,6 +37,7 @@ export const usePreferencesStore = defineStore('preferences', {
     setLanguage(lang: string) {
       this.language = lang
       localStorage.setItem('zcard_language', lang)
+      i18n.global.locale.value = lang
     },
   },
 })
