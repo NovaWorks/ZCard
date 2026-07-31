@@ -5,7 +5,12 @@
     "mine": "我的订单",
     "login": "登录",
     "register": "注册",
-    "logout": "退出"
+    "logout": "退出",
+    "brandBar": {
+      "slogan": "🚀 全球领先的虚拟商品自动发卡平台 · 7×24 小时极速发货",
+      "securePay": "✓ 安全支付",
+      "privacy": "✓ 隐私保护"
+    }
   },
   "common": {
     "buy": "购买",

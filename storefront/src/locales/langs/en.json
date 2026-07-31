@@ -5,7 +5,12 @@
     "mine": "My Orders",
     "login": "Login",
     "register": "Register",
-    "logout": "Logout"
+    "logout": "Logout",
+    "brandBar": {
+      "slogan": "🚀 Leading virtual goods auto-delivery platform · 24/7 instant dispatch",
+      "securePay": "✓ Secure payment",
+      "privacy": "✓ Privacy protected"
+    }
   },
   "common": {
     "buy": "Buy",

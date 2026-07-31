@@ -42,10 +42,10 @@ async function logout() {
   <!-- 顶部品牌条 (深蓝渐变) -->
   <div class="bg-gradient-to-r from-primary-hover to-primary text-white text-xs">
     <div class="max-w-6xl mx-auto px-4 h-8 flex items-center justify-between">
-      <span class="opacity-90">🚀 全球领先的虚拟商品自动发卡平台 · 7×24 小时极速发货</span>
+      <span class="opacity-90">{{ t('nav.brandBar.slogan') }}</span>
       <div class="flex items-center gap-3 opacity-90">
-        <span>✓ 安全支付</span>
-        <span>✓ 隐私保护</span>
+        <span>{{ t('nav.brandBar.securePay') }}</span>
+        <span>{{ t('nav.brandBar.privacy') }}</span>
       </div>
     </div>
   </div>
