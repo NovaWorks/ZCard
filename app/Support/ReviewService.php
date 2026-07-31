@@ -21,13 +21,18 @@ class ReviewService
             ->first();
 
         if (! $order) {
-            throw new \RuntimeException('订单不存在或未支付');
+            throw new \RuntimeException(__('messages.review.order_not_found'));
         }
 
         // 检查是否已评价(unique 约束兜底)
         $exists = Review::where('order_id', $orderId)->where('product_id', $productId)->exists();
         if ($exists) {
-            throw new \RuntimeException('该订单已评价');
+            throw new \RuntimeException(__('messages.review.already_reviewed'));
+        }
+
+        // 检查是否允许用户发布评价
+        if (! StorefrontConfig::get('allow_post_review')) {
+            throw new \RuntimeException(__('messages.review.disabled'));
         }
 
         $needAudit = StorefrontConfig::get('review_need_audit');

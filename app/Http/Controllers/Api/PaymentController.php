@@ -39,7 +39,7 @@ class PaymentController extends Controller
         $order = Order::where('order_no', $data['order_no'])->firstOrFail();
 
         if ($order->status !== 'pending') {
-            return response()->json(['message' => '订单状态异常'], 400);
+            return response()->json(['message' => __('messages.order.status_abnormal')], 400);
         }
 
         try {

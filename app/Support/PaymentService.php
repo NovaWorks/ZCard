@@ -25,7 +25,7 @@ class PaymentService
     {
         $channel = PaymentChannel::findOrFail($channelId);
         if (! $channel->enabled) {
-            throw new \RuntimeException('该支付通道未启用');
+            throw new \RuntimeException(__('messages.payment.channel_disabled'));
         }
 
         $driver = $this->resolveDriver($channel);
