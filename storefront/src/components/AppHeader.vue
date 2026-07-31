@@ -36,6 +36,11 @@ async function logout() {
   await authStore.logout()
   router.push('/')
 }
+
+function languageLabel(code: string): string {
+  const labels: Record<string, string> = { zh: '中文', en: 'English' }
+  return labels[code] || code
+}
 </script>
 
 <template>
@@ -68,8 +73,7 @@ async function logout() {
         </select>
         <!-- 语言切换器 (vue-i18n 响应式,无需刷新) -->
         <select v-model="langSel" class="px-2 py-1 ml-1 rounded-field border border-border text-xs text-ink-soft bg-white">
-          <option value="zh">中文</option>
-          <option value="en">English</option>
+          <option v-for="lang in prefs.languages" :key="lang" :value="lang">{{ languageLabel(lang) }}</option>
         </select>
         <template v-if="authStore.isLoggedIn">
           <RouterLink to="/orders/mine" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.mine') }}</RouterLink>
