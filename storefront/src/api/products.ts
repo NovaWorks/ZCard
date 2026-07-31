@@ -1,8 +1,9 @@
 import request from './request'
 
-export interface Sku { id: number; name: string; price: number; stock: number }
+export interface Sku { id: number; name: string; price: number; stock: number; price_base?: number; price_display?: number; display_currency?: string }
 export interface Product {
   id: number; name: string; slug: string; cover: string | null; price: number
+  price_base: number; price_display: number; display_currency: string; exchange_rate: number
   stock: number; sales: number; is_featured: boolean
   description?: string; images?: string[]; category?: { id: number; name: string; slug: string }
   skus?: Sku[]; virtual_reviews?: { rating?: number; count?: number; list?: any[] }

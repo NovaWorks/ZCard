@@ -2,8 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getMyOrders, type OrderDetail } from '@/api/orders'
+import { formatMoney } from '@/utils/money'
+import { usePreferencesStore } from '@/stores/preferences'
 
 const router = useRouter()
+const prefs = usePreferencesStore()
 const list = ref<OrderDetail[]>([])
 const loading = ref(true)
 const err = ref('')
@@ -20,8 +23,6 @@ const statusClass = (s: string) => ({
   closed: 'bg-gray-100 text-gray-600',
   refunded: 'bg-red-100 text-red-700',
 }[s] || 'bg-gray-100 text-gray-600')
-
-const fmt = (fen: number) => (fen / 100).toFixed(2)
 
 const fmtDate = (d?: string) => {
   if (!d) return ''
@@ -63,29 +64,29 @@ onMounted(async () => {
 
     <div v-else class="space-y-3">
       <div v-for="o in list" :key="o.order_no"
-        class="bg-white rounded-card border border-gray-200 p-4">
+        class="bg-white rounded-card border border-border p-4">
         <!-- 头部:商品 + 状态 -->
         <div class="flex items-start gap-3">
           <img v-if="o.product_cover" :src="o.product_cover" :alt="o.product_name"
-            class="w-14 h-14 rounded-field object-cover bg-gray-100 shrink-0" />
-          <div v-else class="w-14 h-14 rounded-field bg-gray-100 shrink-0 flex items-center justify-center text-ink-muted text-xs">
+            class="w-14 h-14 rounded-field object-cover bg-surface-subtle shrink-0" />
+          <div v-else class="w-14 h-14 rounded-field bg-surface-subtle shrink-0 flex items-center justify-center text-ink-muted text-xs">
             无图
           </div>
 
           <div class="flex-1 min-w-0">
             <div class="text-sm font-semibold text-ink truncate">{{ o.product_name || '商品已下架' }}</div>
             <div class="text-xs text-ink-muted mt-0.5">× {{ o.quantity }}</div>
-            <div class="text-primary font-bold mt-1">¥{{ fmt(o.amount) }}</div>
+            <div class="text-price font-bold mt-1">{{ formatMoney(o.amount_display ?? o.amount, prefs.currentCurrency) }}</div>
           </div>
 
-          <span class="text-xs font-bold px-2 py-0.5 rounded-full shrink-0"
+          <span class="text-xs font-bold px-2 py-0.5 rounded-pill shrink-0"
             :class="statusClass(o.status)">
             {{ statusText(o.status) }}
           </span>
         </div>
 
         <!-- 订单号 + 时间 -->
-        <div class="flex justify-between items-center mt-3 pt-2 border-t border-gray-100">
+        <div class="flex justify-between items-center mt-3 pt-2 border-t border-border">
           <span class="text-[11px] text-ink-muted">{{ o.order_no }}</span>
           <span class="text-[11px] text-ink-muted">{{ fmtDate(o.paid_at || o.created_at) }}</span>
         </div>
@@ -93,18 +94,18 @@ onMounted(async () => {
         <!-- 卡密(已支付且有卡) -->
         <div v-if="o.status === 'paid' && o.cards.length" class="mt-3">
           <button @click="toggle(o.order_no)"
-            class="text-xs text-primary flex items-center gap-1">
+            class="text-xs text-primary hover:text-primary-hover flex items-center gap-1 transition">
             {{ expanded.has(o.order_no) ? '收起卡密' : `查看卡密(${o.cards.length})` }}
             <span class="text-[10px]">{{ expanded.has(o.order_no) ? '▲' : '▼' }}</span>
           </button>
 
           <div v-if="expanded.has(o.order_no)" class="mt-2 space-y-2">
             <div v-for="(card, i) in o.cards" :key="i" class="flex items-center gap-2">
-              <code class="flex-1 text-xs bg-gray-50 p-2 rounded break-all">{{ card }}</code>
-              <button @click="copy(card)" class="text-primary text-xs shrink-0">复制</button>
+              <code class="flex-1 text-xs bg-surface-subtle p-2 rounded-field break-all">{{ card }}</code>
+              <button @click="copy(card)" class="text-primary text-xs shrink-0 hover:text-primary-hover transition">复制</button>
             </div>
             <button v-if="o.cards.length > 1" @click="copyAll(o.cards)"
-              class="text-xs text-ink-soft underline mt-1">复制全部</button>
+              class="text-xs text-ink-soft underline mt-1 hover:text-primary transition">复制全部</button>
           </div>
         </div>
 
