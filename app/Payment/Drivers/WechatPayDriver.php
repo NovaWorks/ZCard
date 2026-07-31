@@ -41,7 +41,7 @@ class WechatPayDriver implements PaymentDriver
             'out_trade_no' => $order->order_no,
             'description' => $order->order_no,
             'amount' => [
-                'total' => (int) round((float) $order->amount * 100),
+                'total' => (int) $order->amount, // 微信 V3 用分,order->amount 已是分
                 'currency' => 'CNY',
             ],
         ]);
@@ -71,12 +71,12 @@ class WechatPayDriver implements PaymentDriver
             return null;
         }
 
-        $amount = $data['amount']['total'] ?? ($data['amount']['payer_total'] ?? null);
+        $amount = $data['amount']['total'] ?? ($data['amount']['payer_total'] ?? null); // 微信已是分
 
         return [
             'channel_order_no' => $data['transaction_id'] ?? null,
             'out_trade_no' => $data['out_trade_no'] ?? null,
-            'amount' => $amount !== null ? bcdiv((string) $amount, '100', 2) : null,
+            'amount' => $amount !== null ? (int) $amount : null,
             'raw' => $data,
         ];
     }
@@ -125,5 +125,10 @@ class WechatPayDriver implements PaymentDriver
             'name' => '微信支付',
             'icon' => '💚',
         ];
+    }
+
+    public function getSupportedCurrencies(): array
+    {
+        return ['CNY'];
     }
 }

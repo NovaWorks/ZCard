@@ -34,11 +34,11 @@ class AlipayDriver implements PaymentDriver
 
     public function pay(Order $order, array $config): PaymentResult
     {
-        Pay::setAlipayConfig($this->buildConfig($config));
+        Pay::config($this->buildConfig($config));
 
         $result = Pay::alipay()->web([
             'out_trade_no' => $order->order_no,
-            'total_amount' => (string) $order->amount,
+            'total_amount' => bcdiv((string) $order->amount, '100', 2), // 分→元
             'subject' => $order->order_no,
         ]);
 
@@ -50,7 +50,7 @@ class AlipayDriver implements PaymentDriver
 
     public function verifyCallback(Request $request, array $config): ?array
     {
-        Pay::setAlipayConfig($this->buildConfig($config));
+        Pay::config($this->buildConfig($config));
 
         try {
             $result = Pay::alipay()->callback($request->all());
@@ -68,7 +68,7 @@ class AlipayDriver implements PaymentDriver
         return [
             'channel_order_no' => $data['trade_no'] ?? null,
             'out_trade_no' => $data['out_trade_no'] ?? null,
-            'amount' => $data['total_amount'] ?? null,
+            'amount' => (int) round(bcmul((string) ($data['total_amount'] ?? 0), '100', 3)), // 元→分
             'raw' => $data,
         ];
     }
@@ -107,5 +107,10 @@ class AlipayDriver implements PaymentDriver
             'name' => '支付宝',
             'icon' => '💰',
         ];
+    }
+
+    public function getSupportedCurrencies(): array
+    {
+        return ['CNY'];
     }
 }
