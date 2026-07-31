@@ -116,6 +116,18 @@ class CodePayDriver implements PaymentDriver
                 'required' => true,
                 'default' => 'alipay',
             ],
+            'target_currency' => [
+                'label' => '收款货币',
+                'type' => 'text',
+                'required' => false,
+                'default' => 'CNY',
+            ],
+            'exchange_rate' => [
+                'label' => '汇率(基础货币→收款货币)',
+                'type' => 'text',
+                'required' => false,
+                'default' => '1',
+            ],
         ];
     }
 

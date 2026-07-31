@@ -5,6 +5,8 @@ export interface PaymentChannel {
   name: string
   code: string
   icon: string
+  supported_currencies?: string[]
+  target_currency?: string | null
 }
 
 export interface PaymentResult {

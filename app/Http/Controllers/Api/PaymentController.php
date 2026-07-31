@@ -12,12 +12,20 @@ class PaymentController extends Controller
 {
     public function channels(PaymentService $service): JsonResponse
     {
-        $channels = $service->getEnabledChannels()->map(fn ($ch) => [
-            'id' => $ch->id,
-            'name' => $ch->name,
-            'code' => $ch->code,
-            'icon' => app($ch->driver)->getInfo()['icon'] ?? '💳',
-        ]);
+        $channels = $service->getEnabledChannels()->map(function ($ch) {
+            $driver = app($ch->driver);
+            $config = $ch->config ?? [];
+
+            return [
+                'id' => $ch->id,
+                'name' => $ch->name,
+                'code' => $ch->code,
+                'icon' => $driver->getInfo()['icon'] ?? '💳',
+                'supported_currencies' => $driver->getSupportedCurrencies(),
+                'target_currency' => $config['target_currency'] ?? ($driver->getSupportedCurrencies()[0] ?? null),
+            ];
+        });
+
         return response()->json($channels);
     }
 

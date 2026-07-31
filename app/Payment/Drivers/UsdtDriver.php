@@ -86,6 +86,18 @@ class UsdtDriver implements PaymentDriver
                 'required' => true,
                 'default' => 30,
             ],
+            'target_currency' => [
+                'label' => '收款货币',
+                'type' => 'text',
+                'required' => false,
+                'default' => 'USDT',
+            ],
+            'exchange_rate' => [
+                'label' => '汇率(基础货币→收款货币)',
+                'type' => 'text',
+                'required' => false,
+                'default' => '1',
+            ],
         ];
     }
 
