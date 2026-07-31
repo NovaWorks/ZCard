@@ -1,0 +1,20 @@
+{
+  "nav": {
+    "home": "首页",
+    "orders": "订单查询",
+    "mine": "我的订单",
+    "login": "登录",
+    "register": "注册",
+    "logout": "退出"
+  },
+  "common": {
+    "buy": "购买",
+    "soldOut": "已售罄",
+    "stock": "库存",
+    "sold": "已售",
+    "noImage": "暂无图片",
+    "loading": "加载中...",
+    "confirm": "确认",
+    "cancel": "取消"
+  }
+}

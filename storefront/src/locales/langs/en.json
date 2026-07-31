@@ -1,0 +1,20 @@
+{
+  "nav": {
+    "home": "Home",
+    "orders": "Track Order",
+    "mine": "My Orders",
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout"
+  },
+  "common": {
+    "buy": "Buy",
+    "soldOut": "Sold Out",
+    "stock": "Stock",
+    "sold": "Sold",
+    "noImage": "No image",
+    "loading": "Loading...",
+    "confirm": "Confirm",
+    "cancel": "Cancel"
+  }
+}
