@@ -46,6 +46,13 @@ class PaymentChannelController extends Controller
             'sort'    => 'sometimes|integer',
         ]);
 
+        // config 合并保存(而非覆盖):前端对敏感字段留空时不传,
+        // 这里与旧值合并,实现"留空=保留旧值"
+        if (isset($data['config'])) {
+            $oldConfig = $channel->config ?? [];
+            $data['config'] = array_merge($oldConfig, $data['config']);
+        }
+
         $channel->update($data);
 
         return response()->json($channel->fresh());
@@ -53,6 +60,9 @@ class PaymentChannelController extends Controller
 
     /**
      * 给前端 modal 渲染 config 表单:实例化 driver,取它的 getConfigFields()。
+     * 驱动返回的是 [key => {label, type, ...}] 关联数组,
+     * 这里转换成前端期望的扁平数组 [{key, label, type, ...}]。
+     * 同时附加该通道的异步回调地址,供后台参考配置。
      */
     public function configFields(int $id): JsonResponse
     {
@@ -69,10 +79,30 @@ class PaymentChannelController extends Controller
         $driver = new $driverClass();
         /** @var PaymentDriver $driver */
 
+        $rawFields = $driver->getConfigFields();
+        $fields = [];
+        foreach ($rawFields as $key => $field) {
+            $f = is_array($field) ? $field : [];
+            $f['key'] = $key;
+            // select 选项归一:驱动返回 ['value' => 'label'],前端要 [{value,label}]
+            if (($f['type'] ?? null) === 'select' && isset($f['options']) && is_array($f['options'])) {
+                $opts = [];
+                foreach ($f['options'] as $val => $label) {
+                    $opts[] = ['value' => $val, 'label' => $label];
+                }
+                $f['options'] = $opts;
+            }
+            $fields[] = $f;
+        }
+
+        // 回调地址(异步通知),供后台参考
+        $callbackUrl = rtrim(config('app.url'), '/') . '/api/payments/callback/' . $channel->code;
+
         return response()->json([
-            'channel_id' => $channel->id,
-            'driver'     => $channel->driver,
-            'fields'     => $driver->getConfigFields(),
+            'channel_id'   => $channel->id,
+            'driver'       => $channel->driver,
+            'fields'       => $fields,
+            'callback_url' => $callbackUrl,
         ]);
     }
 }

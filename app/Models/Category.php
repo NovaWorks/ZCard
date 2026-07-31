@@ -8,7 +8,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Category extends Model
 {
-    protected $fillable = ['parent_id', 'merchant_id', 'name', 'slug', 'sort', 'status'];
+    protected $fillable = ['parent_id', 'merchant_id', 'name', 'slug', 'icon', 'description', 'sort', 'status', 'hide'];
+
+    protected function casts(): array
+    {
+        return ['status' => 'boolean', 'hide' => 'boolean'];
+    }
 
     public function merchant(): BelongsTo
     {

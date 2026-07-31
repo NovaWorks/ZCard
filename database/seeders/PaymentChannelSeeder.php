@@ -8,7 +8,7 @@ use Illuminate\Database\Seeder;
 class PaymentChannelSeeder extends Seeder
 {
     /**
-     * 预置 6 个支付渠道（默认全部禁用，需运营在后台配置后启用）。
+     * 预置 7 个支付渠道（默认全部禁用，需运营在后台配置后启用）。
      */
     public function run(): void
     {
@@ -22,6 +22,11 @@ class PaymentChannelSeeder extends Seeder
                 'code' => 'wechatpay',
                 'name' => '微信支付',
                 'driver' => \App\Payment\Drivers\WechatPayDriver::class,
+            ],
+            [
+                'code' => 'epay',
+                'name' => '易支付',
+                'driver' => \App\Payment\Drivers\EpayDriver::class,
             ],
             [
                 'code' => 'usdt',
@@ -42,6 +47,11 @@ class PaymentChannelSeeder extends Seeder
                 'code' => 'stripe',
                 'name' => 'Stripe',
                 'driver' => \App\Payment\Drivers\StripeDriver::class,
+            ],
+            [
+                'code' => 'epusdt',
+                'name' => 'EpuSdt(USDT)',
+                'driver' => \App\Payment\Drivers\EpuSdtDriver::class,
             ],
         ];
 
