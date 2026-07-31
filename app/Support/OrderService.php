@@ -46,7 +46,7 @@ class OrderService
                 ->get();
 
             if ($cards->count() < $qty) {
-                throw new InsufficientStockException("库存不足,需要 {$qty} 张,仅剩 {$cards->count()} 张");
+                throw new InsufficientStockException(__('messages.insufficient_stock', ['need' => $qty, 'have' => $cards->count()]));
             }
 
             $extra = array_merge(

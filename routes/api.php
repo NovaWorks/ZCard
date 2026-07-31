@@ -125,7 +125,7 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
 // 公开货币列表(供前台货币切换器,不需要 display.currency 中间件)
 Route::get('/currencies', [CurrencyController::class, 'index'])->name('api.currencies.index');
 
-Route::middleware('display.currency')->group(function () {
+Route::middleware(['display.currency', 'set.locale'])->group(function () {
     Route::get('/categories', [CategoryController::class, 'index'])->name('api.categories');
     Route::get('/products', [ProductController::class, 'index'])->name('api.products');
     Route::get('/products/featured', [ProductController::class, 'featured'])->name('api.products.featured');
@@ -138,7 +138,7 @@ Route::middleware('display.currency')->group(function () {
 
 // 提交评价(需登录)
 Route::middleware('auth:sanctum')->post('/reviews', [ReviewController::class, 'store'])->name('api.reviews.store');
-Route::get('/settings/storefront', [StorefrontSettingsController::class, 'show'])->middleware('display.currency')->name('api.settings.storefront');
+Route::get('/settings/storefront', [StorefrontSettingsController::class, 'show'])->middleware(['display.currency', 'set.locale'])->name('api.settings.storefront');
 
 // 验证码(图形验证码,基于 mews/captcha)
 Route::get('/captcha/config', [CaptchaController::class, 'config'])->name('api.captcha.config');
@@ -160,9 +160,9 @@ Route::middleware('auth:sanctum')->get('/products/{id}/stock', [CardController::
 Route::middleware('auth:sanctum')->get('/cards', [CardController::class, 'index'])->name('api.cards.index');
 
 // 订单(游客,不需 auth)— API-first:前台和后台都调 OrderService
-Route::post('/orders', [OrderController::class, 'create'])->middleware('display.currency')->name('api.orders.create');
-Route::post('/orders/{orderNo}/mock-pay', [OrderController::class, 'mockPay'])->middleware('display.currency')->name('api.orders.mock-pay');
-Route::get('/orders/query', [OrderController::class, 'query'])->middleware('display.currency')->name('api.orders.query');
+Route::post('/orders', [OrderController::class, 'create'])->middleware(['display.currency', 'set.locale'])->name('api.orders.create');
+Route::post('/orders/{orderNo}/mock-pay', [OrderController::class, 'mockPay'])->middleware(['display.currency', 'set.locale'])->name('api.orders.mock-pay');
+Route::get('/orders/query', [OrderController::class, 'query'])->middleware(['display.currency', 'set.locale'])->name('api.orders.query');
 
 // 支付(游客 + 回调,不需 auth)
 Route::get('/payments/channels', [PaymentController::class, 'channels'])->name('api.payments.channels');

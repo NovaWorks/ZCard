@@ -26,13 +26,13 @@ class OrderController extends Controller
         // 游客下单限制
         $guestCheckout = \App\Support\StorefrontConfig::get('guest_checkout') ?? true;
         if (! $guestCheckout && ! $request->user()) {
-            return response()->json(['message' => '当前仅限会员下单,请先登录'], 403);
+            return response()->json(['message' => __('messages.guest_only')], 403);
         }
 
         // 下单验证码校验
         if (\App\Support\CaptchaService::isEnabled('trade')) {
             if (! \App\Support\CaptchaService::verify('trade', $data['captcha'] ?? null)) {
-                return response()->json(['message' => '验证码错误'], 422);
+                return response()->json(['message' => __('messages.captcha_error')], 422);
             }
         }
 
@@ -98,7 +98,7 @@ class OrderController extends Controller
         $orders = $service->searchOrders($data['keyword'], $data['password'] ?? null);
 
         if (! $orders) {
-            return response()->json(['message' => '未找到相关订单'], 404);
+            return response()->json(['message' => __('messages.order_not_found')], 404);
         }
 
         return response()->json($orders);
