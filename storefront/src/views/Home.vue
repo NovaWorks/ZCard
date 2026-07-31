@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
 import { useProductsStore } from '@/stores/products'
 import { getFeatured, type Product } from '@/api/products'
@@ -12,6 +13,7 @@ import ProductCard from '@/components/ProductCard.vue'
 import HotTags from '@/components/HotTags.vue'
 
 const router = useRouter()
+const { t } = useI18n()
 
 /** 网格列数(配置驱动,默认 4 列;safelist 在 main.css) */
 const gridClass = (cols: number) => `grid gap-3 grid-cols-${cols}`
@@ -52,12 +54,12 @@ function goProduct(p: Product) {
     <section class="bg-gradient-to-br from-primary-hover via-primary to-blue-500 text-white">
       <div class="max-w-6xl mx-auto px-4 py-10 flex items-center justify-between gap-6">
         <div class="flex-1">
-          <h1 class="text-3xl font-extrabold tracking-tight">极速 · 安全 · 自动发货</h1>
-          <p class="mt-2 text-white/80 text-sm">全球领先的虚拟商品自动发卡平台,付款即发,7×24 小时在线</p>
+          <h1 class="text-3xl font-extrabold tracking-tight">{{ t('product.home.heroTitle') }}</h1>
+          <p class="mt-2 text-white/80 text-sm">{{ t('product.home.heroSubtitle') }}</p>
           <div class="mt-4 flex gap-4 text-xs text-white/90">
-            <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 bg-green-300 rounded-full"></span> 即时到账</span>
-            <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 bg-green-300 rounded-full"></span> 正品保障</span>
-            <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 bg-green-300 rounded-full"></span> 售后无忧</span>
+            <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 bg-green-300 rounded-full"></span> {{ t('product.home.heroInstant') }}</span>
+            <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 bg-green-300 rounded-full"></span> {{ t('product.home.heroGenuine') }}</span>
+            <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 bg-green-300 rounded-full"></span> {{ t('product.home.heroAfterSales') }}</span>
           </div>
         </div>
         <div class="hidden md:block text-7xl opacity-30">🛒</div>
@@ -69,7 +71,7 @@ function goProduct(p: Product) {
       <div class="bg-white rounded-card p-4 shadow-card border border-border">
         <h2 class="text-base font-bold text-ink mb-3 flex items-center gap-2">
           <span class="w-1 h-4 bg-price rounded-full"></span>
-          <span>🔥 热门推荐</span>
+          <span>{{ t('product.home.featuredTitle') }}</span>
         </h2>
         <div class="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-1 -mx-1 px-1">
           <div v-for="p in featured" :key="p.id"
@@ -77,7 +79,7 @@ function goProduct(p: Product) {
             @click="goProduct(p)">
             <img v-if="p.cover" :src="p.cover" :alt="p.name"
               class="w-full h-28 object-cover bg-surface-subtle" />
-            <div v-else class="w-full h-28 bg-gradient-to-br from-primary-soft to-primary-light flex items-center justify-center text-primary text-xs font-medium">无图</div>
+            <div v-else class="w-full h-28 bg-gradient-to-br from-primary-soft to-primary-light flex items-center justify-center text-primary text-xs font-medium">{{ t('common.noImage') }}</div>
             <div class="p-2.5">
               <div class="text-xs font-medium text-ink line-clamp-1">{{ p.name }}</div>
               <div class="text-price font-bold text-base mt-1">{{ formatMoney(p.price_display ?? p.price, prefs.currentCurrency) }}</div>
@@ -97,7 +99,7 @@ function goProduct(p: Product) {
       <CategoryNav v-if="settings.config" v-model="category" :style="settings.config.category_nav_style" />
       <div class="flex-1 min-w-0">
         <div class="flex justify-between items-center px-4 py-3">
-          <span class="text-sm font-semibold text-ink">全部商品</span>
+          <span class="text-sm font-semibold text-ink">{{ t('product.home.allProducts') }}</span>
           <ViewSwitcher />
         </div>
         <div class="px-4 pb-6">
@@ -116,7 +118,7 @@ function goProduct(p: Product) {
         </div>
         <div v-if="!products.loading && !products.list.length" class="text-center text-ink-muted py-20">
           <div class="text-5xl mb-3 opacity-40">📦</div>
-          <div>暂无商品(请先在后台添加商品)</div>
+          <div>{{ t('product.home.noProducts') }}</div>
         </div>
       </div>
     </div>
