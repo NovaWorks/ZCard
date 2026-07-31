@@ -58,15 +58,24 @@ class ProductController extends Controller
         return response()->json($products);
     }
 
-    /** 统一输出格式:金额分,加 sales/stock */
+    /** 统一输出格式:金额分,加 sales/stock,注入显示货币字段(spec §3.5)。 */
     private function transform(Product $p, bool $detail = false): array
     {
+        // 解析当前显示货币(display.currency 中间件写入的 request attribute)
+        $svc = app(\App\Support\CurrencyService::class);
+        $cur = request()->attributes->get('currency') ?? $svc->getBaseCurrency();
+        $conv = $svc->convert((int) $p->price, $cur);
+
         $data = [
             'id' => $p->id,
             'name' => $p->name,
             'slug' => $p->slug,
             'cover' => $p->cover,
-            'price' => (int) $p->price,
+            'price' => (int) $p->price,                    // 兼容旧字段(=基础货币分)
+            'price_base' => (int) $p->price,
+            'price_display' => $conv['amount'],
+            'display_currency' => $conv['currency'],
+            'exchange_rate' => $conv['rate'],
             'stock' => (int) $p->stock,
             'sales' => $p->displaySales(),
             'is_featured' => (bool) $p->is_featured,
@@ -76,15 +85,26 @@ class ProductController extends Controller
                 'description' => $p->description,
                 'images' => $p->images ?? [],
                 'category' => $p->category?->only(['id', 'name', 'slug']),
-                'skus' => $p->skus->map(fn ($s) => [
-                    'id' => $s->id, 'name' => $s->name,
-                    'price' => (int) $s->price, 'stock' => (int) $p->stock,
-                ]),
+                'skus' => $p->skus->map(function ($s) use ($svc, $cur) {
+                    $sconv = $svc->convert((int) $s->price, $cur);
+                    return [
+                        'id' => $s->id, 'name' => $s->name,
+                        'price' => (int) $s->price,
+                        'price_base' => (int) $s->price,
+                        'price_display' => $sconv['amount'],
+                        'display_currency' => $sconv['currency'],
+                        'exchange_rate' => $sconv['rate'],
+                        'stock' => (int) $p->stock,
+                    ];
+                }),
                 'virtual_reviews' => $p->virtual_reviews,
                 'min_order' => $p->min_order, 'max_order' => $p->max_order,
                 'stock_type' => $p->stock_type, 'delivery_mode' => $p->delivery_mode,
                 'control_config' => $p->control_config ?? [],
-                'member_price' => $p->member_price,
+                'member_price' => is_array($p->member_price)
+                    ? array_map(fn ($price) => $svc->convert((int) $price, $cur)['amount'], $p->member_price)
+                    : $p->member_price,
+                'member_price_base' => $p->member_price,
                 'contact_type' => $p->contact_type ?? 'email',
                 'only_user' => (bool) $p->only_user,
                 'send_email' => (bool) $p->send_email,

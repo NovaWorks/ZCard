@@ -37,14 +37,14 @@ class StripeDriver implements PaymentDriver
                     'product_data' => [
                         'name' => $order->order_no,
                     ],
-                    'unit_amount' => (int) round((float) $order->amount * 100),
+                    'unit_amount' => (int) $order->amount, // Stripe 用分,order->amount 已是分
                 ],
                 'quantity' => 1,
             ]],
             'mode' => 'payment',
             'client_reference_id' => $order->order_no,
-            'success_url' => $this->namedUrl('payment.return', ['code' => 'stripe']) . '?session_id={CHECKOUT_SESSION_ID}',
-            'cancel_url' => $this->namedUrl('payment.cancel', ['code' => 'stripe']),
+            'success_url' => $this->namedUrl('payment.return', ['code' => 'stripe']) . '?order_no=' . $order->order_no . '&session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url' => $this->namedUrl('payment.cancel', ['code' => 'stripe']) . '?order_no=' . $order->order_no,
         ]);
 
         return PaymentResult::redirect($session->url);
@@ -74,9 +74,7 @@ class StripeDriver implements PaymentDriver
             return null;
         }
 
-        $amount = isset($session->amount_total)
-            ? bcdiv((string) $session->amount_total, '100', 2)
-            : null;
+        $amount = isset($session->amount_total) ? (int) $session->amount_total : null; // Stripe 已是分
 
         return [
             'channel_order_no' => $session->payment_intent ?? $session->id,
@@ -99,6 +97,18 @@ class StripeDriver implements PaymentDriver
                 'type' => 'text',
                 'required' => true,
             ],
+            'target_currency' => [
+                'label' => '收款货币',
+                'type' => 'text',
+                'required' => false,
+                'default' => 'USD',
+            ],
+            'exchange_rate' => [
+                'label' => '汇率(基础货币→收款货币)',
+                'type' => 'text',
+                'required' => false,
+                'default' => '1',
+            ],
         ];
     }
 
@@ -108,5 +118,10 @@ class StripeDriver implements PaymentDriver
             'name' => 'Stripe',
             'icon' => '💳',
         ];
+    }
+
+    public function getSupportedCurrencies(): array
+    {
+        return ['USD', 'EUR', 'GBP', 'CNY', 'JPY'];
     }
 }

@@ -1,102 +1,305 @@
-<!-- 店铺设置 - 后台管理 -->
+<!-- 店铺设置 - 选项卡布局 -->
 <template>
   <div class="setting-page art-full-height">
-    <ElCard v-loading="loading" class="art-table-card" shadow="never">
-      <ElForm :model="form" label-width="140px" class="setting-form">
-        <!-- 布局 -->
-        <div class="section">
-          <div class="section-title">{{ t('zcard.setting.layout') }}</div>
-          <ElFormItem :label="t('zcard.setting.categoryNavStyle')">
-            <ElRadioGroup v-model="form.category_nav_style">
-              <ElRadio value="sidebar">{{ t('zcard.setting.navSidebar') }}</ElRadio>
-              <ElRadio value="top">{{ t('zcard.setting.navTop') }}</ElRadio>
-              <ElRadio value="drawer">{{ t('zcard.setting.navDrawer') }}</ElRadio>
-            </ElRadioGroup>
-          </ElFormItem>
-          <ElFormItem :label="t('zcard.setting.listDefaultView')">
-            <ElRadioGroup v-model="form.list_default_view">
-              <ElRadio value="grid">{{ t('zcard.setting.viewGrid') }}</ElRadio>
-              <ElRadio value="list">{{ t('zcard.setting.viewList') }}</ElRadio>
-            </ElRadioGroup>
-          </ElFormItem>
-          <ElFormItem :label="t('zcard.setting.gridColumns')">
-            <ElInputNumber
-              v-model="form.grid_columns"
-              :min="2"
-              :max="6"
-              controls-position="right"
-            />
-          </ElFormItem>
-        </div>
+    <ElCard v-loading="loading" class="art-table-card setting-card" shadow="never">
+      <ElTabs v-model="activeTab" class="setting-tabs">
+        <ElTabPane :label="t('zcard.setting.tabSite')" name="site">
+          <ElForm :model="form" label-width="auto" class="setting-form">
+            <ElFormItem :label="t('zcard.setting.siteName')">
+              <ElInput v-model="form.site_name" placeholder="ZCard" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.siteUrl')">
+              <ElInput v-model="form.site_url" placeholder="https://example.com" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.siteLogo')">
+              <ElInput v-model="form.site_logo" :placeholder="t('zcard.setting.siteLogoPlaceholder')" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.siteDescription')">
+              <ElInput v-model="form.site_description" type="textarea" :rows="2" :placeholder="t('zcard.setting.siteDescriptionPlaceholder')" maxlength="120" show-word-limit />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.footerCopyright')">
+              <ElInput v-model="form.footer_copyright" :placeholder="t('zcard.setting.footerCopyrightPlaceholder')" />
+            </ElFormItem>
+          </ElForm>
+        </ElTabPane>
 
-        <!-- 展示项 -->
-        <div class="section">
-          <div class="section-title">{{ t('zcard.setting.displayItems') }}</div>
-          <ElFormItem :label="t('zcard.setting.showStock')">
-            <ElSwitch v-model="form.show_stock" />
-          </ElFormItem>
-          <ElFormItem :label="t('zcard.setting.showSales')">
-            <ElSwitch v-model="form.show_sales" />
-          </ElFormItem>
-          <ElFormItem :label="t('zcard.setting.showPrice')">
-            <ElSwitch v-model="form.show_price" />
-          </ElFormItem>
-          <ElFormItem :label="t('zcard.setting.showDescription')">
-            <ElSwitch v-model="form.show_description" />
-          </ElFormItem>
-        </div>
+        <ElTabPane :label="t('zcard.setting.tabFooter')" name="footer">
+          <ElForm :model="form" label-width="auto" class="setting-form">
+            <ElFormItem :label="t('zcard.setting.footerAbout')">
+              <ElInput v-model="form.footer_about" type="textarea" :rows="3" :placeholder="t('zcard.setting.footerAboutPlaceholder')" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.footerLinks')">
+              <ElInput v-model="form.footerLinksJson" type="textarea" :rows="5" placeholder="JSON" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.footerContact')">
+              <ElInput v-model="form.footerContactJson" type="textarea" :rows="5" placeholder="JSON" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.footerSocial')">
+              <ElInput v-model="form.footerSocialJson" type="textarea" :rows="6" placeholder="JSON" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.footerAnalytics')">
+              <ElInput v-model="form.footer_analytics" type="textarea" :rows="5" :placeholder="t('zcard.setting.footerAnalyticsPlaceholder')" />
+            </ElFormItem>
+          </ElForm>
+        </ElTabPane>
 
-        <!-- 首页推荐 -->
-        <div class="section">
-          <div class="section-title">{{ t('zcard.setting.featured') }}</div>
-          <ElFormItem :label="t('zcard.setting.showFeatured')">
-            <ElSwitch v-model="form.featured_enabled" />
-          </ElFormItem>
-          <ElFormItem :label="t('zcard.setting.featuredLimit')">
-            <ElInputNumber
-              v-model="form.featured_limit"
-              :min="1"
-              :max="50"
-              controls-position="right"
-            />
-          </ElFormItem>
-        </div>
+        <ElTabPane :label="t('zcard.setting.tabDisplay')" name="display">
+          <ElForm :model="form" label-width="auto" class="setting-form">
+            <ElFormItem :label="t('zcard.setting.categoryNavStyle')">
+              <ElRadioGroup v-model="form.category_nav_style">
+                <ElRadio value="sidebar">{{ t('zcard.setting.navSidebar') }}</ElRadio>
+                <ElRadio value="pills">{{ t('zcard.setting.navTop') }}</ElRadio>
+                <ElRadio value="combo">{{ t('zcard.setting.navDrawer') }}</ElRadio>
+              </ElRadioGroup>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.listDefaultView')">
+              <ElRadioGroup v-model="form.list_default_view">
+                <ElRadio value="grid">{{ t('zcard.setting.viewGrid') }}</ElRadio>
+                <ElRadio value="list">{{ t('zcard.setting.viewList') }}</ElRadio>
+              </ElRadioGroup>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.gridColumns')">
+              <ElInputNumber v-model="form.grid_columns" :min="2" :max="6" controls-position="right" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.pageSize')">
+              <ElInputNumber v-model="form.page_size" :min="6" :max="60" controls-position="right" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.defaultOrder')">
+              <ElSelect v-model="form.default_order" style="width: 200px">
+                <ElOption label="最新上架" value="newest" />
+                <ElOption label="销量优先" value="sales" />
+                <ElOption label="价格升序" value="price_asc" />
+                <ElOption label="价格降序" value="price_desc" />
+              </ElSelect>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.showStock')">
+              <ElSwitch v-model="form.show_stock" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.showSales')">
+              <ElSwitch v-model="form.show_sales" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.showPrice')">
+              <ElSwitch v-model="form.show_price" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.showDescription')">
+              <ElSwitch v-model="form.show_description" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.showReviews')">
+              <ElSwitch v-model="form.show_reviews" />
+            </ElFormItem>
+          </ElForm>
+        </ElTabPane>
 
-        <!-- 热门标签 -->
-        <div class="section">
-          <div class="section-title">{{ t('zcard.setting.hotTags') }}</div>
-          <ElFormItem :label="t('zcard.setting.showHotTags')">
-            <ElSwitch v-model="form.hot_tags_enabled" />
-          </ElFormItem>
-          <ElFormItem :label="t('zcard.setting.hotTags')">
-            <ElInput
-              v-model="form.hot_tags"
-              type="textarea"
-              :rows="3"
-              :placeholder="t('zcard.setting.hotTagsPlaceholder')"
-            />
-          </ElFormItem>
-        </div>
+        <ElTabPane :label="t('zcard.setting.tabFeatured')" name="featured">
+          <ElForm :model="form" label-width="auto" class="setting-form">
+            <ElFormItem :label="t('zcard.setting.showFeatured')">
+              <ElSwitch v-model="form.show_featured" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.featuredCount')">
+              <ElInputNumber v-model="form.featured_count" :min="1" :max="50" controls-position="right" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.showHotTags')">
+              <ElSwitch v-model="form.show_hot_tags" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.hotTags')">
+              <ElInput v-model="form.hotTagCategoriesJson" type="textarea" :rows="4" :placeholder="t('zcard.setting.hotTagsPlaceholder')" />
+            </ElFormItem>
+          </ElForm>
+        </ElTabPane>
 
-        <!-- 下单设置 -->
-        <div class="section">
-          <div class="section-title">{{ t('zcard.setting.checkoutSettings') }}</div>
-          <ElFormItem :label="t('zcard.setting.guestCheckout')">
-            <ElSwitch v-model="form.guest_checkout" />
-          </ElFormItem>
-          <ElFormItem :label="t('zcard.setting.orderExpireMinutes')">
-            <ElInputNumber
-              v-model="form.order_expire_minutes"
-              :min="1"
-              :max="1440"
-              controls-position="right"
-            />
-          </ElFormItem>
-          <ElFormItem :label="t('zcard.setting.requireContact')">
-            <ElSwitch v-model="form.require_contact" />
-          </ElFormItem>
-        </div>
-      </ElForm>
+        <ElTabPane :label="t('zcard.setting.tabTrade')" name="trade">
+          <ElForm :model="form" label-width="auto" class="setting-form">
+            <ElFormItem :label="t('zcard.setting.guestCheckout')">
+              <ElSwitch v-model="form.guest_checkout" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.orderCloseMinutes')">
+              <ElInputNumber v-model="form.order_close_minutes" :min="1" :max="1440" controls-position="right" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.requireContact')">
+              <ElSwitch v-model="form.require_contact" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.contactType')">
+              <ElSelect v-model="form.contact_type" style="width: 200px">
+                <ElOption label="邮箱" value="email" />
+                <ElOption label="手机号" value="phone" />
+              </ElSelect>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.orderQueryPassword')">
+              <ElSwitch v-model="form.order_query_password" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.tradeCaptcha')">
+              <ElSwitch v-model="form.trade_captcha" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.allowPostReview')">
+              <ElSwitch v-model="form.allow_post_review" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.reviewNeedAudit')">
+              <ElSwitch v-model="form.review_need_audit" />
+            </ElFormItem>
+          </ElForm>
+        </ElTabPane>
+
+        <!-- Tab: 安全设置 -->
+        <ElTabPane :label="t('zcard.setting.tabSecurity')" name="security">
+          <ElForm :model="form" label-width="auto" class="setting-form">
+            <ElFormItem :label="t('zcard.setting.registerOpen')">
+              <ElSwitch v-model="form.register_open" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.registerType')">
+              <ElSelect v-model="form.register_type" style="width: 200px">
+                <ElOption label="邮箱注册" value="email" />
+                <ElOption label="用户名注册" value="username" />
+              </ElSelect>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.usernameMinLength')">
+              <ElInputNumber v-model="form.username_min_length" :min="1" :max="32" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.captchaRegister')">
+              <ElSwitch v-model="form.captcha_register" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.captchaLogin')">
+              <ElSwitch v-model="form.captcha_login" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.forgetType')">
+              <ElSelect v-model="form.forget_type" style="width: 200px">
+                <ElOption label="邮箱找回" value="email" />
+                <ElOption label="手机找回" value="sms" />
+              </ElSelect>
+            </ElFormItem>
+          </ElForm>
+        </ElTabPane>
+
+        <!-- Tab: 系统运维 -->
+        <ElTabPane :label="t('zcard.setting.tabSystem')" name="system">
+          <ElForm :model="form" label-width="auto" class="setting-form">
+            <ElFormItem :label="t('zcard.setting.maintenanceMode')">
+              <ElSwitch v-model="form.maintenance_mode" />
+              <span class="form-tip">{{ t('zcard.setting.maintenanceTip') }}</span>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.maintenanceMessage')">
+              <ElInput v-model="form.maintenance_message" type="textarea" :rows="2" :placeholder="t('zcard.setting.maintenanceMessagePlaceholder')" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.siteNotice')">
+              <ElInput v-model="form.site_notice" type="textarea" :rows="2" :placeholder="t('zcard.setting.siteNoticePlaceholder')" />
+            </ElFormItem>
+          </ElForm>
+        </ElTabPane>
+
+        <!-- Tab: 邮件设置 -->
+        <ElTabPane :label="t('zcard.setting.tabMail')" name="mail">
+          <ElForm :model="form" label-width="auto" class="setting-form">
+            <ElFormItem :label="t('zcard.setting.mailEnabled')">
+              <ElSwitch v-model="form.mail_enabled" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.mailHost')">
+              <ElInput v-model="form.mail_host" placeholder="smtp.example.com" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.mailPort')">
+              <ElInputNumber v-model="form.mail_port" :min="1" :max="65535" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.mailEncryption')">
+              <ElSelect v-model="form.mail_encryption" style="width: 120px">
+                <ElOption label="SSL" value="ssl" />
+                <ElOption label="TLS" value="tls" />
+                <ElOption label="无" value="" />
+              </ElSelect>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.mailUsername')">
+              <ElInput v-model="form.mail_username" placeholder="SMTP 用户名" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.mailPassword')">
+              <ElInput v-model="form.mail_password" type="password" show-password placeholder="SMTP 密码/授权码" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.mailFromAddress')">
+              <ElInput v-model="form.mail_from_address" placeholder="noreply@example.com" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.mailFromName')">
+              <ElInput v-model="form.mail_from_name" placeholder="ZCard" />
+            </ElFormItem>
+          </ElForm>
+        </ElTabPane>
+
+        <!-- Tab: 短信设置 -->
+        <ElTabPane :label="t('zcard.setting.tabSms')" name="sms">
+          <ElForm :model="form" label-width="auto" class="setting-form">
+            <ElFormItem :label="t('zcard.setting.smsEnabled')">
+              <ElSwitch v-model="form.sms_enabled" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.smsPlatform')">
+              <ElSelect v-model="form.sms_platform" style="width: 200px">
+                <ElOption label="阿里云短信" value="aliyun" />
+                <ElOption label="腾讯云短信" value="tencent" />
+              </ElSelect>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.smsAccessKey')">
+              <ElInput v-model="form.sms_access_key" placeholder="AccessKey ID" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.smsAccessSecret')">
+              <ElInput v-model="form.sms_access_secret" type="password" show-password placeholder="AccessKey Secret" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.smsSignName')">
+              <ElInput v-model="form.sms_sign_name" placeholder="短信签名" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.smsTemplateCode')">
+              <ElInput v-model="form.sms_template_code" placeholder="短信模板 CODE" />
+            </ElFormItem>
+          </ElForm>
+        </ElTabPane>
+
+        <!-- Tab: 提现设置 -->
+        <ElTabPane :label="t('zcard.setting.tabCash')" name="cash">
+          <ElForm :model="form" label-width="auto" class="setting-form">
+            <ElFormItem :label="t('zcard.setting.cashMin')">
+              <ElInputNumber v-model="form.cash_min" :min="0" :precision="2" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.cashFee')">
+              <ElInputNumber v-model="form.cash_fee" :min="0" :precision="2" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.cashTypeAlipay')">
+              <ElSwitch v-model="form.cash_type_alipay" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.cashTypeWechat')">
+              <ElSwitch v-model="form.cash_type_wechat" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.cashTypeUsdt')">
+              <ElSwitch v-model="form.cash_type_usdt" />
+            </ElFormItem>
+          </ElForm>
+        </ElTabPane>
+
+        <!-- Tab: 多语言与货币 -->
+        <ElTabPane :label="t('zcard.setting.tabLocale')" name="locale">
+          <ElForm :model="form" label-width="auto" class="setting-form">
+            <ElFormItem :label="t('zcard.setting.baseCurrency')">
+              <ElSelect v-model="form.base_currency" style="width: 220px">
+                <ElOption
+                  v-for="c in currencies"
+                  :key="c.code"
+                  :label="`${c.code} ${c.symbol} ${c.name}`"
+                  :value="c.code"
+                />
+              </ElSelect>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.defaultDisplayCurrency')">
+              <ElSelect v-model="form.default_display_currency" style="width: 220px">
+                <ElOption v-for="c in currencies" :key="c.code" :label="`${c.code} ${c.symbol}`" :value="c.code" />
+              </ElSelect>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.enabledLanguages')">
+              <ElSelect v-model="form.enabled_languages" multiple style="width: 320px">
+                <ElOption label="中文" value="zh" />
+                <ElOption label="English" value="en" />
+              </ElSelect>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.defaultLanguage')">
+              <ElSelect v-model="form.default_language" style="width: 220px">
+                <ElOption label="中文" value="zh" />
+                <ElOption label="English" value="en" />
+              </ElSelect>
+            </ElFormItem>
+          </ElForm>
+        </ElTabPane>
+      </ElTabs>
 
       <div class="form-footer">
         <ElButton @click="loadSettings">{{ t('zcard.common.reset') }}</ElButton>
@@ -110,93 +313,278 @@
   import { ElMessage } from 'element-plus'
   import { useI18n } from 'vue-i18n'
   import { getSettings, updateSettings, type Settings } from '@/api/settings'
+  import { getCurrencies, type Currency } from '@/api/currency'
 
   defineOptions({ name: 'SettingIndex' })
 
   const { t } = useI18n()
 
-  /**
-   * 表单结构：所有字段在表单中显式声明，便于渲染。
-   * 加载时把后端扁平配置合并进来；保存时只回传表单中存在的键。
-   */
+  const activeTab = ref<'site' | 'footer' | 'display' | 'featured' | 'trade' | 'security' | 'system' | 'mail' | 'sms' | 'cash' | 'locale'>('site')
+
   interface SettingForm {
-    // 布局
+    site_name: string
+    site_url: string
+    site_logo: string
+    site_description: string
+    footer_copyright: string
+    footer_about: string
+    footer_analytics: string
+    footerLinksJson: string
+    footerContactJson: string
+    footerSocialJson: string
+    hotTagCategoriesJson: string
     category_nav_style: string
     list_default_view: string
     grid_columns: number
-    // 展示项
+    page_size: number
+    default_order: string
     show_stock: boolean
     show_sales: boolean
     show_price: boolean
     show_description: boolean
-    // 首页推荐
-    featured_enabled: boolean
-    featured_limit: number
-    // 热门标签
-    hot_tags_enabled: boolean
-    hot_tags: string
-    // 下单设置
+    show_reviews: boolean
+    show_featured: boolean
+    featured_count: number
+    show_hot_tags: boolean
     guest_checkout: boolean
-    order_expire_minutes: number
+    order_close_minutes: number
     require_contact: boolean
+    contact_type: string
+    order_query_password: boolean
+    trade_captcha: boolean
+    allow_post_review: boolean
+    review_need_audit: boolean
+    // 安全设置
+    register_open: boolean
+    register_type: string
+    captcha_register: boolean
+    captcha_login: boolean
+    forget_type: string
+    username_min_length: number
+    // 系统运维
+    maintenance_mode: boolean
+    maintenance_message: string
+    site_notice: string
+    // 邮件设置
+    mail_enabled: boolean
+    mail_host: string
+    mail_port: number
+    mail_encryption: string
+    mail_username: string
+    mail_password: string
+    mail_from_address: string
+    mail_from_name: string
+    // 短信设置
+    sms_enabled: boolean
+    sms_platform: string
+    sms_access_key: string
+    sms_access_secret: string
+    sms_sign_name: string
+    sms_template_code: string
+    // 提现设置
+    cash_min: number
+    cash_fee: number
+    cash_type_alipay: boolean
+    cash_type_wechat: boolean
+    cash_type_usdt: boolean
+    // 多语言与货币
+    base_currency: string
+    default_display_currency: string
+    enabled_languages: string[]
+    default_language: string
   }
 
   const defaultForm = (): SettingForm => ({
-    category_nav_style: 'sidebar',
+    site_name: 'ZCard',
+    site_url: '',
+    site_logo: '',
+    site_description: '',
+    footer_copyright: '',
+    footer_about: '',
+    footer_analytics: '',
+    footerLinksJson: '[]',
+    footerContactJson: '[]',
+    footerSocialJson: '[]',
+    hotTagCategoriesJson: '[]',
+    category_nav_style: 'pills',
     list_default_view: 'grid',
     grid_columns: 4,
+    page_size: 12,
+    default_order: 'newest',
     show_stock: true,
     show_sales: true,
     show_price: true,
     show_description: true,
-    featured_enabled: true,
-    featured_limit: 8,
-    hot_tags_enabled: true,
-    hot_tags: '',
-    guest_checkout: false,
-    order_expire_minutes: 30,
-    require_contact: true
+    show_reviews: false,
+    show_featured: true,
+    featured_count: 8,
+    show_hot_tags: true,
+    guest_checkout: true,
+    order_close_minutes: 15,
+    require_contact: true,
+    contact_type: 'email',
+    order_query_password: true,
+    trade_captcha: true,
+    allow_post_review: true,
+    review_need_audit: true,
+    register_open: true,
+    register_type: 'email',
+    captcha_register: false,
+    captcha_login: false,
+    forget_type: 'email',
+    username_min_length: 3,
+    maintenance_mode: false,
+    maintenance_message: '系统维护中,请稍后再来访问。',
+    site_notice: '',
+    mail_enabled: false,
+    mail_host: '',
+    mail_port: 465,
+    mail_encryption: 'ssl',
+    mail_username: '',
+    mail_password: '',
+    mail_from_address: '',
+    mail_from_name: 'ZCard',
+    sms_enabled: false,
+    sms_platform: 'aliyun',
+    sms_access_key: '',
+    sms_access_secret: '',
+    sms_sign_name: '',
+    sms_template_code: '',
+    cash_min: 100,
+    cash_fee: 5,
+    cash_type_alipay: true,
+    cash_type_wechat: true,
+    cash_type_usdt: true,
+    base_currency: 'CNY',
+    default_display_currency: 'CNY',
+    enabled_languages: ['zh'],
+    default_language: 'zh',
   })
 
   const form = reactive<SettingForm>(defaultForm())
-
-  /** 原始后端配置，用于合并未知字段 */
   const raw = ref<Settings>({})
-
   const loading = ref(false)
   const saving = ref(false)
+  const currencies = ref<Currency[]>([])
 
-  /** 把后端任意值转成表单字段对应类型 */
+  const coerceBool = (value: any, fallback: boolean): boolean => {
+    if (value === undefined || value === null || value === '') return fallback
+    if (typeof value === 'boolean') return value
+    const s = String(value).toLowerCase().trim()
+    if (['true', '1', 'yes', 'on'].includes(s)) return true
+    if (['false', '0', 'no', 'off'].includes(s)) return false
+    return fallback
+  }
+
   const coerce = <T,>(value: any, fallback: T): T => {
     if (value === undefined || value === null || value === '') return fallback
     return value as T
   }
 
-  /** 加载设置 */
+  const toText = (v: any): string => {
+    if (Array.isArray(v)) return JSON.stringify(v, null, 2)
+    if (typeof v === 'string' && v.trim().startsWith('[')) {
+      try { return JSON.stringify(JSON.parse(v), null, 2) } catch { return v }
+    }
+    return '[]'
+  }
+
+  const parseArr = (text: string): any[] | null => {
+    try {
+      const v = JSON.parse(text)
+      return Array.isArray(v) ? v : null
+    } catch {
+      return null
+    }
+  }
+
+  const coerceArray = (value: any, fallback: string[]): string[] => {
+    if (Array.isArray(value)) return value.map((v) => String(v))
+    if (typeof value === 'string' && value.trim().startsWith('[')) {
+      try {
+        const v = JSON.parse(value)
+        if (Array.isArray(v)) return v.map((x: any) => String(x))
+      } catch { /* fall through */ }
+    }
+    return fallback
+  }
+
   const loadSettings = async () => {
     loading.value = true
     try {
-      const data = await getSettings()
+      const [data, currencyList] = await Promise.all([
+        getSettings(),
+        getCurrencies().catch(() => [] as Currency[]),
+      ])
       raw.value = data || {}
+      currencies.value = currencyList || []
       const d = defaultForm()
       Object.assign(form, {
+        site_name: coerce(data.site_name, d.site_name),
+        site_url: coerce(data.site_url, d.site_url),
+        site_logo: coerce(data.site_logo, d.site_logo),
+        site_description: coerce(data.site_description, d.site_description),
+        footer_copyright: coerce(data.footer_copyright, d.footer_copyright),
+        footer_about: coerce(data.footer_about, d.footer_about),
+        footer_analytics: coerce(data.footer_analytics, d.footer_analytics),
         category_nav_style: coerce(data.category_nav_style, d.category_nav_style),
         list_default_view: coerce(data.list_default_view, d.list_default_view),
         grid_columns: Number(coerce(data.grid_columns, d.grid_columns)),
+        page_size: Number(coerce(data.page_size, d.page_size)),
+        default_order: coerce(data.default_order, d.default_order),
         show_stock: coerceBool(data.show_stock, d.show_stock),
         show_sales: coerceBool(data.show_sales, d.show_sales),
         show_price: coerceBool(data.show_price, d.show_price),
         show_description: coerceBool(data.show_description, d.show_description),
-        featured_enabled: coerceBool(data.featured_enabled, d.featured_enabled),
-        featured_limit: Number(coerce(data.featured_limit, d.featured_limit)),
-        hot_tags_enabled: coerceBool(data.hot_tags_enabled, d.hot_tags_enabled),
-        hot_tags: coerce(data.hot_tags, d.hot_tags),
+        show_reviews: coerceBool(data.show_reviews, d.show_reviews),
+        show_featured: coerceBool(data.show_featured, d.show_featured),
+        featured_count: Number(coerce(data.featured_count, d.featured_count)),
+        show_hot_tags: coerceBool(data.show_hot_tags, d.show_hot_tags),
         guest_checkout: coerceBool(data.guest_checkout, d.guest_checkout),
-        order_expire_minutes: Number(
-          coerce(data.order_expire_minutes, d.order_expire_minutes)
-        ),
-        require_contact: coerceBool(data.require_contact, d.require_contact)
+        order_close_minutes: Number(coerce(data.order_close_minutes, d.order_close_minutes)),
+        require_contact: coerceBool(data.require_contact, d.require_contact),
+        contact_type: coerce(data.contact_type, d.contact_type),
+        order_query_password: coerceBool(data.order_query_password, d.order_query_password),
+        trade_captcha: coerceBool(data.trade_captcha, d.trade_captcha),
+        allow_post_review: coerceBool(data.allow_post_review, d.allow_post_review),
+        review_need_audit: coerceBool(data.review_need_audit, d.review_need_audit),
+        register_open: coerceBool(data.register_open, d.register_open),
+        register_type: coerce(data.register_type, d.register_type),
+        captcha_register: coerceBool(data.captcha_register, d.captcha_register),
+        captcha_login: coerceBool(data.captcha_login, d.captcha_login),
+        forget_type: coerce(data.forget_type, d.forget_type),
+        username_min_length: Number(coerce(data.username_min_length, d.username_min_length)),
+        maintenance_mode: coerceBool(data.maintenance_mode, d.maintenance_mode),
+        maintenance_message: coerce(data.maintenance_message, d.maintenance_message),
+        site_notice: coerce(data.site_notice, d.site_notice),
+        mail_enabled: coerceBool(data.mail_enabled, d.mail_enabled),
+        mail_host: coerce(data.mail_host, d.mail_host),
+        mail_port: Number(coerce(data.mail_port, d.mail_port)),
+        mail_encryption: coerce(data.mail_encryption, d.mail_encryption),
+        mail_username: coerce(data.mail_username, d.mail_username),
+        mail_password: coerce(data.mail_password, d.mail_password),
+        mail_from_address: coerce(data.mail_from_address, d.mail_from_address),
+        mail_from_name: coerce(data.mail_from_name, d.mail_from_name),
+        sms_enabled: coerceBool(data.sms_enabled, d.sms_enabled),
+        sms_platform: coerce(data.sms_platform, d.sms_platform),
+        sms_access_key: coerce(data.sms_access_key, d.sms_access_key),
+        sms_access_secret: coerce(data.sms_access_secret, d.sms_access_secret),
+        sms_sign_name: coerce(data.sms_sign_name, d.sms_sign_name),
+        sms_template_code: coerce(data.sms_template_code, d.sms_template_code),
+        cash_min: Number(coerce(data.cash_min, d.cash_min)),
+        cash_fee: Number(coerce(data.cash_fee, d.cash_fee)),
+        cash_type_alipay: coerceBool(data.cash_type_alipay, d.cash_type_alipay),
+        cash_type_wechat: coerceBool(data.cash_type_wechat, d.cash_type_wechat),
+        cash_type_usdt: coerceBool(data.cash_type_usdt, d.cash_type_usdt),
+        base_currency: coerce(data.base_currency, d.base_currency),
+        default_display_currency: coerce(data.default_display_currency, d.default_display_currency),
+        enabled_languages: coerceArray(data.enabled_languages, d.enabled_languages),
+        default_language: coerce(data.default_language, d.default_language),
       })
+      form.footerLinksJson = toText(data.footer_links)
+      form.footerContactJson = toText(data.footer_contact)
+      form.footerSocialJson = toText(data.footer_social)
+      form.hotTagCategoriesJson = toText(data.hot_tag_categories)
     } catch (e) {
       // 拦截器处理
     } finally {
@@ -204,21 +592,29 @@
     }
   }
 
-  /** 宽松布尔转换（兼容字符串 "true"/"false"/"1"/"0"） */
-  const coerceBool = (value: any, fallback: boolean): boolean => {
-    if (value === undefined || value === null || value === '') return fallback
-    if (typeof value === 'boolean') return value
-    const s = String(value).toLowerCase().trim()
-    if (s === 'true' || s === '1' || s === 'yes' || s === 'on') return true
-    if (s === 'false' || s === '0' || s === 'no' || s === 'off') return false
-    return fallback
-  }
-
-  /** 保存：合并表单 + 原始未知字段后回传 */
   const handleSave = async () => {
+    const links = parseArr(form.footerLinksJson)
+    const contact = parseArr(form.footerContactJson)
+    const social = parseArr(form.footerSocialJson)
+    const hotTags = parseArr(form.hotTagCategoriesJson)
+    if (links === null || contact === null || social === null || hotTags === null) {
+      ElMessage.error(t('zcard.setting.jsonFormatError'))
+      return
+    }
     saving.value = true
     try {
-      const payload: Settings = { ...raw.value, ...form }
+      const payload: Settings = {
+        ...raw.value,
+        ...form,
+        footer_links: links,
+        footer_contact: contact,
+        footer_social: social,
+        hot_tag_categories: hotTags,
+      }
+      delete (payload as any).footerLinksJson
+      delete (payload as any).footerContactJson
+      delete (payload as any).footerSocialJson
+      delete (payload as any).hotTagCategoriesJson
       await updateSettings(payload)
       raw.value = payload
       ElMessage.success(t('zcard.setting.saveSuccess'))
@@ -240,28 +636,43 @@
     flex-direction: column;
   }
 
-  .section {
-    padding: 16px 0;
-    border-bottom: 1px solid var(--el-border-color-lighter);
+  .setting-card {
+    display: flex;
+    flex-direction: column;
 
-    &:last-of-type {
-      border-bottom: none;
+    :deep(.el-card__body) {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      padding-bottom: 0;
     }
   }
 
-  .section-title {
-    margin-bottom: 16px;
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--el-text-color-primary);
+  .setting-tabs {
+    flex: 1;
+
+    :deep(.el-tabs__content) {
+      max-height: calc(100vh - 280px);
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+  }
+
+  .setting-form {
+    max-width: 640px;
+    padding-top: 8px;
   }
 
   .form-footer {
+    position: sticky;
+    bottom: 0;
     display: flex;
     justify-content: flex-end;
     gap: 12px;
+    padding: 12px 0;
     margin-top: 8px;
-    padding-top: 16px;
+    background: var(--el-bg-color);
     border-top: 1px solid var(--el-border-color-lighter);
+    z-index: 10;
   }
 </style>

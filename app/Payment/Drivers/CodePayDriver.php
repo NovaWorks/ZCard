@@ -28,7 +28,7 @@ class CodePayDriver implements PaymentDriver
      */
     protected function sign(array $params, string $key): string
     {
-        $params = Arr::where($params, fn ($v, $k) => $k !== 'sign' && $v !== '' && $v !== null);
+        $params = Arr::where($params, fn ($v, $k) => $k !== 'sign' && $k !== 'sign_type' && $v !== '' && $v !== null);
         ksort($params);
 
         $parts = [];
@@ -44,16 +44,16 @@ class CodePayDriver implements PaymentDriver
     {
         $pid = $config['pid'] ?? '';
         $key = $config['key'] ?? '';
-        $apiUrl = rtrim($config['api_url'] ?? '', '/');
+        $apiUrl = rtrim($config['url'] ?? $config['api_url'] ?? '', '/');
 
         $params = [
             'pid' => $pid,
-            'type' => 'alipay',
+            'type' => $config['type'] ?? 'alipay',
             'out_trade_no' => $order->order_no,
-            'notify_url' => $this->namedUrl('payment.notify', ['code' => 'codepay']),
-            'return_url' => $this->namedUrl('payment.return', ['code' => 'codepay']),
+            'notify_url' => $this->namedUrl('payment.notify', ['channel' => 'codepay']),
+            'return_url' => $this->namedUrl('payment.return', ['code' => 'codepay']) . '?order_no=' . $order->order_no,
             'name' => $order->order_no,
-            'money' => (string) $order->amount,
+            'money' => bcdiv((string) $order->amount, '100', 2), // 分→元
         ];
 
         $params['sign'] = $this->sign($params, $key);
@@ -67,7 +67,8 @@ class CodePayDriver implements PaymentDriver
     public function verifyCallback(Request $request, array $config): ?array
     {
         $key = $config['key'] ?? '';
-        $data = $request->all();
+        // 码支付回调可能走 GET query 或 POST body
+        $data = array_merge($request->query(), $request->post());
 
         $tradeStatus = $data['trade_status'] ?? '';
         if ($tradeStatus !== 'TRADE_SUCCESS') {
@@ -84,7 +85,7 @@ class CodePayDriver implements PaymentDriver
         return [
             'channel_order_no' => $data['trade_no'] ?? null,
             'out_trade_no' => $data['out_trade_no'] ?? null,
-            'amount' => $data['money'] ?? null,
+            'amount' => (int) round(bcmul((string) ($data['money'] ?? 0), '100', 3)), // 元→分
             'raw' => $data,
         ];
     }
@@ -102,10 +103,30 @@ class CodePayDriver implements PaymentDriver
                 'type' => 'text',
                 'required' => true,
             ],
-            'api_url' => [
-                'label' => '接口地址(如 https://www.codepay.fateqq.com)',
+            'url' => [
+                'label' => '支付网关地址',
                 'type' => 'text',
                 'required' => true,
+                'placeholder' => '如 https://www.codepay.fateqq.com',
+            ],
+            'type' => [
+                'label' => '支付方式',
+                'type' => 'select',
+                'options' => ['alipay' => '支付宝', 'wxpay' => '微信支付', 'qqpay' => 'QQ钱包'],
+                'required' => true,
+                'default' => 'alipay',
+            ],
+            'target_currency' => [
+                'label' => '收款货币',
+                'type' => 'text',
+                'required' => false,
+                'default' => 'CNY',
+            ],
+            'exchange_rate' => [
+                'label' => '汇率(基础货币→收款货币)',
+                'type' => 'text',
+                'required' => false,
+                'default' => '1',
             ],
         ];
     }
@@ -116,5 +137,10 @@ class CodePayDriver implements PaymentDriver
             'name' => '码支付',
             'icon' => '📋',
         ];
+    }
+
+    public function getSupportedCurrencies(): array
+    {
+        return ['CNY'];
     }
 }

@@ -10,12 +10,15 @@ class Order extends Model
 {
     protected $fillable = [
         'order_no', 'merchant_id', 'user_id', 'product_id', 'quantity',
-        'amount', 'status', 'paid_at', 'closed_at', 'contact', 'extra',
+        'amount', 'base_currency', 'display_currency', 'exchange_rate', 'amount_display', 'coupon_code', 'discount_amount',
+        'cost', 'sku_name', 'payment_channel',
+        'status', 'delivery_status', 'paid_at', 'closed_at',
+        'contact', 'create_device', 'create_ip', 'extra',
     ];
 
     protected function casts(): array
     {
-        return ['paid_at' => 'datetime', 'closed_at' => 'datetime', 'extra' => 'array'];
+        return ['paid_at' => 'datetime', 'closed_at' => 'datetime', 'extra' => 'array', 'exchange_rate' => 'decimal:8'];
     }
 
     public function product(): BelongsTo

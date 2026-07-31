@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { mockPay } from '@/api/orders'
 import { getChannels, createPayment, type PaymentChannel } from '@/api/payments'
+import { usePreferencesStore } from '@/stores/preferences'
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
+const prefs = usePreferencesStore()
 const orderNo = route.params.orderNo as string
 
 const channels = ref<PaymentChannel[]>([])
@@ -18,9 +22,20 @@ const mockPaying = ref(false)
 const qrcodeContent = ref('')
 const formContainerId = 'pay-form-mount'
 
+/** 通道 target_currency → 货币符号(从 /currencies 拉取的元信息) */
+function currencySymbol(code?: string | null): string {
+  if (!code) return ''
+  return prefs.currencies.find((c) => c.code === code)?.symbol || ''
+}
+
 onMounted(async () => {
+  // 偏好(含货币元信息)用于展示通道收款币种;失败不阻塞
+  void prefs.load()
   await loadChannels()
 })
+
+// 组件卸载时清理轮询
+onUnmounted(stopPolling)
 
 async function loadChannels() {
   loading.value = true
@@ -28,7 +43,7 @@ async function loadChannels() {
   try {
     channels.value = await getChannels()
   } catch (e: any) {
-    err.value = e?.response?.data?.message || '支付通道加载失败'
+    err.value = e?.response?.data?.message || t('order.pay.channelLoadFailed')
   } finally {
     loading.value = false
   }
@@ -42,7 +57,7 @@ async function selectChannel(channel: PaymentChannel) {
     const result = await createPayment(orderNo, channel.id)
     handleResult(result)
   } catch (e: any) {
-    err.value = e?.response?.data?.message || '发起支付失败'
+    err.value = e?.response?.data?.message || t('order.pay.payFailed')
   } finally {
     payingChannelId.value = null
   }
@@ -56,6 +71,8 @@ function handleResult(result: { type: string; redirect_url?: string; qrcode_cont
 
   if (result.type === 'qrcode' && result.qrcode_content) {
     qrcodeContent.value = result.qrcode_content
+    // 启动轮询:扫码支付成功后自动跳转结果页
+    startPolling()
     return
   }
 
@@ -72,7 +89,27 @@ function handleResult(result: { type: string; redirect_url?: string; qrcode_cont
     return
   }
 
-  err.value = '未知的支付返回'
+  err.value = t('order.pay.payUnknown')
+}
+
+/** 轮询订单状态(扫码场景:用户支付后自动跳转) */
+let pollTimer: ReturnType<typeof setInterval> | null = null
+function startPolling() {
+  if (pollTimer) return
+  pollTimer = setInterval(async () => {
+    try {
+      const { queryOrders } = await import('@/api/orders')
+      const list = await queryOrders(orderNo)
+      const found = Array.isArray(list) ? list.find(o => o.order_no === orderNo) : null
+      if (found?.status === 'paid') {
+        stopPolling()
+        router.push('/pay/result?order_no=' + orderNo)
+      }
+    } catch { /* 忽略,继续轮询 */ }
+  }, 3000)
+}
+function stopPolling() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
 }
 
 async function pay() {
@@ -81,11 +118,11 @@ async function pay() {
   try {
     const res = await mockPay(orderNo)
     if (res.delivered) {
-      alert('支付成功!卡密已发货(演示模式)。请通过订单查询页查看卡密。')
+      alert(t('order.pay.mockSuccess'))
       router.push('/orders/query')
     }
   } catch (e: any) {
-    err.value = e?.response?.data?.message || '支付失败'
+    err.value = e?.response?.data?.message || t('order.pay.payFailed')
   } finally {
     mockPaying.value = false
   }
@@ -94,12 +131,12 @@ async function pay() {
 
 <template>
   <div class="max-w-md mx-auto px-4 py-12 text-center">
-    <div class="bg-white rounded-card border border-gray-200 p-6">
-      <h2 class="text-lg font-bold text-ink mb-2">订单待支付</h2>
-      <div class="text-xs text-ink-muted mb-4">订单号:{{ orderNo }}</div>
+    <div class="bg-white rounded-card border border-border p-6">
+      <h2 class="text-lg font-bold text-ink mb-2">{{ t('order.pay.title') }}</h2>
+      <div class="text-xs text-ink-muted mb-4">{{ t('order.pay.orderNo', { no: orderNo }) }}</div>
 
       <!-- 加载中 -->
-      <div v-if="loading" class="text-sm text-ink-soft py-6">正在加载支付通道...</div>
+      <div v-if="loading" class="text-sm text-ink-soft py-6">{{ t('order.pay.loadingChannels') }}</div>
 
       <!-- 错误 -->
       <div v-else-if="err" class="text-danger text-xs mb-3">{{ err }}</div>
@@ -112,35 +149,38 @@ async function pay() {
           type="button"
           :disabled="payingChannelId !== null"
           @click="selectChannel(ch)"
-          class="flex items-center gap-2 border border-gray-200 rounded-card px-3 py-3 text-left hover:border-primary transition disabled:opacity-50"
-          :class="payingChannelId === ch.id ? 'border-primary' : ''"
+          class="flex items-center gap-2 border border-border rounded-card px-3 py-3 text-left hover:border-primary hover:bg-primary-light transition disabled:opacity-50"
+          :class="payingChannelId === ch.id ? 'border-primary ring-2 ring-primary/20' : ''"
         >
-          <span class="text-2xl leading-none">{{ ch.icon || '💳' }}</span>
-          <span class="text-sm font-medium text-ink truncate">
-            {{ payingChannelId === ch.id ? '处理中...' : ch.name }}
+          <span class="text-2xl leading-none shrink-0">{{ ch.icon || '💳' }}</span>
+          <span class="text-sm font-medium text-ink leading-tight">
+            <span class="block">{{ payingChannelId === ch.id ? t('order.pay.processing') : ch.name }}</span>
+            <span v-if="ch.target_currency" class="block text-[10px] font-normal text-ink-muted">
+              {{ t('order.pay.receiveLabel', { symbol: currencySymbol(ch.target_currency), code: ch.target_currency }) }}
+            </span>
           </span>
         </button>
       </div>
 
       <div v-if="!loading && !channels.length && !err" class="text-sm text-ink-soft py-4 mb-3">
-        暂无可用支付通道
+        {{ t('order.pay.noChannels') }}
       </div>
 
       <!-- 二维码展示 -->
       <div v-if="qrcodeContent" class="bg-orange-50 border border-orange-200 rounded-card p-3 mb-4 text-left">
-        <div class="text-xs font-medium text-ink mb-1">请使用手机扫码支付</div>
+        <div class="text-xs font-medium text-ink mb-1">{{ t('order.pay.qrcodeHint') }}</div>
         <div class="break-all text-xs text-ink-muted select-all bg-white rounded p-2">{{ qrcodeContent }}</div>
       </div>
 
       <!-- 模拟支付 -->
-      <div class="mt-4 border-t border-gray-100 pt-4">
-        <div class="text-xs text-ink-muted mb-2">(演示模式:无需真实通道也可完成下单流程)</div>
+      <div class="mt-4 border-t border-border pt-4">
+        <div class="text-xs text-ink-muted mb-2">{{ t('order.pay.demoHint') }}</div>
         <button
           @click="pay"
           :disabled="mockPaying"
-          class="w-full bg-gradient-to-br from-primary to-blue-500 text-white font-bold py-3 rounded-card shadow-md disabled:opacity-50"
+          class="w-full bg-gradient-to-r from-primary to-primary-hover text-white font-bold py-3 rounded-card shadow-md hover:shadow-pop disabled:opacity-50 transition"
         >
-          {{ mockPaying ? '支付中...' : '模拟支付' }}
+          {{ mockPaying ? t('order.pay.paying') : t('order.pay.demoPay') }}
         </button>
       </div>
 

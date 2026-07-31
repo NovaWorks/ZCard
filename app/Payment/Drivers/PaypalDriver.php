@@ -52,8 +52,8 @@ class PaypalDriver implements PaymentDriver
     {
         $token = $this->accessToken($config);
 
-        $returnUrl = $this->namedUrl('payment.return', ['code' => 'paypal']);
-        $cancelUrl = $this->namedUrl('payment.cancel', ['code' => 'paypal']);
+        $returnUrl = $this->namedUrl('payment.return', ['code' => 'paypal']) . '?order_no=' . $order->order_no;
+        $cancelUrl = $this->namedUrl('payment.cancel', ['code' => 'paypal']) . '?order_no=' . $order->order_no;
 
         $payload = [
             'intent' => 'CAPTURE',
@@ -62,7 +62,7 @@ class PaypalDriver implements PaymentDriver
                     'reference_id' => $order->order_no,
                     'amount' => [
                         'currency_code' => 'USD',
-                        'value' => number_format((float) $order->amount, 2, '.', ''),
+                        'value' => bcdiv((string) $order->amount, '100', 2), // 分→元
                     ],
                 ],
             ],
@@ -118,12 +118,12 @@ class PaypalDriver implements PaymentDriver
         }
 
         $unit = $data['purchase_units'][0] ?? [];
-        $amount = $unit['payments']['captures'][0]['amount']['value'] ?? null;
+        $amountStr = $unit['payments']['captures'][0]['amount']['value'] ?? null;
 
         return [
             'channel_order_no' => $data['id'] ?? null,
             'out_trade_no' => $unit['reference_id'] ?? null,
-            'amount' => $amount,
+            'amount' => $amountStr !== null ? (int) round(bcmul((string) $amountStr, '100', 3)) : null, // 元→分
             'raw' => $data,
         ];
     }
@@ -148,6 +148,18 @@ class PaypalDriver implements PaymentDriver
                 'required' => true,
                 'default' => 'live',
             ],
+            'target_currency' => [
+                'label' => '收款货币',
+                'type' => 'text',
+                'required' => false,
+                'default' => 'USD',
+            ],
+            'exchange_rate' => [
+                'label' => '汇率(基础货币→收款货币)',
+                'type' => 'text',
+                'required' => false,
+                'default' => '1',
+            ],
         ];
     }
 
@@ -157,5 +169,10 @@ class PaypalDriver implements PaymentDriver
             'name' => 'PayPal',
             'icon' => '🅿️',
         ];
+    }
+
+    public function getSupportedCurrencies(): array
+    {
+        return ['USD', 'EUR', 'GBP']; // PayPal 支持的主流货币
     }
 }

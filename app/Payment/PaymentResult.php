@@ -13,6 +13,8 @@ class PaymentResult
         public ?string $redirectUrl = null,
         public ?string $qrcodeContent = null,
         public ?string $formHtml = null,
+        public ?string $currencySent = null,
+        public ?int $amountSent = null,
     ) {}
 
     public static function redirect(string $url): static
@@ -37,6 +39,8 @@ class PaymentResult
             'redirect_url' => $this->redirectUrl,
             'qrcode_content' => $this->qrcodeContent,
             'form_html' => $this->formHtml,
+            'currency_sent' => $this->currencySent,
+            'amount_sent' => $this->amountSent,
         ];
     }
 }

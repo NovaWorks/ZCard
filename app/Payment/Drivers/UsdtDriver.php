@@ -22,7 +22,9 @@ class UsdtDriver implements PaymentDriver
     public function pay(Order $order, array $config): PaymentResult
     {
         $wallet = $config['wallet_address'] ?? '';
-        $usdt = $this->toUsdt((float) $order->amount, $config);
+        // order->amount 是分,先转元再÷汇率
+        $yuan = bcdiv((string) $order->amount, '100', 2);
+        $usdt = $this->toUsdt((float) $yuan, $config);
 
         // 形如 tron:Txxx...?amount=1.234567，钱包 App 识别后可自动填金额。
         $content = 'tron:' . $wallet . '?amount=' . $usdt;
@@ -45,10 +47,16 @@ class UsdtDriver implements PaymentDriver
             return null;
         }
 
+        // 回调 amount 是 USDT 数值,需按汇率反算回分(与下单时 pay() 互逆)
+        // 下单:fen→元(bcdiv/100)→USDT(÷rate);回调:USDT×rate×100=fen
+        $usdtAmount = (float) ($data['amount'] ?? 0);
+        $rate = (float) ($config['rate'] ?? 1);
+        $fen = $rate > 0 ? (int) round($usdtAmount * $rate * 100) : (int) round($usdtAmount * 100);
+
         return [
             'channel_order_no' => $data['tx_id'] ?? ($data['channel_order_no'] ?? null),
             'out_trade_no' => $data['out_trade_no'] ?? null,
-            'amount' => $data['amount'] ?? null,
+            'amount' => $fen, // 归一到分
             'raw' => $data,
         ];
     }
@@ -78,6 +86,18 @@ class UsdtDriver implements PaymentDriver
                 'required' => true,
                 'default' => 30,
             ],
+            'target_currency' => [
+                'label' => '收款货币',
+                'type' => 'text',
+                'required' => false,
+                'default' => 'USDT',
+            ],
+            'exchange_rate' => [
+                'label' => '汇率(基础货币→收款货币)',
+                'type' => 'text',
+                'required' => false,
+                'default' => '1',
+            ],
         ];
     }
 
@@ -87,5 +107,10 @@ class UsdtDriver implements PaymentDriver
             'name' => 'USDT',
             'icon' => '₮',
         ];
+    }
+
+    public function getSupportedCurrencies(): array
+    {
+        return ['USDT'];
     }
 }
