@@ -30,31 +30,27 @@ class PaymentService
 
         $driver = $this->resolveDriver($channel);
         $config = $channel->config ?? [];
-        // 通道目标货币 + 汇率(spec §5.3):config 未配则用驱动首个支持货币 + 汇率 1
+        // 通道目标货币 + 汇率(spec §5.3):作为审计元数据记录。
+        // 注意:各驱动 pay() 实际以「基础货币」金额向网关发起收款(未做通道换算),
+        // 因此 charged_amount = order.amount(基础货币分),与驱动 verifyCallback 回报的
+        // 基础货币分口径一致,保证回调金额校验正确。target_currency/exchange_rate 仅记录
+        // 该通道声明的目标货币与汇率,供对账/审计使用。
         $supported = $driver->getSupportedCurrencies();
         $targetCur = strtoupper($config['target_currency'] ?? ($supported[0] ?? 'CNY'));
         $rate = (float) ($config['exchange_rate'] ?? 1);
         if ($rate <= 0) {
             $rate = 1.0;
         }
-        // 基础货币分 → 目标货币分:分→元 ×rate → 元 → 分(四舍五入)
-        $baseYuan = bcdiv((string) $order->amount, '100', 8);
-        $targetYuan = bcmul($baseYuan, (string) $rate, 8);
-        $targetMin = (int) $this->bcRound(bcmul($targetYuan, '100', 8));
 
         $result = $driver->pay($order, $config);
-
-        // 驱动若回报了实际发送金额则用之,否则用通道换算值
-        $chargedCur = $result->currencySent ?? $targetCur;
-        $chargedAmt = $result->amountSent ?? $targetMin;
 
         Payment::create([
             'order_id' => $order->id,
             'channel' => $channel->code,
             'amount' => $order->amount,
             'status' => 'pending',
-            'charged_currency' => $chargedCur,
-            'charged_amount' => $chargedAmt,
+            'charged_currency' => $result->currencySent ?? $targetCur,
+            'charged_amount' => $result->amountSent ?? (int) $order->amount,
             'channel_exchange_rate' => $rate,
         ]);
 
@@ -127,14 +123,6 @@ class PaymentService
         return new $driverClass();
     }
 
-    /** bcmath 四舍五入到整数(half away from zero) */
-    private function bcRound(string $value): string
-    {
-        if (str_starts_with($value, '-')) {
-            return bcsub($value, '0.5', 0);
-        }
-        return bcadd($value, '0.5', 0);
-    }
 
     /**
      * 检查凭据是否已配置(至少有一个敏感字段非空)。

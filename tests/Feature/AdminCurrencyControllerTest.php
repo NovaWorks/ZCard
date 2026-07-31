@@ -52,6 +52,20 @@ class AdminCurrencyControllerTest extends TestCase
         $this->assertFalse((bool) Currency::find('CNY')->is_base);
         // base rate forced to 1 (decimal:8 cast renders as "1.00000000", compare numerically)
         $this->assertEquals(1, (float) Currency::find('USD')->exchange_rate);
+        // I-2: setting base also syncs StorefrontConfig.base_currency (single source of truth)
+        $this->assertSame('USD', \App\Support\StorefrontConfig::get('base_currency'));
+    }
+
+    public function test_exchange_rate_must_be_positive(): void
+    {
+        // M-3: exchange_rate=0 should be rejected (would make prices display as free)
+        Currency::create(['code'=>'CNY','name'=>'人民币','symbol'=>'¥','symbol_position'=>'before','decimal_places'=>2,'exchange_rate'=>'1','is_base'=>true,'is_enabled'=>true,'sort'=>0]);
+        $resp = $this->withHeaders($this->authHeaders())->postJson('/api/admin/currencies', [
+            'code' => 'JPY', 'name' => '日元', 'symbol' => '¥',
+            'symbol_position' => 'before', 'decimal_places' => 0,
+            'exchange_rate' => 0, 'is_base' => false, 'is_enabled' => true, 'sort' => 2,
+        ]);
+        $resp->assertStatus(422); // validation error (gt:0)
     }
 
     public function test_cannot_delete_base_currency(): void

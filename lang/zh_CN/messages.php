@@ -41,4 +41,5 @@ return [
     'mail.disabled' => '邮件功能未开启',
 
     'insufficient_stock_short' => '库存不足',
+    'currency_base_undeletable' => '基础货币不可删除',
 ];

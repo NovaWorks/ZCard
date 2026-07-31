@@ -41,4 +41,5 @@ return [
     'mail.disabled' => 'Mail service is not enabled.',
 
     'insufficient_stock_short' => 'Insufficient stock.',
+    'currency_base_undeletable' => 'Base currency cannot be deleted.',
 ];
