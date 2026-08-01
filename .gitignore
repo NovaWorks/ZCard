@@ -33,4 +33,5 @@ Thumbs.db
 /sysadmin/node_modules/
 /sysadmin/dist/
 /public/admin/
+/public/storefront/
 /.superpowers/
