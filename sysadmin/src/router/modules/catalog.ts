@@ -54,5 +54,15 @@ export const catalogRoutes: AppRouteRecord = {
         keepAlive: true,
       },
     },
+    {
+      path: '/reviewmgt/index',
+      name: 'ReviewIndex',
+      component: '/review/list/index',
+      meta: {
+        title: 'menus.review.title',
+        icon: 'ri:star-line',
+        keepAlive: false,
+      },
+    },
   ],
 }
