@@ -26,15 +26,17 @@ class InstallCommand extends Command
         $this->info('╚══════════════════════════════════════════╝');
         $this->info('');
 
-        // ─── Step 1: 数据库配置(交互式) ───
+        // ─── Step 1: 环境检查(先检查再改 .env,避免检查失败时 .env 已被修改) ───
+        $this->info('');
+        $this->info('📋 环境检查');
+        if (! $this->checkEnvironment()) {
+            return self::FAILURE;
+        }
+
+        // ─── Step 2: 数据库配置(交互式) ───
         if (! $this->option('skip-db')) {
             $this->configureDatabase();
         }
-
-        // ─── Step 2: 环境检查 ───
-        $this->info('');
-        $this->info('📋 环境检查');
-        $this->checkEnvironment();
 
         // ─── Step 3: APP_KEY ───
         if (empty(config('app.key'))) {
@@ -173,14 +175,22 @@ class InstallCommand extends Command
 
         $this->info(' ✔ 数据库配置已写入 .env');
 
-        // 清除配置缓存让新值生效
-        $this->callSilently('config:clear');
+        // 刷新进程内 DB 配置(让新 .env 的凭据立即生效)
+        config([
+            'database.connections.mysql.host' => $host,
+            'database.connections.mysql.port' => $port,
+            'database.connections.mysql.database' => $database,
+            'database.connections.mysql.username' => $username,
+            'database.connections.mysql.password' => $password ?? '',
+        ]);
+        \DB::purge('mysql');
+        \DB::reconnect('mysql');
     }
 
     /**
-     * 环境检查
+     * 环境检查(返回 bool,不硬 exit)
      */
-    private function checkEnvironment(): void
+    private function checkEnvironment(): bool
     {
         $checks = [
             'PHP >= 8.3' => version_compare(PHP_VERSION, '8.3.0', '>='),
@@ -207,16 +217,21 @@ class InstallCommand extends Command
         if (! $allPass) {
             $this->error('');
             $this->error('存在未满足的必需环境要求,请安装对应的 PHP 扩展后重试');
-            exit(1);
+            return false;
         }
+        return true;
     }
 
-    /** 写入 .env */
+    /** 写入 .env(带引号保护含特殊字符的值) */
     private function writeEnv(string $key, string $value): void
     {
         $path = base_path('.env');
         if (! file_exists($path)) {
             copy(base_path('.env.example'), $path);
+        }
+        // 值含特殊字符时加双引号(符合 vlucas/phpdotenv 规范)
+        if (preg_match('/[\s#=]/', $value) || $value === '') {
+            $value = '"' . str_replace('"', '\\"', $value) . '"';
         }
         $content = file_get_contents($path);
         $pattern = '/^' . preg_quote($key, '/') . '=.*/m';
