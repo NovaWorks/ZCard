@@ -19,6 +19,14 @@ class ProductController extends Controller
             ->with(['skus' => fn ($q) => $q->where('status', true)->orderBy('sort')])
             ->withCount(['cards as stock' => fn ($q) => $q->where('status', 'unused')]);
 
+        // 关键词搜索(商品名/描述)
+        if ($keyword = $request->input('keyword')) {
+            $query->where(function ($q) use ($keyword) {
+                $q->where('name', 'like', "%{$keyword}%")
+                  ->orWhere('description', 'like', "%{$keyword}%");
+            });
+        }
+
         if ($categoryId = $request->input('category')) {
             $query->where('category_id', $categoryId);
         }
