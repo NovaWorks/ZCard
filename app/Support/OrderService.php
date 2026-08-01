@@ -25,19 +25,51 @@ class OrderService
             : $product->price;
         $amount = $unitPrice * $qty;
 
+        // 分站定价(spec §5):读 subsite,按分站加价
+        $subsite = request()->attributes->get('subsite');
+        $subsiteId = null;
+        $subsiteDomain = null;
+        $baseUnitPrice = $unitPrice;
+        $profitEligible = true;
+        $profitBlockReason = null;
+        if ($subsite) {
+            $pricing = app(\App\Support\SubsitePricingService::class)
+                ->resolveUnitPrice($product, $skuId ? $product->skus->firstWhere('id', $skuId) : null, $subsite);
+            $unitPrice = $pricing['price'];
+            $amount = $unitPrice * $qty; // 重算金额(加价后)
+            $subsiteId = $subsite->id;
+            $subsiteDomain = request()->host();
+            // 防自购(spec §6)
+            $buyerId = $customer['user_id'] ?? null;
+            if ($buyerId && $buyerId == $subsite->user_id) {
+                $profitEligible = false;
+                $profitBlockReason = 'self_dealing_owner';
+            } elseif ($buyerId) {
+                $upline = \App\Models\User::find($buyerId);
+                for ($i = 0; $i < 3 && $upline && $upline->pid; $i++) {
+                    $upline = \App\Models\User::find($upline->pid);
+                    if ($upline && $upline->id == $subsite->user_id) {
+                        $profitEligible = false;
+                        $profitBlockReason = 'self_dealing_upline';
+                        break;
+                    }
+                }
+            }
+        }
+
         // 优惠券处理
         $couponCode = $customer['coupon_code'] ?? null;
         $discountAmount = 0;
         $coupon = null;
 
-        if ($couponCode && $qty === 1) {
+        if ($couponCode && $qty === 1 && ! $subsite) {
             $result = \App\Support\CouponService::validate($couponCode, $productId, $amount);
             $discountAmount = $result['discount'];
             $coupon = $result['coupon'];
             $amount = max(0, $amount - $discountAmount);
         }
 
-        return DB::transaction(function () use ($productId, $skuId, $qty, $customer, $product, $amount, $discountAmount, $couponCode, $coupon, $displayCurrency) {
+        return DB::transaction(function () use ($productId, $skuId, $qty, $customer, $product, $amount, $discountAmount, $couponCode, $coupon, $displayCurrency, $subsite, $subsiteId, $subsiteDomain, $baseUnitPrice, $unitPrice, $profitEligible, $profitBlockReason) {
             // 锁卡(FOR UPDATE 防并发超卖)
             $cards = Card::where('product_id', $productId)
                 ->where('status', Card::STATUS_UNUSED)
@@ -80,6 +112,9 @@ class OrderService
                 'display_currency' => $conv['currency'],
                 'exchange_rate' => $conv['rate'],
                 'amount_display' => $conv['amount'],
+                'subsite_id' => $subsiteId,
+                'subsite_domain' => $subsiteDomain,
+                'subsite_profit' => $profitEligible ? (($unitPrice - $baseUnitPrice) * $qty) : 0,
                 'coupon_code' => $couponCode,
                 'discount_amount' => $discountAmount,
                 'cost' => $unitCost * $qty,
@@ -95,6 +130,24 @@ class OrderService
             // 核销优惠券
             if ($coupon) {
                 \App\Support\CouponService::apply($coupon, $order->id, $customer['user_id'] ?? null);
+            }
+
+            // 分站订单定价快照(spec §5)
+            if ($subsiteId) {
+                \App\Models\SubsiteOrderSnapshot::create([
+                    'order_id' => $order->id,
+                    'merchant_id' => $subsiteId,
+                    'domain' => $subsiteDomain,
+                    'reseller_user_id' => $subsite->user_id,
+                    'buyer_id' => $customer['user_id'] ?? null,
+                    'base_amount' => $baseUnitPrice * $qty,
+                    'reseller_amount' => $amount,
+                    'profit_amount' => $profitEligible ? (($unitPrice - $baseUnitPrice) * $qty) : 0,
+                    'profit_eligible' => $profitEligible,
+                    'profit_block_reason' => $profitBlockReason,
+                    'pricing_snapshot' => ['unit_base' => $baseUnitPrice, 'unit_reseller' => $unitPrice, 'qty' => $qty],
+                    'risk_snapshot' => ['profit_eligible' => $profitEligible, 'profit_block_reason' => $profitBlockReason],
+                ]);
             }
 
             // 锁定卡密
