@@ -76,11 +76,19 @@ class InstallCommand extends Command
         // ─── Step 8: 管理员账号 ───
         $email = $this->option('email');
         $existingUser = User::where('email', $email)->first();
+        if (! $existingUser) {
+            // 也检查 username=admin 是否已存在(避免唯一约束冲突)
+            $existingUser = User::where('username', 'admin')->first();
+        }
         $newPassword = null;
 
         if ($existingUser) {
-            $this->warn("   邮箱 {$email} 已存在,跳过创建");
+            $this->warn("   管理员账号已存在({$existingUser->email}),跳过创建");
             $adminUser = $existingUser;
+            // 确保 super_admin 角色
+            if (! $adminUser->hasRole('super_admin')) {
+                $adminUser->assignRole('super_admin');
+            }
         } else {
             $newPassword = $this->option('password') ?: Str::random(8);
             $adminUser = User::create([
