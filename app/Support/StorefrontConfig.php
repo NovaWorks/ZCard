@@ -114,6 +114,11 @@ class StorefrontConfig
             'distribution_rate_l1' => 10,   // 百分比(10 = 10%)
             'distribution_rate_l2' => 5,
             'distribution_rate_l3' => 2,
+
+            // 分站
+            'subsite_enabled' => false,
+            'subsite_default_confirm_days' => 7,
+            'subsite_subdomain_base' => '',
         ];
     }
 
