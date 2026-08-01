@@ -241,7 +241,10 @@
               <ElInput v-model="form.sms_sign_name" placeholder="短信签名" />
             </ElFormItem>
             <ElFormItem :label="t('zcard.setting.smsTemplateCode')">
-              <ElInput v-model="form.sms_template_code" placeholder="短信模板 CODE" />
+              <ElInput v-model="form.sms_template_code" placeholder="验证码模板 CODE" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.smsDeliveryTemplateCode')">
+              <ElInput v-model="form.sms_delivery_template_code" placeholder="发货通知模板 CODE" />
             </ElFormItem>
           </ElForm>
         </ElTabPane>
@@ -400,6 +403,7 @@
     sms_access_secret: string
     sms_sign_name: string
     sms_template_code: string
+    sms_delivery_template_code: string
     // 提现设置
     cash_min: number
     cash_fee: number
@@ -474,6 +478,7 @@
     sms_access_secret: '',
     sms_sign_name: '',
     sms_template_code: '',
+    sms_delivery_template_code: '',
     cash_min: 100,
     cash_fee: 5,
     cash_type_alipay: true,
@@ -599,6 +604,7 @@
         sms_access_secret: coerce(data.sms_access_secret, d.sms_access_secret),
         sms_sign_name: coerce(data.sms_sign_name, d.sms_sign_name),
         sms_template_code: coerce(data.sms_template_code, d.sms_template_code),
+        sms_delivery_template_code: coerce(data.sms_delivery_template_code, d.sms_delivery_template_code),
         cash_min: Number(coerce(data.cash_min, d.cash_min)),
         cash_fee: Number(coerce(data.cash_fee, d.cash_fee)),
         cash_type_alipay: coerceBool(data.cash_type_alipay, d.cash_type_alipay),

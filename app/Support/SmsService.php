@@ -27,9 +27,7 @@ class SmsService
      */
     public static function sendCaptchaSms(string $phone, string $code): void
     {
-        self::send($phone, [
-            'code' => $code,
-        ]);
+        self::send($phone, ['code' => $code], StorefrontConfig::get('sms_template_code'));
     }
 
     /**
@@ -39,15 +37,17 @@ class SmsService
      */
     public static function sendDeliverySms(string $phone, array $params = []): void
     {
-        self::send($phone, $params);
+        self::send($phone, $params, StorefrontConfig::get('sms_delivery_template_code'));
     }
 
     /**
      * 通用发送(阿里云 Dysmsapi SendSms)。
      * @param string $phone 手机号
      * @param array $templateParam 模板变量 JSON
+     * @param string|null $templateCode 模板 CODE(不传则用 sms_template_code)
+     * @param array $templateParam 模板变量 JSON
      */
-    public static function send(string $phone, array $templateParam = []): void
+    public static function send(string $phone, array $templateParam = [], ?string $templateCode = null): void
     {
         if (! StorefrontConfig::get('sms_enabled')) {
             return;
@@ -56,7 +56,7 @@ class SmsService
         $accessKey = StorefrontConfig::get('sms_access_key');
         $accessSecret = StorefrontConfig::get('sms_access_secret');
         $signName = StorefrontConfig::get('sms_sign_name');
-        $templateCode = StorefrontConfig::get('sms_template_code');
+        $templateCode = $templateCode ?: StorefrontConfig::get('sms_template_code');
 
         if (! $accessKey || ! $accessSecret || ! $signName || ! $templateCode) {
             Log::warning('短信发送跳过:阿里云 SMS 配置不完整');

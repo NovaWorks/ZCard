@@ -88,13 +88,15 @@ class StorefrontConfig
             'mail_from_address' => '',
             'mail_from_name' => 'ZCard',
 
-            // 短信设置(预留)
+            // 短信设置(阿里云/腾讯云,从店铺设置配置)
             'sms_enabled' => false,
             'sms_platform' => 'aliyun',
             'sms_access_key' => '',
             'sms_access_secret' => '',
             'sms_sign_name' => '',
-            'sms_template_code' => '',
+            'sms_template_code' => '',           // 验证码模板 CODE
+            'sms_delivery_template_code' => '',   // 发货通知模板 CODE
+
 
             // 提现设置(预留)
             'cash_min' => 100,
