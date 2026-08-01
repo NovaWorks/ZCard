@@ -78,6 +78,7 @@ function languageLabel(code: string): string {
         <template v-if="authStore.isLoggedIn">
           <RouterLink to="/orders/mine" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.mine') }}</RouterLink>
           <RouterLink v-if="settings.config?.distribution_enabled" to="/distribution" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.distribution') }}</RouterLink>
+          <RouterLink v-if="settings.config?.subsite_enabled" to="/my-subsite" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.mySubsite') }}</RouterLink>
           <span class="px-2 text-ink-muted">|</span>
           <span class="text-ink font-medium px-1">{{ authStore.user?.username }}</span>
           <button @click="logout" class="ml-1 px-3 py-1.5 rounded-field text-ink-soft hover:text-danger hover:bg-red-50 transition">{{ t('nav.logout') }}</button>
