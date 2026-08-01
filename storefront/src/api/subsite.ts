@@ -42,6 +42,7 @@ export interface SubsiteProductSetting {
 export const getMySubsite = () => request.get<unknown, SubsiteInfo>('/subsite-console/')
 export const getSubsiteFinance = () => request.get<unknown, SubsiteFinance>('/subsite-console/finance')
 export const getSubsiteLedger = () => request.get<unknown, SubsiteLedgerEntry[]>('/subsite-console/ledger')
+export const getSubsiteOrders = () => request.get<unknown, any[]>('/subsite-console/orders')
 export const bindSubsiteDomain = (data: { domain: string; type: string }) =>
   request.post('/subsite-console/domains', data)
 export const getSubsiteProductSettings = () =>

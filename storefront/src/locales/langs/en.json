@@ -89,7 +89,19 @@
     "modePercent": "Percent Markup",
     "modeFixedMarkup": "Fixed Markup Amount",
     "modeFixedPrice": "Fixed Price",
-    "loadFailed": "Failed to load"
+    "loadFailed": "Failed to load",
+    "orders": "Sales Orders",
+    "noOrders": "No orders",
+    "orderNo": "Order No.",
+    "productName": "Product",
+    "buyer": "Buyer",
+    "quantity": "Qty",
+    "profit": "Profit",
+    "orderPending": "Pending",
+    "orderPaid": "Paid",
+    "orderCompleted": "Completed",
+    "orderCancelled": "Cancelled",
+    "orderRefunded": "Refunded"
   },
   "withdraw": {
     "title": "Withdraw",

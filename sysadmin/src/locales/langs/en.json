@@ -399,6 +399,9 @@
     },
     "subsite": {
       "title": "Subsites"
+    },
+    "review": {
+      "title": "Reviews"
     }
   },
   "table": {
@@ -805,6 +808,26 @@
       "tier1": "Tier 1",
       "tier2": "Tier 2",
       "tier3": "Tier 3"
+    },
+    "review": {
+      "title": "Reviews",
+      "statTotal": "Total Reviews",
+      "statPending": "Pending",
+      "statApproved": "Approved",
+      "statRejected": "Rejected",
+      "productName": "Product",
+      "username": "User",
+      "rating": "Rating",
+      "content": "Content",
+      "status": "Status",
+      "date": "Date",
+      "operation": "Action",
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "allStatus": "All Status",
+      "approve": "Approve",
+      "reject": "Reject"
     },
     "withdrawal": {
       "title": "Withdrawals",

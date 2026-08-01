@@ -67,6 +67,18 @@ class DeliveryService
             }
         }
 
+        // 发送短信通知(#3:如果 contact 是手机号且开启了短信功能)
+        if ($order->contact && preg_match('/^1[3-9]\d{9}$/', $order->contact)) {
+            try {
+                \App\Support\SmsService::sendDeliverySms($order->contact, [
+                    'order_no' => $order->order_no,
+                    'product_name' => $product->name,
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning("订单 {$order->order_no} 短信通知失败: {$e->getMessage()}");
+            }
+        }
+
         Log::info("订单 {$order->order_no} 发货完成", ['cards' => $cards->count(), 'mode' => $mode]);
     }
 }

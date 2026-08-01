@@ -141,6 +141,34 @@ class SubsiteConsoleController extends Controller
         return response()->json($merchant);
     }
 
+    /** 分站销售订单列表(#4) — 按当前用户分站的订单 */
+    public function orders(Request $request): JsonResponse
+    {
+        $merchant = $this->getMySubsite($request);
+        if (! $merchant) return response()->json(['message' => '无分站'], 404);
+
+        $orders = \App\Models\Order::where('subsite_id', $merchant->id)
+            ->with('product:id,name,slug', 'buyer:id,username')
+            ->select(['id', 'order_no', 'product_id', 'user_id', 'quantity', 'amount', 'subsite_profit', 'status', 'created_at', 'paid_at'])
+            ->orderByDesc('id')
+            ->limit(100)
+            ->get()
+            ->map(fn ($o) => [
+                'id' => $o->id,
+                'order_no' => $o->order_no,
+                'product_name' => $o->product?->name,
+                'buyer_name' => $o->buyer?->username ?? '游客',
+                'quantity' => $o->quantity,
+                'amount' => (int) $o->amount,
+                'profit' => (int) $o->subsite_profit,
+                'status' => $o->status,
+                'created_at' => $o->created_at?->toDateTimeString(),
+                'paid_at' => $o->paid_at?->toDateTimeString(),
+            ]);
+
+        return response()->json($orders);
+    }
+
     private function getMySubsite(Request $request): ?Merchant
     {
         return Merchant::where('user_id', $request->user()->id)->where('settings->is_subsite', true)->first();

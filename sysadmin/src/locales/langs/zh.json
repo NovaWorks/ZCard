@@ -399,6 +399,9 @@
     },
     "subsite": {
       "title": "分站管理"
+    },
+    "review": {
+      "title": "评价审核"
     }
   },
   "table": {
@@ -805,6 +808,26 @@
       "tier1": "一级",
       "tier2": "二级",
       "tier3": "三级"
+    },
+    "review": {
+      "title": "评价审核",
+      "statTotal": "评价总数",
+      "statPending": "待审核",
+      "statApproved": "已通过",
+      "statRejected": "已拒绝",
+      "productName": "商品",
+      "username": "用户",
+      "rating": "评分",
+      "content": "内容",
+      "status": "状态",
+      "date": "时间",
+      "operation": "操作",
+      "pending": "待审核",
+      "approved": "已通过",
+      "rejected": "已拒绝",
+      "allStatus": "全部状态",
+      "approve": "通过",
+      "reject": "拒绝"
     },
     "withdrawal": {
       "title": "提现管理",
