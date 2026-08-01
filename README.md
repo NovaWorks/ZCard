@@ -43,6 +43,96 @@
 
 ---
 
+## Web 服务器配置
+
+ZCard 基于 Laravel 框架，**Web 根目录必须指向 `public/` 子目录**，并配置伪静态规则将所有请求转发到 `public/index.php`。
+
+### Nginx 配置
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    root /path/to/ZCard/public;   # ← 必须指向 public/
+    index index.php index.html;
+
+    # 超时设置(在线更新可能耗时)
+    fastcgi_read_timeout 300;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # 静态资源不记录日志
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 30d;
+        access_log off;
+        try_files $uri =404;
+    }
+
+    # PHP-FPM
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;  # ← 按实际 socket 路径调整
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    # 禁止访问敏感文件
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+    location ~* ^/(storage|bootstrap/cache|vendor|node_modules)/ {
+        deny all;
+    }
+}
+```
+
+> **注意**：`root` 必须是 `ZCard/public`，不是 `ZCard/`。如果指向错误，访问首页会看到目录列表或 403。
+
+### Apache 配置
+
+Laravel 自带的 `public/.htaccess` 已处理伪静态，确保 Apache 启用 `mod_rewrite`：
+
+```apache
+<VirtualHost *:80>
+    ServerName your-domain.com
+    DocumentRoot /path/to/ZCard/public   # ← 必须指向 public/
+
+    <Directory /path/to/ZCard/public>
+        AllowOverride All                # ← 必须 All，让 .htaccess 生效
+        Require all granted
+    </Directory>
+
+    # PHP-FPM（如果用 mod_php 则不需要这段）
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/var/run/php/php8.3-fpm.sock|fcgi://localhost"
+    </FilesMatch>
+</VirtualHost>
+```
+
+如果使用共享主机（CPanel/宝塔等），设置网站根目录为 `public` 即可，`.htaccess` 会自动生效。
+
+### 宝塔面板
+
+1. 添加站点 → 域名指向 `ZCard/public`
+2. PHP 版本 >= 8.3
+3. 伪静态选择 `laravel5`（或粘贴上面的 Nginx 规则）
+
+### 分站域名配置（可选）
+
+如果启用了分站功能，需要支持自定义域名解析：
+
+```nginx
+# 通配域名 server_name（让分站域名也能指向同一站点）
+server_name your-domain.com *.your-domain.com;
+
+# 或让分站主绑定自己的域名(DNS A 记录指向同一 IP)
+# Nginx 不需要额外配置,ResolveSubsite 中间件会自动按 Host 头解析
+```
+
+---
+
 ## 安装方式
 
 ZCard 提供两种安装方式，选择其中一种即可。
