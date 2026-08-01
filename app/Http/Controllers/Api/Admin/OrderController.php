@@ -64,6 +64,15 @@ class OrderController extends Controller
             $query->where('create_ip', 'like', "%{$ip}%");
         }
 
+        // 分站筛选(G3):subsite_id 精确 / subsite_only=1 只看分站订单 / main_only=1 只看主站订单
+        if ($subsiteId = $request->input('subsite_id')) {
+            $query->where('subsite_id', $subsiteId);
+        } elseif ($request->input('subsite_only')) {
+            $query->whereNotNull('subsite_id');
+        } elseif ($request->input('main_only')) {
+            $query->whereNull('subsite_id');
+        }
+
         // 时间范围
         if ($startDate = $request->input('start_date')) {
             $query->whereDate('created_at', '>=', $startDate);

@@ -54,6 +54,18 @@ class ProductController extends Controller
             ->withCount(['cards as stock' => fn ($q) => $q->where('status', 'unused')])
             ->firstOrFail();
 
+        // 分站可见性校验:分站下架的商品不允许直接访问(spec §4,G1 修复)
+        $subsite = request()->attributes->get('subsite');
+        if ($subsite) {
+            $hidden = \App\Models\SubsiteProductSetting::where('merchant_id', $subsite->id)
+                ->where('product_id', $product->id)
+                ->where('is_listed', false)
+                ->exists();
+            if ($hidden) {
+                abort(404);
+            }
+        }
+
         return response()->json($this->transform($product, true));
     }
 

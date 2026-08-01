@@ -48,6 +48,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/product-settings', [SubsiteConsoleController::class, 'productSettings']);
         Route::post('/product-settings', [SubsiteConsoleController::class, 'upsertProductSetting']);
         Route::post('/withdrawals', [SubsiteConsoleController::class, 'requestWithdrawal']);
+        Route::put('/branding', [SubsiteConsoleController::class, 'updateBranding']);
     });
 });
 

@@ -125,6 +125,22 @@ class SubsiteConsoleController extends Controller
         }
     }
 
+    /** 更新分站白标配置(站名/logo/公告) — G2 修复 */
+    public function updateBranding(Request $request): JsonResponse
+    {
+        $merchant = $this->getMySubsite($request);
+        if (! $merchant) return response()->json(['message' => '无分站'], 404);
+        $data = $request->validate([
+            'site_name' => 'nullable|string|max:120',
+            'logo' => 'nullable|string|max:500',
+            'announcement' => 'nullable|string|max:1000',
+        ]);
+        $settings = $merchant->settings ?? [];
+        $settings = array_merge($settings, array_filter($data, fn ($v) => $v !== null));
+        $merchant->update(['settings' => $settings]);
+        return response()->json($merchant);
+    }
+
     private function getMySubsite(Request $request): ?Merchant
     {
         return Merchant::where('user_id', $request->user()->id)->where('settings->is_subsite', true)->first();
