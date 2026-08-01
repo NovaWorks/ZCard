@@ -34,10 +34,22 @@ class UpdateController extends Controller
         $currentVersion = config('app.version', '0.0.0');
 
         try {
-            $resp = Http::timeout(15)->get("https://api.github.com/repos/{$repo}/releases/latest");
+            $resp = Http::timeout(15)->withHeaders(['User-Agent' => 'ZCard'])->get("https://api.github.com/repos/{$repo}/releases/latest");
+
+            if ($resp->status() === 404) {
+                // 无 Release(仓库未创建任何 Release)
+                return response()->json([
+                    'current_version' => $currentVersion,
+                    'latest_version' => $currentVersion,
+                    'has_update' => false,
+                    'release_url' => "https://github.com/{$repo}/releases",
+                    'release_notes' => '尚未发布任何版本。请先在 GitHub 上创建 Release(如 v1.0.0)。',
+                    'published_at' => '',
+                ]);
+            }
 
             if (! $resp->successful()) {
-                return response()->json(['message' => '无法连接 GitHub'], 502);
+                return response()->json(['message' => '无法连接 GitHub(HTTP ' . $resp->status() . '),请检查网络或仓库设置'], 502);
             }
 
             $release = $resp->json();
@@ -63,7 +75,7 @@ class UpdateController extends Controller
         $repo = config('zcard.update.repo', 'NovaWorks/ZCard');
 
         try {
-            $resp = Http::timeout(15)->get("https://api.github.com/repos/{$repo}/releases?per_page=10");
+            $resp = Http::timeout(15)->withHeaders(['User-Agent' => 'ZCard'])->get("https://api.github.com/repos/{$repo}/releases?per_page=10");
 
             if (! $resp->successful()) {
                 return response()->json(['message' => '无法连接 GitHub'], 502);
@@ -138,9 +150,13 @@ class UpdateController extends Controller
             Artisan::call('route:cache');
             Artisan::call('view:cache');
 
-            // Step 7: 前端构建(sysadmin)
-            $this->log($logFile, '构建后台前端...');
+            // Step 7: 前端构建(sysadmin → public/admin/, storefront → public/storefront/)
+            $this->log($logFile, '构建后台前端(sysadmin)...');
             $output = shell_exec('cd ' . base_path() . '/sysadmin && pnpm install --frozen-lockfile 2>&1 && pnpm run build 2>&1');
+            $this->log($logFile, $output);
+
+            $this->log($logFile, '构建前台前端(storefront)...');
+            $output = shell_exec('cd ' . base_path() . '/storefront && pnpm install --frozen-lockfile 2>&1 && pnpm run build 2>&1');
             $this->log($logFile, $output);
 
             // Step 8: 新版本号
