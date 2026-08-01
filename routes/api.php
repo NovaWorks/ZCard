@@ -52,6 +52,7 @@ use App\Http\Controllers\Api\Admin\WithdrawalController as AdminWithdrawalContro
 use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Api\Admin\ProductSkuController as AdminProductSkuController;
 use App\Http\Controllers\Api\Admin\SettingController as AdminSettingController;
+use App\Http\Controllers\Api\Admin\SubsiteController as AdminSubsiteController;
 use App\Http\Controllers\Api\Admin\UploadController as AdminUploadController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\Admin\UserGroupController as AdminUserGroupController;
@@ -133,6 +134,13 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
 
     // 货币管理(CRUD)
     Route::apiResource('currencies', AdminCurrencyController::class)->except(['show']);
+
+    // 分站管理
+    Route::get('subsites', [AdminSubsiteController::class, 'index']);
+    Route::post('subsites', [AdminSubsiteController::class, 'store']);
+    Route::put('subsites/domains/{domain}', [AdminSubsiteController::class, 'updateDomain']);
+    Route::get('subsites/{merchant}/product-settings', [AdminSubsiteController::class, 'productSettings']);
+    Route::post('subsites/product-settings', [AdminSubsiteController::class, 'upsertProductSetting']);
 });
 
 // 公开货币列表(供前台货币切换器,不需要 display.currency 中间件)
