@@ -707,7 +707,7 @@
       "close": "Close Order",
       "closeConfirm": "Confirm closing this order? Locked cards will be released",
       "detail": "Order Detail",
-      "cards": "Delivered Cards",
+      "cards": "Cards",
       "statusPending": "Pending",
       "statusPaid": "Paid",
       "statusClosed": "Closed",
@@ -744,7 +744,6 @@
       "sku": "SKU",
       "cost": "Cost",
       "commission": "Commission",
-      "cards": "Cards",
       "cardUnit": "",
       "userType": "Customer",
       "userGuest": "Guest",
@@ -1201,7 +1200,6 @@
       "delete": "Delete",
       "confirm": "Confirm",
       "cancel": "Cancel",
-      "search": "Search",
       "reset": "Reset",
       "save": "Save",
       "deleteSuccess": "Deleted",
@@ -1319,7 +1317,12 @@
       "versionCol": "Version",
       "viewLog": "View full log",
       "viewDetail": "Details",
-      "updateCancelled": "Update cancelled"
+      "updateCancelled": "Update cancelled",
+      "rollback": "Rollback",
+      "rollbackConfirm": "Confirm Rollback",
+      "rollbackConfirmTip": "This will rollback to the previous version (including database migration rollback). System enters maintenance mode during rollback. Continue?",
+      "rollbackSuccess": "Rolled back successfully, page will refresh",
+      "rollbackFailed": "Rollback failed"
     }
   }
 }

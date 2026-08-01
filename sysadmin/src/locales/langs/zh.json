@@ -707,7 +707,7 @@
       "close": "关闭订单",
       "closeConfirm": "确认关闭此订单？关闭后卡密将释放",
       "detail": "订单详情",
-      "cards": "发货卡密",
+      "cards": "卡密",
       "statusPending": "待支付",
       "statusPaid": "已支付",
       "statusClosed": "已关闭",
@@ -744,7 +744,6 @@
       "sku": "SKU",
       "cost": "成本",
       "commission": "佣金",
-      "cards": "卡密",
       "cardUnit": "张",
       "userType": "客户类型",
       "userGuest": "匿名访客",
@@ -1201,7 +1200,6 @@
       "delete": "删除",
       "confirm": "确定",
       "cancel": "取消",
-      "search": "搜索",
       "reset": "重置",
       "save": "保存",
       "deleteSuccess": "删除成功",
@@ -1319,7 +1317,12 @@
       "versionCol": "版本",
       "viewLog": "查看完整日志",
       "viewDetail": "详情",
-      "updateCancelled": "已取消更新"
+      "updateCancelled": "已取消更新",
+      "rollback": "回退上一版本",
+      "rollbackConfirm": "确认回退",
+      "rollbackConfirmTip": "将回退到上一个版本(包含数据库迁移回退),期间系统进入维护模式。确认操作?",
+      "rollbackSuccess": "已回退到上一个版本,页面即将刷新",
+      "rollbackFailed": "回退失败"
     }
   }
 }

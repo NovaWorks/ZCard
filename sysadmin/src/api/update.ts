@@ -38,4 +38,7 @@ export const getVersions = () => http.get<VersionInfo[]>({ url: '/admin/update/v
 export const runUpdate = () =>
   http.post<UpdateResult>({ url: '/admin/update/run', timeout: 180000 })
 
+export const rollbackUpdate = () =>
+  http.post<UpdateResult>({ url: '/admin/update/rollback', timeout: 180000 })
+
 export const getUpdateLog = () => http.get<UpdateLog>({ url: '/admin/update/log' })

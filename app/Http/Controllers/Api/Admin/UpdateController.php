@@ -197,7 +197,81 @@ class UpdateController extends Controller
             return response()->json([
                 'message' => '更新失败: ' . $e->getMessage(),
                 'log' => file_get_contents($logFile),
-                'rollback_hint' => '可通过 git reset --hard HEAD~1 回退到更新前版本',
+                'can_rollback' => true,
+            ], 500);
+        }
+    }
+
+    /**
+     * 回退到上一个版本(git reset + migrate:rollback + 重建前端)。
+     * POST /api/admin/update/rollback
+     */
+    public function rollback(): JsonResponse
+    {
+        $lockFile = storage_path('app/update.lock');
+        if (file_exists($lockFile) && (time() - filemtime($lockFile) < 600)) {
+            return response()->json(['message' => '更新正在进行中,无法回退'], 409);
+        }
+
+        $logFile = storage_path('app/update.log');
+        file_put_contents($logFile, "=== 回退开始 " . now() . " ===\n");
+
+        try {
+            // Step 1: 维护模式
+            $this->log($logFile, '进入维护模式...');
+            Artisan::call('down', ['--render' => 'maintenance']);
+
+            // Step 2: 查看上一个版本
+            $this->log($logFile, '当前 HEAD:');
+            $output = shell_exec('cd ' . base_path() . ' && git log --oneline -3 2>&1');
+            $this->log($logFile, $output);
+
+            // Step 3: git reset 回退一个提交
+            $this->log($logFile, '执行 git reset --hard HEAD~1...');
+            $output = shell_exec('cd ' . base_path() . ' && git reset --hard HEAD~1 2>&1');
+            $this->log($logFile, $output);
+
+            // Step 4: 回退数据库迁移
+            $this->log($logFile, '回退数据库迁移...');
+            try {
+                Artisan::call('migrate:rollback', ['--force' => true]);
+                $this->log($logFile, Artisan::output());
+            } catch (\Throwable $e) {
+                $this->log($logFile, 'migrate:rollback 警告(可能无迁移可回退): ' . $e->getMessage());
+            }
+
+            // Step 5: 重建依赖和前端
+            $this->log($logFile, '安装依赖...');
+            $output = shell_exec('cd ' . base_path() . ' && composer install --no-dev --optimize-autoloader --no-interaction 2>&1');
+            $this->log($logFile, $output);
+
+            $this->log($logFile, '重建前端...');
+            $output = shell_exec('cd ' . base_path() . '/sysadmin && pnpm install --frozen-lockfile 2>&1 && pnpm run build 2>&1');
+            $this->log($logFile, $output);
+            $output = shell_exec('cd ' . base_path() . '/storefront && pnpm install --frozen-lockfile 2>&1 && pnpm run build 2>&1');
+            $this->log($logFile, $output);
+
+            // Step 6: 清缓存 + 上线
+            Artisan::call('config:cache');
+            Artisan::call('route:cache');
+            Artisan::call('view:cache');
+            Artisan::call('up');
+
+            $version = \App\Support\AppHelper::version();
+            $this->log($logFile, "回退完成! 当前版本: {$version}");
+
+            return response()->json([
+                'message' => '已回退到上一个版本',
+                'current_version' => $version,
+                'log' => file_get_contents($logFile),
+            ]);
+
+        } catch (\Throwable $e) {
+            $this->log($logFile, '回退失败: ' . $e->getMessage());
+            try { Artisan::call('up'); } catch (\Throwable $ignore) {}
+            return response()->json([
+                'message' => '回退失败: ' . $e->getMessage(),
+                'log' => file_get_contents($logFile),
             ], 500);
         }
     }

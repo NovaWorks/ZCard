@@ -6,6 +6,7 @@ import {
   checkUpdate,
   getVersions,
   runUpdate,
+  rollbackUpdate,
 } from '@/api/update'
 import type { UpdateCheck, VersionInfo, UpdateResult } from '@/api/update'
 
@@ -125,6 +126,32 @@ const loadVersions = async () => {
 const handleRetry = () => {
   failedVisible.value = false
   handleCheck()
+}
+
+// 回退到上一个版本
+const rollingBack = ref(false)
+const handleRollback = () => {
+  ElMessageBox.confirm(
+    t('zcard.update.rollbackConfirmTip'),
+    t('zcard.update.rollbackConfirm'),
+    { type: 'warning', confirmButtonText: t('zcard.update.rollback'), cancelButtonText: t('zcard.common.cancel') }
+  )
+    .then(async () => {
+      failedVisible.value = false
+      updating.value = true
+      rollingBack.value = true
+      try {
+        await rollbackUpdate()
+        ElMessage.success(t('zcard.update.rollbackSuccess'))
+        setTimeout(() => window.location.reload(), 1500)
+      } catch (e: any) {
+        ElMessage.error(e?.response?.data?.message || t('zcard.update.rollbackFailed'))
+      } finally {
+        updating.value = false
+        rollingBack.value = false
+      }
+    })
+    .catch(() => {})
 }
 
 onMounted(() => {
@@ -324,6 +351,7 @@ onMounted(() => {
       </div>
       <template #footer>
         <ElButton @click="failedVisible = false" round>{{ t('zcard.common.cancel') }}</ElButton>
+        <ElButton type="warning" @click="handleRollback" :loading="rollingBack" round>⏪ {{ t('zcard.update.rollback') }}</ElButton>
         <ElButton type="primary" @click="handleRetry" round>🔄 {{ t('zcard.update.checkUpdate') }}</ElButton>
       </template>
     </ElDialog>

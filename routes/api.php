@@ -87,6 +87,7 @@ Route::middleware(['auth:sanctum', 'admin.role'])->prefix('admin')->group(functi
     Route::get('update/check', [AdminUpdateController::class, 'check']);
     Route::get('update/versions', [AdminUpdateController::class, 'versions']);
     Route::post('update/run', [AdminUpdateController::class, 'update']);
+    Route::post('update/rollback', [AdminUpdateController::class, 'rollback']);
     Route::get('update/log', [AdminUpdateController::class, 'getLog']);
 
     // stats/batch 必须在 apiResource 之前(否则 stats 被当成 {product} 参数)
