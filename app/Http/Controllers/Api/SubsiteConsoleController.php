@@ -74,6 +74,34 @@ class SubsiteConsoleController extends Controller
         return response()->json($row, 201);
     }
 
+    /** 触发域名验证(DNS TXT + HTTP well-known 双查) */
+    public function verifyDomain(Request $request, int $domainId): JsonResponse
+    {
+        $merchant = $this->getMySubsite($request);
+        if (! $merchant) return response()->json(['message' => '无分站'], 404);
+
+        $domain = SubsiteDomain::where('id', $domainId)->where('merchant_id', $merchant->id)->first();
+        if (! $domain) return response()->json(['message' => '域名不存在'], 404);
+        if ($domain->verification_status === 'verified') {
+            return response()->json(['message' => '域名已验证', 'verified' => true]);
+        }
+
+        $result = \App\Support\DomainVerificationService::verify($domain);
+        return response()->json($result, $result['verified'] ? 200 : 422);
+    }
+
+    /** 获取域名验证指引(供前端展示 DNS/HTTP 配置方法) */
+    public function domainInstructions(Request $request, int $domainId): JsonResponse
+    {
+        $merchant = $this->getMySubsite($request);
+        if (! $merchant) return response()->json(['message' => '无分站'], 404);
+
+        $domain = SubsiteDomain::where('id', $domainId)->where('merchant_id', $merchant->id)->first();
+        if (! $domain) return response()->json(['message' => '域名不存在'], 404);
+
+        return response()->json(\App\Support\DomainVerificationService::getInstructions($domain));
+    }
+
     /** 商品配置列表 */
     public function productSettings(Request $request): JsonResponse
     {

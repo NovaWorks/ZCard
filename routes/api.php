@@ -45,6 +45,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/finance', [SubsiteConsoleController::class, 'finance']);
         Route::get('/ledger', [SubsiteConsoleController::class, 'ledger']);
         Route::post('/domains', [SubsiteConsoleController::class, 'bindDomain']);
+        Route::post('/domains/{domainId}/verify', [SubsiteConsoleController::class, 'verifyDomain']);
+        Route::get('/domains/{domainId}/instructions', [SubsiteConsoleController::class, 'domainInstructions']);
         Route::get('/product-settings', [SubsiteConsoleController::class, 'productSettings']);
         Route::post('/product-settings', [SubsiteConsoleController::class, 'upsertProductSetting']);
         Route::post('/withdrawals', [SubsiteConsoleController::class, 'requestWithdrawal']);
