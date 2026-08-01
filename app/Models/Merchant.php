@@ -29,4 +29,10 @@ class Merchant extends Model
     {
         return $this->hasMany(MerchantMember::class);
     }
+
+    /** 分站域名(分站=Merchant 行时的关联) */
+    public function domains(): HasMany
+    {
+        return $this->hasMany(SubsiteDomain::class);
+    }
 }
