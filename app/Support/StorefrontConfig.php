@@ -108,6 +108,12 @@ class StorefrontConfig
             'default_display_currency' => 'CNY',
             'enabled_languages' => ['zh'],
             'default_language' => 'zh',
+
+            // 三级分销
+            'distribution_enabled' => false,
+            'distribution_rate_l1' => 10,   // 百分比(10 = 10%)
+            'distribution_rate_l2' => 5,
+            'distribution_rate_l3' => 2,
         ];
     }
 

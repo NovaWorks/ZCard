@@ -46,6 +46,7 @@ class OrderController extends Controller
                     'password' => $data['password'] ?? null,
                     'extra' => $data['extra'] ?? null,
                     'coupon_code' => $data['coupon_code'] ?? null,
+                    'user_id' => $request->user()?->id,
                     'create_ip' => $request->ip(),
                     'create_device' => $this->detectDevice($request),
                 ],
