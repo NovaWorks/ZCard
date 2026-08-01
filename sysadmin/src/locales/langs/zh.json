@@ -1189,7 +1189,7 @@
     "dashboard": {
       "title": "ZCard 管理后台",
       "welcomeBack": "欢迎回来",
-      "tip": "系统统计模块正在搭建中，敬请期待。",
+      "tip": "以下是系统实时统计数据概览。",
       "admin": "管理员",
       "gDawn": "凌晨好",
       "gMorning": "早上好",
@@ -1197,7 +1197,13 @@
       "gNoon": "中午好",
       "gAfternoon": "下午好",
       "gEvening": "傍晚好",
-      "gNight": "晚上好"
+      "gNight": "晚上好",
+      "statProductTotal": "商品总数",
+      "statOrderTotal": "订单总数",
+      "statOrderPending": "待支付金额",
+      "statRevenue": "已收入金额",
+      "statUserTotal": "用户总数",
+      "statCommission": "佣金总额"
     },
     "member": {
       "introTitle": "会员等级管理",
