@@ -7,25 +7,16 @@
 <h1 align="center">ZCard — 现代化自动发卡 / 虚拟商品销售系统</h1>
 
 <p align="center">
-  <strong>Laravel 13 · Vue 3 · Filament v5 · Element Plus · 多货币 · 多语言 · API-First</strong>
+  <strong>Laravel 13 · Vue 3 · Filament v5 · Element Plus · 多货币 · 多语言 · 三级分销 · 分站 · API-First</strong>
 </p>
 
 <p align="center">
-<span>
-<img src="https://img.shields.io/badge/PHP-8.3+-777BB4?logo=php&logoColor=white" alt="PHP 8.3+">
-</span>
-<span>
-<img src="https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white" alt="Laravel 13">
-</span>
-<span>
-<img src="https://img.shields.io/badge/Vue-3-42B883?logo=vue.js&logoColor=white" alt="Vue 3">
-</span>
-<span>
-<img src="https://img.shields.io/badge/MySQL-8.4-4479A1?logo=mysql&logoColor=white" alt="MySQL">
-</span>
-<span>
-<img src="https://img.shields.io/badge/License-MIT-green" alt="MIT">
-</span>
+<span><img src="https://img.shields.io/badge/PHP-8.3+-777BB4?logo=php&logoColor=white" alt="PHP 8.3+"></span>
+<span><img src="https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white" alt="Laravel 13"></span>
+<span><img src="https://img.shields.io/badge/Vue-3-42B883?logo=vue.js&logoColor=white" alt="Vue 3"></span>
+<span><img src="https://img.shields.io/badge/MySQL-8.0+-4479A1?logo=mysql&logoColor=white" alt="MySQL 8.0+"></span>
+<span><img src="https://img.shields.io/badge/Redis-6.0+-DC382D?logo=redis&logoColor=white" alt="Redis"></span>
+<span><img src="https://img.shields.io/badge/License-MIT-green" alt="MIT"></span>
 </p>
 
 ---
@@ -38,76 +29,173 @@
 
 ---
 
-## 项目简介
+## 环境要求
 
-ZCard 是一套**现代化的虚拟商品自动发卡 / 个人店铺系统**，采用 Laravel 13 + Vue 3 双栈构建，开箱即用。
+| 组件 | 版本要求 | 说明 |
+|---|---|---|
+| **PHP** | **>= 8.3** | 需扩展：pdo_mysql, mbstring, openssl, bcmath, json, curl, gd(或 imagick), redis(可选) |
+| **MySQL** | **>= 8.0**（推荐 8.4） | utf8mb4 字符集 |
+| **Redis** | **>= 6.0**（可选） | 用于缓存，不装也可运行（降级为 database 缓存） |
+| **Composer** | >= 2.x | PHP 依赖管理 |
+| **Node.js** | >= 18（可选） | 仅开发/重新编译前端时需要，**生产部署不需要**（编译产物已在仓库） |
 
-**核心差异化**：现代技术栈（PHP 8.3 / Laravel 13 / Vue 3 / Tailwind v4）+ 多货币 + 多语言 + API-First 架构 + 双后台（Element Plus SPA + Filament v5）+ 卡密应用层加密 + 8 大支付通道。
-
-> 适用场景：游戏卡密 / 账号售卖、软件授权、会员开通、数字商品自动交付、点卡兑换码等任何"付款即自动发货"的在线交易。
+> **生产部署无需 Node.js/pnpm** —— `public/admin/` 和 `public/storefront/` 的编译产物已提交到仓库，`git clone` 后可直接访问。
 
 ---
 
-## 功能简介
+## 安装方式
+
+ZCard 提供两种安装方式，选择其中一种即可。
+
+### 方式一：Web 安装向导（推荐）
+
+适合不熟悉命令行的用户，浏览器操作即可完成。
+
+```bash
+# 1. 克隆仓库 + 安装 PHP 依赖
+git clone https://github.com/NovaWorks/ZCard.git
+cd ZCard
+composer install
+
+# 2. 配置环境
+cp .env.example .env
+
+# 3. 浏览器访问安装向导
+# 访问 http://你的域名/install
+# 按向导步骤操作：
+#   Step 1: 环境检查（自动检测 PHP 扩展 + 目录权限）
+#   Step 2: 填写数据库信息（支持实时连接测试）
+#   Step 3: 设置管理员邮箱 + 密码
+#   Step 4: 安装完成，跳转后台
+```
+
+### 方式二：命令行安装
+
+适合服务器运维人员，一行命令完成。
+
+```bash
+# 1. 克隆仓库 + 安装依赖
+git clone https://github.com/NovaWorks/ZCard.git
+cd ZCard
+composer install
+
+# 2. 配置环境
+cp .env.example .env
+php artisan key:generate
+
+# 3. 交互式安装（会提示输入数据库和管理员信息）
+php artisan zcard:install
+#    或跳过数据库交互（使用已有 .env 配置）:
+php artisan zcard:install --skip-db --email=admin@example.com --password=yourpassword
+
+# 4. 完成！
+# 访问 http://你的域名        → 前台商城
+# 访问 http://你的域名/admin   → 后台管理
+```
+
+### Docker 开发环境（Laravel Sail）
+
+```bash
+composer install
+./vendor/bin/sail up -d
+./vendor/bin/sail artisan zcard:install --skip-db
+```
+
+### 默认端口
+
+| 服务 | 地址 |
+|---|---|
+| 前台商城 | http://你的域名/ |
+| 管理后台 | http://你的域名/admin/ |
+| 安装向导 | http://你的域名/install |
+| Filament 面板（开发期 CRUD） | http://你的域名/filament |
+
+---
+
+## 功能总览
 
 ### 🛒 商品与卡密
 
-- **商品管理**：支持分类（树形 + 图标 + 排序拖拽）、多 SKU、会员等级定价、最低/最高起购、限购、精选/热标签、虚拟销量与虚拟评价、自定义购买控件（control_config）。
-- **卡密系统**：应用层 **AES 加密**存储 + sha256 去重（去重可按商品开关）；批量导入（≤5000 同步、>5000 入队列），导入批次可撤销；支持预选卡密加价、卡类型（月卡/周卡等）。
-- **库存防超卖**：下单时 `lockForUpdate` 行锁锁定卡密，付款失败/订单超时自动释放。
+- **商品管理**：分类（树形+图标+排序拖拽）、多 SKU、会员等级定价、最低/最高起购、限购、精选/热标签、虚拟销量与虚拟评价、自定义购买控件
+- **卡密系统**：应用层 **AES 加密**存储 + sha256 去重（去重可按商品开关）；批量导入（≤5000 同步、>5000 入队列），导入批次可撤销
+- **库存防超卖**：下单时 `lockForUpdate` 行锁，付款失败/订单超时自动释放
 
 ### 💳 订单与支付
 
-- **自动发卡**：付款成功即刻触发发货（同步事务），支持"标记已用 / 物理删除"两种发货模式，可邮件通知。
-- **游客下单**：无需注册即可购买；订单查询支持按订单号/联系方式 + 查询密码。
-- **8 大支付通道**（全部真实实现，非占位）：
+- **自动发卡**：付款成功即刻发货（同步事务），支持"标记已用/物理删除"两种模式，邮件+短信通知
+- **游客下单**：无需注册，订单查询支持订单号/联系方式 + 查询密码
+- **9 大支付通道**（全部真实实现）：
 
-  | 通道 | 支持货币 | 说明 |
-  |---|---|---|
-  | 支付宝 / 微信支付 | CNY | yansongda/pay v3 |
-  | PayPal | USD/EUR/GBP | PayPal Orders v2 |
-  | Stripe | USD/EUR/GBP/CNY/JPY | Checkout Session + Webhook |
-  | 易支付 / 码支付 | CNY | 通用聚合支付 |
-  | USDT | USDT | TRC20 钱包二维码 |
-  | EpuSdt | CNY/USD | EpUSDT / GMPay |
-
-  每个通道可在后台独立配置凭据、手续费、排序、启停；回调统一做凭据校验（防空 key 伪造）+ 金额核对 + 幂等。
+  | 通道 | 支持货币 |
+  |---|---|
+  | 支付宝 / 微信支付 | CNY |
+  | PayPal | USD/EUR/GBP |
+  | Stripe | USD/EUR/GBP/CNY/JPY |
+  | 易支付 / 码支付 | CNY |
+  | USDT (TRC20) | USDT |
+  | EpuSdt | CNY/USD |
 
 ### 💰 多货币
 
-- **基础货币**（默认 CNY）为唯一记账真相源，所有金额以「分」整数存储（bcmath 运算，杜绝浮点误差）。
-- **客户可切换显示货币**：前台货币切换器，按汇率实时换算展示，下单瞬间**锁定汇率快照**（历史订单不随后续汇率变动）。
-- 后台货币管理：增删货币、改汇率、设基础货币、启停（改汇率自动清缓存）。
+- 基础货币（默认 CNY）为唯一记账真相源，所有金额以「分」整数存储
+- 客户可切换显示货币（前台切换器），按汇率实时换算
+- 下单瞬间锁定汇率快照，历史订单不随后续汇率变动
 
 ### 🌐 多语言
 
-- **前台 storefront**：vue-i18n，中/英双语，语言切换器即时切换（无需刷新），记住上次选择。
-- **后端 API**：`Accept-Language` / `X-Lang` 请求头控制，错误提示消息多语言。
-- 后台可配置启用的语言与默认语言。
+- 前台 vue-i18n 中/英双语，即时切换
+- 后端 API `__()` 全量提取（`Accept-Language`/`X-Lang` 头控制）
+- 后台可配置启用的语言与默认语言
 
-### 👤 会员与资金
+### 👥 三级分销
 
-- **会员体系**：用户 + 会员等级（user_groups，自定义折扣率、充值升级阈值），商品可按等级差异化定价。
-- **余额 / 账单**：每笔资金变动记流水（balance_after 快照），后台可手动调账。
-- **提现**：支持支付宝/微信/USDT 提现，手续费配置，审批流（批准/驳回退回）。
-- **认证**：注册/登录/找回密码（邮箱验证码），首次登录强制改密，图形验证码可配。
+- 推广链接注册绑定上下级链（`?ref=用户名`）
+- 按毛利 × 每级费率向上追溯最多 3 级发佣
+- 自推荐拒绝、自购拦截
+- FIFO 提现 + 后台审批
+
+### 🏪 分站 / 白标店铺
+
+- 域名解析（Host 头 + Redis 缓存 + 归一化）
+- 4 模式加价定价引擎（inherit / markup_percent / fixed_markup / fixed_price）
+- 订单快照 + 冻结期账本 + 防自购（owner + buyer 上级链）
+- DNS TXT + HTTP well-known 双方案域名验证
+- FIFO 提现 + 后台审批
+- 与分销互斥
 
 ### 🎟️ 优惠券
 
-- 满减券（固定金额）/ 折扣券（百分比），可限定商品/分类，最低消费门槛，批量生成，下单前可预校验。
+- 满减券 / 折扣券，限定商品/分类，最低消费门槛，批量生成
 
-### 🛠️ 双后台管理
+### 📊 仪表盘
 
-- **Element Plus SPA（`/admin`）**：基于 art-design-pro 模板，现代化管理后台，覆盖商品/分类/卡密/订单/会员/用户/账单/提现/优惠券/支付通道/货币/设置全模块，中英双语，ECharts 数据看板。
-- **Filament v5 面板（`/filament`）**：开发期 CRUD 利器，配合 filament-shield 的 RBAC（super_admin / merchant / user 三角色）。
+- ECharts 销售趋势面积图 + 订单柱状图
+- 8 个 KPI 指标卡（订单/收入/利润/支付/库存/用户/提现）
+- 热销商品 Top10 + 支付通道排行
 
-### ⚙️ 店铺配置（~60 项）
+### 🔄 在线更新
 
-站点信息、页脚（链接/客服/社交）、列表布局、注册开关、验证码、维护模式、SMTP 邮件、提现、多货币、多语言……全部后台可视化配置。
+- Git-based 更新（检查 GitHub Release → 一键 git pull + migrate + 重建前端）
+- 版本回退（git reset + migrate:rollback）
+- 维护模式 + 版本锁防并发
 
 ### 🔒 安全
 
-卡密 AES 加密存储 · 支付回调凭据校验 + 金额核对 + 幂等 · 首次登录强制改密 · RBAC 权限模型 · 维护模式开关。
+- RBAC 权限守卫（super_admin / merchant / user）
+- AES-256 卡密加密存储
+- 支付回调凭据校验 + 金额核对 + 幂等
+- 认证端点限流（登录/注册 5次/分）
+- 图形验证码
+
+### 📱 通知
+
+- 邮件通知（SMTP，发货通知 + 验证码）
+- 短信通知（阿里云 REST API，发货通知 + 验证码）
+
+### ⭐ 评价审核
+
+- 评价审核系统（pending/approved/rejected）
+- 真实评价 + 虚拟评价合并评分
 
 ---
 
@@ -115,54 +203,10 @@ ZCard 是一套**现代化的虚拟商品自动发卡 / 个人店铺系统**，�
 
 | 层 | 技术 |
 |---|---|
-| **后端** | PHP 8.3+ · Laravel 13 · Filament v5 · Sanctum（API Token）· spatie/laravel-permission + filament-shield（RBAC）· yansongda/pay · stripe-php · mews/captcha · bcmath |
+| **后端** | PHP 8.3+ · Laravel 13 · Filament v5 · Sanctum · Spatie Permission · yansongda/pay · stripe-php · mews/captcha · bcmath |
 | **前台 storefront** | Vue 3 · Vite · Tailwind CSS v4 · Pinia · Vue Router · vue-i18n · axios |
-| **后台 sysadmin** | Vue 3 · Element Plus · Vite · Pinia · Vue Router · ECharts · wangEditor · Tailwind v4 |
-| **基础设施** | MySQL 8.4 · Redis · Laravel Sail（Docker）|
-
----
-
-## 快速开始
-
-### 环境要求
-
-- Docker（PHP/MySQL/Redis 走容器，无需本机安装）
-- Node 22 + pnpm（前端构建）
-
-### 安装步骤
-
-```bash
-# 1. 克隆仓库
-git clone https://github.com/NovaWorks/ZCard.git
-cd ZCard
-
-# 2. 安装后端依赖
-composer install
-
-# 3. 启动容器（首次构建镜像约 1-3 分钟）
-./vendor/bin/sail up -d
-
-# 4. 初始化系统（迁移 + RBAC + 默认商户 + 超管账号，幂等）
-./vendor/bin/sail artisan zcard:install
-#    命令行会打印一个随机初始密码，首次登录强制改密
-
-# 5. 前端
-cd storefront && pnpm install && pnpm dev      # 前台，访问 http://localhost:5173
-cd ../sysadmin && pnpm install && pnpm dev      # 后台 SPA dev（:3006），或用构建产物
-```
-
-### 访问地址
-
-| 服务 | 地址 |
-|---|---|
-| Laravel 应用 | http://localhost:8092 |
-| **管理后台 SPA** | **http://localhost:8092/admin/** |
-| Filament 面板（开发期 CRUD） | http://localhost:8092/filament |
-| 前台商城（dev） | http://localhost:5173 |
-| MySQL | localhost:3307 |
-| Redis | localhost:6380 |
-
-> 超管账号：`admin@zcard.local` + install 打印的密码。端口可在 `.env` 的 `APP_PORT` / `FORWARD_DB_PORT` / `FORWARD_REDIS_PORT` 调整。
+| **后台 sysadmin** | Vue 3 · Element Plus · ECharts · Pinia · Vue Router · Tailwind v4 |
+| **基础设施** | MySQL 8.0+ · Redis 6.0+（可选） · Laravel Sail (Docker) |
 
 ---
 
@@ -171,20 +215,21 @@ cd ../sysadmin && pnpm install && pnpm dev      # 后台 SPA dev（:3006），�
 ```
 ZCard/
 ├── app/
-│   ├── Console/Commands/InstallCommand.php   zcard:install 初始化
-│   ├── Filament/                             Filament v5 后台（Resources/Pages/Widgets）
-│   ├── Http/Controllers/Api/                 API 控制器（Admin + 前台）
-│   ├── Http/Middleware/                      中间件（显示货币/语言/维护模式/强制改密）
-│   ├── Models/                               数据模型
-│   ├── Payment/                              支付契约 + 8 个驱动
-│   └── Support/                              业务服务（CurrencyService/OrderService/PaymentService 等）
-├── database/migrations/                      数据库迁移
-├── lang/                                     后端多语言（zh_CN / en）
-├── storefront/                               Vue3 前台商城（独立工程）
-├── sysadmin/                                 Vue3 + Element Plus 管理后台（构建到 public/admin/）
-├── plugins/                                  插件骨架（规划中，见下文）
-├── config/zcard.php                          功能开关
-└── compose.yaml                              Laravel Sail 编排
+│   ├── Console/Commands/          zcard:install 安装命令
+│   ├── Filament/                  Filament v5 后台
+│   ├── Http/Controllers/Api/      API 控制器（Admin + 前台 + 安装向导）
+│   ├── Http/Middleware/           中间件（显示货币/语言/维护模式/RBAC/分站解析）
+│   ├── Models/                    数据模型
+│   ├── Payment/                   支付契约 + 9 个驱动
+│   └── Support/                   业务服务（CurrencyService/OrderService/CommissionService 等）
+├── database/migrations/           数据库迁移
+├── lang/                          后端多语言（zh_CN / en）
+├── public/admin/                  后台编译产物（已在仓库）
+├── public/storefront/             前台编译产物（已在仓库）
+├── storefront/                    前台源码（Vue 3 + Tailwind）
+├── sysadmin/                      后台源码（Vue 3 + Element Plus）
+├── config/zcard.php               功能开关
+└── compose.yaml                   Laravel Sail 编排
 ```
 
 ---
@@ -193,28 +238,41 @@ ZCard/
 
 | 命令 | 说明 |
 |---|---|
-| `./vendor/bin/sail up -d` | 启动容器 |
-| `./vendor/bin/sail artisan zcard:install` | 系统初始化（幂等） |
-| `./vendor/bin/sail artisan test` | 运行测试 |
-| `./vendor/bin/sail artisan tinker` | Tinker REPL |
-| `cd storefront && pnpm dev` / `pnpm build` | 前台 dev / 构建 |
-| `cd sysadmin && pnpm dev` / `pnpm build` | 后台 dev / 构建到 `public/admin/` |
+| `php artisan zcard:install` | 交互式安装（提示输入数据库+管理员） |
+| `php artisan zcard:install --skip-db` | 跳过数据库交互（使用已有 .env） |
+| `php artisan migrate` | 运行数据库迁移 |
+| `php artisan test` | 运行测试（56 passed） |
+| `php artisan tinker` | Tinker REPL |
+| `cd storefront && pnpm build` | 重新编译前台（开发时） |
+| `cd sysadmin && pnpm build` | 重新编译后台（开发时） |
+
+---
+
+## 版本号规则
+
+采用 `x.y.z` 版本号：
+
+- **x**（重大版本）：核心大量重构或破坏性 API 变更
+- **y**（主要功能）：公开 API 破坏性变更，可能不兼容前版本
+- **z**（修复版本）：BUG 修复/安全修复/新增不破坏兼容的功能
 
 ---
 
 ## 路线图
 
 ### ✅ 已完成
-
-- **Phase 1**：商品管理、卡密导入与库存、订单与收银台、8 大支付通道、自动发货、会员/余额/提现、优惠券、认证与 RBAC、双后台。
-- **多货币多语言**：客户可切换显示货币 + 订单汇率快照 + 支付通道货币元数据 + 前后端 i18n（中/英）。
+- 商品/卡密/SKU/库存防超卖
+- 9 大支付通道
+- 多货币 + 多语言
+- 三级分销 + 分站/白标店铺
+- 优惠券 / 仪表盘 / RBAC / 短信 / 评价审核
+- 在线更新（Git-based）+ 版本回退
+- Web 安装向导 + 命令行交互式安装
 
 ### 🚧 规划中
-
-- **插件系统**：Hook 总线 + 插件安装/启停生命周期（当前 `plugins/` 仅为骨架）。
-- **多商户 / 三级分销 / 分站**：当前为单商户运营（`config/zcard.php` 已预留开关，Phase 3+ 启用）。
-- **余额支付**：余额账户已就绪，下单时用余额抵扣的流程待接入。
-- **更多语言**：后台框架级英文翻译补全。
+- 多商户（config flag 已预留）
+- 更多支付通道
+- 应用商店/插件系统
 
 ---
 
