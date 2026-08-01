@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\StorefrontSettingsController;
+use App\Http\Controllers\Api\SubsiteConsoleController;
 use App\Http\Controllers\Api\WithdrawalController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -37,6 +38,17 @@ Route::middleware('auth:sanctum')->group(function () {
     // 提现(需登录)
     Route::post('/withdrawals', [WithdrawalController::class, 'request'])->name('api.withdrawals.request');
     Route::get('/withdrawals/history', [WithdrawalController::class, 'history'])->name('api.withdrawals.history');
+
+    // 分站主自助控制台(只在主站)
+    Route::middleware('require.main.site')->prefix('subsite-console')->group(function () {
+        Route::get('/', [SubsiteConsoleController::class, 'mySubsite']);
+        Route::get('/finance', [SubsiteConsoleController::class, 'finance']);
+        Route::get('/ledger', [SubsiteConsoleController::class, 'ledger']);
+        Route::post('/domains', [SubsiteConsoleController::class, 'bindDomain']);
+        Route::get('/product-settings', [SubsiteConsoleController::class, 'productSettings']);
+        Route::post('/product-settings', [SubsiteConsoleController::class, 'upsertProductSetting']);
+        Route::post('/withdrawals', [SubsiteConsoleController::class, 'requestWithdrawal']);
+    });
 });
 
 // 后台管理 API(Sanctum token)
