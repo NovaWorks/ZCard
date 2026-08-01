@@ -70,7 +70,7 @@ use App\Http\Controllers\Api\Admin\UploadController as AdminUploadController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\Admin\UserGroupController as AdminUserGroupController;
 
-Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
+Route::middleware(['auth:sanctum', 'admin.role'])->prefix('admin')->group(function () {
     // stats/batch 必须在 apiResource 之前(否则 stats 被当成 {product} 参数)
     Route::get('products/stats', [AdminProductController::class, 'stats']);
     Route::post('products/batch', [AdminProductController::class, 'batch']);

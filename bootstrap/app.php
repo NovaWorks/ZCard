@@ -26,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'display.currency' => \App\Http\Middleware\ResolveDisplayCurrency::class,
             'set.locale' => \App\Http\Middleware\SetLocale::class,
             'require.main.site' => \App\Http\Middleware\RequireMainSite::class,
+            'admin.role' => \App\Http\Middleware\RequireAdminRole::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
