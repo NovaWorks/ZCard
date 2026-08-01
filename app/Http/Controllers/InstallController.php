@@ -51,6 +51,7 @@ class InstallController extends Controller
 
         $writable = [
             ['name' => 'storage/', 'passed' => is_writable(storage_path())],
+            ['name' => 'storage/app/', 'passed' => is_writable(storage_path('app'))],
             ['name' => 'bootstrap/cache/', 'passed' => is_writable(base_path('bootstrap/cache'))],
         ];
 
@@ -73,17 +74,22 @@ class InstallController extends Controller
     public function testDb(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'host' => 'required|string',
-            'port' => 'required|integer',
-            'database' => 'required|string',
-            'username' => 'required|string',
+            'host' => ['required', 'string', 'regex:/^[a-zA-Z0-9._\-.:]+$/'],
+            'port' => 'required|integer|between:1,65535',
+            'database' => ['required', 'string', 'regex:/^[a-zA-Z0-9_]+$/'],
+            'username' => 'required|string|max:100',
             'password' => 'nullable|string',
         ]);
 
         try {
             $dsn = "mysql:host={$data['host']};port={$data['port']};dbname={$data['database']};charset=utf8mb4";
-            $pdo = new \PDO($dsn, $data['username'], $data['password'] ?? '', [\PDO::ATTR_TIMEOUT => 5]);
-            $pdo = null; // 关闭连接
+            $options = [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION];
+            // MySQL 连接超时(正确的常量)
+            if (defined('PDO::MYSQL_ATTR_CONNECT_TIMEOUT')) {
+                $options[\PDO::MYSQL_ATTR_CONNECT_TIMEOUT] = 5;
+            }
+            $pdo = new \PDO($dsn, $data['username'], $data['password'] ?? '', $options);
+            $pdo = null;
 
             return response()->json(['success' => true, 'message' => '数据库连接成功']);
         } catch (\PDOException $e) {
@@ -105,24 +111,22 @@ class InstallController extends Controller
         }
 
         $data = $request->validate([
-            'db_host' => 'required|string',
-            'db_port' => 'required|integer',
-            'db_database' => 'required|string',
-            'db_username' => 'required|string',
+            'db_host' => ['required', 'string', 'regex:/^[a-zA-Z0-9._\-.:]+$/'],
+            'db_port' => 'required|integer|between:1,65535',
+            'db_database' => ['required', 'string', 'regex:/^[a-zA-Z0-9_]+$/'],
+            'db_username' => 'required|string|max:100',
             'db_password' => 'nullable|string',
             'admin_email' => 'required|email',
             'admin_password' => 'required|string|min:6',
         ]);
 
         try {
-            // Step 1: 写入 .env
+            // Step 1: 写入 .env(带引号保护特殊字符)
             $this->writeEnv('DB_HOST', $data['db_host']);
-            $this->writeEnv('DB_PORT', $data['db_port']);
+            $this->writeEnv('DB_PORT', (string) $data['db_port']);
             $this->writeEnv('DB_DATABASE', $data['db_database']);
             $this->writeEnv('DB_USERNAME', $data['db_username']);
-            if (! empty($data['db_password'])) {
-                $this->writeEnv('DB_PASSWORD', $data['db_password']);
-            }
+            $this->writeEnv('DB_PASSWORD', $data['db_password'] ?? '');
 
             // Step 2: APP_KEY
             if (empty(config('app.key'))) {
@@ -130,13 +134,22 @@ class InstallController extends Controller
             }
 
             // Step 3: 卡密加密密钥
-            if (empty(config('zcard.card_encryption_key'))) {
+            if (empty(env('CARD_ENCRYPTION_KEY'))) {
                 $key = 'base64:' . base64_encode(random_bytes(32));
                 $this->writeEnv('CARD_ENCRYPTION_KEY', $key);
             }
 
-            // Step 4: 清除配置缓存让新 .env 生效
-            Artisan::call('config:clear');
+            // Step 4: 关键! 刷新进程内 DB 配置(让新 .env 的数据库凭据生效)
+            // config:clear 只删缓存文件,不刷新进程内 config repository
+            config([
+                'database.connections.mysql.host' => $data['db_host'],
+                'database.connections.mysql.port' => $data['db_port'],
+                'database.connections.mysql.database' => $data['db_database'],
+                'database.connections.mysql.username' => $data['db_username'],
+                'database.connections.mysql.password' => $data['db_password'] ?? '',
+            ]);
+            DB::purge('mysql');
+            DB::reconnect('mysql');
 
             // Step 5: 迁移
             Artisan::call('migrate', ['--force' => true]);
@@ -146,18 +159,27 @@ class InstallController extends Controller
                 \Spatie\Permission\Models\Role::firstOrCreate(['name' => $role]);
             }
 
-            // Step 7: 管理员账号
-            $admin = \App\Models\User::firstOrCreate(
-                ['email' => $data['admin_email']],
-                [
+            // Step 7: 管理员账号(检查 email 或 username=admin 已存在)
+            $admin = \App\Models\User::where('email', $data['admin_email'])->first();
+            if (! $admin) {
+                $admin = \App\Models\User::where('username', 'admin')->first();
+            }
+            if ($admin) {
+                // 已存在,确保角色
+                if (! $admin->hasRole('super_admin')) {
+                    $admin->assignRole('super_admin');
+                }
+            } else {
+                $admin = \App\Models\User::create([
                     'username' => 'admin',
                     'name' => 'Super Admin',
+                    'email' => $data['admin_email'],
                     'password' => $data['admin_password'],
                     'status' => 1,
                     'password_changed_at' => null,
-                ]
-            );
-            $admin->assignRole('super_admin');
+                ]);
+                $admin->assignRole('super_admin');
+            }
 
             // Step 8: 默认商户
             \App\Models\Merchant::firstOrCreate(
@@ -165,14 +187,18 @@ class InstallController extends Controller
                 ['user_id' => $admin->id, 'name' => '默认商户', 'status' => 1, 'commission_rate' => 0]
             );
 
-            // Step 9: 安装锁
+            // Step 9: 缓存优化(失败不中断安装)
+            try {
+                Artisan::call('config:cache');
+            } catch (\Throwable $e) {
+                // config:cache 失败不影响安装结果
+            }
+
+            // Step 10: 安装锁(最后一步,确保全部成功后才写)
             file_put_contents(storage_path('app/installed'), json_encode([
                 'version' => config('app.version', '1.0.0'),
                 'installed_at' => now()->toIso8601String(),
             ]));
-
-            // Step 10: 缓存优化
-            Artisan::call('config:cache');
 
             return response()->json([
                 'success' => true,
@@ -188,11 +214,18 @@ class InstallController extends Controller
         }
     }
 
+    /**
+     * 写入 .env(带引号保护含特殊字符的值)。
+     */
     private function writeEnv(string $key, string $value): void
     {
         $path = base_path('.env');
         if (! file_exists($path)) {
             copy(base_path('.env.example'), $path);
+        }
+        // 值含特殊字符时加双引号(符合 vlucas/phpdotenv 规范)
+        if (preg_match('/[\s#=]/', $value) || $value === '') {
+            $value = '"' . str_replace('"', '\\"', $value) . '"';
         }
         $content = file_get_contents($path);
         $pattern = '/^' . preg_quote($key, '/') . '=.*/m';
