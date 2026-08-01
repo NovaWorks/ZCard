@@ -6,6 +6,7 @@ import {
   getSubsiteFinance,
   getSubsiteLedger,
   getSubsiteProductSettings,
+  getSubsiteOrders,
   bindSubsiteDomain,
   upsertSubsiteProductSetting,
   requestSubsiteWithdrawal,
@@ -30,6 +31,7 @@ const err = ref('')
 const info = ref<SubsiteInfo | null>(null)
 const finance = ref<SubsiteFinance | null>(null)
 const ledger = ref<SubsiteLedgerEntry[]>([])
+const orders = ref<any[]>([])
 const products = ref<SubsiteProductSetting[]>([])
 
 const hasSubsite = computed(() => !!info.value)
@@ -74,6 +76,17 @@ const ledgerStatusText = (s: string) => {
   return map[s] || s
 }
 
+const orderStatusText = (s: string) => {
+  const map: Record<string, string> = {
+    pending: t('subsite.orderPending'),
+    paid: t('subsite.orderPaid'),
+    completed: t('subsite.orderCompleted'),
+    cancelled: t('subsite.orderCancelled'),
+    refunded: t('subsite.orderRefunded'),
+  }
+  return map[s] || s || '-'
+}
+
 const pricingModeLabel = (mode: string) => {
   if (mode === 'percent') return t('subsite.modePercent')
   if (mode === 'fixed_markup') return t('subsite.modeFixedMarkup')
@@ -99,14 +112,16 @@ async function loadAll() {
         logo: myInfo.settings?.logo || '',
         announcement: myInfo.settings?.announcement || '',
       }
-      const [f, l, p] = await Promise.all([
+      const [f, l, p, o] = await Promise.all([
         getSubsiteFinance().catch(() => null),
         getSubsiteLedger().catch(() => []),
         getSubsiteProductSettings().catch(() => []),
+        getSubsiteOrders().catch(() => []),
       ])
       finance.value = f
       ledger.value = Array.isArray(l) ? l : []
       products.value = Array.isArray(p) ? p : []
+      orders.value = Array.isArray(o) ? o : []
     }
   } catch (e: any) {
     err.value = e?.response?.data?.message || t('subsite.loadFailed')
@@ -434,6 +449,40 @@ onMounted(async () => {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- 销售订单 -->
+      <div class="bg-white rounded-card border border-border p-4 mt-4">
+        <div class="text-sm font-semibold text-ink mb-3">{{ t('subsite.orders') }}</div>
+        <div v-if="!orders.length" class="text-center text-ink-muted text-xs py-6">{{ t('subsite.noOrders') }}</div>
+        <div v-else class="overflow-x-auto">
+          <table class="w-full text-xs whitespace-nowrap">
+            <thead>
+              <tr class="text-ink-muted border-b border-border">
+                <th class="text-left font-medium py-2 pr-3">{{ t('subsite.orderNo') }}</th>
+                <th class="text-left font-medium py-2 pr-3">{{ t('subsite.productName') }}</th>
+                <th class="text-left font-medium py-2 pr-3">{{ t('subsite.buyer') }}</th>
+                <th class="text-right font-medium py-2 pr-3">{{ t('subsite.quantity') }}</th>
+                <th class="text-right font-medium py-2 pr-3">{{ t('subsite.amount') }}</th>
+                <th class="text-right font-medium py-2 pr-3">{{ t('subsite.profit') }}</th>
+                <th class="text-left font-medium py-2 pr-3">{{ t('subsite.status') }}</th>
+                <th class="text-right font-medium py-2">{{ t('subsite.date') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="o in orders" :key="o.id" class="border-b border-border/60">
+                <td class="py-2 pr-3 text-ink font-mono">{{ o.order_no || '#' + o.id }}</td>
+                <td class="py-2 pr-3 text-ink">{{ o.product_name || '-' }}</td>
+                <td class="py-2 pr-3 text-ink">{{ o.buyer_name || '-' }}</td>
+                <td class="py-2 pr-3 text-right text-ink">{{ o.quantity }}</td>
+                <td class="py-2 pr-3 text-right text-price font-semibold">{{ formatMoney(o.amount, prefs.currentCurrency) }}</td>
+                <td class="py-2 pr-3 text-right text-price font-semibold">{{ formatMoney(o.profit, prefs.currentCurrency) }}</td>
+                <td class="py-2 pr-3 text-ink-muted">{{ orderStatusText(o.status) }}</td>
+                <td class="py-2 text-right text-ink-muted">{{ fmtDate(o.paid_at || o.created_at) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </template>
   </div>

@@ -89,7 +89,19 @@
     "modePercent": "按比例加价",
     "modeFixedMarkup": "固定加价额",
     "modeFixedPrice": "固定售价",
-    "loadFailed": "加载失败"
+    "loadFailed": "加载失败",
+    "orders": "销售订单",
+    "noOrders": "暂无订单",
+    "orderNo": "订单号",
+    "productName": "商品名",
+    "buyer": "买家",
+    "quantity": "数量",
+    "profit": "利润",
+    "orderPending": "待支付",
+    "orderPaid": "已支付",
+    "orderCompleted": "已完成",
+    "orderCancelled": "已取消",
+    "orderRefunded": "已退款"
   },
   "withdraw": {
     "title": "提现",
