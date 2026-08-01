@@ -111,6 +111,8 @@
   },
   "common": {
     "buy": "Buy",
+    "search": "Search",
+    "searchPlaceholder": "Search product name or keyword...",
     "soldOut": "Sold Out",
     "stock": "Stock",
     "sold": "Sold",

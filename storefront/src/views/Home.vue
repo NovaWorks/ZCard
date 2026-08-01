@@ -24,12 +24,15 @@ const prefs = usePreferencesStore()
 const category = ref<number | null>(null)
 const order = ref('')
 const featured = ref<Product[]>([])
+const keyword = ref('')
+const keywordInput = ref('')
 
 async function load() {
   await settings.load()
   await products.fetch({
     category: category.value ?? undefined,
     order: order.value || undefined,
+    keyword: keyword.value || undefined,
   })
   if (settings.config?.show_featured && !featured.value.length) {
     try {
@@ -42,6 +45,17 @@ async function load() {
 }
 onMounted(load)
 watch(category, load)
+
+function doSearch() {
+  keyword.value = keywordInput.value.trim()
+  load()
+}
+
+function clearSearch() {
+  keywordInput.value = ''
+  keyword.value = ''
+  load()
+}
 
 function goProduct(p: Product) {
   router.push({ name: 'product', params: { id: p.slug ?? p.id } })
@@ -98,8 +112,33 @@ function goProduct(p: Product) {
       <!-- 分类导航 + 列表 -->
       <CategoryNav v-if="settings.config" v-model="category" :style="settings.config.category_nav_style" />
       <div class="flex-1 min-w-0">
+        <!-- 搜索框 -->
+        <div class="px-4 pt-3">
+          <div class="flex gap-2">
+            <input
+              v-model="keywordInput"
+              type="text"
+              :placeholder="t('common.searchPlaceholder')"
+              class="flex-1 px-3 py-2 rounded-field border border-border bg-white text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition"
+              @keydown.enter="doSearch"
+            />
+            <button
+              type="button"
+              class="px-4 py-2 rounded-field bg-primary text-white text-sm font-medium hover:bg-primary-hover transition shadow-sm"
+              @click="doSearch"
+            >{{ t('common.search') }}</button>
+            <button
+              v-if="keyword"
+              type="button"
+              class="px-3 py-2 rounded-field border border-border text-ink-soft text-sm hover:text-danger hover:border-danger transition"
+              @click="clearSearch"
+            >×</button>
+          </div>
+        </div>
         <div class="flex justify-between items-center px-4 py-3">
-          <span class="text-sm font-semibold text-ink">{{ t('product.home.allProducts') }}</span>
+          <span class="text-sm font-semibold text-ink">
+            {{ keyword ? `${t('common.search')}: "${keyword}"` : t('product.home.allProducts') }}
+          </span>
           <ViewSwitcher />
         </div>
         <div class="px-4 pb-6">

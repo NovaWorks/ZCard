@@ -111,6 +111,8 @@
   },
   "common": {
     "buy": "购买",
+    "search": "搜索",
+    "searchPlaceholder": "搜索商品名称或关键词...",
     "soldOut": "已售罄",
     "stock": "库存",
     "sold": "已售",
