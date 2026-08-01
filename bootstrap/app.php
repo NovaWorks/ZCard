@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             \Illuminate\Session\Middleware\StartSession::class,
             \App\Http\Middleware\MaintenanceMiddleware::class,
+            \App\Http\Middleware\ResolveSubsite::class,
         ]);
         // 确保 StatefulApi 域配置存在(Sanctum SPA 认证也需要)
         $middleware->statefulApi();
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'display.currency' => \App\Http\Middleware\ResolveDisplayCurrency::class,
             'set.locale' => \App\Http\Middleware\SetLocale::class,
+            'require.main.site' => \App\Http\Middleware\RequireMainSite::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

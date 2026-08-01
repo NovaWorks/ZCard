@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\StorefrontSettingsController;
+use App\Http\Controllers\Api\SubsiteConsoleController;
 use App\Http\Controllers\Api\WithdrawalController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -37,6 +38,17 @@ Route::middleware('auth:sanctum')->group(function () {
     // 提现(需登录)
     Route::post('/withdrawals', [WithdrawalController::class, 'request'])->name('api.withdrawals.request');
     Route::get('/withdrawals/history', [WithdrawalController::class, 'history'])->name('api.withdrawals.history');
+
+    // 分站主自助控制台(只在主站)
+    Route::middleware('require.main.site')->prefix('subsite-console')->group(function () {
+        Route::get('/', [SubsiteConsoleController::class, 'mySubsite']);
+        Route::get('/finance', [SubsiteConsoleController::class, 'finance']);
+        Route::get('/ledger', [SubsiteConsoleController::class, 'ledger']);
+        Route::post('/domains', [SubsiteConsoleController::class, 'bindDomain']);
+        Route::get('/product-settings', [SubsiteConsoleController::class, 'productSettings']);
+        Route::post('/product-settings', [SubsiteConsoleController::class, 'upsertProductSetting']);
+        Route::post('/withdrawals', [SubsiteConsoleController::class, 'requestWithdrawal']);
+    });
 });
 
 // 后台管理 API(Sanctum token)
@@ -52,6 +64,7 @@ use App\Http\Controllers\Api\Admin\WithdrawalController as AdminWithdrawalContro
 use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Api\Admin\ProductSkuController as AdminProductSkuController;
 use App\Http\Controllers\Api\Admin\SettingController as AdminSettingController;
+use App\Http\Controllers\Api\Admin\SubsiteController as AdminSubsiteController;
 use App\Http\Controllers\Api\Admin\UploadController as AdminUploadController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\Admin\UserGroupController as AdminUserGroupController;
@@ -133,6 +146,13 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
 
     // 货币管理(CRUD)
     Route::apiResource('currencies', AdminCurrencyController::class)->except(['show']);
+
+    // 分站管理
+    Route::get('subsites', [AdminSubsiteController::class, 'index']);
+    Route::post('subsites', [AdminSubsiteController::class, 'store']);
+    Route::put('subsites/domains/{domain}', [AdminSubsiteController::class, 'updateDomain']);
+    Route::get('subsites/{merchant}/product-settings', [AdminSubsiteController::class, 'productSettings']);
+    Route::post('subsites/product-settings', [AdminSubsiteController::class, 'upsertProductSetting']);
 });
 
 // 公开货币列表(供前台货币切换器,不需要 display.currency 中间件)

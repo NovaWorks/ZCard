@@ -22,6 +22,9 @@ class CommissionService
         if (! StorefrontConfig::get('distribution_enabled')) {
             return;
         }
+        if ($event->order->subsite_id) {
+            return; // 分站订单不发分销佣金(spec §7.4 互斥)
+        }
 
         $order = $event->order;
         $buyerId = $order->user_id;
