@@ -10,63 +10,91 @@ use Spatie\Permission\Models\Role;
 
 class InstallCommand extends Command
 {
-    protected $signature = 'zcard:install {--email=admin@zcard.local : 超级管理员邮箱}';
+    protected $signature = 'zcard:install
+                            {--email=admin@zcard.local : 超级管理员邮箱}
+                            {--password= : 超级管理员密码(不传则随机生成)}
+                            {--skip-db : 跳过数据库配置交互(使用现有 .env)}';
 
-    protected $description = 'ZCard 系统初始化：迁移、角色权限、默认商户、超管账号（随机8位密码）';
+    protected $description = 'ZCard 系统初始化：配置数据库、迁移、角色权限、默认商户、超管账号';
 
     public function handle(): int
     {
-        $this->info('ZCard 系统初始化');
+        $this->info('');
+        $this->info('╔══════════════════════════════════════════╗');
+        $this->info('║     ZCard 安装向导                        ║');
+        $this->info('║     现代化虚拟商品自动发卡系统             ║');
+        $this->info('╚══════════════════════════════════════════╝');
+        $this->info('');
 
-        // 1. APP_KEY（若为空才生成；避免覆盖已有 key）
+        // ─── Step 1: 数据库配置(交互式) ───
+        if (! $this->option('skip-db')) {
+            $this->configureDatabase();
+        }
+
+        // ─── Step 2: 环境检查 ───
+        $this->info('');
+        $this->info('📋 环境检查');
+        $this->checkEnvironment();
+
+        // ─── Step 3: APP_KEY ───
         if (empty(config('app.key'))) {
             $this->call('key:generate');
             $this->info(' ✔ 生成应用密钥');
         }
 
-        // 2. 卡密加密密钥（与 APP_KEY 同约定：base64: 前缀）
+        // ─── Step 4: 卡密加密密钥 ───
         if (empty(config('zcard.card_encryption_key'))) {
-            $key = 'base64:'.base64_encode(random_bytes(32));
+            $key = 'base64:' . base64_encode(random_bytes(32));
             $this->writeEnv('CARD_ENCRYPTION_KEY', $key);
             $this->info(' ✔ 生成卡密加密密钥');
         }
 
-        // 3. 迁移
-        $this->call('migrate', ['--force' => true]);
-        $this->info(' ✔ 迁移数据库');
+        // ─── Step 5: 测试数据库连接 ───
+        $this->info('');
+        $this->info('🔗 测试数据库连接...');
+        try {
+            \DB::connection()->getPdo();
+            $this->info(' ✔ 数据库连接成功');
+        } catch (\Throwable $e) {
+            $this->error(' ✘ 数据库连接失败: ' . $e->getMessage());
+            $this->warn('   请检查 .env 中的 DB_HOST / DB_DATABASE / DB_USERNAME / DB_PASSWORD');
+            return self::FAILURE;
+        }
 
-        // 4. 角色与权限（幂等）
+        // ─── Step 6: 迁移 ───
+        $this->info('');
+        $this->call('migrate', ['--force' => true]);
+        $this->info(' ✔ 数据库迁移完成');
+
+        // ─── Step 7: 角色与权限 ───
         foreach (['super_admin', 'merchant', 'user'] as $roleName) {
             Role::firstOrCreate(['name' => $roleName]);
         }
-        // filament-shield：初始化 Shield 核心（创建 super_admin 角色、配置 Gate）。--silent 避免交互。
         $this->callSilently('shield:setup', ['--silent' => true]);
         $this->info(' ✔ 创建角色与权限');
 
-        // 5. 超管账号（幂等）— 必须先于商户创建，因为 merchants.user_id 外键引用 users.id
+        // ─── Step 8: 管理员账号 ───
         $email = $this->option('email');
         $existingUser = User::where('email', $email)->first();
         $newPassword = null;
 
         if ($existingUser) {
-            $this->warn("   邮箱 {$email} 已存在账号，跳过创建。");
+            $this->warn("   邮箱 {$email} 已存在,跳过创建");
             $adminUser = $existingUser;
         } else {
-            $newPassword = Str::random(8); // 8 位随机密码（spec §7.2）
+            $newPassword = $this->option('password') ?: Str::random(8);
             $adminUser = User::create([
                 'username' => 'admin',
                 'name' => 'Super Admin',
                 'email' => $email,
                 'password' => $newPassword,
                 'status' => 1,
-                'password_changed_at' => null, // 强制首次改密
+                'password_changed_at' => null,
             ]);
             $adminUser->assignRole('super_admin');
-            // Shield 的 super_admin 绕过仅校验角色名（FilamentShieldServiceProvider::57-58），
-            // assignRole('super_admin') 已足够，无需再跑 shield:super-admin（其会交互式提问）。
         }
 
-        // 6. 默认商户（merchant_id=1，slug=default）— 店主为超管
+        // ─── Step 9: 默认商户 ───
         Merchant::firstOrCreate(
             ['slug' => 'default'],
             [
@@ -76,34 +104,114 @@ class InstallCommand extends Command
                 'commission_rate' => 0,
             ]
         );
-        $this->info(' ✔ 创建默认商户（slug=default）');
+        $this->info(' ✔ 创建默认商户');
+
+        // ─── 安装锁 ───
+        file_put_contents(storage_path('app/installed'), json_encode([
+            'version' => config('app.version', '1.0.0'),
+            'installed_at' => now()->toIso8601String(),
+        ]));
+
+        // ─── 完成 ───
+        $this->info('');
+        $this->info('═══════════════════════════════════════════');
+        $this->info('  🎉 ZCard 安装完成!');
+        $this->info('═══════════════════════════════════════════');
 
         if ($newPassword !== null) {
-            $this->info(' ✔ 创建超级管理员账号');
-            $this->line('');
-            $this->line("   邮箱：  {$email}");
-            $this->line('   初始密码（随机生成，请妥善保存）：');
-            $this->line('   ┌──────────────────────────┐');
-            $this->line("   │  {$newPassword}              │");
-            $this->line('   └──────────────────────────┘');
-            $this->warn('   ⚠ 首次登录后请立即在「个人设置」修改密码');
+            $this->info('');
+            $this->info('  管理员账号:');
+            $this->line("    邮箱:  {$email}");
+            $this->line("    密码:  {$newPassword}");
+            $this->warn('    ⚠ 首次登录后请立即修改密码');
         }
 
         $this->info('');
-        $this->info(' ✔ 安装完成。访问 /admin 登录。');
+        $this->info('  后台地址: ' . config('app.url') . '/admin');
+        $this->info('  前台地址: ' . config('app.url'));
+        $this->info('');
 
         return self::SUCCESS;
     }
 
-    /** 写入 .env（键已存在则更新，否则追加） */
+    /**
+     * 交互式数据库配置
+     */
+    private function configureDatabase(): void
+    {
+        $this->info('');
+        $this->info('📋 数据库配置(直接回车使用默认值)');
+
+        $currentHost = config('database.connections.mysql.host', '127.0.0.1');
+        $currentPort = config('database.connections.mysql.port', '3306');
+        $currentDb = config('database.connections.mysql.database', 'zcard');
+        $currentUser = config('database.connections.mysql.username', 'root');
+        $currentPass = config('database.connections.mysql.password', '');
+
+        $host = $this->ask('数据库主机', $currentHost);
+        $port = $this->ask('数据库端口', $currentPort);
+        $database = $this->ask('数据库名', $currentDb);
+        $username = $this->ask('数据库用户名', $currentUser);
+        $password = $this->secret('数据库密码(输入时不显示)');
+
+        // 写入 .env
+        $this->writeEnv('DB_HOST', $host);
+        $this->writeEnv('DB_PORT', $port);
+        $this->writeEnv('DB_DATABASE', $database);
+        $this->writeEnv('DB_USERNAME', $username);
+        if ($password !== null && $password !== '') {
+            $this->writeEnv('DB_PASSWORD', $password);
+        }
+
+        $this->info(' ✔ 数据库配置已写入 .env');
+
+        // 清除配置缓存让新值生效
+        $this->callSilently('config:clear');
+    }
+
+    /**
+     * 环境检查
+     */
+    private function checkEnvironment(): void
+    {
+        $checks = [
+            'PHP >= 8.3' => version_compare(PHP_VERSION, '8.3.0', '>='),
+            'PDO MySQL' => extension_loaded('pdo_mysql'),
+            'mbstring' => extension_loaded('mbstring'),
+            'OpenSSL' => extension_loaded('openssl'),
+            'bcmath' => extension_loaded('bcmath'),
+            'JSON' => extension_loaded('json'),
+            'cURL' => extension_loaded('curl'),
+            'GD/Imagick' => extension_loaded('gd') || extension_loaded('imagick'),
+            'Redis(可选)' => extension_loaded('redis'),
+        ];
+
+        $allPass = true;
+        foreach ($checks as $name => $passed) {
+            $ext = str_contains($name, '可选') ? '⚠' : '✘';
+            $mark = $passed ? '✔' : $ext;
+            $this->line("   {$mark} {$name}" . ($passed ? '' : (str_contains($name, '可选') ? ' (跳过)' : ' (必需!)')));
+            if (! $passed && ! str_contains($name, '可选')) {
+                $allPass = false;
+            }
+        }
+
+        if (! $allPass) {
+            $this->error('');
+            $this->error('存在未满足的必需环境要求,请安装对应的 PHP 扩展后重试');
+            exit(1);
+        }
+    }
+
+    /** 写入 .env */
     private function writeEnv(string $key, string $value): void
     {
         $path = base_path('.env');
         if (! file_exists($path)) {
-            return;
+            copy(base_path('.env.example'), $path);
         }
         $content = file_get_contents($path);
-        $pattern = '/^'.preg_quote($key, '/').'=.*/m';
+        $pattern = '/^' . preg_quote($key, '/') . '=.*/m';
         if (preg_match($pattern, $content)) {
             $content = preg_replace($pattern, "{$key}={$value}", $content);
         } else {

@@ -23,6 +23,8 @@ const router = createRouter({
         { path: 'forget-password', name: 'forget-password', component: () => import('@/views/ForgetPassword.vue') },
       ],
     },
+    // 安装向导(独立路由,不在 DefaultLayout 内)
+    { path: '/install', name: 'install', component: () => import('@/views/Install.vue') },
   ],
 })
 
