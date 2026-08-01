@@ -396,6 +396,9 @@
     },
     "currency": {
       "title": "货币管理"
+    },
+    "subsite": {
+      "title": "分站管理"
     }
   },
   "table": {
@@ -643,6 +646,46 @@
       "namePlaceholder": "如 人民币",
       "symbolPlaceholder": "如 ¥",
       "exchangeRatePlaceholder": "相对基础货币的汇率"
+    },
+    "subsite": {
+      "title": "分站管理",
+      "name": "分站名称",
+      "slug": "Slug",
+      "owner": "店主",
+      "domains": "域名",
+      "domain": "域名",
+      "defaultMarkup": "默认加价率",
+      "maxMarkup": "最大加价率",
+      "createSubsite": "创建分站",
+      "addSubsite": "新增分站",
+      "approveDomain": "通过",
+      "disableDomain": "禁用",
+      "productSettings": "商品配置",
+      "userId": "店主用户 ID",
+      "namePlaceholder": "如 张三卡铺",
+      "slugPlaceholder": "如 zhangsan",
+      "nameRequired": "请输入分站名称",
+      "slugRequired": "请输入 Slug",
+      "userIdRequired": "请输入店主用户 ID",
+      "approveConfirm": "确认通过该域名验证并启用?",
+      "disableConfirm": "确认禁用该域名?",
+      "approved": "域名已通过",
+      "disabled": "域名已禁用",
+      "created": "分站创建成功",
+      "active": "正常",
+      "inactive": "停用",
+      "statTotal": "分站总数",
+      "statActive": "正常",
+      "statInactive": "停用",
+      "searchPlaceholder": "搜索分站名 / Slug / 店主",
+      "productName": "商品",
+      "pricingMode": "加价模式",
+      "modePercent": "按比例加价",
+      "modeFixedMarkup": "固定加价额",
+      "modeFixedPrice": "固定售价",
+      "markup": "加价率",
+      "listed": "上架",
+      "productSaved": "商品配置已保存"
     },
     "order": {
       "title": "订单管理",
@@ -1146,7 +1189,7 @@
     "dashboard": {
       "title": "ZCard 管理后台",
       "welcomeBack": "欢迎回来",
-      "tip": "系统统计模块正在搭建中，敬请期待。",
+      "tip": "以下是系统实时统计数据概览。",
       "admin": "管理员",
       "gDawn": "凌晨好",
       "gMorning": "早上好",
@@ -1154,7 +1197,13 @@
       "gNoon": "中午好",
       "gAfternoon": "下午好",
       "gEvening": "傍晚好",
-      "gNight": "晚上好"
+      "gNight": "晚上好",
+      "statProductTotal": "商品总数",
+      "statOrderTotal": "订单总数",
+      "statOrderPending": "待支付金额",
+      "statRevenue": "已收入金额",
+      "statUserTotal": "用户总数",
+      "statCommission": "佣金总额"
     },
     "member": {
       "introTitle": "会员等级管理",

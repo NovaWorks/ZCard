@@ -396,6 +396,9 @@
     },
     "currency": {
       "title": "Currency Management"
+    },
+    "subsite": {
+      "title": "Subsites"
     }
   },
   "table": {
@@ -643,6 +646,46 @@
       "namePlaceholder": "e.g. US Dollar",
       "symbolPlaceholder": "e.g. $",
       "exchangeRatePlaceholder": "Rate relative to base currency"
+    },
+    "subsite": {
+      "title": "Subsite Management",
+      "name": "Subsite Name",
+      "slug": "Slug",
+      "owner": "Owner",
+      "domains": "Domains",
+      "domain": "Domain",
+      "defaultMarkup": "Default Markup",
+      "maxMarkup": "Max Markup",
+      "createSubsite": "Create Subsite",
+      "addSubsite": "Add Subsite",
+      "approveDomain": "Approve",
+      "disableDomain": "Disable",
+      "productSettings": "Product Settings",
+      "userId": "Owner User ID",
+      "namePlaceholder": "e.g. John's Card Shop",
+      "slugPlaceholder": "e.g. johnshop",
+      "nameRequired": "Please enter the subsite name",
+      "slugRequired": "Please enter the slug",
+      "userIdRequired": "Please enter the owner user ID",
+      "approveConfirm": "Approve and verify this domain?",
+      "disableConfirm": "Disable this domain?",
+      "approved": "Domain approved",
+      "disabled": "Domain disabled",
+      "created": "Subsite created",
+      "active": "Active",
+      "inactive": "Inactive",
+      "statTotal": "Total Subsites",
+      "statActive": "Active",
+      "statInactive": "Inactive",
+      "searchPlaceholder": "Search name / slug / owner",
+      "productName": "Product",
+      "pricingMode": "Pricing Mode",
+      "modePercent": "Percent Markup",
+      "modeFixedMarkup": "Fixed Markup Amount",
+      "modeFixedPrice": "Fixed Price",
+      "markup": "Markup",
+      "listed": "Listed",
+      "productSaved": "Product settings saved"
     },
     "order": {
       "title": "Orders",
@@ -1146,7 +1189,7 @@
     "dashboard": {
       "title": "ZCard Admin",
       "welcomeBack": "welcome back",
-      "tip": "System statistics module is under construction, stay tuned.",
+      "tip": "Below is a real-time overview of system statistics.",
       "admin": "Admin",
       "gDawn": "Good dawn",
       "gMorning": "Good morning",
@@ -1154,7 +1197,13 @@
       "gNoon": "Good noon",
       "gAfternoon": "Good afternoon",
       "gEvening": "Good evening",
-      "gNight": "Good night"
+      "gNight": "Good night",
+      "statProductTotal": "Total Products",
+      "statOrderTotal": "Total Orders",
+      "statOrderPending": "Pending Amount",
+      "statRevenue": "Revenue",
+      "statUserTotal": "Total Users",
+      "statCommission": "Total Commission"
     },
     "member": {
       "introTitle": "Member Level Management",
