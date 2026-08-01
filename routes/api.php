@@ -20,6 +20,13 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class)->name('api.health');
 
+// 安装向导(无需认证,安装前可用)
+Route::prefix('install')->group(function () {
+    Route::get('/status', [\App\Http\Controllers\InstallController::class, 'status'])->name('api.install.status');
+    Route::post('/test-db', [\App\Http\Controllers\InstallController::class, 'testDb'])->name('api.install.test-db');
+    Route::post('/run', [\App\Http\Controllers\InstallController::class, 'run'])->name('api.install.run');
+});
+
 // 前台认证(游客,不需 auth)— 限流防暴力破解
 Route::middleware('throttle:5,1')->post('/auth/register', [AuthController::class, 'register'])->name('api.auth.register');
 Route::middleware('throttle:5,1')->post('/auth/login', [AuthController::class, 'login'])->name('api.auth.login');
