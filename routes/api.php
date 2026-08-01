@@ -20,10 +20,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class)->name('api.health');
 
-// 前台认证(游客,不需 auth)
-Route::post('/auth/register', [AuthController::class, 'register'])->name('api.auth.register');
-Route::post('/auth/login', [AuthController::class, 'login'])->name('api.auth.login');
-Route::post('/auth/send-reset-code', [AuthController::class, 'sendResetCode'])->name('api.auth.send-reset-code');
+// 前台认证(游客,不需 auth)— 限流防暴力破解
+Route::middleware('throttle:5,1')->post('/auth/register', [AuthController::class, 'register'])->name('api.auth.register');
+Route::middleware('throttle:5,1')->post('/auth/login', [AuthController::class, 'login'])->name('api.auth.login');
+Route::middleware('throttle:3,1')->post('/auth/send-reset-code', [AuthController::class, 'sendResetCode'])->name('api.auth.send-reset-code');
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('api.auth.reset-password');
 
 // 需登录
