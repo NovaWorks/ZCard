@@ -23,6 +23,16 @@ class ProductController extends Controller
             $query->where('category_id', $categoryId);
         }
 
+        // 分站可见性过滤:排除分站显式下架(is_listed=false)的商品(spec §4)。
+        $subsite = $request->attributes->get('subsite');
+        if ($subsite) {
+            $excludedIds = \App\Models\SubsiteProductSetting::where('merchant_id', $subsite->id)
+                ->where('is_listed', false)->pluck('product_id')->toArray();
+            if ($excludedIds) {
+                $query->whereNotIn('id', $excludedIds);
+            }
+        }
+
         $query = match ($order) {
             'price_asc' => $query->orderBy('price'),
             'price_desc' => $query->orderByDesc('price'),
@@ -64,15 +74,22 @@ class ProductController extends Controller
         // 解析当前显示货币(display.currency 中间件写入的 request attribute)
         $svc = app(\App\Support\CurrencyService::class);
         $cur = request()->attributes->get('currency') ?? $svc->getBaseCurrency();
-        $conv = $svc->convert((int) $p->price, $cur);
+        // 分站定价:若请求来自分站(subsite request attribute),按分站定价引擎计算生效价(spec §4)。
+        $subsite = request()->attributes->get('subsite');
+        $effectivePrice = (int) $p->price;
+        if ($subsite) {
+            $pricing = app(\App\Support\SubsitePricingService::class)->resolveUnitPrice($p, null, $subsite);
+            $effectivePrice = $pricing['price'];
+        }
+        $conv = $svc->convert($effectivePrice, $cur);
 
         $data = [
             'id' => $p->id,
             'name' => $p->name,
             'slug' => $p->slug,
             'cover' => $p->cover,
-            'price' => (int) $p->price,                    // 兼容旧字段(=基础货币分)
-            'price_base' => (int) $p->price,
+            'price' => $effectivePrice,                    // 兼容旧字段(=基础货币分,分站含加价)
+            'price_base' => $effectivePrice,
             'price_display' => $conv['amount'],
             'display_currency' => $conv['currency'],
             'exchange_rate' => $conv['rate'],
