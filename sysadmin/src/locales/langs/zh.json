@@ -1317,7 +1317,9 @@
       "viewRelease": "查看发布",
       "refreshHistory": "刷新",
       "versionCol": "版本",
-      "viewLog": "查看完整日志"
+      "viewLog": "查看完整日志",
+      "viewDetail": "详情",
+      "updateCancelled": "已取消更新"
     }
   }
 }

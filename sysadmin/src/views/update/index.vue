@@ -6,9 +6,8 @@ import {
   checkUpdate,
   getVersions,
   runUpdate,
-  getUpdateLog,
 } from '@/api/update'
-import type { UpdateCheck, VersionInfo, UpdateResult, UpdateLog } from '@/api/update'
+import type { UpdateCheck, VersionInfo, UpdateResult } from '@/api/update'
 
 defineOptions({ name: 'UpdateIndex' })
 
@@ -24,11 +23,14 @@ const versionsLoading = ref(false)
 
 // 更新执行
 const updating = ref(false)
-const updateLog = ref<UpdateLog | null>(null)
 const successVisible = ref(false)
 const successResult = ref<UpdateResult | null>(null)
 const failedVisible = ref(false)
 const failedResult = ref<{ message: string; log: string } | null>(null)
+
+// 版本详情弹窗
+const versionDetailVisible = ref(false)
+const versionDetailData = ref<VersionInfo | null>(null)
 
 // 日期格式化
 const formatDate = (iso?: string) => {
@@ -43,8 +45,43 @@ const handleCheck = async () => {
   checking.value = true
   try {
     checkResult.value = await checkUpdate()
-    if (!checkResult.value.has_update) {
-      ElMessage.info(t('zcard.update.noUpdate'))
+
+    // 有新版本 → 弹出更新确认对话框(大厂交互:自动弹窗 + 明确的更新引导)
+    if (checkResult.value.has_update) {
+      const msgHtml = `
+        <div style="line-height:1.8;font-size:14px;">
+          <p style="margin:0 0 12px;">
+            <strong>${t('zcard.update.currentVersion')}:</strong>
+            <span style="font-family:monospace;font-size:16px;color:var(--el-text-color-secondary);">v${checkResult.value.current_version}</span>
+          </p>
+          <p style="margin:0 0 12px;">
+            <strong>${t('zcard.update.latestVersion')}:</strong>
+            <span style="font-family:monospace;font-size:18px;color:var(--el-color-success);font-weight:700;">v${checkResult.value.latest_version}</span>
+          </p>
+          <div style="margin:12px 0;padding:12px;background:var(--el-fill-color-light);border-radius:8px;max-height:200px;overflow:auto;">
+            <pre style="margin:0;font-size:12px;white-space:pre-wrap;word-break:break-word;font-family:inherit;line-height:1.6;">${checkResult.value.release_notes || ''}</pre>
+          </div>
+        </div>
+      `
+      ElMessageBox({
+        title: `🚀 ${t('zcard.update.hasUpdate')}`,
+        message: msgHtml,
+        dangerouslyUseHTMLString: true,
+        confirmButtonText: `⬆️ ${t('zcard.update.runUpdate')}`,
+        cancelButtonText: t('zcard.common.cancel'),
+        confirmButtonClass: 'el-button--success',
+        type: 'success',
+        showCancelButton: true,
+        closeOnClickModal: false,
+      })
+        .then(() => {
+          performUpdate()
+        })
+        .catch(() => {
+          ElMessage.info(t('zcard.update.updateCancelled'))
+        })
+    } else {
+      ElMessage.success(t('zcard.update.noUpdate'))
     }
   } catch (e: any) {
     checkResult.value = null
@@ -54,29 +91,9 @@ const handleCheck = async () => {
   }
 }
 
-const handleRunUpdate = () => {
-  if (!checkResult.value?.has_update) return
-  ElMessageBox.confirm(t('zcard.update.updateConfirmTip'), t('zcard.update.updateConfirm'), {
-    type: 'warning',
-    confirmButtonText: t('zcard.update.runUpdate'),
-    cancelButtonText: t('zcard.common.cancel'),
-    confirmButtonClass: 'el-button--danger',
-  })
-    .then(async () => {
-      await performUpdate()
-    })
-    .catch(() => {})
-}
-
 const performUpdate = async () => {
   updating.value = true
   failedVisible.value = false
-  // 后台可能正在写入日志,这里异步拉取一次以备用
-  try {
-    updateLog.value = await getUpdateLog()
-  } catch {
-    /* 忽略日志拉取失败 */
-  }
 
   try {
     const result = await runUpdate()
@@ -84,14 +101,8 @@ const performUpdate = async () => {
     updating.value = false
     successVisible.value = true
   } catch (e: any) {
-    const message = e?.message || t('zcard.update.updateFailed')
-    let log = ''
-    try {
-      const lg = await getUpdateLog()
-      log = lg?.log || ''
-    } catch {
-      /* ignore */
-    }
+    const message = e?.response?.data?.message || e?.message || t('zcard.update.updateFailed')
+    const log = e?.response?.data?.log || ''
     failedResult.value = { message, log }
     updating.value = false
     failedVisible.value = true
@@ -118,8 +129,13 @@ const handleRetry = () => {
   handleCheck()
 }
 
+// 点击版本行 → 弹出完整详情(大厂交互:可点击查看完整信息)
+const showVersionDetail = (row: VersionInfo) => {
+  versionDetailData.value = row
+  versionDetailVisible.value = true
+}
+
 onMounted(() => {
-  // 进入页面自动检查一次,并加载版本历史
   handleCheck()
   loadVersions()
 })
@@ -159,7 +175,7 @@ onMounted(() => {
             effect="dark"
           >✅ {{ t('zcard.update.hasUpdate') }}</ElTag>
           <ElTag v-else type="primary" size="large" effect="dark">
-            {{ t('zcard.update.noUpdate') }}
+            ✅ {{ t('zcard.update.noUpdate') }}
           </ElTag>
           <span v-if="checkResult.published_at" class="published-at">
             {{ t('zcard.update.releasedAt') }}: {{ formatDate(checkResult.published_at) }}
@@ -168,7 +184,7 @@ onMounted(() => {
             v-if="checkResult.has_update"
             type="success"
             :loading="updating"
-            @click="handleRunUpdate"
+            @click="performUpdate"
           >⬆️ {{ t('zcard.update.runUpdate') }}</ElButton>
           <ElButton
             v-if="checkResult.release_url"
@@ -176,7 +192,7 @@ onMounted(() => {
             :href="checkResult.release_url"
             target="_blank"
             rel="noopener"
-          >🔗 {{ t('zcard.update.viewRelease') }}</ElButton>
+          >🔗 GitHub</ElButton>
         </div>
 
         <div v-if="checkResult?.release_notes" class="release-notes">
@@ -191,7 +207,7 @@ onMounted(() => {
       </div>
     </ElCard>
 
-    <!-- Section 3: 版本历史 -->
+    <!-- Section 2: 版本历史 -->
     <ElCard class="art-table-card" shadow="never">
       <template #header>
         <div class="card-header">
@@ -202,7 +218,14 @@ onMounted(() => {
         </div>
       </template>
 
-      <ElTable v-loading="versionsLoading" :data="versions" border stripe>
+      <ElTable
+        v-loading="versionsLoading"
+        :data="versions"
+        border
+        stripe
+        @row-click="showVersionDetail"
+        :row-style="{ cursor: 'pointer' }"
+      >
         <ElTableColumn :label="t('zcard.update.versionCol')" width="160">
           <template #default="{ row }">
             <div class="version-cell">
@@ -224,27 +247,20 @@ onMounted(() => {
         </ElTableColumn>
         <ElTableColumn :label="t('zcard.update.releaseNotes')" min-width="320">
           <template #default="{ row }">
-            <div class="notes-truncate" :title="row.notes">{{ row.notes }}</div>
+            <div class="notes-truncate">{{ row.notes }}</div>
           </template>
         </ElTableColumn>
-        <ElTableColumn :label="t('zcard.common.actions')" width="100" align="center">
+        <ElTableColumn :label="t('zcard.common.actions')" width="120" align="center">
           <template #default="{ row }">
-            <ElButton
-              v-if="row.url"
-              tag="a"
-              :href="row.url"
-              target="_blank"
-              rel="noopener"
-              text
-              type="primary"
-              size="small"
-            >🔗</ElButton>
+            <ElButton text type="primary" size="small" @click.stop="showVersionDetail(row)">
+              📋 {{ t('zcard.update.viewDetail') }}
+            </ElButton>
           </template>
         </ElTableColumn>
       </ElTable>
     </ElCard>
 
-    <!-- 更新执行:全屏 Loading -->
+    <!-- 更新执行:全屏遮罩 -->
     <ElDialog
       v-model="updating"
       :show-close="false"
@@ -260,7 +276,6 @@ onMounted(() => {
         <div class="updating-title">{{ t('zcard.update.updating') }}</div>
         <div class="updating-tip">{{ t('zcard.update.updatingTip') }}</div>
         <ElProgress :percentage="100" :indeterminate="true" :show-text="false" />
-        <pre v-if="updateLog?.log" class="log-preview">{{ updateLog.log }}</pre>
       </div>
     </ElDialog>
 
@@ -325,6 +340,37 @@ onMounted(() => {
           🔄 {{ t('zcard.update.checkUpdate') }}
         </ElButton>
       </template>
+    </ElDialog>
+
+    <!-- 版本详情弹窗(点击版本行或查看详情按钮) -->
+    <ElDialog
+      v-model="versionDetailVisible"
+      :title="versionDetailData ? `v${versionDetailData.version}` : ''"
+      width="720px"
+      align-center
+      append-to-body
+    >
+      <div v-if="versionDetailData" class="version-detail-body">
+        <div class="detail-meta">
+          <ElTag type="primary" size="large">v{{ versionDetailData.version }}</ElTag>
+          <ElTag v-if="versionDetailData.prerelease" type="warning">
+            {{ t('zcard.update.prerelease') }}
+          </ElTag>
+          <span class="detail-date">{{ formatDate(versionDetailData.published_at) }}</span>
+          <ElButton
+            v-if="versionDetailData.url"
+            tag="a"
+            :href="versionDetailData.url"
+            target="_blank"
+            rel="noopener"
+            size="small"
+          >🔗 GitHub</ElButton>
+        </div>
+        <div class="detail-notes">
+          <div class="notes-label">{{ t('zcard.update.releaseNotes') }}</div>
+          <pre class="notes-content">{{ versionDetailData.notes || '-' }}</pre>
+        </div>
+      </div>
     </ElDialog>
   </div>
 </template>
@@ -409,7 +455,7 @@ onMounted(() => {
     line-height: 1.6;
     white-space: pre-wrap;
     word-break: break-word;
-    max-height: 320px;
+    max-height: 400px;
     overflow: auto;
     margin: 0;
     color: var(--el-text-color-regular);
@@ -458,21 +504,6 @@ onMounted(() => {
     font-size: 13px;
     color: var(--el-text-color-secondary);
     text-align: center;
-  }
-  .log-preview {
-    width: 100%;
-    max-height: 120px;
-    overflow: auto;
-    background: var(--el-fill-color-light);
-    padding: 8px;
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 11px;
-    line-height: 1.4;
-    color: var(--el-text-color-secondary);
-    margin: 0;
-    white-space: pre-wrap;
-    word-break: break-word;
   }
 
   // 结果对话框
@@ -529,5 +560,27 @@ onMounted(() => {
     word-break: break-word;
     max-height: 240px;
     overflow: auto;
+  }
+
+  // 版本详情弹窗
+  .version-detail-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .detail-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .detail-date {
+    font-size: 13px;
+    color: var(--el-text-color-secondary);
+  }
+  .detail-notes {
+    .notes-content {
+      max-height: 480px;
+    }
   }
 </style>

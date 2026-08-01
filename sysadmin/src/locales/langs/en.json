@@ -1317,7 +1317,9 @@
       "viewRelease": "View Release",
       "refreshHistory": "Refresh",
       "versionCol": "Version",
-      "viewLog": "View full log"
+      "viewLog": "View full log",
+      "viewDetail": "Details",
+      "updateCancelled": "Update cancelled"
     }
   }
 }
