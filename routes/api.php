@@ -49,6 +49,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/product-settings', [SubsiteConsoleController::class, 'upsertProductSetting']);
         Route::post('/withdrawals', [SubsiteConsoleController::class, 'requestWithdrawal']);
         Route::put('/branding', [SubsiteConsoleController::class, 'updateBranding']);
+        Route::get('/orders', [SubsiteConsoleController::class, 'orders']);
     });
 });
 
@@ -56,6 +57,7 @@ Route::middleware('auth:sanctum')->group(function () {
 use App\Http\Controllers\Api\Admin\CardController as AdminCardController;
 use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Api\Admin\CurrencyController as AdminCurrencyController;
+use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\BillController as AdminBillController;
 use App\Http\Controllers\Api\Admin\CommissionController as AdminCommissionController;
@@ -100,6 +102,12 @@ Route::middleware(['auth:sanctum', 'admin.role'])->prefix('admin')->group(functi
 
     // 分销佣金管理(列表/统计)
     Route::get('commissions/stats', [AdminCommissionController::class, 'stats']);
+
+    // 评价审核管理(列表/统计/通过/拒绝)
+    Route::get('reviews/stats', [AdminReviewController::class, 'stats']);
+    Route::get('reviews', [AdminReviewController::class, 'index']);
+    Route::post('reviews/{id}/approve', [AdminReviewController::class, 'approve']);
+    Route::post('reviews/{id}/reject', [AdminReviewController::class, 'reject']);
     Route::get('commissions', [AdminCommissionController::class, 'index']);
 
     // 提现管理(列表/统计/审核)
