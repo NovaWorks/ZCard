@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import {
@@ -28,10 +28,6 @@ const successResult = ref<UpdateResult | null>(null)
 const failedVisible = ref(false)
 const failedResult = ref<{ message: string; log: string } | null>(null)
 
-// 版本详情弹窗
-const versionDetailVisible = ref(false)
-const versionDetailData = ref<VersionInfo | null>(null)
-
 // 日期格式化
 const formatDate = (iso?: string) => {
   if (!iso) return '-'
@@ -46,21 +42,20 @@ const handleCheck = async () => {
   try {
     checkResult.value = await checkUpdate()
 
-    // 有新版本 → 弹出更新确认对话框(大厂交互:自动弹窗 + 明确的更新引导)
     if (checkResult.value.has_update) {
       const msgHtml = `
         <div style="line-height:1.8;font-size:14px;">
-          <p style="margin:0 0 12px;">
-            <strong>${t('zcard.update.currentVersion')}:</strong>
-            <span style="font-family:monospace;font-size:16px;color:var(--el-text-color-secondary);">v${checkResult.value.current_version}</span>
-          </p>
-          <p style="margin:0 0 12px;">
-            <strong>${t('zcard.update.latestVersion')}:</strong>
-            <span style="font-family:monospace;font-size:18px;color:var(--el-color-success);font-weight:700;">v${checkResult.value.latest_version}</span>
-          </p>
-          <div style="margin:12px 0;padding:12px;background:var(--el-fill-color-light);border-radius:8px;max-height:200px;overflow:auto;">
-            <pre style="margin:0;font-size:12px;white-space:pre-wrap;word-break:break-word;font-family:inherit;line-height:1.6;">${checkResult.value.release_notes || ''}</pre>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <span style="font-size:13px;color:var(--el-text-color-secondary);">${t('zcard.update.currentVersion')}</span>
+            <span style="font-family:monospace;font-size:18px;font-weight:600;color:var(--el-text-color-regular);">v${checkResult.value.current_version}</span>
+            <span style="font-size:18px;color:var(--el-text-color-placeholder);">→</span>
+            <span style="font-family:monospace;font-size:22px;font-weight:800;color:var(--el-color-success);">v${checkResult.value.latest_version}</span>
           </div>
+          ${checkResult.value.release_notes ? `
+          <div style="margin:8px 0;padding:14px 16px;background:var(--el-fill-color-light);border-radius:8px;max-height:240px;overflow:auto;border:1px solid var(--el-border-color-lighter);">
+            <div style="font-size:12px;font-weight:600;color:var(--el-text-color-secondary);margin-bottom:8px;">${t('zcard.update.releaseNotes')}</div>
+            <pre style="margin:0;font-size:13px;white-space:pre-wrap;word-break:break-word;font-family:inherit;line-height:1.7;color:var(--el-text-color-regular);">${checkResult.value.release_notes}</pre>
+          </div>` : ''}
         </div>
       `
       ElMessageBox({
@@ -74,12 +69,8 @@ const handleCheck = async () => {
         showCancelButton: true,
         closeOnClickModal: false,
       })
-        .then(() => {
-          performUpdate()
-        })
-        .catch(() => {
-          ElMessage.info(t('zcard.update.updateCancelled'))
-        })
+        .then(() => performUpdate())
+        .catch(() => ElMessage.info(t('zcard.update.updateCancelled')))
     } else {
       ElMessage.success(t('zcard.update.noUpdate'))
     }
@@ -94,7 +85,6 @@ const handleCheck = async () => {
 const performUpdate = async () => {
   updating.value = true
   failedVisible.value = false
-
   try {
     const result = await runUpdate()
     successResult.value = result
@@ -109,9 +99,7 @@ const performUpdate = async () => {
   }
 }
 
-const handleRefresh = () => {
-  window.location.reload()
-}
+const handleRefresh = () => window.location.reload()
 
 const loadVersions = async () => {
   versionsLoading.value = true
@@ -129,12 +117,6 @@ const handleRetry = () => {
   handleCheck()
 }
 
-// 点击版本行 → 弹出完整详情(大厂交互:可点击查看完整信息)
-const showVersionDetail = (row: VersionInfo) => {
-  versionDetailData.value = row
-  versionDetailVisible.value = true
-}
-
 onMounted(() => {
   handleCheck()
   loadVersions()
@@ -143,237 +125,170 @@ onMounted(() => {
 
 <template>
   <div class="update-page art-full-height">
-    <!-- Section 1: 当前状态 -->
-    <ElCard class="art-table-card" shadow="never">
-      <template #header>
-        <div class="card-header">
-          <span class="header-title">{{ t('zcard.update.currentStatus') }}</span>
-          <ElButton type="primary" :loading="checking" @click="handleCheck">
-            🔄 {{ t('zcard.update.checkUpdate') }}
-          </ElButton>
-        </div>
-      </template>
-
-      <div v-loading="checking" class="status-block">
-        <div v-if="checkResult" class="version-row">
-          <div class="version-box">
-            <div class="version-label">{{ t('zcard.update.currentVersion') }}</div>
-            <div class="version-num current">v{{ checkResult.current_version }}</div>
+    <!-- ========== Section 1: 当前版本状态卡 ========== -->
+    <div class="status-hero" v-loading="checking">
+      <div class="hero-bg-icon">📦</div>
+      <div class="hero-content">
+        <div class="hero-version-row">
+          <div class="hero-version-box">
+            <div class="hero-version-label">{{ t('zcard.update.currentVersion') }}</div>
+            <div class="hero-version-num current">v{{ checkResult?.current_version || '...' }}</div>
           </div>
-          <div class="arrow">→</div>
-          <div class="version-box">
-            <div class="version-label">{{ t('zcard.update.latestVersion') }}</div>
-            <div class="version-num latest">v{{ checkResult.latest_version }}</div>
+          <div class="hero-arrow" v-if="checkResult?.has_update">→</div>
+          <div class="hero-version-box" v-if="checkResult?.has_update">
+            <div class="hero-version-label">{{ t('zcard.update.latestVersion') }}</div>
+            <div class="hero-version-num latest">v{{ checkResult?.latest_version }}</div>
           </div>
         </div>
 
-        <div v-if="checkResult" class="status-row">
-          <ElTag
-            v-if="checkResult.has_update"
-            type="success"
-            size="large"
-            effect="dark"
-          >✅ {{ t('zcard.update.hasUpdate') }}</ElTag>
-          <ElTag v-else type="primary" size="large" effect="dark">
+        <div class="hero-actions">
+          <ElTag v-if="checkResult && !checkResult.has_update" type="success" size="large" effect="dark" round>
             ✅ {{ t('zcard.update.noUpdate') }}
           </ElTag>
-          <span v-if="checkResult.published_at" class="published-at">
-            {{ t('zcard.update.releasedAt') }}: {{ formatDate(checkResult.published_at) }}
-          </span>
-          <ElButton
-            v-if="checkResult.has_update"
-            type="success"
-            :loading="updating"
-            @click="performUpdate"
-          >⬆️ {{ t('zcard.update.runUpdate') }}</ElButton>
-          <ElButton
-            v-if="checkResult.release_url"
-            tag="a"
-            :href="checkResult.release_url"
-            target="_blank"
-            rel="noopener"
-          >🔗 GitHub</ElButton>
+          <ElTag v-if="checkResult?.has_update" type="warning" size="large" effect="dark" round>
+            🆕 {{ t('zcard.update.hasUpdate') }}
+          </ElTag>
+
+          <ElButton type="primary" plain :loading="checking" @click="handleCheck" round>
+            🔄 {{ t('zcard.update.checkUpdate') }}
+          </ElButton>
+          <ElButton v-if="checkResult?.has_update" type="success" :loading="updating" @click="performUpdate" round>
+            ⬆️ {{ t('zcard.update.runUpdate') }}
+          </ElButton>
+          <ElButton v-if="checkResult?.release_url" tag="a" :href="checkResult.release_url" target="_blank" round>
+            🔗 GitHub
+          </ElButton>
         </div>
 
-        <div v-if="checkResult?.release_notes" class="release-notes">
-          <div class="notes-label">{{ t('zcard.update.releaseNotes') }}</div>
-          <pre class="notes-content">{{ checkResult.release_notes }}</pre>
+        <div class="hero-meta" v-if="checkResult?.published_at">
+          {{ t('zcard.update.releasedAt') }}: {{ formatDate(checkResult.published_at) }}
         </div>
-
-        <ElEmpty
-          v-if="!checkResult && !checking"
-          :description="t('zcard.update.checkTip')"
-        />
       </div>
+    </div>
+
+    <!-- ========== Section 2: 最新版本更新日志(卡片式,可展开) ========== -->
+    <ElCard v-if="checkResult?.release_notes" class="art-table-card" shadow="never">
+      <template #header>
+        <div class="card-header">
+          <span class="header-title">📋 {{ t('zcard.update.releaseNotes') }}</span>
+          <ElTag v-if="checkResult" type="info" effect="plain" size="small">
+            v{{ checkResult.latest_version }}
+          </ElTag>
+        </div>
+      </template>
+      <div class="changelog-body" v-html="checkResult.release_notes"></div>
     </ElCard>
 
-    <!-- Section 2: 版本历史 -->
+    <!-- ========== Section 3: 版本历史(时间线式) ========== -->
     <ElCard class="art-table-card" shadow="never">
       <template #header>
         <div class="card-header">
-          <span class="header-title">{{ t('zcard.update.versionHistory') }}</span>
+          <span class="header-title">📜 {{ t('zcard.update.versionHistory') }}</span>
           <ElButton text type="primary" :loading="versionsLoading" @click="loadVersions">
             🔄 {{ t('zcard.update.refreshHistory') }}
           </ElButton>
         </div>
       </template>
 
-      <ElTable
-        v-loading="versionsLoading"
-        :data="versions"
-        border
-        stripe
-        @row-click="showVersionDetail"
-        :row-style="{ cursor: 'pointer' }"
-      >
-        <ElTableColumn :label="t('zcard.update.versionCol')" width="160">
-          <template #default="{ row }">
-            <div class="version-cell">
-              <ElTag type="primary" effect="plain">v{{ row.version }}</ElTag>
-              <ElTag v-if="row.prerelease" type="warning" size="small">
-                {{ t('zcard.update.prerelease') }}
-              </ElTag>
+      <div v-loading="versionsLoading" class="timeline">
+        <div v-for="(ver, idx) in versions" :key="ver.version" class="timeline-item">
+          <!-- 时间线竖线 + 圆点 -->
+          <div class="timeline-dot" :class="{ 'is-latest': idx === 0 }"></div>
+
+          <div class="timeline-card" :class="{ 'is-latest': idx === 0 }">
+            <div class="timeline-card-header">
+              <div class="version-badge-row">
+                <span class="version-badge" :class="{ 'latest-badge': idx === 0 }">v{{ ver.version }}</span>
+                <ElTag v-if="ver.prerelease" type="warning" size="small" effect="plain">Pre-release</ElTag>
+                <ElTag v-if="idx === 0" type="success" size="small" effect="dark">Latest</ElTag>
+              </div>
+              <span class="timeline-date">{{ formatDate(ver.published_at) }}</span>
             </div>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn
-          :label="t('zcard.update.releasedAt')"
-          width="180"
-          align="center"
-        >
-          <template #default="{ row }">
-            {{ formatDate(row.published_at) }}
-          </template>
-        </ElTableColumn>
-        <ElTableColumn :label="t('zcard.update.releaseNotes')" min-width="320">
-          <template #default="{ row }">
-            <div class="notes-truncate">{{ row.notes }}</div>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn :label="t('zcard.common.actions')" width="120" align="center">
-          <template #default="{ row }">
-            <ElButton text type="primary" size="small" @click.stop="showVersionDetail(row)">
-              📋 {{ t('zcard.update.viewDetail') }}
-            </ElButton>
-          </template>
-        </ElTableColumn>
-      </ElTable>
+
+            <div class="timeline-notes-preview" @click="ver._expanded = !ver._expanded">
+              <div class="notes-text" :class="{ collapsed: !ver._expanded }">
+                {{ ver.notes || '(无更新说明)' }}
+              </div>
+              <ElButton v-if="ver.notes && ver.notes.length > 120" text type="primary" size="small" class="expand-btn">
+                {{ ver._expanded ? '收起' : '展开全部' }}
+              </ElButton>
+            </div>
+
+            <div class="timeline-actions">
+              <ElButton v-if="ver.url" tag="a" :href="ver.url" target="_blank" text type="primary" size="small">
+                🔗 GitHub
+              </ElButton>
+            </div>
+          </div>
+        </div>
+
+        <ElEmpty v-if="!versionsLoading && versions.length === 0" description="暂无版本历史" />
+      </div>
     </ElCard>
 
-    <!-- 更新执行:全屏遮罩 -->
+    <!-- ========== 更新执行遮罩 ========== -->
     <ElDialog
       v-model="updating"
       :show-close="false"
       :close-on-click-modal="false"
       :close-on-press-escape="false"
-      width="420px"
-      class="updating-dialog"
+      width="440px"
       align-center
       append-to-body
     >
       <div class="updating-body">
-        <div class="spinner">⏳</div>
+        <div class="spinner-wrap">
+          <ElIcon class="is-loading" :size="48"><Loading /></ElIcon>
+        </div>
         <div class="updating-title">{{ t('zcard.update.updating') }}</div>
         <div class="updating-tip">{{ t('zcard.update.updatingTip') }}</div>
-        <ElProgress :percentage="100" :indeterminate="true" :show-text="false" />
+        <ElProgress :percentage="100" :indeterminate="true" :show-text="false" color="var(--el-color-primary)" />
       </div>
     </ElDialog>
 
-    <!-- 成功对话框 -->
-    <ElDialog
-      v-model="successVisible"
-      :title="t('zcard.update.updateSuccess')"
-      width="640px"
-      :close-on-click-modal="false"
-      align-center
-      append-to-body
-    >
+    <!-- ========== 成功对话框 ========== -->
+    <ElDialog v-model="successVisible" :title="t('zcard.update.updateSuccess')" width="600px" :close-on-click-modal="false" align-center append-to-body>
       <div class="result-body">
-        <div class="result-icon success">✅</div>
+        <div class="result-icon-wrap success"><ElIcon :size="48"><CircleCheckFilled /></ElIcon></div>
         <div v-if="successResult" class="version-change">
           <span class="ver old">v{{ successResult.old_version || '-' }}</span>
           <span class="arrow">→</span>
           <span class="ver new">v{{ successResult.new_version || '-' }}</span>
         </div>
-        <div v-if="successResult?.message" class="result-message">
-          {{ successResult.message }}
-        </div>
+        <div v-if="successResult?.message" class="result-message">{{ successResult.message }}</div>
         <details v-if="successResult?.log" class="log-details">
-          <summary>{{ t('zcard.update.viewLog') }}</summary>
+          <summary>📋 {{ t('zcard.update.viewLog') }}</summary>
           <pre class="log-content">{{ successResult.log }}</pre>
         </details>
       </div>
       <template #footer>
-        <ElButton type="primary" @click="handleRefresh">
-          🔄 {{ t('zcard.update.refresh') }}
-        </ElButton>
+        <ElButton type="primary" @click="handleRefresh" round>🔄 {{ t('zcard.update.refresh') }}</ElButton>
       </template>
     </ElDialog>
 
-    <!-- 失败对话框 -->
-    <ElDialog
-      v-model="failedVisible"
-      :title="t('zcard.update.updateFailed')"
-      width="640px"
-      align-center
-      append-to-body
-    >
+    <!-- ========== 失败对话框 ========== -->
+    <ElDialog v-model="failedVisible" :title="t('zcard.update.updateFailed')" width="600px" align-center append-to-body>
       <div class="result-body">
-        <div class="result-icon failed">❌</div>
-        <div v-if="failedResult?.message" class="result-message failed-msg">
-          {{ failedResult.message }}
-        </div>
-        <ElAlert
-          :title="t('zcard.update.rollbackHint')"
-          type="warning"
-          :closable="false"
-          show-icon
-        />
+        <div class="result-icon-wrap failed"><ElIcon :size="48"><CircleCloseFilled /></ElIcon></div>
+        <div v-if="failedResult?.message" class="result-message failed-msg">{{ failedResult.message }}</div>
+        <ElAlert :title="t('zcard.update.rollbackHint')" type="warning" :closable="false" show-icon />
         <details v-if="failedResult?.log" class="log-details" open>
-          <summary>{{ t('zcard.update.viewLog') }}</summary>
+          <summary>📋 {{ t('zcard.update.viewLog') }}</summary>
           <pre class="log-content">{{ failedResult.log }}</pre>
         </details>
       </div>
       <template #footer>
-        <ElButton @click="failedVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
-        <ElButton type="primary" @click="handleRetry">
-          🔄 {{ t('zcard.update.checkUpdate') }}
-        </ElButton>
+        <ElButton @click="failedVisible = false" round>{{ t('zcard.common.cancel') }}</ElButton>
+        <ElButton type="primary" @click="handleRetry" round>🔄 {{ t('zcard.update.checkUpdate') }}</ElButton>
       </template>
-    </ElDialog>
-
-    <!-- 版本详情弹窗(点击版本行或查看详情按钮) -->
-    <ElDialog
-      v-model="versionDetailVisible"
-      :title="versionDetailData ? `v${versionDetailData.version}` : ''"
-      width="720px"
-      align-center
-      append-to-body
-    >
-      <div v-if="versionDetailData" class="version-detail-body">
-        <div class="detail-meta">
-          <ElTag type="primary" size="large">v{{ versionDetailData.version }}</ElTag>
-          <ElTag v-if="versionDetailData.prerelease" type="warning">
-            {{ t('zcard.update.prerelease') }}
-          </ElTag>
-          <span class="detail-date">{{ formatDate(versionDetailData.published_at) }}</span>
-          <ElButton
-            v-if="versionDetailData.url"
-            tag="a"
-            :href="versionDetailData.url"
-            target="_blank"
-            rel="noopener"
-            size="small"
-          >🔗 GitHub</ElButton>
-        </div>
-        <div class="detail-notes">
-          <div class="notes-label">{{ t('zcard.update.releaseNotes') }}</div>
-          <pre class="notes-content">{{ versionDetailData.notes || '-' }}</pre>
-        </div>
-      </div>
     </ElDialog>
   </div>
 </template>
+
+<script lang="ts">
+import { Loading, CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue'
+export default { components: { Loading, CircleCheckFilled, CircleCloseFilled } }
+</script>
 
 <style lang="scss" scoped>
   .update-page {
@@ -381,6 +296,76 @@ onMounted(() => {
     flex-direction: column;
     gap: 16px;
   }
+
+  /* ========== Hero 状态卡 ========== */
+  .status-hero {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 28px 32px;
+    background: linear-gradient(135deg, var(--el-color-primary-light-9), var(--el-fill-color-extra-light));
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-bg-icon {
+    position: absolute;
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 120px;
+    opacity: 0.06;
+    pointer-events: none;
+  }
+  .hero-content {
+    flex: 1;
+    position: relative;
+    z-index: 1;
+  }
+  .hero-version-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .hero-version-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .hero-version-label {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+  .hero-version-num {
+    font-size: 32px;
+    font-weight: 800;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    line-height: 1.2;
+    &.current { color: var(--el-color-primary); }
+    &.latest { color: var(--el-color-success); }
+  }
+  .hero-arrow {
+    font-size: 28px;
+    color: var(--el-text-color-placeholder);
+    font-weight: 700;
+    margin-top: 8px;
+  }
+  .hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .hero-meta {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--el-text-color-placeholder);
+  }
+
+  /* ========== 卡片通用 ========== */
   .card-header {
     display: flex;
     justify-content: space-between;
@@ -390,111 +375,127 @@ onMounted(() => {
     font-size: 16px;
     font-weight: 600;
   }
-  .status-block {
-    min-height: 120px;
-  }
-  .version-row {
-    display: flex;
-    align-items: center;
-    gap: 24px;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
-  }
-  .version-box {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-  .version-label {
-    font-size: 12px;
-    color: var(--el-text-color-secondary);
-  }
-  .version-num {
-    font-size: 28px;
-    font-weight: 700;
-    font-family: monospace;
-    &.current {
-      color: var(--el-color-primary);
-    }
-    &.latest {
-      color: var(--el-color-success);
-    }
-  }
-  .arrow {
-    font-size: 24px;
-    color: var(--el-text-color-secondary);
-    font-weight: 700;
-  }
-  .status-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
-  }
-  .published-at {
-    font-size: 13px;
-    color: var(--el-text-color-secondary);
-  }
-  .release-notes {
-    border-top: 1px dashed var(--el-border-color);
-    padding-top: 16px;
-  }
-  .notes-label {
-    font-size: 13px;
-    font-weight: 600;
-    margin-bottom: 8px;
+
+  /* ========== 更新日志卡 ========== */
+  .changelog-body {
+    font-size: 14px;
+    line-height: 1.8;
     color: var(--el-text-color-regular);
-  }
-  .notes-content {
-    background: var(--el-fill-color-light);
-    border-radius: 6px;
-    padding: 12px;
-    font-family: monospace;
-    font-size: 13px;
-    line-height: 1.6;
     white-space: pre-wrap;
     word-break: break-word;
-    max-height: 400px;
+    max-height: 480px;
     overflow: auto;
-    margin: 0;
-    color: var(--el-text-color-regular);
-  }
-  .version-cell {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-  .notes-truncate {
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: pre-wrap;
-    word-break: break-word;
-    font-size: 13px;
-    line-height: 1.5;
-    color: var(--el-text-color-regular);
   }
 
-  // 更新中遮罩
+  /* ========== 时间线版本历史 ========== */
+  .timeline {
+    position: relative;
+    padding-left: 8px;
+  }
+  .timeline-item {
+    position: relative;
+    padding-left: 28px;
+    padding-bottom: 20px;
+    &:last-child { padding-bottom: 0; }
+    &::before {
+      content: '';
+      position: absolute;
+      left: 5px;
+      top: 20px;
+      bottom: 0;
+      width: 2px;
+      background: var(--el-border-color-lighter);
+    }
+    &:last-child::before { display: none; }
+  }
+  .timeline-dot {
+    position: absolute;
+    left: 0;
+    top: 6px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--el-color-info-light-5);
+    border: 2px solid var(--el-bg-color);
+    z-index: 1;
+    &.is-latest {
+      background: var(--el-color-success);
+      box-shadow: 0 0 0 4px var(--el-color-success-light-9);
+    }
+  }
+  .timeline-card {
+    background: var(--el-fill-color-blank);
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 10px;
+    padding: 14px 18px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    &:hover {
+      border-color: var(--el-color-primary-light-5);
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    }
+    &.is-latest {
+      border-color: var(--el-color-success-light-5);
+      background: var(--el-color-success-light-9);
+    }
+  }
+  .timeline-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .version-badge-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .version-badge {
+    font-size: 15px;
+    font-weight: 700;
+    font-family: 'SF Mono', monospace;
+    color: var(--el-text-color-regular);
+    &.latest-badge { color: var(--el-color-success); }
+  }
+  .timeline-date {
+    font-size: 12px;
+    color: var(--el-text-color-placeholder);
+  }
+  .timeline-notes-preview {
+    cursor: pointer;
+    .notes-text {
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--el-text-color-regular);
+      white-space: pre-wrap;
+      word-break: break-word;
+      &.collapsed {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+    }
+    .expand-btn {
+      margin-top: 4px;
+    }
+  }
+  .timeline-actions {
+    margin-top: 6px;
+    display: flex;
+    gap: 8px;
+  }
+
+  /* ========== 更新执行遮罩 ========== */
   .updating-body {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 14px;
-    padding: 16px 8px 8px;
-  }
-  .spinner {
-    font-size: 48px;
-    animation: pulse 1.4s ease-in-out infinite;
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.6; transform: scale(0.92); }
+    padding: 20px 8px 8px;
   }
   .updating-title {
     font-size: 18px;
@@ -506,7 +507,7 @@ onMounted(() => {
     text-align: center;
   }
 
-  // 结果对话框
+  /* ========== 结果对话框 ========== */
   .result-body {
     display: flex;
     flex-direction: column;
@@ -514,35 +515,32 @@ onMounted(() => {
     gap: 16px;
     padding: 8px 0;
   }
-  .result-icon {
-    font-size: 56px;
-    line-height: 1;
+  .result-icon-wrap {
+    &.success { color: var(--el-color-success); }
+    &.failed { color: var(--el-color-danger); }
   }
   .version-change {
     display: flex;
     align-items: center;
     gap: 16px;
-    font-size: 22px;
+    font-size: 24px;
     font-weight: 700;
-    font-family: monospace;
+    font-family: 'SF Mono', monospace;
     .ver.old { color: var(--el-text-color-secondary); }
     .ver.new { color: var(--el-color-success); }
-    .arrow { color: var(--el-text-color-secondary); font-size: 22px; }
+    .arrow { color: var(--el-text-color-placeholder); }
   }
   .result-message {
     font-size: 14px;
-    color: var(--el-text-color-regular);
     text-align: center;
-    &.failed-msg {
-      color: var(--el-color-danger);
-      font-weight: 600;
-    }
+    color: var(--el-text-color-regular);
+    &.failed-msg { color: var(--el-color-danger); font-weight: 600; }
   }
   .log-details {
     width: 100%;
     background: var(--el-fill-color-light);
-    border-radius: 6px;
-    padding: 8px 12px;
+    border-radius: 8px;
+    padding: 10px 14px;
     summary {
       cursor: pointer;
       font-size: 13px;
@@ -552,35 +550,13 @@ onMounted(() => {
   }
   .log-content {
     margin: 8px 0 0;
-    font-family: monospace;
+    font-family: 'SF Mono', monospace;
     font-size: 12px;
-    line-height: 1.5;
+    line-height: 1.6;
     color: var(--el-text-color-regular);
     white-space: pre-wrap;
     word-break: break-word;
-    max-height: 240px;
+    max-height: 280px;
     overflow: auto;
-  }
-
-  // 版本详情弹窗
-  .version-detail-body {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-  .detail-meta {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  .detail-date {
-    font-size: 13px;
-    color: var(--el-text-color-secondary);
-  }
-  .detail-notes {
-    .notes-content {
-      max-height: 480px;
-    }
   }
 </style>

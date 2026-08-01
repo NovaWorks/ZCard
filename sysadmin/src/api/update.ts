@@ -15,6 +15,7 @@ export interface VersionInfo {
   notes: string
   published_at: string
   prerelease: boolean
+  _expanded?: boolean
 }
 
 export interface UpdateResult {
