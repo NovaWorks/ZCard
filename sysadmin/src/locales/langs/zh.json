@@ -377,6 +377,9 @@
     "bill": {
       "title": "账单管理"
     },
+    "commission": {
+      "title": "分销佣金"
+    },
     "withdrawal": {
       "title": "提现管理"
     },
@@ -734,6 +737,31 @@
       "adjustUserRequired": "请输入用户ID",
       "adjustAmountRequired": "请输入金额",
       "adjustLogRequired": "请输入调账说明"
+    },
+    "commission": {
+      "title": "分销佣金",
+      "statTotal": "总佣金",
+      "statCount": "总笔数",
+      "statAvailable": "可提现",
+      "keyword": "搜索",
+      "keywordPlaceholder": "推广人/订单号",
+      "tier": "层级",
+      "status": "状态",
+      "allTiers": "全部层级",
+      "allStatus": "全部状态",
+      "available": "可提现",
+      "pending": "冻结中",
+      "paid": "已提现",
+      "orderNo": "订单号",
+      "referrer": "推广人",
+      "buyer": "买家",
+      "rate": "费率",
+      "base": "毛利基数",
+      "amount": "佣金",
+      "date": "时间",
+      "tier1": "一级",
+      "tier2": "二级",
+      "tier3": "三级"
     },
     "withdrawal": {
       "title": "提现管理",

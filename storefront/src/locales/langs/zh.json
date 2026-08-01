@@ -4,6 +4,7 @@
     "orders": "订单查询",
     "mine": "我的订单",
     "distribution": "推广中心",
+    "withdraw": "提现",
     "login": "登录",
     "register": "注册",
     "logout": "退出",
@@ -32,6 +33,24 @@
     "date": "日期",
     "empty": "暂无数据",
     "inviter": "邀请人"
+  },
+  "withdraw": {
+    "title": "提现",
+    "amount": "金额",
+    "method": "方式",
+    "alipay": "支付宝",
+    "wechat": "微信",
+    "usdt": "USDT",
+    "account": "账号",
+    "accountName": "户名",
+    "submit": "申请提现",
+    "history": "提现记录",
+    "status": "状态",
+    "rejectReason": "驳回原因",
+    "date": "日期",
+    "minAmountTip": "最低提现金额",
+    "success": "提现申请已提交",
+    "noMethods": "暂无可用提现方式"
   },
   "common": {
     "buy": "购买",

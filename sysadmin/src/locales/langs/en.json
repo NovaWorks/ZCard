@@ -377,6 +377,9 @@
     "bill": {
       "title": "Bills"
     },
+    "commission": {
+      "title": "Commissions"
+    },
     "withdrawal": {
       "title": "Withdrawals"
     },
@@ -734,6 +737,31 @@
       "adjustUserRequired": "User ID required",
       "adjustAmountRequired": "Amount required",
       "adjustLogRequired": "Reason required"
+    },
+    "commission": {
+      "title": "Commissions",
+      "statTotal": "Total Commission",
+      "statCount": "Total Count",
+      "statAvailable": "Available",
+      "keyword": "Search",
+      "keywordPlaceholder": "Promoter or Order No.",
+      "tier": "Tier",
+      "status": "Status",
+      "allTiers": "All Tiers",
+      "allStatus": "All Status",
+      "available": "Available",
+      "pending": "Pending",
+      "paid": "Paid",
+      "orderNo": "Order No.",
+      "referrer": "Promoter",
+      "buyer": "Buyer",
+      "rate": "Rate",
+      "base": "Base",
+      "amount": "Amount",
+      "date": "Date",
+      "tier1": "Tier 1",
+      "tier2": "Tier 2",
+      "tier3": "Tier 3"
     },
     "withdrawal": {
       "title": "Withdrawals",

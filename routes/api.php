@@ -45,6 +45,7 @@ use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController
 use App\Http\Controllers\Api\Admin\CurrencyController as AdminCurrencyController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\BillController as AdminBillController;
+use App\Http\Controllers\Api\Admin\CommissionController as AdminCommissionController;
 use App\Http\Controllers\Api\Admin\CouponController as AdminCouponController;
 use App\Http\Controllers\Api\Admin\PaymentChannelController as AdminPaymentChannelController;
 use App\Http\Controllers\Api\Admin\WithdrawalController as AdminWithdrawalController;
@@ -82,6 +83,10 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::get('bills/stats', [AdminBillController::class, 'stats']);
     Route::get('bills', [AdminBillController::class, 'index']);
     Route::post('bills/adjust', [AdminBillController::class, 'adjust']);
+
+    // 分销佣金管理(列表/统计)
+    Route::get('commissions/stats', [AdminCommissionController::class, 'stats']);
+    Route::get('commissions', [AdminCommissionController::class, 'index']);
 
     // 提现管理(列表/统计/审核)
     Route::get('withdrawals/stats', [AdminWithdrawalController::class, 'stats']);

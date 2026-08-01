@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getStats, getReferrals, getCommissions, type DistributionStats, type Referral, type CommissionRecord } from '@/api/distribution'
 import { formatMoney } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
 
+const router = useRouter()
 const { t } = useI18n()
 const prefs = usePreferencesStore()
 
@@ -26,7 +28,13 @@ function copyLink() {
   })
 }
 
+function goWithdraw() {
+  router.push('/withdraw')
+}
+
 onMounted(async () => {
+  // 直达子页时 prefs 可能尚未加载 → 先触发加载以保证 formatMoney 正确展示
+  prefs.load()
   try {
     const [s, r, c] = await Promise.all([
       getStats(),
@@ -74,6 +82,10 @@ onMounted(async () => {
         <div class="bg-white rounded-card border border-border p-4">
           <div class="text-xs text-ink-muted">{{ t('distribution.availableCommission') }}</div>
           <div class="text-price font-bold mt-1">{{ formatMoney(stats?.available_commission ?? 0, prefs.currentCurrency) }}</div>
+          <button @click="goWithdraw"
+            class="mt-2 px-3 py-1 rounded-field bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition">
+            {{ t('nav.withdraw') }}
+          </button>
         </div>
         <div class="bg-white rounded-card border border-border p-4">
           <div class="text-xs text-ink-muted">{{ t('distribution.balance') }}</div>
