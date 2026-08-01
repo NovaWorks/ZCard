@@ -34,5 +34,15 @@ export const tradeRoutes: AppRouteRecord = {
         keepAlive: true,
       },
     },
+    {
+      path: '/commissionmgt/index',
+      name: 'CommissionIndex',
+      component: '/commission/list/index',
+      meta: {
+        title: 'menus.commission.title',
+        icon: 'ri:share-line',
+        keepAlive: false,
+      },
+    },
   ],
 }
