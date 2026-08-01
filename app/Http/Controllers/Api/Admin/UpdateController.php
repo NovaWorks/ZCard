@@ -34,25 +34,35 @@ class UpdateController extends Controller
         $currentVersion = config('app.version', '0.0.0');
 
         try {
-            $resp = Http::timeout(15)->withHeaders(['User-Agent' => 'ZCard'])->get("https://api.github.com/repos/{$repo}/releases/latest");
+            // 先尝试 /releases/latest(只返回正式版,不含 prerelease)
+            // 如果 404(只有 prerelease 或完全无 release),回退到 /releases 取第一个
+            $resp = Http::timeout(15)->withHeaders(['User-Agent' => 'ZCard'])
+                ->get("https://api.github.com/repos/{$repo}/releases/latest");
 
             if ($resp->status() === 404) {
-                // 无 Release(仓库未创建任何 Release)
-                return response()->json([
-                    'current_version' => $currentVersion,
-                    'latest_version' => $currentVersion,
-                    'has_update' => false,
-                    'release_url' => "https://github.com/{$repo}/releases",
-                    'release_notes' => '尚未发布任何版本。请先在 GitHub 上创建 Release(如 v1.0.0)。',
-                    'published_at' => '',
-                ]);
+                // 回退:取所有 releases 的第一个(含 prerelease)
+                $fallback = Http::timeout(15)->withHeaders(['User-Agent' => 'ZCard'])
+                    ->get("https://api.github.com/repos/{$repo}/releases?per_page=1");
+
+                if ($fallback->successful() && ! empty($fallback->json())) {
+                    $release = $fallback->json()[0];
+                } else {
+                    // 确实没有任何 Release
+                    return response()->json([
+                        'current_version' => $currentVersion,
+                        'latest_version' => $currentVersion,
+                        'has_update' => false,
+                        'release_url' => "https://github.com/{$repo}/releases",
+                        'release_notes' => '尚未发布任何版本。请先在 GitHub 上创建 Release。',
+                        'published_at' => '',
+                    ]);
+                }
+            } elseif (! $resp->successful()) {
+                return response()->json(['message' => '无法连接 GitHub(HTTP ' . $resp->status() . ')'], 502);
+            } else {
+                $release = $resp->json();
             }
 
-            if (! $resp->successful()) {
-                return response()->json(['message' => '无法连接 GitHub(HTTP ' . $resp->status() . '),请检查网络或仓库设置'], 502);
-            }
-
-            $release = $resp->json();
             $latestVersion = ltrim($release['tag_name'] ?? '', 'v');
             $hasUpdate = version_compare($latestVersion, $currentVersion, '>');
 
