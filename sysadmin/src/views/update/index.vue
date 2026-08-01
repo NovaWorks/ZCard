@@ -28,6 +28,11 @@ const successResult = ref<UpdateResult | null>(null)
 const failedVisible = ref(false)
 const failedResult = ref<{ message: string; log: string } | null>(null)
 
+// 弹窗状态
+const latestNotesVisible = ref(false)
+const versionDetailVisible = ref(false)
+const versionDetailData = ref<VersionInfo | null>(null)
+
 // 日期格式化
 const formatDate = (iso?: string) => {
   if (!iso) return '-'
@@ -35,6 +40,11 @@ const formatDate = (iso?: string) => {
   if (isNaN(d.getTime())) return iso
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+const openVersionDetail = (ver: VersionInfo) => {
+  versionDetailData.value = ver
+  versionDetailVisible.value = true
 }
 
 const handleCheck = async () => {
@@ -166,20 +176,26 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- ========== Section 2: 最新版本更新日志(卡片式,可展开) ========== -->
-    <ElCard v-if="checkResult?.release_notes" class="art-table-card" shadow="never">
+    <!-- ========== Section 2: 最新版本更新日志(仅版本号,点击弹窗看详情) ========== -->
+    <ElCard v-if="checkResult" class="art-table-card" shadow="never">
       <template #header>
         <div class="card-header">
           <span class="header-title">📋 {{ t('zcard.update.releaseNotes') }}</span>
-          <ElTag v-if="checkResult" type="info" effect="plain" size="small">
-            v{{ checkResult.latest_version }}
-          </ElTag>
         </div>
       </template>
-      <div class="changelog-body" v-html="checkResult.release_notes"></div>
+      <div class="changelog-trigger" @click="latestNotesVisible = true">
+        <div class="changelog-trigger-left">
+          <span class="version-badge large">v{{ checkResult.latest_version }}</span>
+          <ElTag v-if="checkResult.has_update" type="warning" size="small" effect="plain">🆕</ElTag>
+        </div>
+        <div class="changelog-trigger-right">
+          <span class="changelog-hint">{{ t('zcard.update.viewDetail') }}</span>
+          <ElIcon><ArrowRight /></ElIcon>
+        </div>
+      </div>
     </ElCard>
 
-    <!-- ========== Section 3: 版本历史(时间线式) ========== -->
+    <!-- ========== Section 3: 版本历史(时间线式,仅版本号,点击弹窗) ========== -->
     <ElCard class="art-table-card" shadow="never">
       <template #header>
         <div class="card-header">
@@ -192,10 +208,9 @@ onMounted(() => {
 
       <div v-loading="versionsLoading" class="timeline">
         <div v-for="(ver, idx) in versions" :key="ver.version" class="timeline-item">
-          <!-- 时间线竖线 + 圆点 -->
           <div class="timeline-dot" :class="{ 'is-latest': idx === 0 }"></div>
 
-          <div class="timeline-card" :class="{ 'is-latest': idx === 0 }">
+          <div class="timeline-card" :class="{ 'is-latest': idx === 0 }" @click="openVersionDetail(ver)">
             <div class="timeline-card-header">
               <div class="version-badge-row">
                 <span class="version-badge" :class="{ 'latest-badge': idx === 0 }">v{{ ver.version }}</span>
@@ -205,19 +220,9 @@ onMounted(() => {
               <span class="timeline-date">{{ formatDate(ver.published_at) }}</span>
             </div>
 
-            <div class="timeline-notes-preview" @click="ver._expanded = !ver._expanded">
-              <div class="notes-text" :class="{ collapsed: !ver._expanded }">
-                {{ ver.notes || '(无更新说明)' }}
-              </div>
-              <ElButton v-if="ver.notes && ver.notes.length > 120" text type="primary" size="small" class="expand-btn">
-                {{ ver._expanded ? '收起' : '展开全部' }}
-              </ElButton>
-            </div>
-
-            <div class="timeline-actions">
-              <ElButton v-if="ver.url" tag="a" :href="ver.url" target="_blank" text type="primary" size="small">
-                🔗 GitHub
-              </ElButton>
+            <div class="timeline-hint-row">
+              <span class="timeline-hint-text">{{ t('zcard.update.viewDetail') }}</span>
+              <ElIcon class="timeline-hint-icon"><ArrowRight /></ElIcon>
             </div>
           </div>
         </div>
@@ -225,6 +230,46 @@ onMounted(() => {
         <ElEmpty v-if="!versionsLoading && versions.length === 0" description="暂无版本历史" />
       </div>
     </ElCard>
+
+    <!-- ========== 版本详情弹窗(通用,最新日志 + 历史版本共用) ========== -->
+    <ElDialog
+      v-model="latestNotesVisible"
+      :title="checkResult ? `v${checkResult.latest_version} ${t('zcard.update.releaseNotes')}` : ''"
+      width="720px"
+      align-center
+      append-to-body
+      class="notes-dialog"
+    >
+      <div v-if="checkResult" class="detail-dialog-body">
+        <div class="detail-dialog-meta">
+          <span class="version-badge large">v{{ checkResult.latest_version }}</span>
+          <ElTag v-if="checkResult.has_update" type="warning" effect="plain">🆕 New</ElTag>
+          <span class="detail-date">{{ formatDate(checkResult.published_at) }}</span>
+        </div>
+        <pre class="detail-notes-full">{{ checkResult.release_notes || '(无更新说明)' }}</pre>
+      </div>
+    </ElDialog>
+
+    <ElDialog
+      v-model="versionDetailVisible"
+      :title="versionDetailData ? `v${versionDetailData.version} ${t('zcard.update.releaseNotes')}` : ''"
+      width="720px"
+      align-center
+      append-to-body
+      class="notes-dialog"
+    >
+      <div v-if="versionDetailData" class="detail-dialog-body">
+        <div class="detail-dialog-meta">
+          <span class="version-badge large">v{{ versionDetailData.version }}</span>
+          <ElTag v-if="versionDetailData.prerelease" type="warning" effect="plain">Pre-release</ElTag>
+          <span class="detail-date">{{ formatDate(versionDetailData.published_at) }}</span>
+          <ElButton v-if="versionDetailData.url" tag="a" :href="versionDetailData.url" target="_blank" size="small" round>
+            🔗 GitHub
+          </ElButton>
+        </div>
+        <pre class="detail-notes-full">{{ versionDetailData.notes || '(无更新说明)' }}</pre>
+      </div>
+    </ElDialog>
 
     <!-- ========== 更新执行遮罩 ========== -->
     <ElDialog
@@ -286,8 +331,8 @@ onMounted(() => {
 </template>
 
 <script lang="ts">
-import { Loading, CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue'
-export default { components: { Loading, CircleCheckFilled, CircleCloseFilled } }
+import { Loading, CircleCheckFilled, CircleCloseFilled, ArrowRight } from '@element-plus/icons-vue'
+export default { components: { Loading, CircleCheckFilled, CircleCloseFilled, ArrowRight } }
 </script>
 
 <style lang="scss" scoped>
@@ -376,18 +421,42 @@ export default { components: { Loading, CircleCheckFilled, CircleCloseFilled } }
     font-weight: 600;
   }
 
-  /* ========== 更新日志卡 ========== */
-  .changelog-body {
-    font-size: 14px;
-    line-height: 1.8;
+  /* ========== 更新日志触发行 ========== */
+  .changelog-trigger {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 4px;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.2s;
+    &:hover { background: var(--el-fill-color-light); }
+  }
+  .changelog-trigger-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .changelog-trigger-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--el-text-color-secondary);
+  }
+  .changelog-hint { font-size: 13px; }
+
+  /* ========== 版本号 badge ========== */
+  .version-badge {
+    font-size: 15px;
+    font-weight: 700;
+    font-family: 'SF Mono', monospace;
     color: var(--el-text-color-regular);
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 480px;
-    overflow: auto;
+    &.large { font-size: 18px; }
+    &.latest-badge { color: var(--el-color-success); }
   }
 
-  /* ========== 时间线版本历史 ========== */
+  /* ========== 时间线(简化:仅版本号+点击) ========== */
   .timeline {
     position: relative;
     padding-left: 8px;
@@ -395,7 +464,7 @@ export default { components: { Loading, CircleCheckFilled, CircleCloseFilled } }
   .timeline-item {
     position: relative;
     padding-left: 28px;
-    padding-bottom: 20px;
+    padding-bottom: 16px;
     &:last-child { padding-bottom: 0; }
     &::before {
       content: '';
@@ -427,7 +496,8 @@ export default { components: { Loading, CircleCheckFilled, CircleCloseFilled } }
     background: var(--el-fill-color-blank);
     border: 1px solid var(--el-border-color-lighter);
     border-radius: 10px;
-    padding: 14px 18px;
+    padding: 12px 16px;
+    cursor: pointer;
     transition: border-color 0.2s, box-shadow 0.2s;
     &:hover {
       border-color: var(--el-color-primary-light-5);
@@ -442,7 +512,6 @@ export default { components: { Loading, CircleCheckFilled, CircleCloseFilled } }
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
     flex-wrap: wrap;
     gap: 6px;
   }
@@ -452,41 +521,50 @@ export default { components: { Loading, CircleCheckFilled, CircleCloseFilled } }
     gap: 6px;
     flex-wrap: wrap;
   }
-  .version-badge {
-    font-size: 15px;
-    font-weight: 700;
-    font-family: 'SF Mono', monospace;
-    color: var(--el-text-color-regular);
-    &.latest-badge { color: var(--el-color-success); }
-  }
   .timeline-date {
     font-size: 12px;
     color: var(--el-text-color-placeholder);
   }
-  .timeline-notes-preview {
-    cursor: pointer;
-    .notes-text {
-      font-size: 13px;
-      line-height: 1.7;
-      color: var(--el-text-color-regular);
-      white-space: pre-wrap;
-      word-break: break-word;
-      &.collapsed {
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        line-clamp: 3;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-      }
-    }
-    .expand-btn {
-      margin-top: 4px;
-    }
-  }
-  .timeline-actions {
-    margin-top: 6px;
+  .timeline-hint-row {
     display: flex;
-    gap: 8px;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+
+  /* ========== 详情弹窗 ========== */
+  .detail-dialog-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .detail-dialog-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .detail-date {
+    font-size: 13px;
+    color: var(--el-text-color-secondary);
+  }
+  .detail-notes-full {
+    background: var(--el-fill-color-light);
+    border-radius: 8px;
+    padding: 16px;
+    font-family: 'SF Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--el-text-color-regular);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 520px;
+    overflow: auto;
+    margin: 0;
+    border: 1px solid var(--el-border-color-lighter);
   }
 
   /* ========== 更新执行遮罩 ========== */
