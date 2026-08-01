@@ -11,9 +11,19 @@ class AdminCurrencyControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // RefreshDatabase 清空权限表,需重建角色(P0 RBAC 守卫要求 super_admin/merchant)
+        foreach (['super_admin', 'merchant', 'user'] as $role) {
+            \Spatie\Permission\Models\Role::firstOrCreate(['name' => $role]);
+        }
+    }
+
     private function adminToken(): string
     {
         $user = User::factory()->create();
+        $user->assignRole('super_admin');
         return $user->createToken('test')->plainTextToken;
     }
 
@@ -73,5 +83,29 @@ class AdminCurrencyControllerTest extends TestCase
         Currency::create(['code'=>'CNY','name'=>'人民币','symbol'=>'¥','symbol_position'=>'before','decimal_places'=>2,'exchange_rate'=>'1','is_base'=>true,'is_enabled'=>true,'sort'=>0]);
         $resp = $this->withHeaders($this->authHeaders())->deleteJson('/api/admin/currencies/CNY');
         $resp->assertStatus(422);
+    }
+
+    public function test_normal_user_cannot_access_admin_api(): void
+    {
+        // P0 RBAC:普通 user 角色不能访问 /api/admin/*
+        $user = User::factory()->create();
+        $user->assignRole('user');
+        $token = $user->createToken('test')->plainTextToken;
+
+        $resp = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+            ->getJson('/api/admin/currencies');
+        $resp->assertStatus(403);
+    }
+
+    public function test_merchant_role_can_access_admin_api(): void
+    {
+        // merchant 角色也可访问管理接口
+        $user = User::factory()->create();
+        $user->assignRole('merchant');
+        $token = $user->createToken('test')->plainTextToken;
+
+        $resp = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
+            ->getJson('/api/admin/currencies');
+        $resp->assertOk();
     }
 }
