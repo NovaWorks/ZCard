@@ -402,6 +402,9 @@
     },
     "review": {
       "title": "评价审核"
+    },
+    "update": {
+      "title": "在线更新"
     }
   },
   "table": {
@@ -1287,6 +1290,34 @@
       "enabled": "启用",
       "disabled": "禁用",
       "deleteConfirm": "确认删除等级「{name}」？"
+    },
+    "update": {
+      "title": "在线更新",
+      "currentStatus": "当前状态",
+      "currentVersion": "当前版本",
+      "latestVersion": "最新版本",
+      "checkUpdate": "检查更新",
+      "checkTip": "点击右上角「检查更新」获取最新版本信息",
+      "checkFailed": "检查更新失败",
+      "hasUpdate": "有新版本可用",
+      "noUpdate": "已是最新版本",
+      "runUpdate": "立即更新",
+      "updateConfirm": "更新确认",
+      "updateConfirmTip": "更新期间系统将进入维护模式，大约需要 1-2 分钟。确认更新?",
+      "updating": "正在更新...",
+      "updatingTip": "系统正在升级,请勿关闭页面。预计 1-2 分钟。",
+      "updateSuccess": "更新成功",
+      "updateFailed": "更新失败",
+      "rollbackHint": "更新失败,系统通常已自动回滚至原版本。如无法访问请检查服务器日志或手动恢复。",
+      "versionHistory": "版本历史",
+      "releaseNotes": "更新日志",
+      "prerelease": "预发布",
+      "refresh": "刷新页面",
+      "releasedAt": "发布时间",
+      "viewRelease": "查看发布",
+      "refreshHistory": "刷新",
+      "versionCol": "版本",
+      "viewLog": "查看完整日志"
     }
   }
 }
