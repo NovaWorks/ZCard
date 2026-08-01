@@ -4,6 +4,7 @@
     "orders": "Track Order",
     "mine": "My Orders",
     "distribution": "Distribution",
+    "withdraw": "Withdraw",
     "login": "Login",
     "register": "Register",
     "logout": "Logout",
@@ -32,6 +33,24 @@
     "date": "Date",
     "empty": "No data",
     "inviter": "Inviter"
+  },
+  "withdraw": {
+    "title": "Withdraw",
+    "amount": "Amount",
+    "method": "Method",
+    "alipay": "Alipay",
+    "wechat": "WeChat",
+    "usdt": "USDT",
+    "account": "Account",
+    "accountName": "Account Name",
+    "submit": "Request Withdrawal",
+    "history": "Withdrawal History",
+    "status": "Status",
+    "rejectReason": "Reject Reason",
+    "date": "Date",
+    "minAmountTip": "Minimum withdrawal amount",
+    "success": "Withdrawal request submitted",
+    "noMethods": "No withdrawal methods available"
   },
   "common": {
     "buy": "Buy",
