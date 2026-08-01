@@ -14,6 +14,7 @@ class Order extends Model
         'cost', 'sku_name', 'payment_channel',
         'status', 'delivery_status', 'paid_at', 'closed_at',
         'contact', 'create_device', 'create_ip', 'extra',
+        'subsite_id', 'subsite_domain', 'subsite_profit',
     ];
 
     protected function casts(): array
