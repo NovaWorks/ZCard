@@ -71,6 +71,7 @@ async function submit() {
       referrer: referrer.value || undefined,
     } as any)
     authStore.setAuth(res.token, res.user)
+    localStorage.removeItem('zcard_ref') // 注册成功后清除推荐人,避免后续账号误绑定
     router.push('/')
   } catch (e: any) {
     err.value = e?.response?.data?.message || t('auth.register.registerFailed')
