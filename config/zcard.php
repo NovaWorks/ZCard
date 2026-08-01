@@ -16,4 +16,9 @@ return [
 
     // 卡密默认发放模式：status=保留/used，delete=物理删除（spec §6.1 决策12）
     'card_default_delivery_mode' => env('ZCARD_CARD_DELIVERY_MODE', 'status'),
+
+    // 在线更新配置(Git-based,比 acg-faka 的 OTA zip 方案更安全)
+    'update' => [
+        'repo' => env('ZCARD_UPDATE_REPO', 'NovaWorks/ZCard'), // GitHub 仓库名
+    ],
 ];

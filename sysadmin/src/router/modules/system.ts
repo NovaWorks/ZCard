@@ -44,5 +44,15 @@ export const systemRoutes: AppRouteRecord = {
         keepAlive: false,
       },
     },
+    {
+      path: '/updatemgt/index',
+      name: 'UpdateIndex',
+      component: '/update/index',
+      meta: {
+        title: 'menus.update.title',
+        icon: 'ri:upgrade-line',
+        keepAlive: false,
+      },
+    },
   ],
 }

@@ -2,6 +2,9 @@
 
 return [
 
+    // ZCard 版本号(git pull 后由部署脚本/CI 更新;UpdateController 读取此值对比 GitHub Release)
+    'version' => env('APP_VERSION', '1.0.0'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Name

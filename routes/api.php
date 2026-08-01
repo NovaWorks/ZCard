@@ -60,6 +60,7 @@ use App\Http\Controllers\Api\Admin\CardController as AdminCardController;
 use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Api\Admin\CurrencyController as AdminCurrencyController;
 use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Api\Admin\UpdateController as AdminUpdateController;
 use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\BillController as AdminBillController;
@@ -81,6 +82,12 @@ Route::middleware(['auth:sanctum', 'admin.role'])->prefix('admin')->group(functi
     Route::get('dashboard/trends', [AdminDashboardController::class, 'trends']);
     Route::get('dashboard/top-products', [AdminDashboardController::class, 'topProducts']);
     Route::get('dashboard/top-channels', [AdminDashboardController::class, 'topChannels']);
+
+    // 在线更新(检查版本/执行更新/日志)
+    Route::get('update/check', [AdminUpdateController::class, 'check']);
+    Route::get('update/versions', [AdminUpdateController::class, 'versions']);
+    Route::post('update/run', [AdminUpdateController::class, 'update']);
+    Route::get('update/log', [AdminUpdateController::class, 'getLog']);
 
     // stats/batch 必须在 apiResource 之前(否则 stats 被当成 {product} 参数)
     Route::get('products/stats', [AdminProductController::class, 'stats']);

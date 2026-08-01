@@ -402,6 +402,9 @@
     },
     "review": {
       "title": "Reviews"
+    },
+    "update": {
+      "title": "Online Update"
     }
   },
   "table": {
@@ -1287,6 +1290,34 @@
       "enabled": "Enabled",
       "disabled": "Disabled",
       "deleteConfirm": "Delete level \"{name}\"?"
+    },
+    "update": {
+      "title": "Online Update",
+      "currentStatus": "Current Status",
+      "currentVersion": "Current Version",
+      "latestVersion": "Latest Version",
+      "checkUpdate": "Check for Updates",
+      "checkTip": "Click \"Check for Updates\" to fetch the latest version info",
+      "checkFailed": "Update check failed",
+      "hasUpdate": "New version available",
+      "noUpdate": "Already up to date",
+      "runUpdate": "Update Now",
+      "updateConfirm": "Update Confirmation",
+      "updateConfirmTip": "The system will enter maintenance mode during the update, which takes about 1-2 minutes. Continue?",
+      "updating": "Updating...",
+      "updatingTip": "The system is upgrading. Please keep this page open. Estimated 1-2 minutes.",
+      "updateSuccess": "Update Succeeded",
+      "updateFailed": "Update Failed",
+      "rollbackHint": "The update failed. The system usually rolls back to the previous version automatically. If the site is unreachable, check server logs or restore manually.",
+      "versionHistory": "Version History",
+      "releaseNotes": "Release Notes",
+      "prerelease": "Pre-release",
+      "refresh": "Refresh Page",
+      "releasedAt": "Released At",
+      "viewRelease": "View Release",
+      "refreshHistory": "Refresh",
+      "versionCol": "Version",
+      "viewLog": "View full log"
     }
   }
 }
