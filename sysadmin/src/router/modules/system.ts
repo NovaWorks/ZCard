@@ -34,5 +34,15 @@ export const systemRoutes: AppRouteRecord = {
         keepAlive: false,
       },
     },
+    {
+      path: '/subsitemgt/index',
+      name: 'SubsiteIndex',
+      component: '/subsite/list/index',
+      meta: {
+        title: 'menus.subsite.title',
+        icon: 'ri:global-line',
+        keepAlive: false,
+      },
+    },
   ],
 }
