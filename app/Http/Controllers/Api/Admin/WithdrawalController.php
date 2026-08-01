@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\SubsiteLedgerEntry;
 use App\Models\Withdrawal;
 use App\Support\WithdrawalService;
 use Illuminate\Http\JsonResponse;
@@ -60,6 +61,12 @@ class WithdrawalController extends Controller
     public function approve(Request $request, int $id): JsonResponse
     {
         try {
+            $w = \App\Models\Withdrawal::findOrFail($id);
+            // 分站提现走 SubsiteWithdrawalService(更新 ledger 状态)
+            if (SubsiteLedgerEntry::where('withdraw_request_id', $id)->exists()) {
+                \App\Support\SubsiteWithdrawalService::approve($id);
+                return response()->json($w->fresh());
+            }
             $w = WithdrawalService::approve($id, $request->user()->id);
             return response()->json($w);
         } catch (\Throwable $e) {
@@ -73,6 +80,12 @@ class WithdrawalController extends Controller
             'reason' => 'required|string|max:200',
         ]);
         try {
+            $w = \App\Models\Withdrawal::findOrFail($id);
+            // 分站提现走 SubsiteWithdrawalService(退回 ledger 到 available)
+            if (SubsiteLedgerEntry::where('withdraw_request_id', $id)->exists()) {
+                \App\Support\SubsiteWithdrawalService::reject($id, $data['reason']);
+                return response()->json($w->fresh());
+            }
             $w = WithdrawalService::reject($id, $request->user()->id, $data['reason']);
             return response()->json($w);
         } catch (\Throwable $e) {

@@ -60,8 +60,19 @@ class ProductController extends Controller
     public function featured(Request $request): JsonResponse
     {
         $count = (int) ($request->input('limit', StorefrontConfig::get('featured_count')));
-        $products = Product::where('status', true)->where('is_featured', true)
-            ->latest()->limit($count)
+        $query = Product::where('status', true)->where('is_featured', true);
+
+        // 分站可见性过滤(与 index 一致)
+        $subsite = $request->attributes->get('subsite');
+        if ($subsite) {
+            $excludedIds = \App\Models\SubsiteProductSetting::where('merchant_id', $subsite->id)
+                ->where('is_listed', false)->pluck('product_id')->toArray();
+            if ($excludedIds) {
+                $query->whereNotIn('id', $excludedIds);
+            }
+        }
+
+        $products = $query->latest()->limit($count)
             ->withCount(['cards as stock' => fn ($q) => $q->where('status', 'unused')])
             ->get()->map(fn ($p) => $this->transform($p));
 
