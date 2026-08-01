@@ -3,6 +3,7 @@
     "home": "首页",
     "orders": "订单查询",
     "mine": "我的订单",
+    "distribution": "推广中心",
     "login": "登录",
     "register": "注册",
     "logout": "退出",
@@ -11,6 +12,26 @@
       "securePay": "✓ 安全支付",
       "privacy": "✓ 隐私保护"
     }
+  },
+  "distribution": {
+    "title": "推广中心",
+    "referralLink": "推广链接",
+    "copy": "复制",
+    "copied": "已复制",
+    "totalCommission": "累计佣金",
+    "availableCommission": "可提现佣金",
+    "balance": "账户余额",
+    "referralCount": "直推人数",
+    "myReferrals": "我的下级",
+    "commissions": "佣金明细",
+    "tier": "层级",
+    "orderNo": "订单号",
+    "buyer": "买家",
+    "amount": "金额",
+    "rate": "费率",
+    "date": "日期",
+    "empty": "暂无数据",
+    "inviter": "邀请人"
   },
   "common": {
     "buy": "购买",

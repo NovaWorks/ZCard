@@ -1043,6 +1043,7 @@
       "tabSms": "短信设置",
       "tabCash": "提现设置",
       "tabLocale": "多语言与货币",
+      "tabDistribution": "分销设置",
       "baseCurrency": "基础货币",
       "defaultDisplayCurrency": "默认显示货币",
       "enabledLanguages": "启用的语言",
@@ -1085,7 +1086,12 @@
       "footerAnalyticsPlaceholder": "粘贴百度统计/Google Analytics 等 JS 代码,将注入到前台页面底部",
       "footerCopyright": "版权信息",
       "footerCopyrightPlaceholder": "如：© 2026 ZCard · 自动发卡系统",
-      "jsonFormatError": "JSON 格式错误,请检查"
+      "jsonFormatError": "JSON 格式错误,请检查",
+      "distributionEnabled": "启用分销",
+      "distributionEnabledTip": "开启后,登录用户下单将按毛利向上级发放佣金(另需 .env ZCARD_DISTRIBUTION=true 总开关)",
+      "rateL1": "一级佣金率",
+      "rateL2": "二级佣金率",
+      "rateL3": "三级佣金率"
     },
     "common": {
       "id": "ID",

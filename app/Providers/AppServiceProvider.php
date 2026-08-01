@@ -24,5 +24,6 @@ class AppServiceProvider extends ServiceProvider
     {
         // 订单支付成功 → 自动发货(Laravel 13 用 Event::listen 注册)
         Event::listen(OrderPaid::class, [DeliveryService::class, 'handle']);
+        Event::listen(OrderPaid::class, [\App\Support\CommissionService::class, 'handle']);
     }
 }

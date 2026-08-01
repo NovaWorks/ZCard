@@ -30,6 +30,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
     Route::get('/auth/me', [AuthController::class, 'me'])->name('api.auth.me');
     Route::get('/orders/mine', [OrderController::class, 'myOrders'])->name('api.orders.mine');
+    // 三级分销(推广中心)
+    Route::get('/distribution/stats', [\App\Http\Controllers\Api\DistributionController::class, 'stats'])->name('api.distribution.stats');
+    Route::get('/distribution/referrals', [\App\Http\Controllers\Api\DistributionController::class, 'referrals'])->name('api.distribution.referrals');
+    Route::get('/distribution/commissions', [\App\Http\Controllers\Api\DistributionController::class, 'commissions'])->name('api.distribution.commissions');
     // 提现(需登录)
     Route::post('/withdrawals', [WithdrawalController::class, 'request'])->name('api.withdrawals.request');
     Route::get('/withdrawals/history', [WithdrawalController::class, 'history'])->name('api.withdrawals.history');

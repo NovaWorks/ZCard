@@ -299,6 +299,25 @@
             </ElFormItem>
           </ElForm>
         </ElTabPane>
+
+        <!-- Tab: 分销设置 -->
+        <ElTabPane :label="t('zcard.setting.tabDistribution')" name="distribution">
+          <ElForm :model="form" label-width="auto" class="setting-form">
+            <ElFormItem :label="t('zcard.setting.distributionEnabled')">
+              <ElSwitch v-model="form.distribution_enabled" />
+              <span class="form-tip">{{ t('zcard.setting.distributionEnabledTip') }}</span>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.rateL1')">
+              <ElInputNumber v-model="form.distribution_rate_l1" :min="0" :max="100" :precision="2" /> %
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.rateL2')">
+              <ElInputNumber v-model="form.distribution_rate_l2" :min="0" :max="100" :precision="2" /> %
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.rateL3')">
+              <ElInputNumber v-model="form.distribution_rate_l3" :min="0" :max="100" :precision="2" /> %
+            </ElFormItem>
+          </ElForm>
+        </ElTabPane>
       </ElTabs>
 
       <div class="form-footer">
@@ -319,7 +338,7 @@
 
   const { t } = useI18n()
 
-  const activeTab = ref<'site' | 'footer' | 'display' | 'featured' | 'trade' | 'security' | 'system' | 'mail' | 'sms' | 'cash' | 'locale'>('site')
+  const activeTab = ref<'site' | 'footer' | 'display' | 'featured' | 'trade' | 'security' | 'system' | 'mail' | 'sms' | 'cash' | 'locale' | 'distribution'>('site')
 
   interface SettingForm {
     site_name: string
@@ -392,6 +411,11 @@
     default_display_currency: string
     enabled_languages: string[]
     default_language: string
+    // 分销设置
+    distribution_enabled: boolean
+    distribution_rate_l1: number
+    distribution_rate_l2: number
+    distribution_rate_l3: number
   }
 
   const defaultForm = (): SettingForm => ({
@@ -459,6 +483,10 @@
     default_display_currency: 'CNY',
     enabled_languages: ['zh'],
     default_language: 'zh',
+    distribution_enabled: false,
+    distribution_rate_l1: 10,
+    distribution_rate_l2: 5,
+    distribution_rate_l3: 2,
   })
 
   const form = reactive<SettingForm>(defaultForm())
@@ -580,6 +608,10 @@
         default_display_currency: coerce(data.default_display_currency, d.default_display_currency),
         enabled_languages: coerceArray(data.enabled_languages, d.enabled_languages),
         default_language: coerce(data.default_language, d.default_language),
+        distribution_enabled: coerceBool(data.distribution_enabled, d.distribution_enabled),
+        distribution_rate_l1: Number(coerce(data.distribution_rate_l1, d.distribution_rate_l1)),
+        distribution_rate_l2: Number(coerce(data.distribution_rate_l2, d.distribution_rate_l2)),
+        distribution_rate_l3: Number(coerce(data.distribution_rate_l3, d.distribution_rate_l3)),
       })
       form.footerLinksJson = toText(data.footer_links)
       form.footerContactJson = toText(data.footer_contact)

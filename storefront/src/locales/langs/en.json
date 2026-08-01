@@ -3,6 +3,7 @@
     "home": "Home",
     "orders": "Track Order",
     "mine": "My Orders",
+    "distribution": "Distribution",
     "login": "Login",
     "register": "Register",
     "logout": "Logout",
@@ -11,6 +12,26 @@
       "securePay": "✓ Secure payment",
       "privacy": "✓ Privacy protected"
     }
+  },
+  "distribution": {
+    "title": "Distribution Center",
+    "referralLink": "Referral Link",
+    "copy": "Copy",
+    "copied": "Copied",
+    "totalCommission": "Total Commission",
+    "availableCommission": "Available Commission",
+    "balance": "Account Balance",
+    "referralCount": "Direct Referrals",
+    "myReferrals": "My Referrals",
+    "commissions": "Commission Records",
+    "tier": "Tier",
+    "orderNo": "Order No.",
+    "buyer": "Buyer",
+    "amount": "Amount",
+    "rate": "Rate",
+    "date": "Date",
+    "empty": "No data",
+    "inviter": "Inviter"
   },
   "common": {
     "buy": "Buy",

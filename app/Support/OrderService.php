@@ -72,7 +72,7 @@ class OrderService
             $order = Order::create([
                 'order_no' => $this->generateOrderNo(),
                 'merchant_id' => $product->merchant_id,
-                'user_id' => null, // 游客
+                'user_id' => $customer['user_id'] ?? null,
                 'product_id' => $productId,
                 'quantity' => $qty,
                 'amount' => $amount,

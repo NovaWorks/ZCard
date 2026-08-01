@@ -46,6 +46,7 @@ class OrderController extends Controller
                     'password' => $data['password'] ?? null,
                     'extra' => $data['extra'] ?? null,
                     'coupon_code' => $data['coupon_code'] ?? null,
+                    'user_id' => $request->user()?->id,
                     'create_ip' => $request->ip(),
                     'create_device' => $this->detectDevice($request),
                 ],
@@ -75,6 +76,11 @@ class OrderController extends Controller
 
     public function mockPay(string $orderNo, OrderService $service): JsonResponse
     {
+        // 安全:模拟支付仅限开发/测试环境,生产环境禁用(否则任何人可白嫖订单+触发佣金)
+        if (! app()->environment('local', 'testing')) {
+            return response()->json(['message' => 'Not available'], 404);
+        }
+
         try {
             $order = $service->markPaid($orderNo);
 

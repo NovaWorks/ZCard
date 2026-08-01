@@ -27,6 +27,7 @@ class AuthController extends Controller
             'email' => 'required|email|max:255|unique:users,email',
             'password' => 'required|string|min:6|max:50',
             'captcha' => 'nullable|string',
+            'referrer' => 'nullable|string|max:50',
         ];
 
         // 用户名最小长度(从配置读)
@@ -50,11 +51,21 @@ class AuthController extends Controller
             }
         }
 
+        // 推广人绑定:referrer=用户名 → pid
+        $pid = 0;
+        if (! empty($data['referrer'])) {
+            $referrerUser = \App\Models\User::where('username', $data['referrer'])->first();
+            if ($referrerUser && $referrerUser->username !== $data['username']) {
+                $pid = $referrerUser->id;
+            }
+        }
+
         $user = User::create([
             'username' => $data['username'],
             'email' => $data['email'],
             'password' => $data['password'],
             'status' => 1,
+            'pid' => $pid,
             'password_changed_at' => now(),
         ]);
         $user->assignRole('user');

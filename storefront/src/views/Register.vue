@@ -20,6 +20,8 @@ const confirmPassword = ref('')
 const captcha = ref('')
 const err = ref('')
 const loading = ref(false)
+// 邀请人(来自 ?ref= → localStorage)
+const referrer = ref(localStorage.getItem('zcard_ref') || '')
 
 const registerOpen = computed(() => settings.config?.register_open !== false)
 const needCaptcha = computed(() => !!settings.config?.captcha_register)
@@ -66,8 +68,10 @@ async function submit() {
       email: email.value,
       password: password.value,
       captcha: needCaptcha.value ? captcha.value : undefined,
+      referrer: referrer.value || undefined,
     } as any)
     authStore.setAuth(res.token, res.user)
+    localStorage.removeItem('zcard_ref') // 注册成功后清除推荐人,避免后续账号误绑定
     router.push('/')
   } catch (e: any) {
     err.value = e?.response?.data?.message || t('auth.register.registerFailed')
@@ -99,6 +103,10 @@ async function submit() {
         <p class="text-xs text-ink-muted mt-1">{{ t('auth.register.subtitle') }}</p>
       </div>
 
+      <!-- 邀请人提示 -->
+      <div v-if="referrer" class="text-xs text-ink-muted bg-surface-subtle border border-border rounded-field px-3 py-2 mb-2">
+        {{ t('distribution.inviter') }}: <span class="text-ink font-medium">{{ referrer }}</span>
+      </div>
       <form @submit.prevent="submit" class="space-y-4">
         <div>
           <label class="block text-xs font-semibold text-ink-soft mb-1">{{ t('auth.register.username') }}</label>
