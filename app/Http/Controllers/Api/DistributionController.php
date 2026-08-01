@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Commission;
 use App\Models\User;
+use App\Support\StorefrontConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -58,6 +59,8 @@ class DistributionController extends Controller
 
     private function referralLink(string $username): string
     {
-        return rtrim(config('app.url', ''), '/') . '/?ref=' . urlencode($username);
+        // 优先用店铺站点 URL(StorefrontConfig.site_url,后台可配);否则回退 app.url
+        $base = rtrim((string) (StorefrontConfig::get('site_url') ?: config('app.url', '')), '/');
+        return $base . '/?ref=' . urlencode($username);
     }
 }

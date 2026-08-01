@@ -51,10 +51,11 @@ class AuthController extends Controller
             }
         }
 
-        // 推广人绑定:referrer=用户名 → pid
+        // 推广人绑定:referrer=用户名 → pid(trim 防首尾空格失配)
         $pid = 0;
-        if (! empty($data['referrer'])) {
-            $referrerUser = \App\Models\User::where('username', $data['referrer'])->first();
+        $referrerName = trim((string) ($data['referrer'] ?? ''));
+        if ($referrerName !== '') {
+            $referrerUser = \App\Models\User::where('username', $referrerName)->first();
             if ($referrerUser && $referrerUser->username !== $data['username']) {
                 $pid = $referrerUser->id;
             }
