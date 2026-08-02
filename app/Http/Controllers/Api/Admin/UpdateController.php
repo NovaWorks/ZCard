@@ -153,10 +153,11 @@ class UpdateController extends Controller
             // Step 6: 缓存优化(先清后建,避免旧缓存)
             // 注意: 不执行 view:cache —— Filament v5 有动态 Blade 组件(如 modal),
             // view:cache 预编译时会找不到而崩溃。config/route cache 是安全的。
+            // 重要: 先物理删除 bootstrap/cache 里的旧缓存文件(php 文件),
+            // 避免 config:clear 自身因旧缓存崩溃(config:clear 也需要读 config)。
             $this->log($logFile, '优化缓存...');
-            Artisan::call('config:clear');
-            Artisan::call('route:clear');
-            Artisan::call('view:clear');
+            $this->clearBootstrapCache();
+            Artisan::call('package:discover');
             Artisan::call('config:cache');
             Artisan::call('route:cache');
 
@@ -184,9 +185,11 @@ class UpdateController extends Controller
             ]);
 
         } catch (\Throwable $e) {
-            // 失败:记录错误,退出维护模式,保留日志
+            // 失败:记录错误,退出维护模式,清缓存,保留日志
             $this->log($logFile, '更新失败: ' . $e->getMessage());
-            $this->log($logFile, '尝试退出维护模式...');
+            $this->log($logFile, '清理缓存 + 退出维护模式...');
+            $this->clearBootstrapCache();
+            try { Artisan::call('package:discover'); } catch (\Throwable $ignore) {}
             try { Artisan::call('up'); } catch (\Throwable $ignore) {}
             @unlink($lockFile);
 
@@ -258,6 +261,8 @@ class UpdateController extends Controller
 
         } catch (\Throwable $e) {
             $this->log($logFile, '回退失败: ' . $e->getMessage());
+            $this->clearBootstrapCache();
+            try { Artisan::call('package:discover'); } catch (\Throwable $ignore) {}
             try { Artisan::call('up'); } catch (\Throwable $ignore) {}
 
             return response()->json([
@@ -314,6 +319,22 @@ class UpdateController extends Controller
         if (preg_match('#git@github\.com:(.+)/(.+)\.git#', trim($remote), $m)) {
             $https = "https://github.com/{$m[1]}/{$m[2]}.git";
             shell_exec('cd ' . base_path() . " && git remote set-url origin {$https} 2>&1");
+        }
+    }
+
+    /**
+     * 物理删除 bootstrap/cache 里的编译缓存(config/routes/packages/services)。
+     * 在 config:clear 自身可能因旧缓存崩溃时,这是唯一可靠的方法。
+     * package:discover 会重建 packages.php + services.php。
+     */
+    private function clearBootstrapCache(): void
+    {
+        $cacheDir = base_path('bootstrap/cache');
+        foreach (['config.php', 'routes-v7.php', 'packages.php', 'services.php'] as $file) {
+            $path = $cacheDir . '/' . $file;
+            if (file_exists($path)) {
+                @unlink($path);
+            }
         }
     }
 
