@@ -14,6 +14,7 @@ class SupplierAccount extends Model
         'name', 'api_key', 'api_secret', 'balance', 'status', 'contact', 'remark',
     ];
 
+    // api_secret 由服务层 Crypt::encryptString 加密存储,中间件手动解密(不用 cast 避免双重加密)
     protected $hidden = ['api_secret'];
 
     protected function casts(): array

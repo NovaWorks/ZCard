@@ -29,6 +29,9 @@ class SupplySource extends Model
     public const DRIVER_ACG_FAKA = 'acg_faka';
     public const DRIVER_ZCARD = 'zcard';
 
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_DISABLED = 'disabled';
+
     public function products(): HasMany
     {
         return $this->hasMany(Product::class, 'upstream_source_id');
@@ -36,6 +39,6 @@ class SupplySource extends Model
 
     public function isActive(): bool
     {
-        return $this->status === 'active';
+        return $this->status === self::STATUS_ACTIVE;
     }
 }

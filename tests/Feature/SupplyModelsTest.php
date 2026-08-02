@@ -2,10 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Models\Merchant;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\SupplierAccount;
 use App\Models\SupplierLedgerEntry;
+use App\Models\SupplierProductPrice;
+use App\Models\SupplyNonce;
+use App\Models\SupplyOrder;
 use App\Models\SupplySource;
+use App\Models\User;
 use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -56,5 +62,58 @@ class SupplyModelsTest extends TestCase
             'remark' => '首次充值',
         ]);
         $this->assertDatabaseHas('supplier_ledger_entries', ['id' => $entry->id, 'amount' => 10000]);
+    }
+
+    public function test_supplier_product_price_create(): void
+    {
+        $merchant = $this->makeMerchant();
+        $product = Product::create([
+            'merchant_id' => $merchant->id, 'name' => 'P', 'slug' => 'p-' . uniqid(),
+            'price' => 500, 'factory_price' => 400, 'stock_type' => 'card', 'status' => 1,
+        ]);
+        $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'k' . uniqid(), 'api_secret' => 's']);
+
+        $price = SupplierProductPrice::create([
+            'supplier_account_id' => $account->id, 'product_id' => $product->id,
+            'sku_id' => null, 'price' => 450,
+        ]);
+        $this->assertDatabaseHas('supplier_product_prices', ['id' => $price->id, 'price' => 450]);
+    }
+
+    public function test_supply_order_create(): void
+    {
+        $merchant = $this->makeMerchant();
+        $product = Product::create([
+            'merchant_id' => $merchant->id, 'name' => 'P', 'slug' => 'p-' . uniqid(),
+            'price' => 500, 'factory_price' => 400, 'stock_type' => 'card', 'status' => 1,
+        ]);
+        $order = Order::create([
+            'order_no' => 'ORD' . uniqid(), 'merchant_id' => $merchant->id, 'product_id' => $product->id,
+            'quantity' => 1, 'amount' => 500, 'status' => 'paid',
+        ]);
+        $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'k' . uniqid(), 'api_secret' => 's']);
+
+        $supplyOrder = SupplyOrder::create([
+            'supplier_account_id' => $account->id, 'order_id' => $order->id,
+            'downstream_order_no' => 'DOWN-' . uniqid(), 'fulfillment_mode' => 'sync',
+        ]);
+        $this->assertDatabaseHas('supply_orders', ['id' => $supplyOrder->id]);
+    }
+
+    public function test_supply_nonce_create(): void
+    {
+        $nonce = SupplyNonce::create([
+            'nonce' => 'n-' . uniqid(), 'expires_at' => now()->addMinutes(5),
+        ]);
+        $this->assertDatabaseHas('supply_nonces', ['id' => $nonce->id]);
+    }
+
+    private function makeMerchant(): Merchant
+    {
+        return Merchant::create([
+            'user_id' => User::factory()->create()->id,
+            'name' => 'M', 'slug' => 'm-' . uniqid(),
+            'status' => 1, 'commission_rate' => 0,
+        ]);
     }
 }
