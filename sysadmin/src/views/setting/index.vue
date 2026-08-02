@@ -321,6 +321,40 @@
             </ElFormItem>
           </ElForm>
         </ElTabPane>
+
+        <!-- Tab: 货源对接 -->
+        <ElTabPane :label="t('zcard.setting.tabSupply')" name="supply">
+          <ElForm :model="form" label-width="auto" class="setting-form">
+            <ElFormItem :label="t('zcard.setting.supplyEnabled')">
+              <ElSwitch v-model="form.supply_enabled" />
+              <span class="form-tip">{{ t('zcard.setting.supplyEnabledTip') }}</span>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.supplyUpstreamEnabled')">
+              <ElSwitch v-model="form.supply_upstream_enabled" />
+              <span class="form-tip">{{ t('zcard.setting.supplyUpstreamEnabledTip') }}</span>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.supplySupplierEnabled')">
+              <ElSwitch v-model="form.supply_supplier_enabled" />
+              <span class="form-tip">{{ t('zcard.setting.supplySupplierEnabledTip') }}</span>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.supplyNonceStore')">
+              <ElSelect v-model="form.supply_nonce_store" style="width: 220px">
+                <ElOption label="Cache (默认)" value="cache" />
+                <ElOption label="Redis" value="redis" />
+                <ElOption label="Database" value="database" />
+              </ElSelect>
+              <span class="form-tip">{{ t('zcard.setting.supplyNonceStoreTip') }}</span>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.supplyRateLimit')">
+              <ElInputNumber v-model="form.supply_rate_limit" :min="1" :max="1000" />
+              <span class="form-tip">{{ t('zcard.setting.supplyRateLimitTip') }}</span>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.supplyTimestampSkew')">
+              <ElInputNumber v-model="form.supply_timestamp_skew" :min="60" :max="3600" />
+              <span class="form-tip">{{ t('zcard.setting.supplyTimestampSkewTip') }}</span>
+            </ElFormItem>
+          </ElForm>
+        </ElTabPane>
       </ElTabs>
 
       <div class="form-footer">
@@ -341,7 +375,7 @@
 
   const { t } = useI18n()
 
-  const activeTab = ref<'site' | 'footer' | 'display' | 'featured' | 'trade' | 'security' | 'system' | 'mail' | 'sms' | 'cash' | 'locale' | 'distribution'>('site')
+  const activeTab = ref<'site' | 'footer' | 'display' | 'featured' | 'trade' | 'security' | 'system' | 'mail' | 'sms' | 'cash' | 'locale' | 'distribution' | 'supply'>('site')
 
   interface SettingForm {
     site_name: string
@@ -420,6 +454,13 @@
     distribution_rate_l1: number
     distribution_rate_l2: number
     distribution_rate_l3: number
+    // 货源对接
+    supply_enabled: boolean
+    supply_upstream_enabled: boolean
+    supply_supplier_enabled: boolean
+    supply_nonce_store: string
+    supply_rate_limit: number
+    supply_timestamp_skew: number
   }
 
   const defaultForm = (): SettingForm => ({
@@ -492,6 +533,13 @@
     distribution_rate_l1: 10,
     distribution_rate_l2: 5,
     distribution_rate_l3: 2,
+    // 货源对接
+    supply_enabled: false,
+    supply_upstream_enabled: true,
+    supply_supplier_enabled: true,
+    supply_nonce_store: 'cache',
+    supply_rate_limit: 60,
+    supply_timestamp_skew: 300,
   })
 
   const form = reactive<SettingForm>(defaultForm())
@@ -618,6 +666,12 @@
         distribution_rate_l1: Number(coerce(data.distribution_rate_l1, d.distribution_rate_l1)),
         distribution_rate_l2: Number(coerce(data.distribution_rate_l2, d.distribution_rate_l2)),
         distribution_rate_l3: Number(coerce(data.distribution_rate_l3, d.distribution_rate_l3)),
+        supply_enabled: coerceBool(data.supply_enabled, d.supply_enabled),
+        supply_upstream_enabled: coerceBool(data.supply_upstream_enabled, d.supply_upstream_enabled),
+        supply_supplier_enabled: coerceBool(data.supply_supplier_enabled, d.supply_supplier_enabled),
+        supply_nonce_store: coerce(data.supply_nonce_store, d.supply_nonce_store),
+        supply_rate_limit: Number(coerce(data.supply_rate_limit, d.supply_rate_limit)),
+        supply_timestamp_skew: Number(coerce(data.supply_timestamp_skew, d.supply_timestamp_skew)),
       })
       form.footerLinksJson = toText(data.footer_links)
       form.footerContactJson = toText(data.footer_contact)
