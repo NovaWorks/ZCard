@@ -22,6 +22,9 @@ class CommissionService
         if (! StorefrontConfig::get('distribution_enabled')) {
             return;
         }
+        if ($event->order->source === 'supply') {
+            return; // 供货订单不参与分销(spec §4.5.1)
+        }
         if ($event->order->subsite_id) {
             return; // 分站订单不发分销佣金(spec §7.4 互斥)
         }

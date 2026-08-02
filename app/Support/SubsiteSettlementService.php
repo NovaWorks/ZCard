@@ -17,6 +17,9 @@ class SubsiteSettlementService
         if (! config('zcard.features.sub_site')) {
             return;
         }
+        if ($event->order->source === 'supply') {
+            return; // 供货订单不参与分站结算(spec §4.5.1)
+        }
         $order = $event->order;
         if (! $order->subsite_id) {
             return;
