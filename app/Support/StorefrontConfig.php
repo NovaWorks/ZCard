@@ -121,6 +121,14 @@ class StorefrontConfig
             'subsite_enabled' => false,
             'subsite_default_confirm_days' => 7,
             'subsite_subdomain_base' => '',
+
+            // 货源对接(spec §8.5) —— 网页可配,取代 .env 的 ZCARD_SUPPLY_*
+            'supply_enabled' => false,            // 总开关(原 ZCARD_SUPPLY)
+            'supply_upstream_enabled' => true,    // 作为下游拿货(原 ZCARD_SUPPLY_UPSTREAM)
+            'supply_supplier_enabled' => true,    // 作为上游供货(原 ZCARD_SUPPLY_SUPPLIER)
+            'supply_nonce_store' => 'cache',      // 防重放存储: cache|redis|database(原 ZCARD_SUPPLY_NONCE_STORE)
+            'supply_rate_limit' => 60,            // 供货API限流: 每账号每分钟(原 ZCARD_SUPPLY_RATE_LIMIT)
+            'supply_timestamp_skew' => 300,       // 签名时间窗口秒(原 ZCARD_SUPPLY_TS_SKEW)
         ];
     }
 

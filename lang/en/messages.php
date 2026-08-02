@@ -74,4 +74,5 @@ return [
     'supply_api.invalid_signature' => 'Invalid signature',
     'supply_api.nonce_reused' => 'Nonce already used',
     'supply_api.unauthorized' => 'Unauthorized',
+    'supply_api.too_many_requests' => 'Too many requests, please try again later',
 ];

@@ -292,7 +292,7 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 // ===== 供货 API(对外供货,spec §4.3) =====
-Route::prefix('supply')->middleware(['supply.auth', 'throttle:' . config('zcard.supply.rate_limit', 60) . ',1'])
+Route::prefix('supply')->middleware(['supply.auth', 'supply.rate'])
     ->group(function () {
         Route::post('ping', [SupplyController::class, 'ping'])->name('api.supply.ping');
         Route::get('categories', [SupplyProductController::class, 'categories'])->name('api.supply.categories');

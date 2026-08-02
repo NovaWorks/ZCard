@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\SupplierAccount;
 use App\Supply\HmacSigner;
 use App\Supply\NonceStore;
+use App\Support\StorefrontConfig;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -20,7 +21,7 @@ class SupplyAuth
 
     public function handle(Request $request, Closure $next): mixed
     {
-        if (! config('zcard.features.supply')) {
+        if (! StorefrontConfig::get('supply_enabled')) {
             return $this->fail('unauthorized', 401);
         }
 
@@ -39,7 +40,7 @@ class SupplyAuth
         }
 
         // timestamp 窗口
-        $skew = (int) config('zcard.supply.timestamp_skew', 300);
+        $skew = (int) StorefrontConfig::get('supply_timestamp_skew');
         if (! HmacSigner::timestampValid((int) $timestamp, $skew)) {
             return $this->fail('timestamp_expired', 401);
         }

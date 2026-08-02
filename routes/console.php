@@ -25,7 +25,7 @@ Schedule::call(function () {
 // 货源商品自动同步(spec §6.6) —— 每小时跑增量,只对开启自动同步的 active 货源
 // 注意:JSON_EXTRACT 为 MySQL 专属语法(生产环境),SQLite 测试环境不会执行调度
 Schedule::call(function () {
-    if (! config('zcard.features.supply')) {
+    if (! \App\Support\StorefrontConfig::get('supply_enabled')) {
         return;
     }
     SupplySource::where('status', 'active')

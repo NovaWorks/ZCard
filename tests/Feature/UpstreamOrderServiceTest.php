@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\SupplySource;
 use App\Models\User;
 use App\Supply\UpstreamOrderService;
+use App\Support\StorefrontConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -24,7 +25,7 @@ class UpstreamOrderServiceTest extends TestCase
 
     public function test_write_cards_marks_order_delivered(): void
     {
-        config(['zcard.features.supply' => true]);
+        StorefrontConfig::setMany(['supply_enabled' => true]);
         $merchant = $this->makeMerchant();
         $source = SupplySource::create(['name' => 'S', 'driver' => 'dujiao_next', 'base_url' => 'https://x.com', 'credentials' => [], 'status' => 'active']);
         $product = Product::create(['merchant_id' => $merchant->id, 'name' => 'P', 'slug' => 'p1', 'price' => 500, 'factory_price' => 400, 'stock_type' => 'card', 'status' => 1, 'upstream_source_id' => $source->id, 'upstream_product_code' => 'UP1']);
@@ -39,7 +40,7 @@ class UpstreamOrderServiceTest extends TestCase
 
     public function test_write_cards_idempotent(): void
     {
-        config(['zcard.features.supply' => true]);
+        StorefrontConfig::setMany(['supply_enabled' => true]);
         $merchant = $this->makeMerchant();
         $source = SupplySource::create(['name' => 'S', 'driver' => 'dujiao_next', 'base_url' => 'https://x.com', 'credentials' => [], 'status' => 'active']);
         $product = Product::create(['merchant_id' => $merchant->id, 'name' => 'P', 'slug' => 'p2', 'price' => 500, 'factory_price' => 400, 'stock_type' => 'card', 'status' => 1, 'upstream_source_id' => $source->id, 'upstream_product_code' => 'UP2']);

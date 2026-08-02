@@ -3,19 +3,20 @@
 namespace App\Supply;
 
 use App\Models\SupplyNonce;
+use App\Support\StorefrontConfig;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Redis;
 
 /**
  * 防重放 nonce 存储(spec §8.5)
- * 按 config('zcard.supply.nonce_store') 选后端:redis|cache|database。
+ * 按 StorefrontConfig('supply_nonce_store') 选后端:redis|cache|database。
  * remember():未见则记录并返回 true;已见返回 false(拒绝重放)。
  */
 class NonceStore
 {
     public function remember(string $nonce, int $ttlSeconds): bool
     {
-        return match (config('zcard.supply.nonce_store', 'cache')) {
+        return match (StorefrontConfig::get('supply_nonce_store')) {
             'redis' => $this->rememberRedis($nonce, $ttlSeconds),
             'database' => $this->rememberDatabase($nonce, $ttlSeconds),
             default => $this->rememberCache($nonce, $ttlSeconds),

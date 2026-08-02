@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\SupplySource;
 use App\Models\User;
+use App\Support\StorefrontConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -30,7 +31,7 @@ class SupplySourceAdminTest extends TestCase
 
     public function test_drivers_endpoint_returns_schema(): void
     {
-        config(['zcard.features.supply' => true]);
+        StorefrontConfig::setMany(['supply_enabled' => true]);
         $resp = $this->withToken($this->adminToken())->getJson('/api/admin/supply-sources/drivers');
         $resp->assertOk()->assertJsonCount(3, 'drivers');
         $this->assertNotNull($resp->json('drivers.0.config_schema.base_url'));
@@ -38,7 +39,7 @@ class SupplySourceAdminTest extends TestCase
 
     public function test_create_source_encrypts_credentials(): void
     {
-        config(['zcard.features.supply' => true]);
+        StorefrontConfig::setMany(['supply_enabled' => true]);
         $resp = $this->withToken($this->adminToken())->postJson('/api/admin/supply-sources', [
             'name' => '主站', 'driver' => 'dujiao_next', 'base_url' => 'https://up.example.com',
             'credentials' => ['base_url' => 'https://up.example.com', 'api_key' => 'ak', 'api_secret' => 'sk_secret'],
@@ -53,7 +54,7 @@ class SupplySourceAdminTest extends TestCase
 
     public function test_update_credentials_merges_keeping_secrets(): void
     {
-        config(['zcard.features.supply' => true]);
+        StorefrontConfig::setMany(['supply_enabled' => true]);
         $source = SupplySource::create([
             'name' => 'S', 'driver' => 'dujiao_next', 'base_url' => 'https://x.com',
             'credentials' => ['api_key' => 'ak', 'api_secret' => 'oldsecret'], 'status' => 'active',

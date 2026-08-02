@@ -9,6 +9,7 @@ use App\Models\SupplierAccount;
 use App\Models\SupplierProductPrice;
 use App\Models\User;
 use App\Supply\HmacSigner;
+use App\Support\StorefrontConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -38,7 +39,7 @@ class SupplyProductApiTest extends TestCase
 
     public function test_products_return_special_price_for_account(): void
     {
-        config(['zcard.features.supply' => true, 'zcard.supply.nonce_store' => 'cache']);
+        StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache']);
         $merchant = $this->makeMerchant();
         $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'ak', 'api_secret' => 'sk', 'status' => 'active']);
         $product = Product::create([
@@ -57,7 +58,7 @@ class SupplyProductApiTest extends TestCase
 
     public function test_show_returns_product_with_price(): void
     {
-        config(['zcard.features.supply' => true, 'zcard.supply.nonce_store' => 'cache']);
+        StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache']);
         $merchant = $this->makeMerchant();
         $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'ak', 'api_secret' => 'sk', 'status' => 'active']);
         $product = Product::create([
@@ -74,7 +75,7 @@ class SupplyProductApiTest extends TestCase
 
     public function test_stock_returns_available_count(): void
     {
-        config(['zcard.features.supply' => true, 'zcard.supply.nonce_store' => 'cache']);
+        StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache']);
         $merchant = $this->makeMerchant();
         $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'ak', 'api_secret' => 'sk', 'status' => 'active']);
         $product = Product::create([

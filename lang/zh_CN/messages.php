@@ -75,4 +75,5 @@ return [
     'supply_api.invalid_signature' => '签名错误',
     'supply_api.nonce_reused' => '请求不可重复',
     'supply_api.unauthorized' => '未认证',
+    'supply_api.too_many_requests' => '请求过于频繁,请稍后再试',
 ];

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\SupplierAccount;
 use App\Supply\HmacSigner;
+use App\Support\StorefrontConfig;
 use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -29,7 +30,7 @@ class SupplyAuthMiddlewareTest extends TestCase
 
     public function test_valid_signature_passes(): void
     {
-        config(['zcard.features.supply' => true, 'zcard.supply.nonce_store' => 'cache']);
+        StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache']);
         $account = SupplierAccount::create([
             'name' => 'A', 'api_key' => 'ak1', 'api_secret' => 'sk1', 'balance' => 10000, 'status' => 'active',
         ]);
@@ -43,14 +44,14 @@ class SupplyAuthMiddlewareTest extends TestCase
 
     public function test_missing_headers_rejected(): void
     {
-        config(['zcard.features.supply' => true]);
+        StorefrontConfig::setMany(['supply_enabled' => true]);
         $resp = $this->postJson('/api/supply/ping');
         $resp->assertStatus(401);
     }
 
     public function test_invalid_signature_rejected(): void
     {
-        config(['zcard.features.supply' => true, 'zcard.supply.nonce_store' => 'cache']);
+        StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache']);
         $account = SupplierAccount::create([
             'name' => 'A', 'api_key' => 'ak1', 'api_secret' => 'sk1', 'status' => 'active',
         ]);
@@ -67,7 +68,7 @@ class SupplyAuthMiddlewareTest extends TestCase
 
     public function test_expired_timestamp_rejected(): void
     {
-        config(['zcard.features.supply' => true, 'zcard.supply.timestamp_skew' => 300]);
+        StorefrontConfig::setMany(['supply_enabled' => true, 'supply_timestamp_skew' => 300]);
         $account = SupplierAccount::create([
             'name' => 'A', 'api_key' => 'ak1', 'api_secret' => 'sk1', 'status' => 'active',
         ]);
@@ -86,7 +87,7 @@ class SupplyAuthMiddlewareTest extends TestCase
 
     public function test_disabled_account_rejected(): void
     {
-        config(['zcard.features.supply' => true, 'zcard.supply.nonce_store' => 'cache']);
+        StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache']);
         $account = SupplierAccount::create([
             'name' => 'A', 'api_key' => 'ak1', 'api_secret' => 'sk1', 'status' => 'disabled',
         ]);

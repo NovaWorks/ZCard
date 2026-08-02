@@ -9,7 +9,8 @@ return [
         'multi_merchant' => env('ZCARD_MULTI_MERCHANT', false), // 多商户/多店（Phase 3）
         'distribution' => env('ZCARD_DISTRIBUTION', false),     // 三级分销（Phase 3）
         'sub_site' => env('ZCARD_SUB_SITE', false),             // 分站（Phase 3）
-        'supply' => env('ZCARD_SUPPLY', false), // 货源对接总开关
+        // 货源对接总开关。运行时改读 StorefrontConfig::get('supply_enabled'),在 sysadmin 设置页配置;此处仅兜底
+        'supply' => env('ZCARD_SUPPLY', false),
     ],
 
     // 卡密加密密钥（应用层 AES，spec §6.1 决策3）。32 字节 base64。
@@ -25,10 +26,9 @@ return [
 
     /**
      * 货源对接配置(spec §8.5)
-     * - 总开关 features.supply 控制整体功能
-     * - upstream_enabled: 作为下游(拿货)
-     * - supplier_enabled: 作为上游(对外供货)
-     * 两个方向可独立开关。
+     * 注意: 运行时真理源已迁至 StorefrontConfig(supply_* 键),在 sysadmin「设置 → 货源对接」
+     * 网页配置,改后立即生效。下方 env() 仅作安装前/首次部署的兜底默认值,运行时代码不再读它。
+     * 数据库/Redis/邮件等基础设施配置仍在 .env(不进网页)。
      */
     'supply' => [
         'upstream_enabled' => env('ZCARD_SUPPLY_UPSTREAM', true),

@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\SupplierAccount;
 use App\Models\User;
 use App\Supply\HmacSigner;
+use App\Support\StorefrontConfig;
 use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
@@ -24,7 +25,7 @@ class SupplyOrderApiTest extends TestCase
 
     public function test_create_order_returns_cards(): void
     {
-        config(['zcard.features.supply' => true, 'zcard.supply.nonce_store' => 'cache']);
+        StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache']);
         $merchant = $this->makeMerchant();
         $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'ak', 'api_secret' => Crypt::encryptString('sk'), 'balance' => 100000, 'status' => 'active']);
         $product = Product::create(['merchant_id' => $merchant->id, 'name' => 'P', 'slug' => 'p1', 'price' => 500, 'factory_price' => 500, 'stock_type' => 'card', 'status' => 1]);
@@ -49,7 +50,7 @@ class SupplyOrderApiTest extends TestCase
 
     public function test_insufficient_balance_returns_402(): void
     {
-        config(['zcard.features.supply' => true, 'zcard.supply.nonce_store' => 'cache']);
+        StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache']);
         $merchant = $this->makeMerchant();
         $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'ak', 'api_secret' => Crypt::encryptString('sk'), 'balance' => 100, 'status' => 'active']);
         $product = Product::create(['merchant_id' => $merchant->id, 'name' => 'P', 'slug' => 'p2', 'price' => 500, 'factory_price' => 500, 'stock_type' => 'card', 'status' => 1]);

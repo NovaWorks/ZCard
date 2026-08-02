@@ -4,6 +4,7 @@ namespace App\Listeners;
 
 use App\Events\OrderPaid;
 use App\Supply\UpstreamOrderService;
+use App\Support\StorefrontConfig;
 
 class FetchFromUpstreamOnOrderPaid
 {
@@ -11,7 +12,7 @@ class FetchFromUpstreamOnOrderPaid
 
     public function handle(OrderPaid $event): void
     {
-        if (! config('zcard.features.supply') || ! config('zcard.supply.upstream_enabled')) {
+        if (! StorefrontConfig::get('supply_enabled') || ! StorefrontConfig::get('supply_upstream_enabled')) {
             return;
         }
 

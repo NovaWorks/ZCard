@@ -7,6 +7,7 @@ use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\StorefrontConfig;
 use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -27,7 +28,8 @@ class SupplyOrderEventGuardTest extends TestCase
 
     public function test_supply_order_does_not_create_commission(): void
     {
-        config(['zcard.features.distribution' => true, 'zcard.features.supply' => true]);
+        config(['zcard.features.distribution' => true]);
+        StorefrontConfig::setMany(['supply_enabled' => true]);
         [$merchant, $product] = $this->makeMerchantProduct();
         $order = Order::create([
             'order_no' => 'S1', 'merchant_id' => $merchant->id, 'product_id' => $product->id, 'quantity' => 1,
@@ -41,7 +43,8 @@ class SupplyOrderEventGuardTest extends TestCase
 
     public function test_supply_order_does_not_create_subsite_settlement(): void
     {
-        config(['zcard.features.sub_site' => true, 'zcard.features.supply' => true]);
+        config(['zcard.features.sub_site' => true]);
+        StorefrontConfig::setMany(['supply_enabled' => true]);
         [$merchant, $product] = $this->makeMerchantProduct();
         $order = Order::create([
             'order_no' => 'S2', 'merchant_id' => $merchant->id, 'product_id' => $product->id, 'quantity' => 1,

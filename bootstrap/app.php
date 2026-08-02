@@ -28,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'require.main.site' => \App\Http\Middleware\RequireMainSite::class,
             'admin.role' => \App\Http\Middleware\RequireAdminRole::class,
             'supply.auth' => \App\Http\Middleware\SupplyAuth::class,
+            'supply.rate' => \App\Http\Middleware\SupplyRateLimit::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

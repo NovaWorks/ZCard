@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\SupplierAccount;
 use App\Models\User;
+use App\Support\StorefrontConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -29,7 +30,7 @@ class SupplierAccountAdminTest extends TestCase
 
     public function test_create_account_returns_plaintext_secret_once(): void
     {
-        config(['zcard.features.supply' => true]);
+        StorefrontConfig::setMany(['supply_enabled' => true]);
         $token = $this->adminToken();
 
         $resp = $this->withToken($token)->postJson('/api/admin/supplier-accounts', ['name' => '下游A']);
@@ -45,7 +46,7 @@ class SupplierAccountAdminTest extends TestCase
 
     public function test_recharge_increases_balance_and_writes_ledger(): void
     {
-        config(['zcard.features.supply' => true]);
+        StorefrontConfig::setMany(['supply_enabled' => true]);
         $token = $this->adminToken();
         $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'k', 'api_secret' => 'enc', 'balance' => 0]);
 
