@@ -45,73 +45,96 @@ class SupplyOrderService
         $unitPrice = $this->pricing->resolvePrice($account, $product, null);
         $amount = $unitPrice * $qty;
 
-        return DB::transaction(function () use ($account, $product, $params, $mode, $qty, $amount) {
-            // 锁账号
-            $locked = SupplierAccount::where('id', $account->id)->lockForUpdate()->firstOrFail();
+        try {
+            return DB::transaction(function () use ($account, $product, $params, $mode, $qty, $amount) {
+                // 锁账号
+                $locked = SupplierAccount::where('id', $account->id)->lockForUpdate()->firstOrFail();
 
-            // 余额检查(锁账号后,锁卡前,避免后续卡锁的死锁)
-            if ($locked->balance < $amount) {
-                throw SupplyApiException::insufficientBalance();
+                // 余额检查(锁账号后,锁卡前,避免后续卡锁的死锁)
+                if ($locked->balance < $amount) {
+                    throw SupplyApiException::insufficientBalance();
+                }
+
+                // 锁卡(防超卖)
+                $cards = Card::where('product_id', $product->id)
+                    ->where('status', Card::STATUS_UNUSED)
+                    ->lockForUpdate()
+                    ->limit($qty)
+                    ->get();
+
+                if ($cards->count() < $qty) {
+                    throw SupplyApiException::insufficientStock();
+                }
+
+                // 创建本地 order(source=supply,不走支付通道)
+                $order = Order::create([
+                    'order_no' => $this->generateOrderNo(),
+                    'merchant_id' => $product->merchant_id,
+                    'product_id' => $product->id,
+                    'quantity' => $qty,
+                    'amount' => $amount,
+                    'cost' => (int) $product->factory_price * $qty,
+                    'status' => 'paid',
+                    'delivery_status' => 'delivered',
+                    'paid_at' => now(),
+                    'source' => 'supply',
+                ]);
+
+                // 同步发卡(锁卡后标记 used,事务内原子)
+                foreach ($cards as $card) {
+                    $card->update(['status' => Card::STATUS_USED, 'order_id' => $order->id, 'used_at' => now()]);
+                }
+
+                // 写 supply_orders(唯一约束 supplier_account_id+downstream_order_no 兜底幂等)
+                $supplyOrder = SupplyOrder::create([
+                    'supplier_account_id' => $account->id,
+                    'order_id' => $order->id,
+                    'downstream_order_no' => $params['downstream_order_no'],
+                    'fulfillment_mode' => $mode,
+                    'callback_url' => $params['callback_url'] ?? null,
+                ]);
+
+                // 扣余额 + 账本(balance_after 快照取 decrement 后内存值)
+                $locked->decrement('balance', $amount);
+                SupplierLedgerEntry::create([
+                    'supplier_account_id' => $account->id,
+                    'order_id' => $order->id,
+                    'type' => SupplierLedgerEntry::TYPE_ORDER,
+                    'amount' => -$amount,
+                    'balance_after' => (int) $locked->balance,
+                    'idempotency_key' => "supply_order:{$supplyOrder->id}",
+                    'remark' => "供货下单[{$params['downstream_order_no']}]",
+                ]);
+
+                return [
+                    'supply_order_id' => $supplyOrder->id,
+                    'order_id' => $order->id,
+                    'amount' => $amount,
+                    'cards' => $cards->pluck('content')->all(),
+                ];
+            });
+        } catch (\Illuminate\Database\QueryException $e) {
+            // 并发竞态:另一请求已插入同 downstream_order_no → 当幂等重试
+            if ($this->isUniqueViolation($e)) {
+                $existing = SupplyOrder::where('supplier_account_id', $account->id)
+                    ->where('downstream_order_no', $params['downstream_order_no'])
+                    ->first();
+                if ($existing) {
+                    return $this->formatResult($existing);
+                }
             }
+            throw $e;
+        }
+    }
 
-            // 锁卡(防超卖)
-            $cards = Card::where('product_id', $product->id)
-                ->where('status', Card::STATUS_UNUSED)
-                ->lockForUpdate()
-                ->limit($qty)
-                ->get();
-
-            if ($cards->count() < $qty) {
-                throw SupplyApiException::insufficientStock();
-            }
-
-            // 创建本地 order(source=supply,不走支付通道)
-            $order = Order::create([
-                'order_no' => $this->generateOrderNo(),
-                'merchant_id' => $product->merchant_id,
-                'product_id' => $product->id,
-                'quantity' => $qty,
-                'amount' => $amount,
-                'cost' => (int) $product->factory_price * $qty,
-                'status' => 'paid',
-                'delivery_status' => 'delivered',
-                'paid_at' => now(),
-                'source' => 'supply',
-            ]);
-
-            // 同步发卡(锁卡后标记 used,事务内原子)
-            foreach ($cards as $card) {
-                $card->update(['status' => Card::STATUS_USED, 'order_id' => $order->id, 'used_at' => now()]);
-            }
-
-            // 写 supply_orders(唯一约束 supplier_account_id+downstream_order_no 兜底幂等)
-            $supplyOrder = SupplyOrder::create([
-                'supplier_account_id' => $account->id,
-                'order_id' => $order->id,
-                'downstream_order_no' => $params['downstream_order_no'],
-                'fulfillment_mode' => $mode,
-                'callback_url' => $params['callback_url'] ?? null,
-            ]);
-
-            // 扣余额 + 账本(balance_after 快照取 decrement 后内存值)
-            $locked->decrement('balance', $amount);
-            SupplierLedgerEntry::create([
-                'supplier_account_id' => $account->id,
-                'order_id' => $order->id,
-                'type' => SupplierLedgerEntry::TYPE_ORDER,
-                'amount' => -$amount,
-                'balance_after' => (int) $locked->balance,
-                'idempotency_key' => "supply_order:{$supplyOrder->id}",
-                'remark' => "供货下单[{$params['downstream_order_no']}]",
-            ]);
-
-            return [
-                'supply_order_id' => $supplyOrder->id,
-                'order_id' => $order->id,
-                'amount' => $amount,
-                'cards' => $cards->pluck('content')->all(),
-            ];
-        });
+    /** 判断是否唯一约束冲突(MySQL 1062 / SQLite/PG "Unique constraint") */
+    private function isUniqueViolation(\Illuminate\Database\QueryException $e): bool
+    {
+        $code = $e->errorInfo[1] ?? null;
+        $msg = (string) $e->getMessage();
+        return $code === 1062 // MySQL duplicate entry
+            || str_contains($msg, 'uniq_supply_downstream_no')
+            || str_contains($msg, 'UNIQUE constraint failed'); // SQLite
     }
 
     private function formatResult(SupplyOrder $supplyOrder): array
