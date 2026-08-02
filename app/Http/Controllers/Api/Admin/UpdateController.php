@@ -133,12 +133,15 @@ class UpdateController extends Controller
 
             // Step 3: git pull(自动切 HTTPS 避免 SSH key 问题)
             $this->log($logFile, '拉取最新代码...');
+            $this->ensureGitSafeDirectory();
             $this->ensureHttpsRemote();
             $output = $this->shell('cd ' . base_path() . ' && git pull origin main 2>&1');
             $this->log($logFile, $output);
 
-            if (str_contains($output, 'CONFLICT') || str_contains($output, 'error:')) {
-                throw new \RuntimeException('Git pull 失败(可能存在冲突): ' . $output);
+            // git pull 可能输出 "dubious ownership" 警告但 exit code 仍为 0,
+            // 这里检测关键错误词
+            if (str_contains($output, 'CONFLICT') || str_contains($output, 'error:') || str_contains($output, 'fatal:')) {
+                throw new \RuntimeException('Git pull 失败: ' . $output);
             }
 
             // Step 4: composer install(设置 COMPOSER_HOME 避免容器无 HOME)
@@ -323,6 +326,24 @@ class UpdateController extends Controller
     private function canExec(): bool
     {
         return function_exists('proc_open');
+    }
+
+    /**
+     * 解决 git "dubious ownership" 问题。
+     *
+     * chown -R www:www 后,git 目录属主变为 www,但执行 git 命令的 PHP-FPM 进程
+     * 身份可能不一致(或以 root 跑),git 出于安全拒绝操作:
+     *   fatal: detected dubious ownership in repository at '...'
+     *
+     * 解决:把项目目录加入 safe.directory(全局,幂等,可重复执行)。
+     */
+    private function ensureGitSafeDirectory(): void
+    {
+        try {
+            $this->shell('git config --global --add safe.directory ' . base_path() . ' 2>/dev/null');
+        } catch (\Throwable $e) {
+            // 函数被禁用或 config 不可写 → 忽略,git pull 会自行报错
+        }
     }
 
     /**
