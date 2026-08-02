@@ -14,6 +14,9 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\StorefrontSettingsController;
 use App\Http\Controllers\Api\SubsiteConsoleController;
+use App\Http\Controllers\Api\Supply\SupplyController;
+use App\Http\Controllers\Api\Supply\SupplyOrderController;
+use App\Http\Controllers\Api\Supply\SupplyProductController;
 use App\Http\Controllers\Api\WithdrawalController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -262,3 +265,22 @@ Route::post('/payments/notify/{channel}', [PaymentController::class, 'callback']
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+// ===== 供货 API(对外供货,spec §4.3) =====
+Route::prefix('supply')->middleware(['supply.auth', 'throttle:' . config('zcard.supply.rate_limit', 60) . ',1'])
+    ->group(function () {
+        Route::post('ping', [SupplyController::class, 'ping'])->name('api.supply.ping');
+        Route::get('categories', [SupplyProductController::class, 'categories'])->name('api.supply.categories');
+        Route::get('products', [SupplyProductController::class, 'index'])->name('api.supply.products.index');
+        Route::get('products/{id}', [SupplyProductController::class, 'show'])->name('api.supply.products.show')
+            ->whereNumber('id');
+        Route::get('products/{id}/stock', [SupplyProductController::class, 'stock'])->name('api.supply.products.stock')
+            ->whereNumber('id');
+        Route::post('orders', [SupplyOrderController::class, 'create'])->name('api.supply.orders.create');
+        Route::get('orders/{id}', [SupplyOrderController::class, 'show'])->name('api.supply.orders.show')
+            ->whereNumber('id');
+        Route::post('orders/{id}/cancel', [SupplyOrderController::class, 'cancel'])->name('api.supply.orders.cancel')
+            ->whereNumber('id');
+    });
+// 回调端点不经过 supply.auth(上游用各自协议签名,由驱动 verifyCallback 处理)
+Route::post('supply/callback', [SupplyController::class, 'callback'])->name('api.supply.callback');
