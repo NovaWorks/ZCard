@@ -298,9 +298,14 @@ class UpdateController extends Controller
     }
 
     /**
-     * 确保 git remote 用 HTTPS(公共仓库无需 SSH key)。
-     * 容器/Docker 环境通常没有宿主机的 SSH key,
-     * 公共仓库改 HTTPS 后 git pull 不需要认证。
+     * 确保 git remote 用 HTTPS。
+     *
+     * 重要: 本仓库是公开仓库,客户部署后 git pull 只需 HTTPS 只读,
+     * 不需要任何认证/GitHub 账号/SSH key。
+     *
+     * 但开发环境本地 clone 用的是 SSH(git@github.com:...),
+     * 客户的机器/容器里通常没有开发者的 SSH key,
+     * 所以在线更新时自动把 SSH remote 切成 HTTPS,确保公开仓库免认证拉取。
      */
     private function ensureHttpsRemote(): void
     {
