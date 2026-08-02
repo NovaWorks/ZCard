@@ -42,4 +42,37 @@ return [
 
     'insufficient_stock_short' => '库存不足',
     'currency_base_undeletable' => '基础货币不可删除',
+
+    // ===== 货源对接(spec §8.1) =====
+    'supply.driver_dujiao_next' => '独角数卡(dujiao-next)',
+    'supply.driver_acg_faka' => 'ACG发卡',
+    'supply.driver_zcard' => 'ZCard',
+    'supply.field_base_url' => '站点地址',
+    'supply.field_api_key' => 'API Key',
+    'supply.field_api_secret' => 'API Secret',
+    'supply.field_app_id' => 'App ID',
+    'supply.field_app_key' => 'App Key',
+    'supply.stock_mode_realtime' => '实时查询',
+    'supply.stock_mode_realtime_help' => '顾客在前台看到的库存是当下向上游发起一次实时查询的结果。最准确,不会超卖(下单前现查);前台每次访问多一次对上游请求,依赖上游响应速度。',
+    'supply.stock_mode_synced' => '本地缓存同步',
+    'supply.stock_mode_synced_help' => '定时将上游库存数量拷贝一份到本地,前台读本地缓存。前台快;有超卖风险(同步间隔内上游可能已售罄),下单时会再查一次上游兜底。',
+    'supply.failure_manual' => '人工介入',
+    'supply.failure_auto_refund' => '自动退款',
+    'supply.pricing_fixed_markup' => '按固定加价',
+    'supply.pricing_percent_markup' => '按比例加价',
+    'supply.pricing_equal_cost' => '平价',
+    'supply.pricing_pending' => '留空待定',
+    'supply.secret_show_once_warning' => '请立即复制保存 API Secret,关闭后将无法再次查看',
+    'supply.balance_low_warning' => '预存余额不足',
+
+    // 供货 API 错误(spec §4.6)
+    'supply_api.insufficient_balance' => '余额不足',
+    'supply_api.insufficient_stock' => '库存不足',
+    'supply_api.product_unavailable' => '商品不可用',
+    'supply_api.order_not_cancelable' => '订单不可取消',
+    'supply_api.bad_request' => '请求参数错误',
+    'supply_api.timestamp_expired' => '请求已过期',
+    'supply_api.invalid_signature' => '签名错误',
+    'supply_api.nonce_reused' => '请求不可重复',
+    'supply_api.unauthorized' => '未认证',
 ];
