@@ -151,13 +151,14 @@ class UpdateController extends Controller
             $this->log($logFile, Artisan::output());
 
             // Step 6: 缓存优化(先清后建,避免旧缓存)
+            // 注意: 不执行 view:cache —— Filament v5 有动态 Blade 组件(如 modal),
+            // view:cache 预编译时会找不到而崩溃。config/route cache 是安全的。
             $this->log($logFile, '优化缓存...');
             Artisan::call('config:clear');
             Artisan::call('route:clear');
             Artisan::call('view:clear');
             Artisan::call('config:cache');
             Artisan::call('route:cache');
-            Artisan::call('view:cache');
 
             // Step 7: 前端构建(有 pnpm 用 pnpm,否则跳过——编译产物已在仓库)
             $this->buildFrontend($logFile, 'sysadmin');
@@ -242,7 +243,6 @@ class UpdateController extends Controller
             Artisan::call('view:clear');
             Artisan::call('config:cache');
             Artisan::call('route:cache');
-            Artisan::call('view:cache');
             Artisan::call('up');
 
             // 清版本缓存确保读到 git reset 后的 tag
