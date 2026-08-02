@@ -25,10 +25,29 @@ class SupplyController extends Controller
         ]);
     }
 
-    /** POST /api/supply/callback 接收上游异步回调(本站作为下游时,Phase 3 实现) */
+    /** POST /api/supply/callback 接收上游异步发货回调(本站作为下游时) */
     public function callback(Request $request): JsonResponse
     {
-        // Phase 3 实现
+        // 本站作为下游时,接收上游异步发货回调(spec §5.3)
+        $orderNo = $request->input('downstream_order_no');
+        $order = $orderNo ? \App\Models\Order::where('order_no', $orderNo)->first() : null;
+
+        if (! $order || ! $order->upstream_source_id) {
+            return response()->json(['ok' => false, 'error' => 'order_not_found'], 404);
+        }
+
+        $source = \App\Models\SupplySource::find($order->upstream_source_id);
+        $driver = app(\App\Supply\SupplyManager::class)->driver($source);
+        $payload = $driver->verifyCallback($request);
+
+        if (! $payload) {
+            return response()->json(['ok' => false, 'error' => 'invalid_signature'], 401);
+        }
+
+        if (! empty($payload['cards'])) {
+            app(\App\Supply\UpstreamOrderService::class)->writeCards($order, $payload['cards']);
+        }
+
         return response()->json(['ok' => true]);
     }
 }
