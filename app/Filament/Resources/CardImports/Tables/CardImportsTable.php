@@ -24,6 +24,8 @@ class CardImportsTable
                 TextColumn::make('source')->label('来源'),
                 TextColumn::make('total')->label('总数')->alignRight(),
                 TextColumn::make('success_count')->label('成功')->alignRight()->color('success'),
+                TextColumn::make('skipped_count')->label('去重跳过')->alignRight()
+                    ->color(fn ($state) => $state > 0 ? 'warning' : 'gray'),
                 TextColumn::make('failed_count')->label('失败')->alignRight()
                     ->color(fn ($state) => $state > 0 ? 'danger' : null),
                 TextColumn::make('status')->badge()->label('状态')->colors([

@@ -59,9 +59,16 @@ class ListProducts extends ListRecords
                         ['source' => 'filament']
                     );
                     $fresh = $import->fresh();
+                    $body = "成功 {$fresh->success_count} / 总数 {$fresh->total}";
+                    if ($fresh->skipped_count > 0) {
+                        $body .= " / 去重跳过 {$fresh->skipped_count}";
+                    }
+                    if ($fresh->failed_count > 0) {
+                        $body .= " / 失败 {$fresh->failed_count}";
+                    }
                     Notification::make()
                         ->title('导入完成')
-                        ->body("成功 {$fresh->success_count} / 失败 {$fresh->failed_count}(总数 {$fresh->total})")
+                        ->body($body)
                         ->success()
                         ->send();
                 }),

@@ -15,6 +15,7 @@ const router = createRouter({
         { path: 'pay/result', name: 'pay-result', component: () => import('@/views/PayResult.vue') },
         { path: 'orders/query', name: 'order-query', component: () => import('@/views/OrderQuery.vue') },
         { path: 'orders/mine', name: 'my-orders', component: () => import('@/views/MyOrders.vue'), meta: { requiresAuth: true } },
+        { path: 'user', name: 'user-center', component: () => import('@/views/UserCenter.vue'), meta: { requiresAuth: true } },
         { path: 'distribution', name: 'distribution', component: () => import('@/views/Distribution.vue'), meta: { requiresAuth: true } },
         { path: 'my-subsite', name: 'my-subsite', component: () => import('@/views/MySubsite.vue'), meta: { requiresAuth: true } },
         { path: 'withdraw', name: 'withdraw', component: () => import('@/views/Withdraw.vue'), meta: { requiresAuth: true } },

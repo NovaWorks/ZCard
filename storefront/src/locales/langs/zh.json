@@ -3,6 +3,7 @@
     "home": "首页",
     "orders": "订单查询",
     "mine": "我的订单",
+    "userCenter": "个人中心",
     "distribution": "推广中心",
     "mySubsite": "我的分站",
     "withdraw": "提现",
@@ -398,5 +399,32 @@
   "layout": {
     "maintenanceTitle": "系统维护中",
     "maintenanceDefault": "系统维护中,请稍后再来访问。"
+  },
+  "userCenter": {
+    "title": "个人中心",
+    "welcome": "欢迎回来",
+    "balance": "账户余额",
+    "recharge": "充值",
+    "rechargeHint": "余额充值功能即将上线,如需充值请联系客服",
+    "quickEntry": "快捷入口",
+    "myOrders": "我的订单",
+    "withdraw": "提现",
+    "distribution": "推广中心",
+    "mySubsite": "我的分站",
+    "orderCount": "历史订单",
+    "accountSettings": "账号设置",
+    "profile": "个人资料",
+    "username": "用户名",
+    "email": "邮箱",
+    "saveProfile": "保存资料",
+    "changePassword": "修改密码",
+    "currentPassword": "当前密码",
+    "newPassword": "新密码",
+    "confirmPassword": "确认新密码",
+    "submitPassword": "确认修改",
+    "passwordChanged": "密码修改成功",
+    "profileSaved": "资料保存成功",
+    "loginRequired": "请先登录",
+    "ordersEmpty": "暂无订单记录"
   }
 }

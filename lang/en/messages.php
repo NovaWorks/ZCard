@@ -16,6 +16,8 @@ return [
     'auth.reset_code_sent' => 'Verification code has been sent to your email.',
     'auth.reset_code_invalid' => 'Verification code is invalid or expired.',
     'auth.password_reset' => 'Your password has been reset successfully.',
+    'auth.invalid_current_password' => 'Current password is incorrect.',
+    'auth.password_changed' => 'Password changed successfully.',
 
     'order.status_abnormal' => 'Order status is abnormal.',
 

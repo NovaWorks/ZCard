@@ -10,7 +10,7 @@ class CardImport extends Model
 {
     protected $fillable = [
         'product_id', 'operator_id', 'source', 'total',
-        'success_count', 'failed_count', 'status', 'error_log',
+        'success_count', 'skipped_count', 'failed_count', 'status', 'error_log',
     ];
 
     protected function casts(): array

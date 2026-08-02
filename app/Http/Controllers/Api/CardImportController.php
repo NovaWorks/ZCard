@@ -30,11 +30,13 @@ class CardImportController extends Controller
             ]
         );
 
+        $fresh = $import->fresh();
         return response()->json([
             'import_id' => $import->id,
-            'status' => $import->fresh()->status,
-            'success_count' => $import->fresh()->success_count,
-            'failed_count' => $import->fresh()->failed_count,
+            'status' => $fresh->status,
+            'success_count' => $fresh->success_count,
+            'skipped_count' => $fresh->skipped_count,
+            'failed_count' => $fresh->failed_count,
             'total' => $import->total,
         ]);
     }

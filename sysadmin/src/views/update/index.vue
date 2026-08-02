@@ -488,6 +488,10 @@ export default { components: { Loading, CircleCheckFilled, CircleCloseFilled, Ar
   .timeline {
     position: relative;
     padding-left: 8px;
+    /* 版本历史可能很长,允许内部滚动(art-table-card 的 body 是 overflow:hidden) */
+    max-height: calc(100vh - 420px);
+    overflow-y: auto;
+    padding-right: 8px;
   }
   .timeline-item {
     position: relative;

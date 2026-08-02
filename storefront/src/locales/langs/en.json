@@ -3,6 +3,7 @@
     "home": "Home",
     "orders": "Track Order",
     "mine": "My Orders",
+    "userCenter": "Account",
     "distribution": "Distribution",
     "mySubsite": "My Subsite",
     "withdraw": "Withdraw",
@@ -398,5 +399,32 @@
   "layout": {
     "maintenanceTitle": "System Maintenance",
     "maintenanceDefault": "The system is under maintenance, please come back later."
+  },
+  "userCenter": {
+    "title": "Account Center",
+    "welcome": "Welcome back",
+    "balance": "Account Balance",
+    "recharge": "Recharge",
+    "rechargeHint": "Recharge is coming soon. Please contact support to top up.",
+    "quickEntry": "Quick Access",
+    "myOrders": "My Orders",
+    "withdraw": "Withdraw",
+    "distribution": "Referral",
+    "mySubsite": "My Subsite",
+    "orderCount": "Total Orders",
+    "accountSettings": "Account Settings",
+    "profile": "Profile",
+    "username": "Username",
+    "email": "Email",
+    "saveProfile": "Save Profile",
+    "changePassword": "Change Password",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "submitPassword": "Update Password",
+    "passwordChanged": "Password changed successfully",
+    "profileSaved": "Profile saved successfully",
+    "loginRequired": "Please log in first",
+    "ordersEmpty": "No orders yet"
   }
 }

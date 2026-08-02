@@ -40,6 +40,8 @@ Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->n
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
     Route::get('/auth/me', [AuthController::class, 'me'])->name('api.auth.me');
+    Route::put('/auth/profile', [AuthController::class, 'updateProfile'])->name('api.auth.profile');
+    Route::put('/auth/password', [AuthController::class, 'updatePassword'])->name('api.auth.password');
     Route::get('/orders/mine', [OrderController::class, 'myOrders'])->name('api.orders.mine');
     // 三级分销(推广中心)
     Route::get('/distribution/stats', [\App\Http\Controllers\Api\DistributionController::class, 'stats'])->name('api.distribution.stats');

@@ -132,6 +132,45 @@ class AuthController extends Controller
     }
 
     /**
+     * 修改密码(个人中心)。
+     */
+    public function updatePassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'current_password' => 'required|string',
+            'password' => 'required|string|min:6|max:50|confirmed',
+        ]);
+
+        $user = $request->user();
+
+        if (! Hash::check($data['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => [__('messages.auth.invalid_current_password')],
+            ]);
+        }
+
+        $user->update(['password' => $data['password']]);
+
+        return response()->json(['message' => __('messages.auth.password_changed')]);
+    }
+
+    /**
+     * 更新个人资料(个人中心)。
+     */
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'username' => 'sometimes|string|min:2|max:50|unique:users,username,' . $request->user()->id,
+            'email' => 'sometimes|email|max:100|unique:users,email,' . $request->user()->id,
+        ]);
+
+        $user = $request->user();
+        $user->update($data);
+
+        return response()->json($this->userArray($user->fresh()));
+    }
+
+    /**
      * 发送找回密码验证码(邮箱)。
      */
     public function sendResetCode(Request $request): JsonResponse

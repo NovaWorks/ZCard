@@ -115,14 +115,14 @@ class CardImportService
 
         $toInsert = [];
         $success = 0;
+        $skipped = 0; // 去重跳过(内容已存在,正常行为,不算失败)
         $failed = 0;
         $errors = [];
         $seenInChunk = []; // 本块内已见的 hash(防块内重复)
         foreach ($chunk as $i => $plain) {
             $hash = $hashes[$i];
             if ($dedup && ($existing->has($hash) || isset($seenInChunk[$hash]))) {
-                $failed++;
-                $errors[] = ['line' => $i, 'reason' => 'duplicate'];
+                $skipped++;
                 continue;
             }
             if ($dedup) {
@@ -147,15 +147,15 @@ class CardImportService
         if ($toInsert) {
             $inserted = DB::table('cards')->insertOrIgnore($toInsert);
             if ($inserted < $success) {
-                $skipped = $success - $inserted;
+                $concurrentSkipped = $success - $inserted;
                 $success = $inserted;
-                $failed += $skipped;
-                $errors[] = ['line' => null, 'reason' => 'concurrent_duplicate', 'count' => $skipped];
+                $skipped += $concurrentSkipped;
             }
         }
 
-        // 累加统计
+        // 累加统计(去重跳过单独计,不算失败)
         $import->increment('success_count', $success);
+        $import->increment('skipped_count', $skipped);
         $import->increment('failed_count', $failed);
         if ($errors) {
             $current = $import->error_log ? (array) $import->error_log : [];

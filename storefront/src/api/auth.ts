@@ -20,3 +20,11 @@ export const sendResetCode = (data: { email: string; captcha?: string }) =>
 /** 重置密码 */
 export const resetPassword = (data: { email: string; code: string; password: string }) =>
   request.post<unknown, { message: string }>('/auth/reset-password', data)
+
+/** 修改密码(个人中心) */
+export const updatePassword = (data: { current_password: string; password: string; password_confirmation: string }) =>
+  request.put<unknown, { message: string }>('/auth/password', data)
+
+/** 更新个人资料 */
+export const updateProfile = (data: { username?: string; email?: string }) =>
+  request.put<unknown, AuthUser>('/auth/profile', data)

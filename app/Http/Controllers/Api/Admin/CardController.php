@@ -94,6 +94,7 @@ class CardController extends Controller
             'import_id'     => $import->id,
             'status'        => $fresh->status,
             'success_count' => $fresh->success_count,
+            'skipped_count' => $fresh->skipped_count,
             'failed_count'  => $fresh->failed_count,
             'total'         => $import->total,
         ], 201);

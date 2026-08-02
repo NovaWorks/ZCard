@@ -16,6 +16,8 @@ return [
     'auth.reset_code_sent' => '验证码已发送至邮箱',
     'auth.reset_code_invalid' => '验证码错误或已过期',
     'auth.password_reset' => '密码重置成功',
+    'auth.invalid_current_password' => '当前密码错误',
+    'auth.password_changed' => '密码修改成功',
 
     'order.status_abnormal' => '订单状态异常',
 
