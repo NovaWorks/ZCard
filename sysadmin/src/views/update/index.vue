@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
+import { marked } from 'marked'
 import {
   checkUpdate,
   getVersions,
@@ -9,6 +10,12 @@ import {
   rollbackUpdate,
 } from '@/api/update'
 import type { UpdateCheck, VersionInfo, UpdateResult } from '@/api/update'
+
+/** Markdown → HTML(marked 已对 XSS 做基本转义;release notes 来自自己的 GitHub) */
+const renderMd = (md?: string): string => {
+  if (!md) return ''
+  return marked.parse(md, { async: false }) as string
+}
 
 defineOptions({ name: 'UpdateIndex' })
 
@@ -65,7 +72,7 @@ const handleCheck = async () => {
           ${checkResult.value.release_notes ? `
           <div style="margin:8px 0;padding:14px 16px;background:var(--el-fill-color-light);border-radius:8px;max-height:240px;overflow:auto;border:1px solid var(--el-border-color-lighter);">
             <div style="font-size:12px;font-weight:600;color:var(--el-text-color-secondary);margin-bottom:8px;">${t('zcard.update.releaseNotes')}</div>
-            <pre style="margin:0;font-size:13px;white-space:pre-wrap;word-break:break-word;font-family:inherit;line-height:1.7;color:var(--el-text-color-regular);">${checkResult.value.release_notes}</pre>
+            <div class="markdown-body" style="margin:0;font-size:13px;line-height:1.7;color:var(--el-text-color-regular);">${renderMd(checkResult.value.release_notes)}</div>
           </div>` : ''}
         </div>
       `
@@ -273,7 +280,8 @@ onMounted(() => {
           <ElTag v-if="checkResult.has_update" type="warning" effect="plain">🆕 New</ElTag>
           <span class="detail-date">{{ formatDate(checkResult.published_at) }}</span>
         </div>
-        <pre class="detail-notes-full">{{ checkResult.release_notes || '(无更新说明)' }}</pre>
+        <div v-if="checkResult.release_notes" class="markdown-body detail-notes-full" v-html="renderMd(checkResult.release_notes)"></div>
+        <pre v-else class="detail-notes-full">(无更新说明)</pre>
       </div>
     </ElDialog>
 
@@ -294,7 +302,8 @@ onMounted(() => {
             🔗 GitHub
           </ElButton>
         </div>
-        <pre class="detail-notes-full">{{ versionDetailData.notes || '(无更新说明)' }}</pre>
+        <div v-if="versionDetailData.notes" class="markdown-body detail-notes-full" v-html="renderMd(versionDetailData.notes)"></div>
+        <pre v-else class="detail-notes-full">(无更新说明)</pre>
       </div>
     </ElDialog>
 

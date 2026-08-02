@@ -65,6 +65,7 @@
     "element-plus": "^2.11.2",
     "file-saver": "^2.0.5",
     "highlight.js": "^11.10.0",
+    "marked": "^18.0.7",
     "mitt": "^3.0.1",
     "nprogress": "^0.2.0",
     "ohash": "^2.0.11",

@@ -21,3 +21,6 @@
 
 // 主题切换圆形扩散动画
 @use './core/theme-animation.scss';
+
+// Markdown 渲染样式(更新日志、版本详情弹窗)
+@use './core/md.scss';
