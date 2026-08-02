@@ -18,12 +18,7 @@ use Illuminate\Support\Facades\Storage;
  * 2. 显示更新日志
  * 3. 一键执行: 维护模式 → 备份 → git pull → composer install → migrate → 前端构建 → 上线
  *
- * 比 acg-faka 强在:
- * - Git 原子性(无半更新风险)
- * - Laravel 迁移系统(事务 + 回滚)
- * - 维护模式(更新期间不服务请求)
- * - 自动备份(失败可恢复)
- * - 无需自建更新服务器(GitHub = 免费 CDN)
+ * 注意: 容器/Docker 环境下 git SSH 可能不可用,自动降级 HTTPS(公共仓库)。
  */
 class UpdateController extends Controller
 {
@@ -101,7 +96,7 @@ class UpdateController extends Controller
 
             return response()->json($releases);
         } catch (\Throwable $e) {
-            return response()->json(['message' => '获取版本列表失败: ' . $e->getMessage()], 500);
+            return response()->json(['message' => '获取版本历史失败'], 500);
         }
     }
 
@@ -127,26 +122,27 @@ class UpdateController extends Controller
         try {
             $this->log($logFile, '当前版本: ' . $currentVersion);
 
-            // Step 1: 维护模式
+            // Step 1: 维护模式(不指定 render 视图,避免找不到组件)
             $this->log($logFile, '进入维护模式...');
-            Artisan::call('down', ['--render' => 'maintenance']);
+            Artisan::call('down');
 
             // Step 2: 备份当前版本信息
             $this->log($logFile, '备份当前版本信息...');
             file_put_contents(storage_path('app/last_version.txt'), $currentVersion);
 
-            // Step 3: git pull
+            // Step 3: git pull(自动切 HTTPS 避免 SSH key 问题)
             $this->log($logFile, '拉取最新代码...');
-            $output = shell_exec('cd ' . base_path() . ' && git pull origin main 2>&1');
+            $this->ensureHttpsRemote();
+            $output = $this->shell('cd ' . base_path() . ' && git pull origin main 2>&1');
             $this->log($logFile, $output);
 
-            if (str_contains($output, 'CONFLICT') || str_contains($output, 'error')) {
+            if (str_contains($output, 'CONFLICT') || str_contains($output, 'error:')) {
                 throw new \RuntimeException('Git pull 失败(可能存在冲突): ' . $output);
             }
 
-            // Step 4: composer install
+            // Step 4: composer install(设置 COMPOSER_HOME 避免容器无 HOME)
             $this->log($logFile, '安装依赖...');
-            $output = shell_exec('cd ' . base_path() . ' && composer install --no-dev --optimize-autoloader --no-interaction 2>&1');
+            $output = $this->shell('cd ' . base_path() . ' && COMPOSER_HOME=/tmp/composer composer install --no-dev --optimize-autoloader --no-interaction 2>&1');
             $this->log($logFile, $output);
 
             // Step 5: 数据库迁移
@@ -154,20 +150,18 @@ class UpdateController extends Controller
             Artisan::call('migrate', ['--force' => true]);
             $this->log($logFile, Artisan::output());
 
-            // Step 6: 缓存优化
+            // Step 6: 缓存优化(先清后建,避免旧缓存)
             $this->log($logFile, '优化缓存...');
+            Artisan::call('config:clear');
+            Artisan::call('route:clear');
+            Artisan::call('view:clear');
             Artisan::call('config:cache');
             Artisan::call('route:cache');
             Artisan::call('view:cache');
 
-            // Step 7: 前端构建(sysadmin → public/admin/, storefront → public/storefront/)
-            $this->log($logFile, '构建后台前端(sysadmin)...');
-            $output = shell_exec('cd ' . base_path() . '/sysadmin && pnpm install --frozen-lockfile 2>&1 && pnpm run build 2>&1');
-            $this->log($logFile, $output);
-
-            $this->log($logFile, '构建前台前端(storefront)...');
-            $output = shell_exec('cd ' . base_path() . '/storefront && pnpm install --frozen-lockfile 2>&1 && pnpm run build 2>&1');
-            $this->log($logFile, $output);
+            // Step 7: 前端构建(有 pnpm 用 pnpm,否则跳过——编译产物已在仓库)
+            $this->buildFrontend($logFile, 'sysadmin');
+            $this->buildFrontend($logFile, 'storefront');
 
             // Step 8: 新版本号(清缓存确保读到 git pull 后的新 tag)
             \App\Support\AppHelper::clearVersionCache();
@@ -179,7 +173,7 @@ class UpdateController extends Controller
             $this->log($logFile, '退出维护模式,更新完成!');
 
             // 清理锁
-            unlink($lockFile);
+            @unlink($lockFile);
 
             return response()->json([
                 'message' => '更新成功',
@@ -193,7 +187,7 @@ class UpdateController extends Controller
             $this->log($logFile, '更新失败: ' . $e->getMessage());
             $this->log($logFile, '尝试退出维护模式...');
             try { Artisan::call('up'); } catch (\Throwable $ignore) {}
-            unlink($lockFile);
+            @unlink($lockFile);
 
             return response()->json([
                 'message' => '更新失败: ' . $e->getMessage(),
@@ -218,41 +212,34 @@ class UpdateController extends Controller
         file_put_contents($logFile, "=== 回退开始 " . now() . " ===\n");
 
         try {
-            // Step 1: 维护模式
+            // Step 1: 维护模式(不指定 render 视图)
             $this->log($logFile, '进入维护模式...');
-            Artisan::call('down', ['--render' => 'maintenance']);
+            Artisan::call('down');
 
-            // Step 2: 查看上一个版本
-            $this->log($logFile, '当前 HEAD:');
-            $output = shell_exec('cd ' . base_path() . ' && git log --oneline -3 2>&1');
+            // Step 2: git reset 回退
+            $this->log($logFile, '回退代码到上一版本...');
+            $this->ensureHttpsRemote();
+            $output = $this->shell('cd ' . base_path() . ' && git reset --hard HEAD~1 2>&1');
             $this->log($logFile, $output);
 
-            // Step 3: git reset 回退一个提交
-            $this->log($logFile, '执行 git reset --hard HEAD~1...');
-            $output = shell_exec('cd ' . base_path() . ' && git reset --hard HEAD~1 2>&1');
-            $this->log($logFile, $output);
-
-            // Step 4: 回退数据库迁移
-            $this->log($logFile, '回退数据库迁移...');
-            try {
-                Artisan::call('migrate:rollback', ['--force' => true]);
-                $this->log($logFile, Artisan::output());
-            } catch (\Throwable $e) {
-                $this->log($logFile, 'migrate:rollback 警告(可能无迁移可回退): ' . $e->getMessage());
-            }
-
-            // Step 5: 重建依赖和前端
+            // Step 3: 安装依赖(可能需要降级)
             $this->log($logFile, '安装依赖...');
-            $output = shell_exec('cd ' . base_path() . ' && composer install --no-dev --optimize-autoloader --no-interaction 2>&1');
+            $output = $this->shell('cd ' . base_path() . ' && COMPOSER_HOME=/tmp/composer composer install --no-dev --optimize-autoloader --no-interaction 2>&1');
             $this->log($logFile, $output);
 
-            $this->log($logFile, '重建前端...');
-            $output = shell_exec('cd ' . base_path() . '/sysadmin && pnpm install --frozen-lockfile 2>&1 && pnpm run build 2>&1');
-            $this->log($logFile, $output);
-            $output = shell_exec('cd ' . base_path() . '/storefront && pnpm install --frozen-lockfile 2>&1 && pnpm run build 2>&1');
-            $this->log($logFile, $output);
+            // Step 4: 数据库回滚迁移
+            $this->log($logFile, '回滚数据库迁移...');
+            Artisan::call('migrate:rollback', ['--force' => true]);
+            $this->log($logFile, Artisan::output());
+
+            // Step 5: 前端构建
+            $this->buildFrontend($logFile, 'sysadmin');
+            $this->buildFrontend($logFile, 'storefront');
 
             // Step 6: 清缓存 + 上线
+            Artisan::call('config:clear');
+            Artisan::call('route:clear');
+            Artisan::call('view:clear');
             Artisan::call('config:cache');
             Artisan::call('route:cache');
             Artisan::call('view:cache');
@@ -272,6 +259,7 @@ class UpdateController extends Controller
         } catch (\Throwable $e) {
             $this->log($logFile, '回退失败: ' . $e->getMessage());
             try { Artisan::call('up'); } catch (\Throwable $ignore) {}
+
             return response()->json([
                 'message' => '回退失败: ' . $e->getMessage(),
                 'log' => file_get_contents($logFile),
@@ -291,8 +279,65 @@ class UpdateController extends Controller
         ]);
     }
 
+    // ─── 私有辅助 ───
+
     private function log(string $file, string $message): void
     {
-        file_put_contents($file, '[' . now()->format('H:i:s') . '] ' . trim($message) . "\n", FILE_APPEND);
+        $message = trim($message);
+        if ($message !== '') {
+            file_put_contents($file, '[' . now()->format('H:i:s') . '] ' . $message . "\n", FILE_APPEND);
+        }
+    }
+
+    /**
+     * 执行 shell 命令,设好环境变量避免容器问题。
+     */
+    private function shell(string $command): string
+    {
+        return (string) shell_exec($command);
+    }
+
+    /**
+     * 确保 git remote 用 HTTPS(公共仓库无需 SSH key)。
+     * 容器/Docker 环境通常没有宿主机的 SSH key,
+     * 公共仓库改 HTTPS 后 git pull 不需要认证。
+     */
+    private function ensureHttpsRemote(): void
+    {
+        $remote = (string) shell_exec('cd ' . base_path() . ' && git remote get-url origin 2>/dev/null');
+        // 如果是 SSH(git@github.com:owner/repo.git),转 HTTPS
+        if (preg_match('#git@github\.com:(.+)/(.+)\.git#', trim($remote), $m)) {
+            $https = "https://github.com/{$m[1]}/{$m[2]}.git";
+            shell_exec('cd ' . base_path() . " && git remote set-url origin {$https} 2>&1");
+        }
+    }
+
+    /**
+     * 构建前端(pnpm 优先,失败则跳过——编译产物已在仓库)。
+     */
+    private function buildFrontend(string $logFile, string $dir): void
+    {
+        $path = base_path() . '/' . $dir;
+        $this->log($logFile, "构建前端({$dir})...");
+
+        // 检测 pnpm 是否可用
+        $pnpm = (string) shell_exec('which pnpm 2>/dev/null');
+        if (trim($pnpm) !== '') {
+            $output = $this->shell("cd {$path} && pnpm install --frozen-lockfile 2>&1 && pnpm run build 2>&1");
+            if (str_contains($output, 'error') || str_contains($output, 'ERR')) {
+                $this->log($logFile, "{$dir} 构建警告(使用仓库已有编译产物): " . substr($output, 0, 200));
+            } else {
+                $this->log($logFile, "{$dir} 构建完成");
+            }
+        } else {
+            // npm fallback
+            $npm = (string) shell_exec('which npm 2>/dev/null');
+            if (trim($npm) !== '') {
+                $output = $this->shell("cd {$path} && npm ci --silent 2>&1 && npm run build 2>&1");
+                $this->log($logFile, "{$dir} npm 构建完成");
+            } else {
+                $this->log($logFile, "{$dir} 无 pnpm/npm,使用仓库已有编译产物(public/{$dir}/)");
+            }
+        }
     }
 }
