@@ -13,6 +13,12 @@ class DeliveryService
     /** 监听 OrderPaid 事件 */
     public function handle(OrderPaid $event): void
     {
+        // 上游商品订单:跳过本地发卡(由 UpstreamOrderService 负责拿货发货)
+        $order = $event->order->loadMissing('product');
+        if ($order->product && $order->product->upstream_source_id) {
+            return;
+        }
+
         $this->deliver($event->order);
     }
 

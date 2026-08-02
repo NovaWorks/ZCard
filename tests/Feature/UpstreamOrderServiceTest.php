@@ -34,8 +34,16 @@ class UpstreamOrderServiceTest extends TestCase
         app(UpstreamOrderService::class)->writeCards($order, ['CARD-A', 'CARD-B']);
 
         $this->assertSame('delivered', $order->fresh()->delivery_status);
-        $this->assertDatabaseHas('cards', ['order_id' => $order->id, 'content' => 'CARD-A']);
-        $this->assertDatabaseHas('cards', ['order_id' => $order->id, 'content' => 'CARD-B']);
+        // Card.content 加密存储(非明文),plainContent() 解密回原文
+        $cards = \App\Models\Card::where('order_id', $order->id)->get();
+        $this->assertCount(2, $cards);
+        $plainContents = $cards->map(fn ($c) => $c->plainContent())->toArray();
+        $this->assertContains('CARD-A', $plainContents);
+        $this->assertContains('CARD-B', $plainContents);
+        $this->assertNotEquals('CARD-A', $cards->first()->content); // 加密后非明文
+        // OrderDelivery 明文快照(顾客订单页读这里)
+        $this->assertDatabaseHas('order_deliveries', ['order_id' => $order->id, 'card_content' => 'CARD-A']);
+        $this->assertDatabaseHas('order_deliveries', ['order_id' => $order->id, 'card_content' => 'CARD-B']);
     }
 
     public function test_write_cards_idempotent(): void

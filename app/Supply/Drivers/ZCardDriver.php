@@ -72,6 +72,8 @@ class ZCardDriver implements SupplyDriver
         $items = collect($data['items'] ?? [])->map(fn ($p) => new UpstreamProduct(
             code: (string) $p['id'], name: $p['name'], price: $p['price'] ?? 0, factoryPrice: $p['price'] ?? 0,
             categoryCode: isset($p['category_id']) ? (string) $p['category_id'] : null, description: $p['description'] ?? null, cover: $p['cover'] ?? null,
+            // ZCard 供货 API 不返回库存数,默认无限(下游同步时 stock_cache 写 -1)
+            stockQuantity: -1,
         ))->all();
         return ['items' => $items, 'total' => $data['total'] ?? 0, 'page' => $page, 'has_more' => false];
     }

@@ -14,7 +14,7 @@ class Product extends Model
     protected $fillable = [
         'merchant_id',
         // 供货上游来源(Phase 1)
-        'upstream_source_id', 'upstream_product_code', 'upstream_synced_at',
+        'upstream_source_id', 'upstream_product_code', 'upstream_synced_at', 'stock_cache',
         'category_id', 'name', 'slug', 'description', 'price',
         'factory_price', 'draft_premium',
         'member_price', 'cover', 'images', 'stock_type', 'stock_visible',
@@ -66,9 +66,14 @@ class Product extends Model
         return $this->hasMany(Card::class);
     }
 
-    /** 可用卡密库存数(cards WHERE unused) */
+    /** 可用库存:上游商品读 stock_cache(无本地卡);本地商品数 unused cards */
     public function availableStock(): int
     {
+        // 上游商品:读缓存的库存数(-1=无限)
+        if ($this->upstream_source_id && $this->stock_cache !== null) {
+            return (int) $this->stock_cache;
+        }
+
         return (int) $this->cards()->where('status', Card::STATUS_UNUSED)->count();
     }
 

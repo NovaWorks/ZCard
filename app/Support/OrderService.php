@@ -70,15 +70,21 @@ class OrderService
         }
 
         return DB::transaction(function () use ($productId, $skuId, $qty, $customer, $product, $amount, $discountAmount, $couponCode, $coupon, $displayCurrency, $subsite, $subsiteId, $subsiteDomain, $baseUnitPrice, $unitPrice, $profitEligible, $profitBlockReason) {
-            // 锁卡(FOR UPDATE 防并发超卖)
-            $cards = Card::where('product_id', $productId)
-                ->where('status', Card::STATUS_UNUSED)
-                ->lockForUpdate()
-                ->limit($qty)
-                ->get();
+            // 上游商品:跳过锁卡(无本地卡),付款后由 UpstreamOrderService 拿货
+            $isUpstream = ! empty($product->upstream_source_id);
+            $cards = collect();
 
-            if ($cards->count() < $qty) {
-                throw new InsufficientStockException(__('messages.insufficient_stock', ['need' => $qty, 'have' => $cards->count()]));
+            if (! $isUpstream) {
+                // 本地商品:锁卡(FOR UPDATE 防并发超卖)
+                $cards = Card::where('product_id', $productId)
+                    ->where('status', Card::STATUS_UNUSED)
+                    ->lockForUpdate()
+                    ->limit($qty)
+                    ->get();
+
+                if ($cards->count() < $qty) {
+                    throw new InsufficientStockException(__('messages.insufficient_stock', ['need' => $qty, 'have' => $cards->count()]));
+                }
             }
 
             $extra = array_merge(
@@ -150,12 +156,14 @@ class OrderService
                 ]);
             }
 
-            // 锁定卡密
-            $cards->each->update([
-                'status' => Card::STATUS_LOCKED,
-                'locked_at' => now(),
-                'order_id' => $order->id,
-            ]);
+            // 锁定卡密(仅本地商品;上游商品付款后由 UpstreamOrderService 拿货)
+            if (! $isUpstream) {
+                $cards->each->update([
+                    'status' => Card::STATUS_LOCKED,
+                    'locked_at' => now(),
+                    'order_id' => $order->id,
+                ]);
+            }
 
             return $order;
         });

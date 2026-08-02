@@ -39,6 +39,7 @@ class SupplySyncService
                 'description' => $dto->description,
                 'cover' => $dto->cover,
                 'factory_price' => $dto->factoryPrice,
+                'stock_cache' => $dto->stockQuantity, // 上游库存缓存
                 'category_id' => $this->resolveCategoryId($source, $dto->categoryCode),
                 'upstream_synced_at' => now(),
                 'hide' => ! $dto->isActive ? true : $existing->hide, // 上游下架→标隐藏,不删
@@ -63,6 +64,7 @@ class SupplySyncService
             'category_id' => $this->resolveCategoryId($source, $dto->categoryCode),
             'upstream_source_id' => $source->id,
             'upstream_product_code' => $dto->code,
+            'stock_cache' => $dto->stockQuantity, // 上游库存缓存(-1=无限)
             'upstream_synced_at' => now(),
         ]);
     }

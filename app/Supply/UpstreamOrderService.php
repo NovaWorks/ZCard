@@ -5,7 +5,9 @@ namespace App\Supply;
 use App\Jobs\FetchFromUpstream;
 use App\Models\Card;
 use App\Models\Order;
+use App\Models\OrderDelivery;
 use App\Models\SupplySource;
+use App\Support\CardCipher;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -78,7 +80,7 @@ class UpstreamOrderService
         // 仍 pending:不动,等 Job 重试或回调
     }
 
-    /** 把上游卡密写入本地订单 */
+    /** 把上游卡密写入本地订单(加密存 Card + 明文写 OrderDelivery 快照供顾客查看) */
     public function writeCards(Order $order, array $cards): void
     {
         DB::transaction(function () use ($order, $cards) {
@@ -87,14 +89,23 @@ class UpstreamOrderService
                 return; // 幂等
             }
 
-            foreach ($cards as $content) {
+            foreach ($cards as $plainContent) {
+                // 加密存 Card(与 CardImportService 一致,plainContent() 才能正确解密)
                 Card::create([
                     'product_id' => $locked->product_id,
-                    'content' => $content,
-                    'content_hash' => hash('sha256', $content . uniqid()),
+                    'content' => CardCipher::encrypt($plainContent),
+                    'content_hash' => hash('sha256', $plainContent . uniqid()),
                     'status' => Card::STATUS_USED,
                     'order_id' => $locked->id,
                     'used_at' => now(),
+                ]);
+                // 明文写 OrderDelivery 快照(顾客订单页读 orderDeliveries.card_content)
+                OrderDelivery::create([
+                    'order_id' => $locked->id,
+                    'product_id' => $locked->product_id,
+                    'card_content' => $plainContent,
+                    'delivered_mode' => 'status',
+                    'delivered_at' => now(),
                 ]);
             }
             $locked->update(['delivery_status' => 'delivered']);
