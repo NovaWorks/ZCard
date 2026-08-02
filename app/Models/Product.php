@@ -12,7 +12,10 @@ class Product extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'merchant_id', 'category_id', 'name', 'slug', 'description', 'price',
+        'merchant_id',
+        // 供货上游来源(Phase 1)
+        'upstream_source_id', 'upstream_product_code', 'upstream_synced_at',
+        'category_id', 'name', 'slug', 'description', 'price',
         'factory_price', 'draft_premium',
         'member_price', 'cover', 'images', 'stock_type', 'stock_visible',
         'control_config', 'delivery_mode', 'sort', 'status',
@@ -30,6 +33,7 @@ class Product extends Model
             'images' => 'array',
             'control_config' => 'array',
             'virtual_reviews' => 'array',
+            'upstream_synced_at' => 'datetime',
             'factory_price' => 'integer',
             'draft_premium' => 'integer',
             'stock_visible' => 'boolean',

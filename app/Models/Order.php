@@ -15,6 +15,8 @@ class Order extends Model
         'status', 'delivery_status', 'paid_at', 'closed_at',
         'contact', 'create_device', 'create_ip', 'extra',
         'subsite_id', 'subsite_domain', 'subsite_profit',
+        // 供货上游来源(Phase 1)
+        'source', 'upstream_order_id', 'upstream_source_id',
     ];
 
     protected function casts(): array
