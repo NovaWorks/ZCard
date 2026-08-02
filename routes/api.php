@@ -204,6 +204,16 @@ Route::middleware(['auth:sanctum', 'admin.role'])->prefix('admin')->group(functi
     // 专属定价(商品维度)
     Route::get('products/{product}/supply-prices', [\App\Http\Controllers\Api\Admin\SupplierPriceController::class, 'indexForProduct']);
     Route::put('products/{product}/supply-prices', [\App\Http\Controllers\Api\Admin\SupplierPriceController::class, 'updateForProduct']);
+
+    // 货源对接设置(spec §6.1)
+    // 注意:静态 GET supply-sources/drivers 必须先于 apiResource 注册,
+    // 否则会被 apiResource 的 show({supplySource}) 当作参数吃掉。
+    Route::get('supply-sources/drivers', [\App\Http\Controllers\Api\Admin\SupplySourceController::class, 'drivers']);
+    Route::apiResource('supply-sources', \App\Http\Controllers\Api\Admin\SupplySourceController::class)
+        ->parameter('supply-sources', 'supplySource');
+    Route::post('supply-sources/{supplySource}/test', [\App\Http\Controllers\Api\Admin\SupplySourceController::class, 'test']);
+    Route::post('supply-sources/{supplySource}/sync', [\App\Http\Controllers\Api\Admin\SupplySourceController::class, 'sync']);
+    Route::get('supply-sources/{supplySource}/sync-status', [\App\Http\Controllers\Api\Admin\SupplySourceController::class, 'syncStatus']);
 });
 
 // 公开货币列表(供前台货币切换器,不需要 display.currency 中间件)
