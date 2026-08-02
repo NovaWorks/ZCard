@@ -12,7 +12,7 @@ return new class extends Migration {
             $table->string('name', 100)->comment('运营起的名字,如「主站dujiao」');
             $table->string('driver', 30)->comment('驱动类型:dujiao_next|acg_faka|zcard');
             $table->string('base_url', 255)->comment('上游站点地址');
-            $table->json('credentials')->comment('凭证(加密存储),结构随 driver 变');
+            $table->text('credentials')->comment('凭证(encrypted:array 加密字符串),结构随 driver 变');
             $table->string('status', 20)->default('active')->comment('active|disabled');
             $table->json('settings')->nullable()->comment('驱动相关开关:库存模式/同步/定价/发卡等');
             $table->timestamp('last_synced_at')->nullable()->comment('最近同步时间');
