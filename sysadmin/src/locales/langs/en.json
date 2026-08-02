@@ -408,6 +408,9 @@
     },
     "supply": {
       "title": "Supply Sources"
+    },
+    "supplierAccount": {
+      "title": "Supplier Accounts"
     }
   },
   "table": {
@@ -1369,6 +1372,53 @@
       "sensitiveTip": "This is a secret key, enter only when saving",
       "sensitiveKeepTip": "Leave empty to keep the existing key",
       "sensitivePlaceholder": "Enter a new key"
+    },
+    "supplierAccount": {
+      "title": "Supplier Accounts",
+      "add": "Add Account",
+      "addTitle": "Add Supplier Account",
+      "editTitle": "Edit Supplier Account",
+      "name": "Name",
+      "namePlaceholder": "e.g. Partner A",
+      "nameRequired": "Please enter a name",
+      "apiKey": "API Key",
+      "balance": "Balance",
+      "status": "Status",
+      "statusActive": "Active",
+      "statusDisabled": "Disabled",
+      "filterStatus": "Filter by status",
+      "contact": "Contact",
+      "contactPlaceholder": "QQ/WeChat/Email (optional)",
+      "remark": "Remark",
+      "remarkPlaceholder": "Remark (optional)",
+      "recharge": "Recharge",
+      "ledger": "Ledger",
+      "resetSecret": "Reset Secret",
+      "secretTitle": "API Credentials (shown once)",
+      "secretWarning": "Copy and save the API Key and Secret now. The Secret cannot be viewed again after closing!",
+      "copy": "Copy",
+      "copySuccess": "Copied",
+      "copyFailed": "Copy failed, please select manually",
+      "iHaveSaved": "I have saved",
+      "resetConfirm": "Reset API Secret for \"{name}\"? The old Secret becomes invalid immediately; the downstream must re-dock with the new Secret.",
+      "resetSuccess": "Secret reset, copy the new Secret to the downstream",
+      "rechargeTitle": "Recharge — {name}",
+      "currentBalance": "Current Balance",
+      "rechargeAmount": "Amount",
+      "yuan": "CNY",
+      "rechargeRemarkPlaceholder": "Remark (optional)",
+      "rechargeSuccess": "Recharged",
+      "ledgerTitle": "Ledger — {name}",
+      "ledgerTime": "Time",
+      "ledgerType": "Type",
+      "ledgerAmount": "Amount",
+      "ledgerBalanceAfter": "Balance After",
+      "typeRecharge": "Recharge",
+      "typeOrder": "Order Deduct",
+      "typeRefund": "Refund",
+      "typeAdjust": "Adjust",
+      "modified": "Modified",
+      "deleteConfirm": "Delete supplier account \"{name}\"? It will no longer be able to dock into this site."
     }
   }
 }

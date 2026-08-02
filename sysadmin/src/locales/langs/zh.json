@@ -408,6 +408,9 @@
     },
     "supply": {
       "title": "货源管理"
+    },
+    "supplierAccount": {
+      "title": "供货账号管理"
     }
   },
   "table": {
@@ -1369,6 +1372,53 @@
       "sensitiveTip": "此为密钥,仅保存时填写",
       "sensitiveKeepTip": "留空表示不修改原密钥",
       "sensitivePlaceholder": "填写新的密钥"
+    },
+    "supplierAccount": {
+      "title": "供货账号管理",
+      "add": "新增供货账号",
+      "addTitle": "新增供货账号",
+      "editTitle": "编辑供货账号",
+      "name": "账号名称",
+      "namePlaceholder": "如：下游A公司",
+      "nameRequired": "请输入账号名称",
+      "apiKey": "API Key",
+      "balance": "预存余额",
+      "status": "状态",
+      "statusActive": "启用",
+      "statusDisabled": "禁用",
+      "filterStatus": "按状态筛选",
+      "contact": "联系方式",
+      "contactPlaceholder": "QQ/微信/邮箱(选填)",
+      "remark": "备注",
+      "remarkPlaceholder": "备注信息(选填)",
+      "recharge": "充值",
+      "ledger": "账本",
+      "resetSecret": "重置密钥",
+      "secretTitle": "API 凭证(仅此一次展示)",
+      "secretWarning": "请立即复制保存 API Key 和 Secret,关闭后将无法再次查看 Secret!",
+      "copy": "复制",
+      "copySuccess": "已复制",
+      "copyFailed": "复制失败,请手动选择复制",
+      "iHaveSaved": "我已保存",
+      "resetConfirm": "确认重置「{name}」的 API Secret?重置后旧 Secret 立即失效,下游需用新 Secret 重新对接",
+      "resetSuccess": "密钥已重置,请复制新 Secret 给下游",
+      "rechargeTitle": "充值预存 — {name}",
+      "currentBalance": "当前余额",
+      "rechargeAmount": "充值金额",
+      "yuan": "元",
+      "rechargeRemarkPlaceholder": "充值备注(选填)",
+      "rechargeSuccess": "充值成功",
+      "ledgerTitle": "账本流水 — {name}",
+      "ledgerTime": "时间",
+      "ledgerType": "类型",
+      "ledgerAmount": "变动金额",
+      "ledgerBalanceAfter": "变动后余额",
+      "typeRecharge": "充值",
+      "typeOrder": "下单扣费",
+      "typeRefund": "退款",
+      "typeAdjust": "手动调整",
+      "modified": "修改成功",
+      "deleteConfirm": "确认删除供货账号「{name}」?删除后该账号无法再对接本站拿货"
     }
   }
 }

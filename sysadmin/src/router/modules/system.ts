@@ -64,5 +64,15 @@ export const systemRoutes: AppRouteRecord = {
         keepAlive: false,
       },
     },
+    {
+      path: '/suppliermgt/index',
+      name: 'SupplierAccountIndex',
+      component: '/supplierAccount/list/index',
+      meta: {
+        title: 'menus.supplierAccount.title',
+        icon: 'ri:key-2-line',
+        keepAlive: false,
+      },
+    },
   ],
 }
