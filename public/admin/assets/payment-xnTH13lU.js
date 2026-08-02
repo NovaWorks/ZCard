@@ -1,1 +1,0 @@
-import{b2 as a}from"./index-fvXM1re0.js";const n=()=>a.get({url:"/admin/payment-channels"}),e=(n,e)=>a.put({url:`/admin/payment-channels/${n}`,data:e}),s=n=>a.get({url:`/admin/payment-channels/${n}/config-fields`});export{s as a,n as g,e as u};

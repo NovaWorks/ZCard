@@ -139,12 +139,13 @@ class UpdateController extends Controller
             // fetch 远程 → reset --hard origin/main(工作区已被 preserveUserFiles 清理干净)
             $output = $this->shell('cd ' . base_path() . ' && git fetch origin main 2>&1 && git reset --hard origin/main 2>&1');
             $this->log($logFile, $output);
-            $this->restoreUserFiles();
 
-            // 检测致命错误(网络问题等)
-            if (str_contains($output, 'fatal:') || str_contains($output, 'Could not resolve host')) {
+            // 检测致命错误(网络问题、文件权限等),必须在 restoreUserFiles 之前:
+            // 否则 .env 恢复时的权限异常会掩盖真正的 git 失败原因。
+            if (str_contains($output, 'fatal:') || str_contains($output, 'Could not resolve host') || str_contains($output, 'Permission denied')) {
                 throw new \RuntimeException('Git pull 失败: ' . $output);
             }
+            $this->restoreUserFiles();
 
             // Step 4: composer install(设置 COMPOSER_HOME 避免容器无 HOME)
             $this->log($logFile, '安装依赖...');
@@ -233,6 +234,11 @@ class UpdateController extends Controller
             $this->preserveUserFiles();
             $output = $this->shell('cd ' . base_path() . ' && git reset --hard HEAD~1 2>&1');
             $this->log($logFile, $output);
+
+            // reset 失败要在 restoreUserFiles 之前检测,避免恢复 .env 时的权限异常掩盖真正的失败原因
+            if (str_contains($output, 'fatal:') || str_contains($output, 'Permission denied')) {
+                throw new \RuntimeException('Git 回退失败: ' . $output);
+            }
             $this->restoreUserFiles();
 
             // Step 3: 安装依赖(可能需要降级)
@@ -473,7 +479,16 @@ class UpdateController extends Controller
             if (! is_dir($parent)) {
                 @mkdir($parent, 0775, true);
             }
-            copy($file->getPathname(), $fullPath);
+            // 恢复失败(权限不足等)不能中断流程,也不能掩盖真正的错误:
+            // .env 已在 .gitignore 中,git reset 不会动它,跳过恢复也不会丢配置。
+            try {
+                if (! @copy($file->getPathname(), $fullPath)) {
+                    // @copy 失败时不抛异常,静默跳过并记日志便于排查
+                    $this->log(storage_path('app/update.log'), "恢复用户文件跳过(权限不足): {$relativePath}");
+                }
+            } catch (\Throwable) {
+                // copy 失败不中断
+            }
             @unlink($file->getPathname());
         }
         // 清理空的备份目录树
