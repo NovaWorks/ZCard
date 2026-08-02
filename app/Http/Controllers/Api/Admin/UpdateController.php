@@ -131,12 +131,14 @@ class UpdateController extends Controller
             $this->log($logFile, '备份当前版本信息...');
             file_put_contents(storage_path('app/last_version.txt'), $currentVersion);
 
-            // Step 3: git pull(自动切 HTTPS 避免 SSH key 问题)
+            // Step 3: git pull(自动处理 .env 等本地改动冲突)
             $this->log($logFile, '拉取最新代码...');
             $this->ensureGitSafeDirectory();
             $this->ensureHttpsRemote();
+            $this->preserveUserFiles();
             $output = $this->shell('cd ' . base_path() . ' && git pull origin main 2>&1');
             $this->log($logFile, $output);
+            $this->restoreUserFiles();
 
             // git pull 可能输出 "dubious ownership" 警告但 exit code 仍为 0,
             // 这里检测关键错误词
@@ -224,11 +226,14 @@ class UpdateController extends Controller
             $this->log($logFile, '进入维护模式...');
             Artisan::call('down');
 
-            // Step 2: git reset 回退
+            // Step 2: git reset 回退(保护 .env 不被覆盖)
             $this->log($logFile, '回退代码到上一版本...');
+            $this->ensureGitSafeDirectory();
             $this->ensureHttpsRemote();
+            $this->preserveUserFiles();
             $output = $this->shell('cd ' . base_path() . ' && git reset --hard HEAD~1 2>&1');
             $this->log($logFile, $output);
+            $this->restoreUserFiles();
 
             // Step 3: 安装依赖(可能需要降级)
             $this->log($logFile, '安装依赖...');
@@ -326,6 +331,59 @@ class UpdateController extends Controller
     private function canExec(): bool
     {
         return function_exists('proc_open');
+    }
+
+    /**
+     * git pull 前保护用户已修改的文件。
+     *
+     * .env 等文件可能被 git 跟踪(旧版本)或本地有改动,导致 git pull 报
+     * "Your local changes would be overwritten" 中断更新。
+     * 这里备份这些文件,然后 git checkout 让工作区干净,pull 后再恢复。
+     * 文件本身不会被 git pull 修改(它们已从新版仓库移除或本地独立)。
+     */
+    private function preserveUserFiles(): void
+    {
+        foreach ($this->userProtectedFiles() as $relativePath) {
+            $fullPath = base_path($relativePath);
+            if (! file_exists($fullPath)) {
+                continue;
+            }
+            // 备份到 storage,git pull 后恢复
+            copy($fullPath, storage_path("app/_update_backup_{$relativePath}"));
+
+            // 只有 git 跟踪的文件才需要 checkout(让工作区干净,pull 才不报冲突)
+            // v1.1.9+ 的 .env 已从 git 移除,不会被跟踪,无需 checkout
+            try {
+                $tracked = trim($this->shell('git ls-files --error-unmatch ' . escapeshellarg($relativePath) . ' 2>/dev/null'));
+                if ($tracked !== '') {
+                    $this->shell('git checkout -- ' . escapeshellarg($relativePath) . ' 2>/dev/null');
+                }
+            } catch (\Throwable) {
+                // 文件不在 git 里,无需 checkout
+            }
+        }
+    }
+
+    /**
+     * git pull 后恢复用户文件。
+     */
+    private function restoreUserFiles(): void
+    {
+        foreach ($this->userProtectedFiles() as $relativePath) {
+            $backup = storage_path("app/_update_backup_{$relativePath}");
+            if (file_exists($backup)) {
+                copy($backup, base_path($relativePath));
+                @unlink($backup);
+            }
+        }
+    }
+
+    /**
+     * 需要保护、绝不能被 git pull 覆盖的文件(用户真实配置)。
+     */
+    private function userProtectedFiles(): array
+    {
+        return ['.env', '.env.local'];
     }
 
     /**
