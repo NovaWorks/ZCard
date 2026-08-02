@@ -61,7 +61,7 @@ class SupplyOrderController extends Controller
         $account = $request->attributes->get('supplier_account');
         $supplyOrder = SupplyOrder::where('supplier_account_id', $account->id)->find($id);
         if (! $supplyOrder) {
-            return response()->json(['ok' => false, 'error_code' => 'order_not_found', 'message' => '订单不存在'], 404);
+            return response()->json(['ok' => false, 'error_code' => 'order_not_found', 'message' => __('messages.supply_api.order_not_found')], 404);
         }
 
         $order = $supplyOrder->order;
@@ -82,7 +82,7 @@ class SupplyOrderController extends Controller
         $account = $request->attributes->get('supplier_account');
         $supplyOrder = SupplyOrder::where('supplier_account_id', $account->id)->find($id);
         if (! $supplyOrder) {
-            return response()->json(['ok' => false, 'error_code' => 'order_not_found', 'message' => '订单不存在'], 404);
+            return response()->json(['ok' => false, 'error_code' => 'order_not_found', 'message' => __('messages.supply_api.order_not_found')], 404);
         }
 
         // 已发货的供货订单不可取消(卡密已发)

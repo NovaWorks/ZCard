@@ -5,6 +5,7 @@ namespace App\Supply;
 use App\Models\Card;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductSku;
 use App\Models\SupplierAccount;
 use App\Models\SupplierLedgerEntry;
 use App\Models\SupplyOrder;
@@ -42,7 +43,14 @@ class SupplyOrderService
         }
 
         $qty = $params['quantity'];
-        $unitPrice = $this->pricing->resolvePrice($account, $product, null);
+        // 解析 SKU(若有),走 SKU 级专属价;否则商品级。修正:之前硬编码 null 导致 SKU 价不生效
+        $sku = null;
+        if (! empty($params['sku_id'])) {
+            $sku = ProductSku::where('id', $params['sku_id'])
+                ->where('product_id', $product->id)
+                ->first();
+        }
+        $unitPrice = $this->pricing->resolvePrice($account, $product, $sku);
         $amount = $unitPrice * $qty;
 
         try {

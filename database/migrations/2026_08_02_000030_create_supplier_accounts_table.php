@@ -11,7 +11,7 @@ return new class extends Migration {
             $table->id();
             $table->string('name', 100)->comment('账号名/公司名');
             $table->string('api_key', 64)->unique()->comment('公开标识(32位hex),可明文返回');
-            $table->string('api_secret', 128)->comment('签名密钥(64位hex),加密存储');
+            $table->string('api_secret', 500)->comment('签名密钥(64位hex),加密存储;Crypt::encryptString 加密后约 200-300 字符');
             $table->bigInteger('balance')->default(0)->comment('预存余额(分)');
             $table->string('status', 20)->default('active')->comment('active|disabled');
             $table->string('contact')->nullable()->comment('联系方式');

@@ -68,6 +68,7 @@ return [
     'supply_api.insufficient_balance' => 'Insufficient balance',
     'supply_api.insufficient_stock' => 'Insufficient stock',
     'supply_api.product_unavailable' => 'Product unavailable',
+    'supply_api.order_not_found' => 'Order not found',
     'supply_api.order_not_cancelable' => 'Order cannot be canceled',
     'supply_api.bad_request' => 'Bad request',
     'supply_api.timestamp_expired' => 'Request expired',

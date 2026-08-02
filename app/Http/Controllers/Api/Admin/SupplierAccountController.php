@@ -106,7 +106,7 @@ class SupplierAccountController extends Controller
             'remark' => 'nullable|string|max:200',
         ]);
 
-        $key = 'recharge_' . $supplierAccount->id . '_' . time() . '_' . random_int(1000, 9999);
+        $key = 'recharge_' . $supplierAccount->id . '_' . time() . '_' . bin2hex(random_bytes(8));
         DB::transaction(function () use ($supplierAccount, $data, $key) {
             $locked = SupplierAccount::where('id', $supplierAccount->id)->lockForUpdate()->firstOrFail();
             $locked->increment('balance', $data['amount']);
@@ -131,7 +131,7 @@ class SupplierAccountController extends Controller
             'remark' => 'nullable|string|max:200',
         ]);
 
-        $key = 'adjust_' . $supplierAccount->id . '_' . time() . '_' . random_int(1000, 9999);
+        $key = 'adjust_' . $supplierAccount->id . '_' . time() . '_' . bin2hex(random_bytes(8));
         DB::transaction(function () use ($supplierAccount, $data, $key) {
             $locked = SupplierAccount::where('id', $supplierAccount->id)->lockForUpdate()->firstOrFail();
             $locked->increment('balance', $data['amount']);

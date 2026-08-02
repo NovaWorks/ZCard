@@ -108,4 +108,29 @@ class SupplyOrderServiceTest extends TestCase
             $this->assertSame('insufficient_stock', $e->errorCode);
         }
     }
+
+    public function test_order_uses_sku_level_price_when_sku_id_given(): void
+    {
+        // 修复 I1:下单传 sku_id 应走 SKU 级专属价,而非商品级
+        $account = $this->makeAccount(100000); // 1000 元
+        $product = $this->makeProductWithCards(500, 2);
+        // 建 SKU 并设 SKU 级专属价 400 分(低于商品 factory_price 500)
+        $sku = \App\Models\ProductSku::create([
+            'product_id' => $product->id, 'name' => '规格A', 'price' => 500, 'stock_type' => 'card', 'status' => 1,
+        ]);
+        \App\Models\SupplierProductPrice::create([
+            'supplier_account_id' => $account->id, 'product_id' => $product->id,
+            'sku_id' => $sku->id, 'price' => 400,
+        ]);
+        $service = app(SupplyOrderService::class);
+
+        $result = $service->createOrder($account, [
+            'product_id' => $product->id, 'sku_id' => $sku->id, 'quantity' => 1,
+            'downstream_order_no' => 'DOWN-SKU-1',
+        ], 'sync');
+
+        // 应按 SKU 级价 400 扣费,而非商品级 500
+        $this->assertSame(400, $result['amount']);
+        $this->assertSame(99600, (int) $account->fresh()->balance); // 100000 - 400
+    }
 }

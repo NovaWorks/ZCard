@@ -13,7 +13,7 @@ return new class extends Migration {
             $table->foreignId('order_id')->constrained('orders')->cascadeOnDelete()->comment('对应本地order(source=supply)');
             $table->string('downstream_order_no', 100)->comment('下游幂等订单号');
             $table->string('fulfillment_mode', 10)->default('sync')->comment('sync|async');
-            $table->string('callback_url')->nullable()->comment('下游回调地址');
+            $table->string('callback_url', 500)->nullable()->comment('下游回调地址');
             $table->string('callback_status', 20)->nullable()->comment('pending|sent|failed');
             $table->timestamps();
 

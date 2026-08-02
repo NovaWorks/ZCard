@@ -69,6 +69,7 @@ return [
     'supply_api.insufficient_balance' => '余额不足',
     'supply_api.insufficient_stock' => '库存不足',
     'supply_api.product_unavailable' => '商品不可用',
+    'supply_api.order_not_found' => '订单不存在',
     'supply_api.order_not_cancelable' => '订单不可取消',
     'supply_api.bad_request' => '请求参数错误',
     'supply_api.timestamp_expired' => '请求已过期',
