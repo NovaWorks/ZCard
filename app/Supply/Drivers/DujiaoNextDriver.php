@@ -4,19 +4,18 @@ namespace App\Supply\Drivers;
 
 use App\Models\SupplySource;
 use App\Supply\Contracts\SupplyDriver;
+use App\Supply\Drivers\Concerns\MakesHttpRequests;
+use App\Supply\Dto\UpstreamCategory;
+use App\Supply\Dto\UpstreamFulfillment;
 use App\Supply\Dto\UpstreamOrder;
 use App\Supply\Dto\UpstreamProduct;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
-/**
- * dujiao-next 上游驱动(spec §3.3)
- * 鉴权:HMAC-SHA256,三头 Dujiao-Next-Api-Key/Timestamp/Signature
- * 端点:/api/v1/upstream/*
- * HTTP 调用实现见 Phase 3 Task。
- */
 class DujiaoNextDriver implements SupplyDriver
 {
+    use MakesHttpRequests;
+
     public function __construct(public readonly SupplySource $source) {}
 
     public static function configSchema(): array
@@ -33,19 +32,147 @@ class DujiaoNextDriver implements SupplyDriver
         return ['name' => '独角数卡(dujiao-next)', 'icon' => '🦄'];
     }
 
-    public function ping(): array { return $this->notImplemented('ping'); }
-    public function listCategories(): array { return $this->notImplemented('listCategories'); }
-    public function listProducts(?Carbon $updatedAfter, int $page): array { return $this->notImplemented('listProducts'); }
-    public function getProduct(string $code): ?UpstreamProduct { return $this->notImplemented('getProduct'); }
-    public function getStock(string $code, ?string $skuCode = null): int { return $this->notImplemented('getStock'); }
-    public function createOrder(array $params): UpstreamOrder { return $this->notImplemented('createOrder'); }
-    public function getOrder(string $upstreamOrderId): UpstreamOrder { return $this->notImplemented('getOrder'); }
-    public function cancelOrder(string $upstreamOrderId): bool { return $this->notImplemented('cancelOrder'); }
-    public function verifyCallback(Request $request): ?array { return $this->notImplemented('verifyCallback'); }
-
-    /** Phase 3 实现 HTTP 调用前抛此异常 */
-    private function notImplemented(string $method): mixed
+    /** dujiao-next HMAC 三头签名(spec §3.3) */
+    private function signedHeaders(string $method, string $path, string $body = ''): array
     {
-        throw new \RuntimeException("DujiaoNextDriver::{$method} 待 Phase 3 实现");
+        $creds = $this->credentials();
+        $ts = (string) time();
+        $signString = implode("\n", [$method, $path, $ts, md5($body)]);
+        $sig = hash_hmac('sha256', $signString, $creds['api_secret']);
+        return [
+            'Dujiao-Next-Api-Key' => $creds['api_key'],
+            'Dujiao-Next-Timestamp' => $ts,
+            'Dujiao-Next-Signature' => $sig,
+        ];
+    }
+
+    public function ping(): array
+    {
+        try {
+            $path = '/api/v1/upstream/ping';
+            $headers = $this->signedHeaders('POST', $path, md5(''));
+            $data = $this->postJson($path, [], $headers);
+            return [
+                'connected' => $data['ok'] ?? false,
+                'name' => $data['name'] ?? null,
+                'balance' => isset($data['balance']) ? (int) round((float) $data['balance'] * 100) : null,
+                'currency' => $data['currency'] ?? 'CNY',
+            ];
+        } catch (\Throwable $e) {
+            return ['connected' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    public function listCategories(): array
+    {
+        $path = '/api/v1/upstream/categories';
+        $data = $this->getJson($path, [], $this->signedHeaders('GET', $path));
+        return collect($data['categories'] ?? [])->map(fn ($c) => new UpstreamCategory(
+            code: (string) $c['id'], name: $c['name'], parentCode: isset($c['parent_id']) ? (string) $c['parent_id'] : null,
+            icon: $c['icon'] ?? null, sort: $c['sort_order'] ?? 0,
+        ))->all();
+    }
+
+    public function listProducts(?Carbon $updatedAfter, int $page): array
+    {
+        $path = '/api/v1/upstream/products';
+        $query = ['page' => $page, 'page_size' => 50];
+        if ($updatedAfter) $query['updated_after'] = $updatedAfter->toIso8601String();
+        $data = $this->getJson($path, $query, $this->signedHeaders('GET', $path));
+        $items = collect($data['items'] ?? [])->map(fn ($p) => $this->mapProduct($p))->all();
+        return ['items' => $items, 'total' => $data['total'] ?? 0, 'page' => $page, 'has_more' => ($page * 50) < ($data['total'] ?? 0)];
+    }
+
+    public function getProduct(string $code): ?UpstreamProduct
+    {
+        $path = "/api/v1/upstream/products/{$code}";
+        $data = $this->getJson($path, [], $this->signedHeaders('GET', $path));
+        return isset($data['product']) ? $this->mapProduct($data['product']) : null;
+    }
+
+    public function getStock(string $code, ?string $skuCode = null): int
+    {
+        $p = $this->getProduct($code);
+        return $p?->stockQuantity ?? -1;
+    }
+
+    public function createOrder(array $params): UpstreamOrder
+    {
+        $path = '/api/v1/upstream/orders';
+        $body = [
+            'sku_id' => (int) $params['product_code'],
+            'quantity' => $params['quantity'],
+            'downstream_order_no' => $params['downstream_order_no'],
+            'callback_url' => $params['callback_url'] ?? null,
+        ];
+        $bodyStr = json_encode($body);
+        $data = $this->postJson($path, $body, $this->signedHeaders('POST', $path, md5($bodyStr)));
+        return new UpstreamOrder(
+            id: (string) ($data['order_id'] ?? ''),
+            status: $data['status'] ?? 'pending',
+            amount: isset($data['amount']) ? (int) round((float) $data['amount'] * 100) : 0,
+            currency: $data['currency'] ?? 'CNY',
+        );
+    }
+
+    public function getOrder(string $upstreamOrderId): UpstreamOrder
+    {
+        $path = "/api/v1/upstream/orders/{$upstreamOrderId}";
+        $data = $this->getJson($path, [], $this->signedHeaders('GET', $path));
+        $fulfillment = null;
+        if (isset($data['fulfillment']) && ($data['fulfillment']['status'] ?? '') === 'delivered') {
+            $cards = [];
+            $payload = $data['fulfillment']['payload'] ?? null;
+            if ($payload) $cards[] = $payload;
+            $fulfillment = new UpstreamFulfillment(status: 'delivered', cards: $cards, deliveredAt: $data['fulfillment']['delivered_at'] ?? null);
+        }
+        return new UpstreamOrder(
+            id: (string) ($data['order_id'] ?? $upstreamOrderId),
+            status: $data['status'] ?? 'pending',
+            amount: isset($data['amount']) ? (int) round((float) $data['amount'] * 100) : 0,
+            currency: $data['currency'] ?? 'CNY',
+            fulfillment: $fulfillment,
+        );
+    }
+
+    public function cancelOrder(string $upstreamOrderId): bool
+    {
+        $path = "/api/v1/upstream/orders/{$upstreamOrderId}/cancel";
+        $data = $this->postJson($path, [], $this->signedHeaders('POST', $path, md5('')));
+        return $data['ok'] ?? false;
+    }
+
+    public function verifyCallback(Request $request): ?array
+    {
+        $creds = $this->credentials();
+        $sig = $request->header('Dujiao-Next-Signature');
+        $ts = $request->header('Dujiao-Next-Timestamp');
+        $path = $request->getPathInfo();
+        $expected = hash_hmac('sha256', implode("\n", ['POST', $path, $ts, md5($request->getContent())]), $creds['api_secret']);
+        if (! hash_equals($expected, $sig)) return null;
+        $data = $request->json()->all();
+        $cards = [];
+        if (($data['fulfillment']['payload'] ?? null)) $cards[] = $data['fulfillment']['payload'];
+        return [
+            'upstream_order_id' => (string) ($data['order_id'] ?? ''),
+            'status' => $data['status'] ?? '',
+            'cards' => $cards,
+            'downstream_order_no' => $data['downstream_order_no'] ?? null,
+        ];
+    }
+
+    private function mapProduct(array $p): UpstreamProduct
+    {
+        return new UpstreamProduct(
+            code: (string) ($p['id'] ?? ''),
+            name: $p['title'] ?? '',
+            price: isset($p['price_amount']) ? (int) round((float) $p['price_amount'] * 100) : 0,
+            factoryPrice: isset($p['wholesale_prices'][0]) ? (int) round((float) $p['wholesale_prices'][0] * 100) : (isset($p['price_amount']) ? (int) round((float) $p['price_amount'] * 100) : 0),
+            categoryCode: isset($p['category_id']) ? (string) $p['category_id'] : null,
+            description: $p['description'] ?? null,
+            cover: $p['images'][0] ?? null,
+            images: $p['images'] ?? [],
+            isActive: $p['is_active'] ?? true,
+        );
     }
 }

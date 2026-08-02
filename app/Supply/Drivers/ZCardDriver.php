@@ -4,19 +4,19 @@ namespace App\Supply\Drivers;
 
 use App\Models\SupplySource;
 use App\Supply\Contracts\SupplyDriver;
+use App\Supply\Drivers\Concerns\MakesHttpRequests;
+use App\Supply\Dto\UpstreamCategory;
+use App\Supply\Dto\UpstreamFulfillment;
 use App\Supply\Dto\UpstreamOrder;
 use App\Supply\Dto\UpstreamProduct;
+use App\Supply\HmacSigner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
-/**
- * ZCard 上游驱动(spec §3.3) —— 用于「自己对接自己」或对接另一个 ZCard 实例
- * 鉴权:本系统自定义 HMAC(同 /api/supply/* 协议)
- * 端点:/api/supply/*
- * HTTP 调用实现见 Phase 3 Task。
- */
 class ZCardDriver implements SupplyDriver
 {
+    use MakesHttpRequests;
+
     public function __construct(public readonly SupplySource $source) {}
 
     public static function configSchema(): array
@@ -33,18 +33,98 @@ class ZCardDriver implements SupplyDriver
         return ['name' => 'ZCard', 'icon' => '🃏'];
     }
 
-    public function ping(): array { return $this->notImplemented('ping'); }
-    public function listCategories(): array { return $this->notImplemented('listCategories'); }
-    public function listProducts(?Carbon $updatedAfter, int $page): array { return $this->notImplemented('listProducts'); }
-    public function getProduct(string $code): ?UpstreamProduct { return $this->notImplemented('getProduct'); }
-    public function getStock(string $code, ?string $skuCode = null): int { return $this->notImplemented('getStock'); }
-    public function createOrder(array $params): UpstreamOrder { return $this->notImplemented('createOrder'); }
-    public function getOrder(string $upstreamOrderId): UpstreamOrder { return $this->notImplemented('getOrder'); }
-    public function cancelOrder(string $upstreamOrderId): bool { return $this->notImplemented('cancelOrder'); }
-    public function verifyCallback(Request $request): ?array { return $this->notImplemented('verifyCallback'); }
-
-    private function notImplemented(string $method): mixed
+    /** 本系统自定义 HMAC 四头签名(同 /api/supply/* 协议,spec §4.2) */
+    private function signedHeaders(string $method, string $path, string $body = ''): array
     {
-        throw new \RuntimeException("ZCardDriver::{$method} 待 Phase 3 实现");
+        $creds = $this->credentials();
+        $ts = (string) time();
+        $nonce = 'zcard_' . uniqid();
+        $ss = HmacSigner::buildSignString($method, $path, $ts, $nonce, md5($body));
+        return [
+            'X-Supply-Key' => $creds['api_key'],
+            'X-Supply-Timestamp' => $ts,
+            'X-Supply-Nonce' => $nonce,
+            'X-Supply-Signature' => HmacSigner::sign($creds['api_secret'], $ss),
+        ];
+    }
+
+    public function ping(): array
+    {
+        try {
+            $path = '/api/supply/ping';
+            $data = $this->postJson($path, [], $this->signedHeaders('POST', $path));
+            return ['connected' => $data['ok'] ?? false, 'name' => $data['name'] ?? null, 'balance' => $data['balance'] ?? null, 'currency' => $data['currency'] ?? 'CNY'];
+        } catch (\Throwable $e) { return ['connected' => false, 'error' => $e->getMessage()]; }
+    }
+
+    public function listCategories(): array
+    {
+        $path = '/api/supply/categories';
+        $data = $this->postJson($path, [], $this->signedHeaders('POST', $path));
+        return collect($data['categories'] ?? [])->map(fn ($c) => new UpstreamCategory(code: (string) $c['id'], name: $c['name'], parentCode: isset($c['parent_id']) ? (string) $c['parent_id'] : null))->all();
+    }
+
+    public function listProducts(?Carbon $updatedAfter, int $page): array
+    {
+        $path = '/api/supply/products';
+        $query = ['page' => $page];
+        $data = $this->getJson($path, $query, $this->signedHeaders('GET', $path));
+        $items = collect($data['items'] ?? [])->map(fn ($p) => new UpstreamProduct(
+            code: (string) $p['id'], name: $p['name'], price: $p['price'] ?? 0, factoryPrice: $p['price'] ?? 0,
+            categoryCode: isset($p['category_id']) ? (string) $p['category_id'] : null, description: $p['description'] ?? null, cover: $p['cover'] ?? null,
+        ))->all();
+        return ['items' => $items, 'total' => $data['total'] ?? 0, 'page' => $page, 'has_more' => false];
+    }
+
+    public function getProduct(string $code): ?UpstreamProduct
+    {
+        $path = "/api/supply/products/{$code}";
+        $data = $this->getJson($path, [], $this->signedHeaders('GET', $path));
+        $p = $data['product'] ?? null;
+        return $p ? new UpstreamProduct(code: (string) $p['id'], name: $p['name'], price: $p['price'] ?? 0, factoryPrice: $p['price'] ?? 0) : null;
+    }
+
+    public function getStock(string $code, ?string $skuCode = null): int
+    {
+        $path = "/api/supply/products/{$code}/stock";
+        $data = $this->getJson($path, [], $this->signedHeaders('GET', $path));
+        return $data['stock'] ?? -1;
+    }
+
+    public function createOrder(array $params): UpstreamOrder
+    {
+        $path = '/api/supply/orders';
+        $body = ['product_id' => (int) $params['product_code'], 'quantity' => $params['quantity'], 'downstream_order_no' => $params['downstream_order_no']];
+        $bodyStr = json_encode($body);
+        $data = $this->postJson($path, $body, $this->signedHeaders('POST', $path, md5($bodyStr)));
+        $cards = $data['fulfillment']['cards'] ?? [];
+        return new UpstreamOrder(id: (string) $data['supply_order_id'], status: $data['fulfillment']['status'] ?? 'pending', amount: $data['amount'] ?? 0, fulfillment: $cards ? new UpstreamFulfillment(status: 'delivered', cards: $cards) : null);
+    }
+
+    public function getOrder(string $upstreamOrderId): UpstreamOrder
+    {
+        $path = "/api/supply/orders/{$upstreamOrderId}";
+        $data = $this->getJson($path, [], $this->signedHeaders('GET', $path));
+        $cards = $data['fulfillment']['cards'] ?? [];
+        return new UpstreamOrder(id: $upstreamOrderId, status: $data['fulfillment']['status'] ?? 'pending', amount: $data['amount'] ?? 0, fulfillment: $cards ? new UpstreamFulfillment(status: 'delivered', cards: $cards) : null);
+    }
+
+    public function cancelOrder(string $upstreamOrderId): bool
+    {
+        $path = "/api/supply/orders/{$upstreamOrderId}/cancel";
+        $data = $this->postJson($path, [], $this->signedHeaders('POST', $path));
+        return $data['ok'] ?? false;
+    }
+
+    public function verifyCallback(Request $request): ?array
+    {
+        $creds = $this->credentials();
+        $sig = $request->header('X-Supply-Signature');
+        $ts = $request->header('X-Supply-Timestamp');
+        $nonce = $request->header('X-Supply-Nonce');
+        $ss = HmacSigner::buildSignString('POST', $request->getPathInfo(), $ts, $nonce, md5($request->getContent() ?: ''));
+        if (! HmacSigner::verify($creds['api_secret'], $ss, $sig)) return null;
+        $data = $request->json()->all();
+        return ['upstream_order_id' => (string) ($data['supply_order_id'] ?? ''), 'status' => $data['status'] ?? '', 'cards' => $data['fulfillment']['cards'] ?? [], 'downstream_order_no' => $data['downstream_order_no'] ?? null];
     }
 }
