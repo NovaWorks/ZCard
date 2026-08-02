@@ -1,6 +1,9 @@
 <?php
 
+use App\Jobs\SyncSupplySourceProducts;
 use App\Models\SubsiteLedgerEntry;
+use App\Models\SupplySource;
+use App\Supply\NonceStore;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -18,3 +21,18 @@ Schedule::call(function () {
         ->where('available_at', '<=', now())
         ->update(['status' => 'available']);
 })->daily();
+
+// 货源商品自动同步(spec §6.6) —— 每小时跑增量,只对开启自动同步的 active 货源
+// 注意:JSON_EXTRACT 为 MySQL 专属语法(生产环境),SQLite 测试环境不会执行调度
+Schedule::call(function () {
+    if (! config('zcard.features.supply')) {
+        return;
+    }
+    SupplySource::where('status', 'active')
+        ->whereRaw("JSON_EXTRACT(settings, '$.auto_sync') = true")
+        ->each(fn ($s) => SyncSupplySourceProducts::dispatch($s->id, 'incremental'));
+})->hourly();
+
+// nonce 清理(database 模式,spec §8.5):每天清掉过期记录
+Schedule::call(fn () => app(NonceStore::class)->pruneExpiredDatabase())->daily();
+

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SyncSupplySourceProducts;
 use App\Models\SupplySource;
 use App\Supply\SupplyManager;
 use Illuminate\Http\JsonResponse;
@@ -100,8 +101,8 @@ class SupplySourceController extends Controller
     public function sync(Request $request, SupplySource $supplySource): JsonResponse
     {
         $mode = in_array($request->input('mode'), ['full', 'incremental']) ? $request->input('mode') : 'incremental';
-        // Task 4 接入 SyncSupplySourceProducts Job
-        return response()->json(['ok' => true, 'message' => '同步任务已派发(待 Task4 实现)', 'mode' => $mode]);
+        SyncSupplySourceProducts::dispatch($supplySource->id, $mode);
+        return response()->json(['ok' => true, 'message' => '同步任务已派发', 'mode' => $mode]);
     }
 
     /** GET /api/admin/supply-sources/{source}/sync-status */
