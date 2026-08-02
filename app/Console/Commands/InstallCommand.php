@@ -33,6 +33,11 @@ class InstallCommand extends Command
             return self::FAILURE;
         }
 
+        // ─── Step 1.5: 修复关键目录权限 ───
+        // composer install / git pull 用 root 执行时,目录属主为 root,而 PHP-FPM 以
+        // www 用户运行 → 不可写 → 500。这里尝试递归 chmod 修复(同组可写)。
+        $this->fixPermissions();
+
         // ─── Step 2: 数据库配置(交互式) ───
         if (! $this->option('skip-db')) {
             $this->configureDatabase();
@@ -220,6 +225,64 @@ class InstallCommand extends Command
             return false;
         }
         return true;
+    }
+
+    /**
+     * 修复关键目录权限。
+     * composer install / git pull 用 root 执行时,目录属主为 root,而 PHP-FPM 以
+     * www 用户运行 → 不可写 → 500。CLI 以 root 运行时还能顺带 chown 修正属主。
+     */
+    private function fixPermissions(): void
+    {
+        $dirs = [
+            storage_path(),
+            storage_path('app'),
+            storage_path('app/public'),
+            storage_path('framework'),
+            storage_path('framework/cache'),
+            storage_path('framework/cache/data'),
+            storage_path('framework/sessions'),
+            storage_path('framework/views'),
+            storage_path('logs'),
+            base_path('bootstrap/cache'),
+        ];
+
+        foreach ($dirs as $dir) {
+            if (! is_dir($dir)) {
+                @mkdir($dir, 0775, true);
+            }
+            @chmod($dir, 0775);
+        }
+
+        // CLI 以 root 运行时,顺带把属主修正为 PHP-FPM 用户(宝塔默认 www)
+        // posix_getuid 需要 posix 扩展;无扩展时静默跳过
+        if (function_exists('posix_getuid') && posix_getuid() === 0) {
+            $phpUser = $this->detectPhpFpmUser();
+            if ($phpUser) {
+                foreach ($dirs as $dir) {
+                    @chown($dir, $phpUser);
+                    @chgrp($dir, $phpUser);
+                }
+                $this->info(" ✔ 目录权限已修复(chown {$phpUser}:{$phpUser} + chmod 775)");
+            } else {
+                $this->info(' ✔ 目录权限已修复(chmod 775;属主请手动 chown)');
+            }
+        }
+    }
+
+    /**
+     * 探测 PHP-FPM 运行用户(宝塔/lnmp 默认 www,aapanel 默认 www-data)。
+     */
+    private function detectPhpFpmUser(): ?string
+    {
+        // 常见 PHP-FPM 用户,优先级从高到低
+        foreach (['www', 'www-data', 'nginx', 'apache'] as $user) {
+            if (function_exists('posix_getpwnam') && @posix_getpwnam($user)) {
+                return $user;
+            }
+        }
+
+        return null;
     }
 
     /** 写入 .env(带引号保护含特殊字符的值) */

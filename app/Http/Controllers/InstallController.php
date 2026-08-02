@@ -121,6 +121,10 @@ class InstallController extends Controller
         ]);
 
         try {
+            // Step 0: 修复关键目录权限(composer install 用 root 跑时,目录属主是 root,
+            // 而 PHP-FPM 以 www 用户运行 → 不可写 → 500)。这里尝试自动 chmod 修复。
+            $this->fixPermissions();
+
             // Step 1: 写入 .env(带引号保护特殊字符)
             $this->writeEnv('DB_HOST', $data['db_host']);
             $this->writeEnv('DB_PORT', (string) $data['db_port']);
@@ -211,6 +215,37 @@ class InstallController extends Controller
                 'success' => false,
                 'message' => '安装失败: ' . $e->getMessage(),
             ], 500);
+        }
+    }
+
+    /**
+     * 修复关键目录权限。
+     * 场景:composer install / git pull 用 root 执行,新生成的 storage、
+     * bootstrap/cache 目录属主为 root,而 PHP-FPM 以 www 用户运行 → 不可写
+     * → Laravel 写 session/日志/编译视图时崩溃 → 500。
+     * 此方法尝试递归 chmod 775 修复;若当前进程无权(chown 需要 root),至少
+     * chmod 能生效(同组可写)。chown 仍需服务器手动执行(见部署指南)。
+     */
+    private function fixPermissions(): void
+    {
+        $dirs = [
+            storage_path(),
+            storage_path('app'),
+            storage_path('app/public'),
+            storage_path('framework'),
+            storage_path('framework/cache'),
+            storage_path('framework/cache/data'),
+            storage_path('framework/sessions'),
+            storage_path('framework/views'),
+            storage_path('logs'),
+            base_path('bootstrap/cache'),
+        ];
+
+        foreach ($dirs as $dir) {
+            if (! is_dir($dir)) {
+                @mkdir($dir, 0775, true);
+            }
+            @chmod($dir, 0775);
         }
     }
 
