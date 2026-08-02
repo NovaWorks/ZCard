@@ -27,7 +27,6 @@ Homestead.yaml
 Thumbs.db
 
 # ZCard
-/docs/
 /storefront/node_modules/
 /storefront/dist/
 /sysadmin/node_modules/

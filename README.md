@@ -36,7 +36,7 @@
 | **PHP** | **>= 8.3** | 需扩展：pdo_mysql, mbstring, openssl, bcmath, json, curl, gd(或 imagick), redis(可选) |
 | **MySQL** | **>= 8.0**（推荐 8.4） | utf8mb4 字符集 |
 | **Redis** | **>= 6.0**（可选） | 用于缓存，不装也可运行（降级为 database 缓存） |
-| **Composer** | >= 2.x | PHP 依赖管理 |
+| **Composer** | **>= 2.8**（推荐最新） | Laravel 13.8+ 要求 `composer-runtime-api ^2.2`,旧版会报错,详见[部署指南](docs/部署安装指南.md) |
 | **Node.js** | >= 18（可选） | 仅开发/重新编译前端时需要，**生产部署不需要**（编译产物已在仓库） |
 
 > **生产部署无需 Node.js/pnpm** —— `public/admin/` 和 `public/storefront/` 的编译产物已提交到仓库，`git clone` 后可直接访问。
@@ -130,6 +130,8 @@ server_name your-domain.com *.your-domain.com;
 # 或让分站主绑定自己的域名(DNS A 记录指向同一 IP)
 # Nginx 不需要额外配置,ResolveSubsite 中间件会自动按 Host 头解析
 ```
+
+> 📖 **部署遇到问题?** 请先阅读 [《部署安装指南(含常见问题排查)》](docs/部署安装指南.md),覆盖了 Composer 版本、PHP 扩展(fileinfo/bcmath)、宝塔禁用函数(putenv)等高频踩坑点。
 
 ---
 
