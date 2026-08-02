@@ -189,6 +189,21 @@ Route::middleware(['auth:sanctum', 'admin.role'])->prefix('admin')->group(functi
     Route::put('subsites/domains/{domain}', [AdminSubsiteController::class, 'updateDomain']);
     Route::get('subsites/{merchant}/product-settings', [AdminSubsiteController::class, 'productSettings']);
     Route::post('subsites/product-settings', [AdminSubsiteController::class, 'upsertProductSetting']);
+
+    // 供货账号管理(spec §7.1)
+    Route::apiResource('supplier-accounts', \App\Http\Controllers\Api\Admin\SupplierAccountController::class)
+        ->parameter('supplier-accounts', 'supplierAccount');
+    Route::post('supplier-accounts/{supplierAccount}/reset-secret', [\App\Http\Controllers\Api\Admin\SupplierAccountController::class, 'resetSecret']);
+    Route::post('supplier-accounts/{supplierAccount}/recharge', [\App\Http\Controllers\Api\Admin\SupplierAccountController::class, 'recharge']);
+    Route::post('supplier-accounts/{supplierAccount}/adjust', [\App\Http\Controllers\Api\Admin\SupplierAccountController::class, 'adjust']);
+    Route::get('supplier-accounts/{supplierAccount}/ledger', [\App\Http\Controllers\Api\Admin\SupplierAccountController::class, 'ledger']);
+    // 专属定价(账号维度)
+    Route::get('supplier-accounts/{supplierAccount}/prices', [\App\Http\Controllers\Api\Admin\SupplierPriceController::class, 'indexForAccount']);
+    Route::put('supplier-accounts/{supplierAccount}/prices', [\App\Http\Controllers\Api\Admin\SupplierPriceController::class, 'updateForAccount']);
+    Route::delete('supplier-accounts/{supplierAccount}/prices/{priceId}', [\App\Http\Controllers\Api\Admin\SupplierPriceController::class, 'destroyForAccount']);
+    // 专属定价(商品维度)
+    Route::get('products/{product}/supply-prices', [\App\Http\Controllers\Api\Admin\SupplierPriceController::class, 'indexForProduct']);
+    Route::put('products/{product}/supply-prices', [\App\Http\Controllers\Api\Admin\SupplierPriceController::class, 'updateForProduct']);
 });
 
 // 公开货币列表(供前台货币切换器,不需要 display.currency 中间件)
