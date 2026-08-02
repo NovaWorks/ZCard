@@ -1,8 +1,10 @@
 *.log
 .DS_Store
-.env
+# .env 提交安全默认值(无真实密钥),让 clone 后开箱即用、可直接进安装向导
+# 仍忽略含真实凭据的备份/覆盖文件
 .env.backup
 .env.production
+.env.local
 .phpactor.json
 .phpunit.result.cache
 /.codex

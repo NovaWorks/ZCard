@@ -19,10 +19,12 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <env name="APP_KEY" value="base64:EAWNbmMOyhwk/HkHRKpHTQkYKyUYKlD6RAuLNVyApPw="/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
+        <env name="CARD_ENCRYPTION_KEY" value="base64:lB/I9UOezhNICph0qOP5e3O0Ta16zR+KUOZA2+oJFCQ="/>
         <env name="DB_DATABASE" value="testing"/>
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
