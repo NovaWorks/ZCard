@@ -336,50 +336,144 @@ class UpdateController extends Controller
     /**
      * git pull 前保护用户已修改的文件。
      *
-     * .env 等文件可能被 git 跟踪(旧版本)或本地有改动,导致 git pull 报
-     * "Your local changes would be overwritten" 中断更新。
-     * 这里备份这些文件,然后 git checkout 让工作区干净,pull 后再恢复。
-     * 文件本身不会被 git pull 修改(它们已从新版仓库移除或本地独立)。
+     * 两种来源的本地改动都会导致 git pull 报
+     * "Your local changes would be overwritten" 中断更新:
+     *   1. 固定保护清单(.env 等用户真实配置,即使未被 git 跟踪)
+     *   2. 用户手动改过的任意 git 跟踪文件(如 config/app.php 改时区)
+     *
+     * 策略:把这两类文件都备份到 storage,然后让工作区恢复干净(git checkout),
+     * pull 完成后再把用户版本恢复回去 —— 用户改动不丢,更新不被阻塞。
      */
     private function preserveUserFiles(): void
     {
+        // 1. 固定保护清单(.env 等核心配置,与 git 跟踪与否无关)
         foreach ($this->userProtectedFiles() as $relativePath) {
             $fullPath = base_path($relativePath);
-            if (! file_exists($fullPath)) {
-                continue;
+            if (file_exists($fullPath)) {
+                copy($fullPath, $this->backupPath($relativePath));
             }
-            // 备份到 storage,git pull 后恢复
-            copy($fullPath, storage_path("app/_update_backup_{$relativePath}"));
+        }
 
-            // 只有 git 跟踪的文件才需要 checkout(让工作区干净,pull 才不报冲突)
-            // v1.1.9+ 的 .env 已从 git 移除,不会被跟踪,无需 checkout
-            try {
-                $tracked = trim($this->shell('git ls-files --error-unmatch ' . escapeshellarg($relativePath) . ' 2>/dev/null'));
-                if ($tracked !== '') {
-                    $this->shell('git checkout -- ' . escapeshellarg($relativePath) . ' 2>/dev/null');
+        // 2. 自动检测所有本地有改动的 git 跟踪文件,一并备份 + checkout
+        //    覆盖用户改过 config/app.php、config/cache.php 等任意配置的场景
+        try {
+            $status = $this->shell('cd ' . base_path() . ' && git status --porcelain 2>/dev/null');
+            $dirtyFiles = $this->parseDirtyFiles($status);
+            foreach ($dirtyFiles as $relativePath) {
+                $fullPath = base_path($relativePath);
+                if (! file_exists($fullPath)) {
+                    continue;
                 }
-            } catch (\Throwable) {
-                // 文件不在 git 里,无需 checkout
+                // 备份用户版本(若尚未备份)
+                $backup = $this->backupPath($relativePath);
+                if (! file_exists($backup)) {
+                    copy($fullPath, $backup);
+                }
+                // 让工作区恢复 HEAD 版本,消除 pull 障碍
+                $this->shell('git checkout -- ' . escapeshellarg($relativePath) . ' 2>/dev/null');
             }
+        } catch (\Throwable) {
+            // 无法检测本地改动(如 shell 被禁用),回退到仅保护固定清单
         }
     }
 
     /**
-     * git pull 后恢复用户文件。
+     * 解析 git status --porcelain 输出,提取有本地改动的文件路径。
+     * 只取「工作区已修改」(M)和「已删除」(D)的文件,忽略未跟踪文件(??)。
+     */
+    private function parseDirtyFiles(string $status): array
+    {
+        $files = [];
+        foreach (preg_split('/\r\n|\r|\n/', trim($status)) as $line) {
+            if ($line === '') {
+                continue;
+            }
+            // porcelain 格式: "XY path"(XY 各1字符,固定宽度,中间无额外空格)
+            // 例: " M file.php"(工作区改)、"M  file.php"(暂存区改)、"?? file"(未跟踪)
+            $flag = substr($line, 0, 2);
+            $path = ltrim(substr($line, 2)); // 跳过 XY 两列,去掉路径前空格
+            // 跳过未跟踪文件(??) 和暂存区新增(A)
+            if (str_starts_with($flag, '?') || str_starts_with($flag, 'A')) {
+                continue;
+            }
+            // 处理重命名 "R  old -> new" 取 new
+            if (str_starts_with($flag, 'R') && str_contains($path, ' -> ')) {
+                $path = trim(substr($path, strpos($path, ' -> ') + 4));
+            }
+            $path = trim($path, '"');
+            if ($path !== '') {
+                $files[] = $path;
+            }
+        }
+
+        return array_unique($files);
+    }
+
+    /**
+     * 用户文件的备份路径(统一存放 storage/app/update_backups/,保留原始相对路径结构)。
+     */
+    private function backupPath(string $relativePath): string
+    {
+        $dir = storage_path('app/update_backups');
+        $full = $dir . '/' . $relativePath;
+        $parent = dirname($full);
+        if (! is_dir($parent)) {
+            @mkdir($parent, 0775, true);
+        }
+
+        return $full;
+    }
+
+    /**
+     * git pull 后恢复用户文件(递归扫描备份目录,按相对路径还原)。
      */
     private function restoreUserFiles(): void
     {
-        foreach ($this->userProtectedFiles() as $relativePath) {
-            $backup = storage_path("app/_update_backup_{$relativePath}");
-            if (file_exists($backup)) {
-                copy($backup, base_path($relativePath));
-                @unlink($backup);
-            }
+        $dir = storage_path('app/update_backups');
+        if (! is_dir($dir)) {
+            return;
         }
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)
+        );
+        foreach ($iterator as $file) {
+            if (! $file->isFile()) {
+                continue;
+            }
+            // 备份内的相对路径 = 原始项目相对路径
+            $relativePath = substr($file->getPathname(), strlen($dir . '/'));
+            $fullPath = base_path($relativePath);
+            // 确保目标目录存在(git pull 可能删除了旧的空目录)
+            $parent = dirname($fullPath);
+            if (! is_dir($parent)) {
+                @mkdir($parent, 0775, true);
+            }
+            copy($file->getPathname(), $fullPath);
+            @unlink($file->getPathname());
+        }
+        // 清理空的备份目录树
+        $this->removeEmptyDirs($dir);
     }
 
     /**
-     * 需要保护、绝不能被 git pull 覆盖的文件(用户真实配置)。
+     * 递归删除空目录。
+     */
+    private function removeEmptyDirs(string $dir): void
+    {
+        if (! is_dir($dir)) {
+            return;
+        }
+        foreach (glob($dir . '/*') as $item) {
+            if (is_dir($item)) {
+                $this->removeEmptyDirs($item);
+            }
+        }
+        @rmdir($dir);
+    }
+
+    /**
+     * 需要固定保护、绝不能被 git pull 覆盖的文件(用户真实配置)。
+     * 这些文件即使本地无改动也强制备份(.env 等),与 git 跟踪与否无关。
      */
     private function userProtectedFiles(): array
     {
