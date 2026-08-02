@@ -13,6 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // 未安装拦截:最先执行,检测到未安装时降级 driver 并跳转 /install
+        // 必须在 StartSession 之前,否则 session(driver=database) 查表会崩
+        $middleware->prepend(\App\Http\Middleware\EnsureInstalled::class);
+
         // API 路由加入 Session 支持(mews/captcha 验证码需要 session 存储)
         $middleware->api(prepend: [
             \Illuminate\Session\Middleware\StartSession::class,
