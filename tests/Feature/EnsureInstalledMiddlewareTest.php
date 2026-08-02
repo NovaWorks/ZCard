@@ -88,6 +88,20 @@ class EnsureInstalledMiddlewareTest extends TestCase
         $this->assertNotEquals(503, $resp->getStatusCode());
     }
 
+    public function test_uninstalled_with_empty_app_key_still_redirects(): void
+    {
+        // 仓库 .env 的 APP_KEY 默认留空(开箱即用),未安装时中间件需兜底生成 key,
+        // 否则 EncryptCookies 中间件初始化会抛异常导致 500、安装向导无法加载
+        $this->markAsUninstalled();
+        config(['app.key' => '']);
+
+        $this->get('/')
+            ->assertRedirect('/install');
+
+        // 中间件应已生成并注入 key
+        $this->assertNotEmpty(config('app.key'));
+    }
+
     public function test_installed_state_does_not_redirect(): void
     {
         $this->markAsInstalled();

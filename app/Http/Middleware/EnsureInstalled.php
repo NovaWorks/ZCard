@@ -31,6 +31,10 @@ class EnsureInstalled
         // 未安装:降级为内存驱动,避免 StartSession 等 middleware 碰数据库而崩溃
         $this->downgradeDrivers();
 
+        // 未安装时若 APP_KEY 为空,EncryptCookies / Session 中间件会抛异常导致 500,
+        // 安装向导无法加载。这里兜底生成 key 并写入 .env(与安装向导后续的 key:generate 一致)
+        $this->ensureAppKey();
+
         // 放行安装向导本身及其依赖的静态资源
         if ($this->isInstallRoute($request) || $this->isStaticAsset($request)) {
             return $next($request);
@@ -69,6 +73,48 @@ class EnsureInstalled
             'cache.default' => 'array',
             'queue.default' => 'sync',
         ]);
+    }
+
+    /**
+     * 兜底生成 APP_KEY。
+     * 仓库 .env 的 APP_KEY 默认留空(便于开箱即用),但 EncryptCookies / Session
+     * 中间件初始化时需要有效 key,否则框架直接 500,安装向导无法加载。
+     * 仅在未安装且 key 为空时执行:生成并写入 .env,同时注入当前进程 config。
+     */
+    private function ensureAppKey(): void
+    {
+        if (! empty(config('app.key'))) {
+            return;
+        }
+
+        $key = 'base64:'.base64_encode(random_bytes(32));
+        $this->writeEnv('APP_KEY', $key);
+        config(['app.key' => $key]);
+    }
+
+    /**
+     * 写入 .env(若 key 已存在则替换,否则追加)。.env 不存在时从 .env.example 创建。
+     */
+    private function writeEnv(string $key, string $value): void
+    {
+        $path = base_path('.env');
+        if (! file_exists($path)) {
+            $example = base_path('.env.example');
+            if (file_exists($example)) {
+                copy($example, $path);
+            } else {
+                file_put_contents($path, '');
+            }
+        }
+
+        $content = file_get_contents($path);
+        $pattern = '/^'.preg_quote($key, '/').'=.*/m';
+        if (preg_match($pattern, $content)) {
+            $content = preg_replace($pattern, "{$key}={$value}", $content);
+        } else {
+            $content .= "{$key}={$value}\n";
+        }
+        file_put_contents($path, $content);
     }
 
     /**
