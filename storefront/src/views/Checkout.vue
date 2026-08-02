@@ -97,7 +97,7 @@ async function validateCoupon() {
     const res = await fetch('/api/coupons/validate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: couponCode.value.trim(), product_id: product.value.id, amount: price() * qty.value / 100 }),
+      body: JSON.stringify({ code: couponCode.value.trim(), product_id: product.value.id, amount: price() * qty.value }),
     })
     const data = await res.json()
     if (data.valid) {

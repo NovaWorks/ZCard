@@ -231,8 +231,8 @@ class CardController extends Controller
             'status' => $card->status,
             'note' => $card->note,
             'card_type' => $card->card_type,
-            'draft_premium' => $card->draft_premium,
-            'draft_cost' => $card->draft_cost,
+            'draft_premium' => round($card->draft_premium / 100, 2),
+            'draft_cost' => round($card->draft_cost / 100, 2),
             'owner_id' => $card->owner_id,
             'product_name' => $card->product?->name,
             'order_no' => $card->order?->order_no,
@@ -252,6 +252,13 @@ class CardController extends Controller
             'draft_cost' => 'nullable|numeric|min:0',
             'status' => 'nullable|string|in:unused,locked,used,disabled',
         ]);
+        // draft_premium/cost 前端传元,存库转分(*100)
+        if (isset($data['draft_premium'])) {
+            $data['draft_premium'] = (int) round($data['draft_premium'] * 100);
+        }
+        if (isset($data['draft_cost'])) {
+            $data['draft_cost'] = (int) round($data['draft_cost'] * 100);
+        }
         $card->update($data);
         return response()->json($card->fresh());
     }

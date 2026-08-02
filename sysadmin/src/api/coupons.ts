@@ -1,4 +1,6 @@
 import http from '@/utils/http'
+import axios from 'axios'
+import { useUserStore } from '@/store/modules/user'
 
 export interface Coupon {
   id: number
@@ -61,3 +63,23 @@ export const toggleCoupon = (id: number) =>
 
 export const deleteCoupon = (id: number) =>
   http.del({ url: `/admin/coupons/${id}` })
+
+/** 导出筛选后的优惠券为 CSV(直接用 axios+blob,不走封装 http) */
+export const exportCoupons = async (params: CouponListParams): Promise<{ filename: string; blob: Blob }> => {
+  const { VITE_API_URL } = import.meta.env
+  const { accessToken } = useUserStore()
+
+  const res = await axios.get(`${VITE_API_URL}/admin/coupons/export`, {
+    params,
+    responseType: 'blob',
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
+  })
+
+  let filename = `coupons-export-${Date.now()}.csv`
+  const cd = res.headers['content-disposition'] as string | undefined
+  if (cd) {
+    const match = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i)
+    if (match) filename = decodeURIComponent(match[1])
+  }
+  return { filename, blob: res.data as Blob }
+}

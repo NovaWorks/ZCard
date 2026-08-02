@@ -15,8 +15,7 @@ use App\Models\UserGroup;
  * 升级规则:在 status=true 的等级中,找出阈值 <= 用户累计值的最高档(按 sort 升序取最后一条),
  * 若该档高于当前等级,则升级。只升不降(累计值下降不回退等级)。
  *
- * 金额单位:users 累计字段为分(integer),user_groups 阈值字段为元(decimal),
- * 比较时把累计值(分)换算成元,统一在「元」维度比较。
+ * 金额单位:users 累计字段和 user_groups 阈值字段均为分(integer),直接比较。
  */
 class MemberUpgradeService
 {
@@ -66,7 +65,7 @@ class MemberUpgradeService
 
     /**
      * 对指定用户执行升级判定(只升不降)。
-     * 阈值字段为元(decimal),累计字段为分(integer),比较时累计值 / 100 换算成元。
+     * 阈值字段和累计字段均为分(integer),直接比较无需换算。
      */
     public static function upgrade(User $user): void
     {
@@ -74,12 +73,12 @@ class MemberUpgradeService
         $thresholdColumn = $basis === 'consumption' ? 'min_consumption' : 'min_recharge';
         $totalColumn = $basis === 'consumption' ? 'total_consumption' : 'total_recharge';
 
-        // 累计值(分)换算成元(decimal:2)
-        $totalYuan = round(((int) $user->{$totalColumn}) / 100, 2);
+        // 累计值(分),阈值也是分,直接比较
+        $totalFen = (int) $user->{$totalColumn};
 
         // 在启用等级中找阈值 <= 累计值 的最高档(按 sort 升序,取最后一条)
         $target = UserGroup::where('status', true)
-            ->where($thresholdColumn, '<=', $totalYuan)
+            ->where($thresholdColumn, '<=', $totalFen)
             ->orderBy('sort')
             ->orderBy('id')
             ->get()

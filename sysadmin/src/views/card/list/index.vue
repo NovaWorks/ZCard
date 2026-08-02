@@ -508,9 +508,9 @@
     )}:${pad(d.getMinutes())}`
   }
 
-  /** 金额格式化（后端 decimal 直接是元，无需 /100） */
+  /** 金额格式化（数据库存分，展示时 /100 转元） */
   const formatMoney = (v: number | null | undefined): string => {
-    const n = Number(v ?? 0)
+    const n = Number(v ?? 0) / 100
     return Number.isFinite(n) ? n.toFixed(2) : '0.00'
   }
 

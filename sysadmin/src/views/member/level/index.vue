@@ -78,8 +78,9 @@ const handleEdit = (row: UserGroup) => {
     id: row.id || 0,
     name: row.name,
     discount: Number(row.discount),
-    min_recharge: Number(row.min_recharge),
-    min_consumption: Number(row.min_consumption ?? 0),
+    // 后端返回分,表单显示元(/100)
+    min_recharge: Number(row.min_recharge) / 100,
+    min_consumption: Number(row.min_consumption ?? 0) / 100,
     sort: row.sort,
     status: row.status
   }
@@ -182,12 +183,12 @@ onMounted(() => {
       </ElTableColumn>
       <ElTableColumn :label="t('zcard.member.minRecharge')" width="140" align="center">
         <template #default="{ row }">
-          ¥{{ Number(row.min_recharge).toFixed(2) }}
+          ¥{{ (Number(row.min_recharge) / 100).toFixed(2) }}
         </template>
       </ElTableColumn>
       <ElTableColumn :label="t('zcard.member.minConsumption')" width="140" align="center">
         <template #default="{ row }">
-          ¥{{ Number(row.min_consumption ?? 0).toFixed(2) }}
+          ¥{{ (Number(row.min_consumption ?? 0) / 100).toFixed(2) }}
         </template>
       </ElTableColumn>
       <ElTableColumn prop="sort" :label="t('zcard.member.sort')" width="80" align="center" />

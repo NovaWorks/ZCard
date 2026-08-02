@@ -34,8 +34,9 @@ class UserGroupController extends Controller
         $group = UserGroup::create([
             'name' => $data['name'],
             'discount' => $data['discount'] ?? 100,
-            'min_recharge' => $data['min_recharge'] ?? 0,
-            'min_consumption' => $data['min_consumption'] ?? 0,
+            // 前端传元,存库转分(*100)
+            'min_recharge' => isset($data['min_recharge']) ? (int) round($data['min_recharge'] * 100) : 0,
+            'min_consumption' => isset($data['min_consumption']) ? (int) round($data['min_consumption'] * 100) : 0,
             'sort' => $data['sort'] ?? 0,
             'status' => array_key_exists('status', $data) ? (bool) $data['status'] : true,
         ]);
@@ -55,6 +56,14 @@ class UserGroupController extends Controller
             'sort' => 'sometimes|integer|min:0',
             'status' => 'sometimes|boolean',
         ]);
+
+        // 前端传元,存库转分(*100)
+        if (isset($data['min_recharge'])) {
+            $data['min_recharge'] = (int) round($data['min_recharge'] * 100);
+        }
+        if (isset($data['min_consumption'])) {
+            $data['min_consumption'] = (int) round($data['min_consumption'] * 100);
+        }
 
         $group->update($data);
 

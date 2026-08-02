@@ -22,8 +22,8 @@ class UserGroup extends Model
         return [
             'status' => 'boolean',
             'discount' => 'decimal:2',
-            'min_recharge' => 'decimal:2',
-            'min_consumption' => 'decimal:2',
+            'min_recharge' => 'integer',
+            'min_consumption' => 'integer',
         ];
     }
 }

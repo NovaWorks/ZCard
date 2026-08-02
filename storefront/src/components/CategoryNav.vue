@@ -46,8 +46,8 @@ function hasChildren(c: Category) { return c.children && c.children.length > 0 }
     </div>
   </div>
 
-  <!-- sidebar: 左侧树(大厂风格:卡片化 + 图标 + 可折叠子分类) -->
-  <aside v-else-if="style === 'sidebar'" class="w-52 shrink-0">
+  <!-- sidebar: 左侧树(大厂风格:卡片化 + 图标 + 可折叠子分类); 手机隐藏,md 以上显示 -->
+  <aside v-else-if="style === 'sidebar'" class="hidden md:block w-52 shrink-0">
     <div class="bg-white rounded-card border border-border overflow-hidden sticky top-4">
       <!-- 标题 -->
       <div class="flex items-center gap-2 px-4 py-3 border-b border-border bg-surface-subtle">

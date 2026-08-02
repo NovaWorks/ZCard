@@ -145,7 +145,8 @@ Route::middleware(['auth:sanctum', 'admin.role'])->prefix('admin')->group(functi
     Route::post('withdrawals/{id}/approve', [AdminWithdrawalController::class, 'approve']);
     Route::post('withdrawals/{id}/reject', [AdminWithdrawalController::class, 'reject']);
 
-    // 优惠券管理(CRUD)
+    // 优惠券管理(CRUD + 导出)
+    Route::get('coupons/export', [AdminCouponController::class, 'export']);
     Route::get('coupons/stats', [AdminCouponController::class, 'stats']);
     Route::post('coupons/toggle/{id}', [AdminCouponController::class, 'toggle']);
     Route::apiResource('coupons', AdminCouponController::class)->only(['index', 'store', 'destroy']);

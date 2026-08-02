@@ -18,10 +18,11 @@ class CouponController extends Controller
         $data = $request->validate([
             'code' => 'required|string|max:32',
             'product_id' => 'required|integer|exists:products,id',
-            'amount' => 'required|numeric|min:0.01',
+            'amount' => 'required|integer|min:0',
         ]);
 
-        $amountFen = (int) round($data['amount'] * 100);
+        // amount 直接是分(前端传 price * qty),无需换算
+        $amountFen = (int) $data['amount'];
 
         try {
             $result = CouponService::validate($data['code'], $data['product_id'], $amountFen);

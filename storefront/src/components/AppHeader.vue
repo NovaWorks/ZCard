@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -41,6 +41,9 @@ function languageLabel(code: string): string {
   const labels: Record<string, string> = { zh: '中文', en: 'English' }
   return labels[code] || code
 }
+
+/** 移动端菜单展开状态 */
+const mobileMenuOpen = ref(false)
 </script>
 
 <template>
@@ -64,7 +67,8 @@ function languageLabel(code: string): string {
         <span v-else class="w-9 h-9 bg-gradient-to-br from-primary to-primary-hover rounded-[10px] text-white font-extrabold flex items-center justify-center text-lg shadow-sm">Z</span>
         <span class="text-xl font-extrabold text-ink tracking-tight">{{ siteName }}</span>
       </RouterLink>
-      <nav class="flex items-center gap-1 text-sm">
+      <!-- 桌面端导航 (md 以上显示) -->
+      <nav class="hidden md:flex items-center gap-1 text-sm">
         <RouterLink to="/" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.home') }}</RouterLink>
         <RouterLink to="/orders/query" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.orders') }}</RouterLink>
         <!-- 货币切换器 -->
@@ -91,6 +95,41 @@ function languageLabel(code: string): string {
             class="ml-1 px-4 py-1.5 rounded-field bg-primary text-white hover:bg-primary-hover transition shadow-sm">{{ t('nav.register') }}</RouterLink>
         </template>
       </nav>
+
+      <!-- 移动端汉堡按钮 (md 以下显示) -->
+      <button @click="mobileMenuOpen = !mobileMenuOpen"
+        class="md:hidden p-2 rounded-field text-ink-soft hover:bg-primary-light transition shrink-0">
+        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path v-if="!mobileMenuOpen" d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/>
+          <path v-else d="M6 6l12 12M18 6l-12 12" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- 移动端下拉菜单 -->
+    <div v-if="mobileMenuOpen" class="md:hidden border-t border-border bg-white px-4 py-3 space-y-2">
+      <RouterLink to="/" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">{{ t('nav.home') }}</RouterLink>
+      <RouterLink to="/orders/query" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">{{ t('nav.orders') }}</RouterLink>
+      <template v-if="authStore.isLoggedIn">
+        <RouterLink to="/user" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink font-medium hover:bg-primary-light transition text-sm">👤 {{ authStore.user?.username }}</RouterLink>
+        <RouterLink to="/orders/mine" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">{{ t('nav.mine') }}</RouterLink>
+        <RouterLink v-if="settings.config?.distribution_enabled" to="/distribution" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">{{ t('nav.distribution') }}</RouterLink>
+        <RouterLink v-if="settings.config?.subsite_enabled" to="/my-subsite" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">{{ t('nav.mySubsite') }}</RouterLink>
+        <button @click="logout(); mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-field text-ink-soft hover:text-danger hover:bg-red-50 transition text-sm">{{ t('nav.logout') }}</button>
+      </template>
+      <template v-else>
+        <RouterLink to="/login" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-primary hover:bg-primary-light transition text-sm">{{ t('nav.login') }}</RouterLink>
+        <RouterLink to="/register" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field bg-primary text-white hover:bg-primary-hover transition text-sm text-center">{{ t('nav.register') }}</RouterLink>
+      </template>
+      <!-- 货币 + 语言切换 -->
+      <div class="flex items-center gap-2 pt-2 border-t border-border">
+        <select v-model="currencySel" class="flex-1 px-2 py-1.5 rounded-field border border-border text-xs text-ink-soft bg-white">
+          <option v-for="c in prefs.currencies" :key="c.code" :value="c.code">{{ c.code }}</option>
+        </select>
+        <select v-model="langSel" class="flex-1 px-2 py-1.5 rounded-field border border-border text-xs text-ink-soft bg-white">
+          <option v-for="lang in prefs.languages" :key="lang" :value="lang">{{ languageLabel(lang) }}</option>
+        </select>
+      </div>
     </div>
   </header>
 </template>

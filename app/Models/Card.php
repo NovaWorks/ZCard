@@ -24,6 +24,8 @@ class Card extends Model
         return [
             'locked_at' => 'datetime',
             'used_at' => 'datetime',
+            'draft_premium' => 'integer',
+            'draft_cost' => 'integer',
         ];
     }
 

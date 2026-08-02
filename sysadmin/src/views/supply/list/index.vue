@@ -169,7 +169,7 @@
         </ElFormItem>
         <ElFormItem :label="t('zcard.supply.autoList')">
           <ElSwitch v-model="formData.settings.auto_list" />
-          <span class="field-help">{{ t('zcard.supply.autoListTip') }}</span>
+          <div class="field-help">{{ t('zcard.supply.autoListTip') }}</div>
         </ElFormItem>
       </ElForm>
       <template #footer>
@@ -494,8 +494,9 @@
   }
   .field-help {
     font-size: 12px;
-    color: var(--el-text-color-secondary);
-    line-height: 1.4;
-    margin-top: 2px;
+    color: var(--el-text-color-placeholder);
+    line-height: 1.5;
+    margin-top: 4px;
+    display: block;
   }
 </style>

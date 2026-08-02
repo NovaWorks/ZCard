@@ -15,9 +15,9 @@ import HotTags from '@/components/HotTags.vue'
 const router = useRouter()
 const { t } = useI18n()
 
-/** 网格列数(配置驱动,默认 4 列;safelist 在 main.css) */
-const gridClass = (cols: number) => `grid gap-3 grid-cols-${cols}`
-const dualClass = 'grid gap-3 grid-cols-2'
+/** 网格列数(配置驱动,默认 4 列;手机强制 2 列,safelist 在 main.css) */
+const gridClass = (cols: number) => `grid gap-3 grid-cols-2 md:grid-cols-${cols}`
+const dualClass = 'grid gap-3 grid-cols-1 md:grid-cols-2'
 const settings = useSettingsStore()
 const products = useProductsStore()
 const prefs = usePreferencesStore()

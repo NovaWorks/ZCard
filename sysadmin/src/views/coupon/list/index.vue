@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
-import { getCoupons, getCouponStats, createCoupons, toggleCoupon, deleteCoupon, type Coupon, type CouponStats } from '@/api/coupons'
+import { getCoupons, getCouponStats, createCoupons, toggleCoupon, deleteCoupon, exportCoupons, type Coupon, type CouponStats } from '@/api/coupons'
 
 defineOptions({ name: 'CouponList' })
 
@@ -60,6 +60,29 @@ const resetSearch = () => { keyword.value = ''; statusFilter.value = ''; typeFil
 const copyText = async (text: string) => {
   try { await navigator.clipboard.writeText(text); ElMessage.success(t('zcard.coupon.copied')) }
   catch { ElMessage.warning(text) }
+}
+
+/** 导出 CSV */
+const exporting = ref(false)
+const handleExport = async () => {
+  exporting.value = true
+  try {
+    ElMessage.info(t('zcard.coupon.exportStarted'))
+    const { filename, blob } = await exportCoupons(buildParams())
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    ElMessage.success(t('zcard.coupon.exportDone'))
+  } catch {
+    ElMessage.error(t('zcard.coupon.exportFailed'))
+  } finally {
+    exporting.value = false
+  }
 }
 
 // 批量生成
@@ -139,7 +162,10 @@ onMounted(fetchData)
           <ElButton type="primary" @click="handleSearch">{{ t('zcard.common.search') }}</ElButton>
           <ElButton @click="resetSearch">{{ t('zcard.common.reset') }}</ElButton>
         </div>
-        <ElButton type="primary" @click="openGen">🎫 {{ t('zcard.coupon.generate') }}</ElButton>
+        <div class="toolbar-right">
+          <ElButton :loading="exporting" @click="handleExport">📥 {{ t('zcard.coupon.exportFiltered') }}</ElButton>
+          <ElButton type="primary" @click="openGen">🎫 {{ t('zcard.coupon.generate') }}</ElButton>
+        </div>
       </div>
 
       <ElTable :data="list" v-loading="loading" border stripe>
