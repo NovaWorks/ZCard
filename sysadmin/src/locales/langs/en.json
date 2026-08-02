@@ -405,6 +405,9 @@
     },
     "update": {
       "title": "Online Update"
+    },
+    "supply": {
+      "title": "Supply Sources"
     }
   },
   "table": {
@@ -1190,7 +1193,6 @@
       "rateL1": "Tier 1 Rate",
       "rateL2": "Tier 2 Rate",
       "rateL3": "Tier 3 Rate",
-      "tabSupply": "Supply Integration",
       "supplyEnabled": "Enable Supply",
       "supplyEnabledTip": "Master switch. When off, both upstream sourcing and downstream supplying are disabled",
       "supplyUpstreamEnabled": "As Downstream (Source)",
@@ -1337,6 +1339,36 @@
       "rollbackConfirmTip": "This will rollback to the previous version (including database migration rollback). System enters maintenance mode during rollback. Continue?",
       "rollbackSuccess": "Rolled back successfully, page will refresh",
       "rollbackFailed": "Rollback failed"
+    },
+    "supply": {
+      "title": "Supply Sources",
+      "add": "Add Source",
+      "addTitle": "Add Supply Source",
+      "editTitle": "Edit Supply Source",
+      "name": "Name",
+      "namePlaceholder": "e.g. Main dujiao",
+      "nameRequired": "Please enter a name",
+      "platform": "Platform",
+      "platformPlaceholder": "Select upstream platform",
+      "platformRequired": "Please select a platform",
+      "baseUrl": "Site URL",
+      "balance": "Upstream Balance",
+      "syncedAt": "Last Synced",
+      "status": "Status",
+      "statusActive": "Active",
+      "statusDisabled": "Disabled",
+      "filterStatus": "Filter by status",
+      "test": "Test",
+      "testSuccess": "Connected, balance: {balance}",
+      "testFailed": "Connection failed: {error}",
+      "sync": "Sync",
+      "syncDispatched": "Sync job dispatched, check status later",
+      "modified": "Modified",
+      "created": "Created",
+      "deleteConfirm": "Delete supply source \"{name}\"? Its products will no longer sync",
+      "sensitiveTip": "This is a secret key, enter only when saving",
+      "sensitiveKeepTip": "Leave empty to keep the existing key",
+      "sensitivePlaceholder": "Enter a new key"
     }
   }
 }

@@ -405,6 +405,9 @@
     },
     "update": {
       "title": "在线更新"
+    },
+    "supply": {
+      "title": "货源管理"
     }
   },
   "table": {
@@ -1190,7 +1193,6 @@
       "rateL1": "一级佣金率",
       "rateL2": "二级佣金率",
       "rateL3": "三级佣金率",
-      "tabSupply": "货源对接",
       "supplyEnabled": "启用货源对接",
       "supplyEnabledTip": "总开关。关闭后对接上游拿货、对外供货均不生效",
       "supplyUpstreamEnabled": "作为下游(拿货)",
@@ -1337,6 +1339,36 @@
       "rollbackConfirmTip": "将回退到上一个版本(包含数据库迁移回退),期间系统进入维护模式。确认操作?",
       "rollbackSuccess": "已回退到上一个版本,页面即将刷新",
       "rollbackFailed": "回退失败"
+    },
+    "supply": {
+      "title": "货源管理",
+      "add": "新增货源",
+      "addTitle": "新增货源",
+      "editTitle": "编辑货源",
+      "name": "货源名称",
+      "namePlaceholder": "如：主站dujiao",
+      "nameRequired": "请输入货源名称",
+      "platform": "对接平台",
+      "platformPlaceholder": "选择上游平台",
+      "platformRequired": "请选择对接平台",
+      "baseUrl": "站点地址",
+      "balance": "上游余额",
+      "syncedAt": "最近同步",
+      "status": "状态",
+      "statusActive": "启用",
+      "statusDisabled": "禁用",
+      "filterStatus": "按状态筛选",
+      "test": "测试连通",
+      "testSuccess": "连接成功,余额：{balance}",
+      "testFailed": "连接失败：{error}",
+      "sync": "同步商品",
+      "syncDispatched": "同步任务已派发,请稍后查看同步状态",
+      "modified": "修改成功",
+      "created": "新增成功",
+      "deleteConfirm": "确认删除货源「{name}」？删除后该上游商品将不再同步",
+      "sensitiveTip": "此为密钥,仅保存时填写",
+      "sensitiveKeepTip": "留空表示不修改原密钥",
+      "sensitivePlaceholder": "填写新的密钥"
     }
   }
 }

@@ -54,5 +54,15 @@ export const systemRoutes: AppRouteRecord = {
         keepAlive: false,
       },
     },
+    {
+      path: '/supplymgt/index',
+      name: 'SupplySourceIndex',
+      component: '/supply/list/index',
+      meta: {
+        title: 'menus.supply.title',
+        icon: 'ri:plug-line',
+        keepAlive: false,
+      },
+    },
   ],
 }
