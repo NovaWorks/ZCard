@@ -2,9 +2,11 @@
 
 return [
 
-    // ZCard 版本号(兜底值)。运行时 AppHelper::version() 优先读 git describe --tags,
-    // git pull/拉取新 release tag 后自动跟上版本号;无 git 或无 tag 时回退此值。
-    'version' => env('APP_VERSION', '1.0.0'),
+    // ZCard 版本号(兜底值)。运行时 AppHelper::version() 优先读 git tag:
+    //   1. git describe(需 proc_open;宝塔/容器常禁用)
+    //   2. 直接读 .git/refs/tags/(纯文件操作,兜底)
+    // 两者都不可用时回退此值。每次发版同步更新。
+    'version' => env('APP_VERSION', '1.1.6'),
 
     /*
     |--------------------------------------------------------------------------

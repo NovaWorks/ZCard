@@ -43,13 +43,17 @@ class AppHelper
     }
 
     /**
-     * 从 git describe --tags 读取版本号。
+     * 从 git 读取版本号。优先用 git describe(含 tag 后提交计数),失败时
+     * 直接读 .git 目录下的 tag 文件(纯文件操作,不受 disable_functions 限制,
+     * 宝塔/容器环境 proc_open 被禁用时 git describe 不可用,这是兜底)。
+     *
      * - 命中 tag 返回纯净版本(如 v1.0.1 → 1.0.1)
      * - tag 之后有提交返回带后缀(如 1.0.1-28-g00ba1fb),取首段版本号
      * - 无 git/无 tag 返回 null(回退 config)
      */
     private static function versionFromGit(): ?string
     {
+        // 方案 1:git describe(最准,含提交计数后缀;需 proc_open)
         try {
             $process = Process::fromShellCommandline(
                 'git describe --tags --always 2>/dev/null',
@@ -59,16 +63,42 @@ class AppHelper
             $output = trim($process->getOutput());
 
             if ($process->isSuccessful() && $output !== '' && ! str_starts_with($output, 'v0.0.0')) {
-                // 形如 v1.0.1 或 1.0.1-28-g00ba1fb → 取首段并去 v 前缀
                 $first = explode('-', $output)[0];
 
                 return ltrim($first, 'vV');
             }
         } catch (\Throwable) {
-            // 无 git 或执行失败 → 回退 config
+            // proc_open 被禁用 / 无 git → 尝试方案 2
         }
 
-        return null;
+        // 方案 2:纯文件读取 .git/refs/tags/ 下最新的 tag(无需执行命令)
+        return self::versionFromGitFiles();
+    }
+
+    /**
+     * 直接读 .git 目录获取最新 tag 版本号(纯文件操作,不执行任何命令)。
+     * 取版本号最大的 tag(v1.1.5 > v1.1.4 > v1.0.0),而非时间最近的。
+     */
+    private static function versionFromGitFiles(): ?string
+    {
+        $tagsDir = base_path('.git/refs/tags');
+        if (! is_dir($tagsDir)) {
+            return null;
+        }
+
+        $tags = array_diff(scandir($tagsDir), ['.', '..']);
+        if (empty($tags)) {
+            return null;
+        }
+
+        // 按语义版本排序,取最大的
+        usort($tags, function ($a, $b) {
+            return version_compare(ltrim($b, 'vV'), ltrim($a, 'vV'));
+        });
+
+        $latest = $tags[0];
+
+        return ltrim($latest, 'vV');
     }
 
     /** 清除版本缓存(更新/回滚后调用,确保下次读到新版本) */

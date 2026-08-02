@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Process\Process;
 
 /**
  * 在线更新系统(Git-based,比 acg-faka 的 OTA zip 方案更安全)。
@@ -296,10 +297,32 @@ class UpdateController extends Controller
 
     /**
      * 执行 shell 命令,设好环境变量避免容器问题。
+     *
+     * 优先用 Symfony Process(更可靠的错误处理);若 proc_open 被 disable_functions
+     * 禁用(宝塔常见),抛出含清晰提示的异常,而非 PHP fatal error。
      */
     private function shell(string $command): string
     {
-        return (string) shell_exec($command);
+        if (! $this->canExec()) {
+            throw new \RuntimeException(
+                '服务器禁用了执行命令所需的函数(proc_open / shell_exec)。'
+                .'请在宝塔面板「PHP 设置 → 禁用函数」中移除 proc_open 和 shell_exec 后重试。'
+            );
+        }
+
+        $process = Process::fromShellCommandline($command, base_path());
+        $process->setTimeout(600);
+        $process->run();
+
+        return $process->getOutput().$process->getErrorOutput();
+    }
+
+    /**
+     * 检测当前环境是否能执行命令(proc_open 是 Symfony Process 的底层依赖)。
+     */
+    private function canExec(): bool
+    {
+        return function_exists('proc_open');
     }
 
     /**
@@ -314,11 +337,15 @@ class UpdateController extends Controller
      */
     private function ensureHttpsRemote(): void
     {
-        $remote = (string) shell_exec('cd ' . base_path() . ' && git remote get-url origin 2>/dev/null');
-        // 如果是 SSH(git@github.com:owner/repo.git),转 HTTPS
-        if (preg_match('#git@github\.com:(.+)/(.+)\.git#', trim($remote), $m)) {
-            $https = "https://github.com/{$m[1]}/{$m[2]}.git";
-            shell_exec('cd ' . base_path() . " && git remote set-url origin {$https} 2>&1");
+        try {
+            $remote = trim($this->shell('git remote get-url origin 2>/dev/null'));
+            // 如果是 SSH(git@github.com:owner/repo.git),转 HTTPS
+            if (preg_match('#git@github\.com:(.+)/(.+)\.git#', $remote, $m)) {
+                $https = "https://github.com/{$m[1]}/{$m[2]}.git";
+                $this->shell("git remote set-url origin {$https}");
+            }
+        } catch (\Throwable $e) {
+            // 函数被禁用时无法检测 remote,不中断(后续 git pull 会自行报错)
         }
     }
 
@@ -346,24 +373,29 @@ class UpdateController extends Controller
         $path = base_path() . '/' . $dir;
         $this->log($logFile, "构建前端({$dir})...");
 
-        // 检测 pnpm 是否可用
-        $pnpm = (string) shell_exec('which pnpm 2>/dev/null');
-        if (trim($pnpm) !== '') {
-            $output = $this->shell("cd {$path} && pnpm install --frozen-lockfile 2>&1 && pnpm run build 2>&1");
-            if (str_contains($output, 'error') || str_contains($output, 'ERR')) {
-                $this->log($logFile, "{$dir} 构建警告(使用仓库已有编译产物): " . substr($output, 0, 200));
+        try {
+            // 检测 pnpm 是否可用
+            $pnpm = trim($this->shell('which pnpm 2>/dev/null'));
+            if ($pnpm !== '') {
+                $output = $this->shell("cd {$path} && pnpm install --frozen-lockfile 2>&1 && pnpm run build 2>&1");
+                if (str_contains($output, 'error') || str_contains($output, 'ERR')) {
+                    $this->log($logFile, "{$dir} 构建警告(使用仓库已有编译产物): " . substr($output, 0, 200));
+                } else {
+                    $this->log($logFile, "{$dir} 构建完成");
+                }
             } else {
-                $this->log($logFile, "{$dir} 构建完成");
+                // npm fallback
+                $npm = trim($this->shell('which npm 2>/dev/null'));
+                if ($npm !== '') {
+                    $output = $this->shell("cd {$path} && npm ci --silent 2>&1 && npm run build 2>&1");
+                    $this->log($logFile, "{$dir} npm 构建完成");
+                } else {
+                    $this->log($logFile, "{$dir} 无 pnpm/npm,使用仓库已有编译产物(public/{$dir}/)");
+                }
             }
-        } else {
-            // npm fallback
-            $npm = (string) shell_exec('which npm 2>/dev/null');
-            if (trim($npm) !== '') {
-                $output = $this->shell("cd {$path} && npm ci --silent 2>&1 && npm run build 2>&1");
-                $this->log($logFile, "{$dir} npm 构建完成");
-            } else {
-                $this->log($logFile, "{$dir} 无 pnpm/npm,使用仓库已有编译产物(public/{$dir}/)");
-            }
+        } catch (\Throwable $e) {
+            // 函数被禁用或构建失败,跳过(编译产物已在仓库)
+            $this->log($logFile, "{$dir} 构建跳过({$e->getMessage()}),使用仓库已有编译产物");
         }
     }
 }
