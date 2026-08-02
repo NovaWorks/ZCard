@@ -31,6 +31,9 @@ class EnsureInstalled
         // 未安装:降级为内存驱动,避免 StartSession 等 middleware 碰数据库而崩溃
         $this->downgradeDrivers();
 
+        // .env 不存在时自动从 .env.example 复制(clone 后首次访问,git pull 不会覆盖)
+        $this->ensureEnvFile();
+
         // 未安装时若 APP_KEY 为空,EncryptCookies / Session 中间件会抛异常导致 500,
         // 安装向导无法加载。这里兜底生成 key 并写入 .env(与安装向导后续的 key:generate 一致)
         $this->ensureAppKey();
@@ -73,6 +76,27 @@ class EnsureInstalled
             'cache.default' => 'array',
             'queue.default' => 'sync',
         ]);
+    }
+
+    /**
+     * .env 不存在时从 .env.example 复制一份。
+     * .env 不进 git(含真实密钥),clone 后首次访问需自动创建,否则框架 500。
+     * 已存在则不动(绝不覆盖用户已配置的真实凭据)。
+     */
+    private function ensureEnvFile(): void
+    {
+        $envPath = base_path('.env');
+        if (file_exists($envPath)) {
+            return;
+        }
+
+        $example = base_path('.env.example');
+        if (file_exists($example)) {
+            copy($example, $envPath);
+        } else {
+            // 极端情况:.env.example 也没有,创建空文件让框架能启动
+            file_put_contents($envPath, '');
+        }
     }
 
     /**
