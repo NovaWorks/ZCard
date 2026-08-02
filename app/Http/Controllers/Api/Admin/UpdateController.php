@@ -131,18 +131,18 @@ class UpdateController extends Controller
             $this->log($logFile, '备份当前版本信息...');
             file_put_contents(storage_path('app/last_version.txt'), $currentVersion);
 
-            // Step 3: git pull(自动处理 .env 等本地改动冲突)
+            // Step 3: 同步远程代码(fetch + reset,比 pull 更不易冲突)
             $this->log($logFile, '拉取最新代码...');
             $this->ensureGitSafeDirectory();
             $this->ensureHttpsRemote();
             $this->preserveUserFiles();
-            $output = $this->shell('cd ' . base_path() . ' && git pull origin main 2>&1');
+            // fetch 远程 → reset --hard origin/main(工作区已被 preserveUserFiles 清理干净)
+            $output = $this->shell('cd ' . base_path() . ' && git fetch origin main 2>&1 && git reset --hard origin/main 2>&1');
             $this->log($logFile, $output);
             $this->restoreUserFiles();
 
-            // git pull 可能输出 "dubious ownership" 警告但 exit code 仍为 0,
-            // 这里检测关键错误词
-            if (str_contains($output, 'CONFLICT') || str_contains($output, 'error:') || str_contains($output, 'fatal:')) {
+            // 检测致命错误(网络问题等)
+            if (str_contains($output, 'fatal:') || str_contains($output, 'Could not resolve host')) {
                 throw new \RuntimeException('Git pull 失败: ' . $output);
             }
 
@@ -347,33 +347,58 @@ class UpdateController extends Controller
     private function preserveUserFiles(): void
     {
         // 1. 固定保护清单(.env 等核心配置,与 git 跟踪与否无关)
+        //    权限不足时静默跳过(.env 在 .gitignore 里,git reset/clean 不会动它)
         foreach ($this->userProtectedFiles() as $relativePath) {
             $fullPath = base_path($relativePath);
-            if (file_exists($fullPath)) {
-                copy($fullPath, $this->backupPath($relativePath));
+            if (! @is_readable($fullPath)) {
+                continue;
+            }
+            try {
+                @copy($fullPath, $this->backupPath($relativePath));
+            } catch (\Throwable) {
+                // 备份失败不中断
             }
         }
 
-        // 2. 自动检测所有本地有改动的 git 跟踪文件,一并备份 + checkout
+        // 2. 自动检测所有本地有改动的 git 跟踪文件,备份用户版本
         //    覆盖用户改过 config/app.php、config/cache.php 等任意配置的场景
         try {
             $status = $this->shell('cd ' . base_path() . ' && git status --porcelain 2>/dev/null');
             $dirtyFiles = $this->parseDirtyFiles($status);
             foreach ($dirtyFiles as $relativePath) {
                 $fullPath = base_path($relativePath);
-                if (! file_exists($fullPath)) {
+                if (! file_exists($fullPath) || ! @is_readable($fullPath)) {
                     continue;
                 }
-                // 备份用户版本(若尚未备份)
                 $backup = $this->backupPath($relativePath);
                 if (! file_exists($backup)) {
-                    copy($fullPath, $backup);
+                    @copy($fullPath, $backup);
                 }
-                // 让工作区恢复 HEAD 版本,消除 pull 障碍
-                $this->shell('git checkout -- ' . escapeshellarg($relativePath) . ' 2>/dev/null');
             }
+            // 3. 强制清理工作区:reset 已跟踪改动 + clean 未跟踪文件
+            //    确保工作区与 HEAD 完全一致,后续 fetch+reset 不被任何本地状态阻塞
+            $this->shell('cd ' . base_path() . ' && git reset --hard HEAD 2>/dev/null');
+            $this->cleanUntracked();
         } catch (\Throwable) {
             // 无法检测本地改动(如 shell 被禁用),回退到仅保护固定清单
+        }
+    }
+
+    /**
+     * 清理未跟踪的文件和目录(git clean -fd)。
+     *
+     * 之前构建的产物文件、临时文件等会成为未跟踪文件,
+     * git 同步新版本时若同名文件进了仓库会报
+     * "untracked working tree files would be overwritten" 中断更新。
+     * 只清理未被 .gitignore 排除的未跟踪文件(不删 .env/storage/node_modules)。
+     */
+    private function cleanUntracked(): void
+    {
+        try {
+            // -f 强制, -d 含目录; 不加 -x 以尊重 .gitignore
+            $this->shell('cd ' . base_path() . ' && git clean -fd 2>&1');
+        } catch (\Throwable) {
+            // 清理失败不中断
         }
     }
 
