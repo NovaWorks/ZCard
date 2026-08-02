@@ -166,6 +166,7 @@
       "passwordLabel": "🔑 Query password",
       "passwordPlaceholder": "Order query password",
       "enterKeyword": "Please enter an order number or contact",
+      "searching": "Searching...",
       "notFound": "No orders found",
       "checkInput": "Please check the order number or contact",
       "totalCount": "{n} orders found",

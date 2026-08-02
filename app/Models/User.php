@@ -16,7 +16,7 @@ use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable([
     'username', 'name', 'email', 'password', 'status',
-    'balance', 'password_changed_at', 'last_login_at',
+    'balance', 'total_recharge', 'total_consumption', 'password_changed_at', 'last_login_at',
     'phone', 'qq', 'avatar', 'points', 'pid', 'group_id', 'login_ip',
 ])]
 #[Hidden(['password', 'remember_token'])]

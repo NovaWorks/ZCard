@@ -5,6 +5,7 @@ export interface UserGroup {
   name: string
   discount: number
   min_recharge: number
+  min_consumption: number
   sort: number
   status: boolean
   created_at?: string

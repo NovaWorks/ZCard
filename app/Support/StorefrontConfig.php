@@ -111,6 +111,9 @@ class StorefrontConfig
             'enabled_languages' => ['zh'],
             'default_language' => 'zh',
 
+            // 会员等级自动升级依据: recharge=按累计充值, consumption=按累计消费
+            'member_upgrade_basis' => 'recharge',
+
             // 三级分销
             'distribution_enabled' => false,
             'distribution_rate_l1' => 10,   // 百分比(10 = 10%)

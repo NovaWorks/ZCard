@@ -166,6 +166,7 @@
       "passwordLabel": "🔑 查询密码",
       "passwordPlaceholder": "订单设置的查询密码",
       "enterKeyword": "请输入订单号或联系方式",
+      "searching": "查询中...",
       "notFound": "未找到相关订单",
       "checkInput": "请检查订单号或联系方式是否正确",
       "totalCount": "共查询到 {n} 笔订单",

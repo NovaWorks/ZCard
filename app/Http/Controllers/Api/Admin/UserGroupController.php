@@ -26,6 +26,7 @@ class UserGroupController extends Controller
             'name' => 'required|string|max:50',
             'discount' => 'nullable|numeric|min:0|max:100',
             'min_recharge' => 'nullable|numeric|min:0',
+            'min_consumption' => 'nullable|numeric|min:0',
             'sort' => 'nullable|integer|min:0',
             'status' => 'nullable|boolean',
         ]);
@@ -34,6 +35,7 @@ class UserGroupController extends Controller
             'name' => $data['name'],
             'discount' => $data['discount'] ?? 100,
             'min_recharge' => $data['min_recharge'] ?? 0,
+            'min_consumption' => $data['min_consumption'] ?? 0,
             'sort' => $data['sort'] ?? 0,
             'status' => array_key_exists('status', $data) ? (bool) $data['status'] : true,
         ]);
@@ -49,6 +51,7 @@ class UserGroupController extends Controller
             'name' => 'sometimes|string|max:50',
             'discount' => 'sometimes|numeric|min:0|max:100',
             'min_recharge' => 'sometimes|numeric|min:0',
+            'min_consumption' => 'sometimes|numeric|min:0',
             'sort' => 'sometimes|integer|min:0',
             'status' => 'sometimes|boolean',
         ]);

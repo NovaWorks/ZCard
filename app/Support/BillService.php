@@ -46,6 +46,8 @@ class BillService
                 $user->decrement('balance', $amountFen);
             } else {
                 $user->increment('balance', $amountFen);
+                // 累计充值(管理员调账 + 分销佣金均计入),并按当前升级依据尝试升级
+                MemberUpgradeService::addRecharge($userId, $amountFen);
             }
 
             return Bill::create([

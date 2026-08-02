@@ -15,7 +15,7 @@ const keyword = ref('')
 const password = ref('')
 const results = ref<OrderDetail[]>([])
 const err = ref('')
-const loading = false
+const loading = ref(false)
 const searched = ref(false)
 const expanded = ref<Set<string>>(new Set())
 /** 当前展开的 FAQ 索引,-1 表示全部收起 */
@@ -50,11 +50,18 @@ async function search() {
     return
   }
   searched.value = true
+  loading.value = true
   try {
     results.value = await queryOrders(keyword.value.trim(), password.value || undefined)
   } catch (e: any) {
+    // 后端未找到返回 200 + 空数组,走空状态;只有真正的网络/服务器错误才进这里
+    const status = e?.response?.status
     const msg = e?.response?.data?.message
-    err.value = msg || t('order.query.notFound')
+    err.value = (status && status !== 404) ? (msg || t('order.query.notFound')) : ''
+    // 兼容旧后端:若仍返回 404,视为空结果而非错误
+    if (status === 404) results.value = []
+  } finally {
+    loading.value = false
   }
 }
 
@@ -121,13 +128,18 @@ async function copyAll(cards: string[]) {
     <!-- 结果区:浅灰,与页脚同色连成一片,FAQ白卡悬浮其上 -->
     <div class="bg-surface-subtle pb-2">
       <div class="mx-auto w-full max-w-2xl px-4 sm:px-6 -mt-5 relative">
+        <!-- 加载提示 -->
+        <div v-if="loading" class="text-center py-14">
+          <div class="text-ink-soft text-sm">{{ t('order.query.searching') }}</div>
+        </div>
+
         <!-- 查询统计 -->
-        <div v-if="hasSearched && !err && results.length" class="mb-3 pt-2 text-sm text-ink-soft">
+        <div v-if="hasSearched && !loading && results.length" class="mb-3 pt-2 text-sm text-ink-soft">
           {{ t('order.query.totalCount', { n: results.length }) }}
         </div>
 
         <!-- 空状态 -->
-        <div v-if="hasSearched && !err && !results.length" class="text-center py-14">
+        <div v-if="hasSearched && !loading && !results.length" class="text-center py-14">
           <div class="text-6xl mb-4 opacity-30">🔍</div>
           <div class="text-ink-soft text-sm">{{ t('order.query.notFound') }}</div>
           <div class="text-ink-muted text-xs mt-1">{{ t('order.query.checkInput') }}</div>

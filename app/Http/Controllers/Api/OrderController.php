@@ -103,11 +103,8 @@ class OrderController extends Controller
 
         $orders = $service->searchOrders($data['keyword'], $data['password'] ?? null);
 
-        if (! $orders) {
-            return response()->json(['message' => __('messages.order_not_found')], 404);
-        }
-
-        return response()->json($orders);
+        // 未找到返回 200 + 空数组,让前端走空状态(而非把 404 当错误处理导致页面空白)
+        return response()->json($orders ?? []);
     }
 
     public function myOrders(Request $request, OrderService $service): JsonResponse

@@ -12,6 +12,7 @@ class UserGroup extends Model
         'name',
         'discount',
         'min_recharge',
+        'min_consumption',
         'sort',
         'status',
     ];
@@ -22,6 +23,7 @@ class UserGroup extends Model
             'status' => 'boolean',
             'discount' => 'decimal:2',
             'min_recharge' => 'decimal:2',
+            'min_consumption' => 'decimal:2',
         ];
     }
 }

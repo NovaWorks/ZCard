@@ -35,3 +35,8 @@ Thumbs.db
 /sysadmin/node_modules/
 /sysadmin/dist/
 /.superpowers/
+/.zcode/
+/.pnpm-store/
+
+# 临时测试脚本(根目录散落的)
+/supply_scenarios_test.php

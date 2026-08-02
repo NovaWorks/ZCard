@@ -27,5 +27,6 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(OrderPaid::class, [\App\Listeners\FetchFromUpstreamOnOrderPaid::class, 'handle']);
         Event::listen(OrderPaid::class, [\App\Support\CommissionService::class, 'handle']);
         Event::listen(OrderPaid::class, [\App\Support\SubsiteSettlementService::class, 'handle']);
+        Event::listen(OrderPaid::class, [\App\Listeners\UpgradeUserGroupOnOrderPaid::class, 'handle']);
     }
 }

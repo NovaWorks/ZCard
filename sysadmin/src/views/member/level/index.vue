@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { getUserGroups, createUserGroup, updateUserGroup, deleteUserGroup } from '@/api/userGroup'
 import type { UserGroup } from '@/api/userGroup'
+import { getSettings, updateSettings } from '@/api/settings'
 
 const { t } = useI18n()
 const loading = ref(false)
@@ -17,9 +18,35 @@ const formData = ref({
   name: '',
   discount: 100,
   min_recharge: 0,
+  min_consumption: 0,
   sort: 0,
   status: true
 })
+
+/** 升级依据:recharge=累计充值,consumption=累计消费 */
+const upgradeBasis = ref('recharge')
+const basisLoading = ref(false)
+
+const loadBasis = async () => {
+  try {
+    const settings = await getSettings()
+    upgradeBasis.value = (settings.member_upgrade_basis as string) || 'recharge'
+  } catch {
+    /* 取不到则用默认值 */
+  }
+}
+
+const changeBasis = async (val: string | number | boolean | undefined) => {
+  basisLoading.value = true
+  try {
+    await updateSettings({ member_upgrade_basis: val as string })
+    ElMessage.success(t('zcard.common.saveSuccess'))
+  } catch {
+    ElMessage.error(t('zcard.common.operationFailed'))
+  } finally {
+    basisLoading.value = false
+  }
+}
 
 const discountHint = ref('')
 
@@ -40,7 +67,7 @@ const loadData = async () => {
 
 const handleAdd = () => {
   isEdit.value = false
-  formData.value = { id: 0, name: '', discount: 100, min_recharge: 0, sort: list.value.length + 1, status: true }
+  formData.value = { id: 0, name: '', discount: 100, min_recharge: 0, min_consumption: 0, sort: list.value.length + 1, status: true }
   updateDiscountHint()
   dialogVisible.value = true
 }
@@ -52,6 +79,7 @@ const handleEdit = (row: UserGroup) => {
     name: row.name,
     discount: Number(row.discount),
     min_recharge: Number(row.min_recharge),
+    min_consumption: Number(row.min_consumption ?? 0),
     sort: row.sort,
     status: row.status
   }
@@ -94,7 +122,10 @@ const handleSubmit = async () => {
   }
 }
 
-onMounted(loadData)
+onMounted(() => {
+  loadData()
+  loadBasis()
+})
 </script>
 
 <template>
@@ -108,6 +139,17 @@ onMounted(loadData)
       show-icon
       class="mb-4"
     />
+
+    <!-- 升级依据全局设置 -->
+    <ElCard shadow="never" class="mb-4">
+      <div class="flex items-center">
+        <span class="text-sm font-medium text-gray-700 mr-3">{{ t('zcard.member.upgradeBasis') }}</span>
+        <ElRadioGroup v-model="upgradeBasis" :loading="basisLoading" @change="changeBasis">
+          <ElRadio value="recharge">{{ t('zcard.member.upgradeBasisRecharge') }}</ElRadio>
+          <ElRadio value="consumption">{{ t('zcard.member.upgradeBasisConsumption') }}</ElRadio>
+        </ElRadioGroup>
+      </div>
+    </ElCard>
 
     <!-- 操作栏 -->
     <div class="mb-4 flex items-center justify-between">
@@ -141,6 +183,11 @@ onMounted(loadData)
       <ElTableColumn :label="t('zcard.member.minRecharge')" width="140" align="center">
         <template #default="{ row }">
           ¥{{ Number(row.min_recharge).toFixed(2) }}
+        </template>
+      </ElTableColumn>
+      <ElTableColumn :label="t('zcard.member.minConsumption')" width="140" align="center">
+        <template #default="{ row }">
+          ¥{{ Number(row.min_consumption ?? 0).toFixed(2) }}
         </template>
       </ElTableColumn>
       <ElTableColumn prop="sort" :label="t('zcard.member.sort')" width="80" align="center" />
@@ -182,6 +229,11 @@ onMounted(loadData)
           <ElInputNumber v-model="formData.min_recharge" :min="0" :step="10" :precision="2" style="width: 160px" />
           <span class="ml-2 text-xs text-gray-400">¥</span>
           <div class="text-xs text-gray-400 mt-1">{{ t('zcard.member.minRechargeHint') }}</div>
+        </ElFormItem>
+        <ElFormItem :label="t('zcard.member.minConsumption')">
+          <ElInputNumber v-model="formData.min_consumption" :min="0" :step="10" :precision="2" style="width: 160px" />
+          <span class="ml-2 text-xs text-gray-400">¥</span>
+          <div class="text-xs text-gray-400 mt-1">{{ t('zcard.member.minConsumptionHint') }}</div>
         </ElFormItem>
         <ElFormItem :label="t('zcard.member.sort')">
           <ElInputNumber v-model="formData.sort" :min="0" style="width: 160px" />

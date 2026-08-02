@@ -129,7 +129,7 @@ onMounted(fetchData)
         <ElTableColumn :label="t('zcard.withdrawal.actual')" width="100" align="right">
           <template #default="{ row }"><span class="actual-text">¥{{ formatAmount(row.actual_amount) }}</span></template>
         </ElTableColumn>
-        <ElTableColumn :label="t('zcard.withdrawal.method')" width="80" align="center">
+        <ElTableColumn :label="t('zcard.withdrawal.method')" width="100" align="center">
           <template #default="{ row }">{{ methodLabel(row.method) }}</template>
         </ElTableColumn>
         <ElTableColumn :label="t('zcard.withdrawal.account')" min-width="150" show-overflow-tooltip>
