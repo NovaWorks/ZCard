@@ -129,6 +129,48 @@
             <ElOption :label="t('zcard.supply.statusDisabled')" value="disabled" />
           </ElSelect>
         </ElFormItem>
+
+        <!-- 货源设置(库存模式/发卡/失败处理/定价) -->
+        <ElDivider content-position="left">{{ t('zcard.supply.settingsSection') }}</ElDivider>
+        <ElFormItem :label="t('zcard.supply.stockMode')">
+          <ElSelect v-model="formData.settings.stock_mode" style="width: 100%">
+            <ElOption :label="t('zcard.supply.stockModeSynced')" value="synced" />
+            <ElOption :label="t('zcard.supply.stockModeRealtime')" value="realtime" />
+          </ElSelect>
+          <div class="field-help">{{ formData.settings.stock_mode === 'realtime' ? t('zcard.supply.stockModeRealtimeTip') : t('zcard.supply.stockModeSyncedTip') }}</div>
+        </ElFormItem>
+        <ElFormItem :label="t('zcard.supply.fulfillmentMode')">
+          <ElSelect v-model="formData.settings.fulfillment_mode" style="width: 100%">
+            <ElOption :label="t('zcard.supply.fulfillmentSync')" value="sync" />
+            <ElOption :label="t('zcard.supply.fulfillmentAsync')" value="async" />
+          </ElSelect>
+        </ElFormItem>
+        <ElFormItem :label="t('zcard.supply.failureAction')">
+          <ElSelect v-model="formData.settings.failure_action" style="width: 100%">
+            <ElOption :label="t('zcard.supply.failureManual')" value="manual" />
+            <ElOption :label="t('zcard.supply.failureAutoRefund')" value="auto_refund" />
+          </ElSelect>
+        </ElFormItem>
+        <ElFormItem :label="t('zcard.supply.pricingMode')">
+          <ElSelect v-model="formData.settings.default_pricing_mode" style="width: 100%">
+            <ElOption :label="t('zcard.supply.pricingPercent')" value="percent" />
+            <ElOption :label="t('zcard.supply.pricingFixed')" value="fixed" />
+            <ElOption :label="t('zcard.supply.pricingEqual')" value="equal" />
+            <ElOption :label="t('zcard.supply.pricingPending')" value="pending" />
+          </ElSelect>
+        </ElFormItem>
+        <ElFormItem v-if="formData.settings.default_pricing_mode === 'percent'" :label="t('zcard.supply.markupPercent')">
+          <ElInputNumber v-model="formData.settings.default_markup_percent" :min="0" :max="500" :precision="0" controls-position="right" style="width: 100%" />
+          <span class="unit">%</span>
+        </ElFormItem>
+        <ElFormItem v-if="formData.settings.default_pricing_mode === 'fixed'" :label="t('zcard.supply.markupAmount')">
+          <ElInputNumber v-model="formData.settings.default_markup_amount" :min="0" :precision="2" controls-position="right" style="width: 100%" />
+          <span class="unit">{{ t('zcard.supplierAccount.yuan') }}</span>
+        </ElFormItem>
+        <ElFormItem :label="t('zcard.supply.autoList')">
+          <ElSwitch v-model="formData.settings.auto_list" />
+          <span class="field-help">{{ t('zcard.supply.autoListTip') }}</span>
+        </ElFormItem>
       </ElForm>
       <template #footer>
         <ElButton @click="dialogVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
@@ -214,11 +256,21 @@
   /** 编辑时哪些敏感字段已被设过(脱敏值,留空=不改) */
   const maskedSet = ref<Set<string>>(new Set())
 
+  const defaultSettings = () => ({
+    stock_mode: 'synced',
+    fulfillment_mode: 'sync',
+    failure_action: 'manual',
+    default_pricing_mode: 'percent',
+    default_markup_percent: 10,
+    default_markup_amount: 0,
+    auto_list: true,
+  })
   const defaultForm = () => ({
     name: '',
     driver: '' as string,
     status: 'active' as 'active' | 'disabled',
     credentials: {} as Record<string, any>,
+    settings: defaultSettings(),
   })
   const formData = reactive(defaultForm())
 
@@ -289,6 +341,17 @@
     })
     formData.credentials = obj
     maskedSet.value = masked
+    // 回填货源设置(合并默认值)
+    const rs = row.settings || {}
+    formData.settings = {
+      stock_mode: rs.stock_mode || 'synced',
+      fulfillment_mode: rs.fulfillment_mode || 'sync',
+      failure_action: rs.failure_action || 'manual',
+      default_pricing_mode: rs.default_pricing_mode || 'percent',
+      default_markup_percent: rs.default_markup_percent ?? 10,
+      default_markup_amount: rs.default_markup_amount ?? 0,
+      auto_list: rs.auto_list ?? true,
+    }
     dialogVisible.value = true
     nextTick(() => formRef.value?.clearValidate())
   }
@@ -317,6 +380,7 @@
         base_url: creds.base_url || '',
         credentials: creds,
         status: formData.status,
+        settings: formData.settings,
       }
       if (isEdit.value && editingId.value !== null) {
         await updateSupplySource(editingId.value, payload)
