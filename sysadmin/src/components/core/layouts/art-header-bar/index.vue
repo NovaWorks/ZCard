@@ -109,15 +109,11 @@
           </template>
         </ElDropdown>
 
-        <!-- 通知按钮 -->
-        <ArtIconButton
-          v-if="shouldShowNotification"
-          icon="ri:notification-2-line"
-          class="notice-button relative"
-          @click="visibleNotice"
-        >
-          <div class="absolute top-2 right-2 size-1.5 !bg-danger rounded-full"></div>
-        </ArtIconButton>
+        <!-- 版本信息按钮(显示当前版本号,有更新显示红点,点击跳转更新页) -->
+        <div v-if="shouldShowNotification" class="version-badge-wrap" @click="goToUpdate">
+          <span class="version-badge-text">v{{ currentVersion || '...' }}</span>
+          <div v-if="hasUpdate" class="absolute -top-0.5 -right-0.5 size-2 !bg-danger rounded-full animate-pulse"></div>
+        </div>
 
         <!-- 聊天按钮 -->
         <ArtIconButton
@@ -335,6 +331,26 @@
     showNotice.value = !showNotice.value
   }
 
+  /** 版本信息:显示当前版本号,有更新时显示红点,点击跳转更新页 */
+  const currentVersion = ref('')
+  const hasUpdate = ref(false)
+  const checkVersionInfo = async () => {
+    try {
+      const { checkUpdate } = await import('@/api/update')
+      const res = await checkUpdate()
+      currentVersion.value = res.current_version || ''
+      hasUpdate.value = res.has_update
+    } catch {
+      currentVersion.value = ''
+    }
+  }
+  const goToUpdate = () => {
+    router.push({ name: 'UpdateIndex' })
+  }
+  onMounted(() => {
+    checkVersionInfo()
+  })
+
   /**
    * 打开聊天窗口
    */
@@ -459,6 +475,25 @@
 
   .notice-button:hover :deep(.art-svg-icon) {
     animation: shake 0.5s ease-in-out;
+  }
+
+  /* 版本信息徽章 */
+  .version-badge-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--el-text-color-regular);
+    background: var(--el-fill-color-light);
+    transition: all 0.2s;
+    &:hover {
+      background: var(--el-color-primary-light-9);
+      color: var(--el-color-primary);
+    }
   }
 
   .chat-button:hover :deep(.art-svg-icon) {

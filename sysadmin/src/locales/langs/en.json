@@ -1215,6 +1215,7 @@
     },
     "common": {
       "id": "ID",
+      "imageUrl": "Image URL",
       "actions": "Actions",
       "search": "Search",
       "collapse": "Collapse",

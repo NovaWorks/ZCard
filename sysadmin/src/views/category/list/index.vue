@@ -11,6 +11,8 @@ import {
   batchUpdateCategory,
 } from '@/api/categories'
 import type { Category, SortItem } from '@/api/categories'
+import IconPicker from '@/components/business/icon-picker/index.vue'
+import ImagePicker from '@/components/business/image-picker/index.vue'
 
 defineOptions({ name: 'CategoryList' })
 
@@ -257,7 +259,10 @@ onMounted(loadData)
         <ElTableColumn :label="t('zcard.category.name')" min-width="220">
           <template #default="{ row }">
             <div class="cat-name-cell">
-              <span v-if="row.icon" class="cat-icon">{{ row.icon }}</span>
+              <template v-if="row.icon">
+                <img v-if="/^https?:\/\/|^\/storage\//.test(row.icon)" :src="row.icon" class="cat-icon-img" />
+                <span v-else class="cat-icon">{{ row.icon }}</span>
+              </template>
               <span v-else class="cat-icon-placeholder">📁</span>
               <span class="cat-name">{{ row.name }}</span>
               <ElTag v-if="row.description" size="small" type="info" class="cat-desc-tag">{{ row.description }}</ElTag>
@@ -301,7 +306,10 @@ onMounted(loadData)
           <ElInput v-model="formData.name" :placeholder="t('zcard.category.searchPlaceholder')" />
         </ElFormItem>
         <ElFormItem :label="t('zcard.category.icon')">
-          <ElInput v-model="formData.icon" :placeholder="t('zcard.category.iconPlaceholder')" />
+          <div class="icon-input-row">
+            <IconPicker v-model="formData.icon" />
+            <ImagePicker v-model="formData.icon" />
+          </div>
         </ElFormItem>
         <ElFormItem :label="t('zcard.category.descriptionLabel')">
           <ElInput v-model="formData.description" :placeholder="t('zcard.category.descriptionPlaceholder')" />
@@ -348,7 +356,15 @@ onMounted(loadData)
   .toolbar-right { display: flex; gap: 8px; align-items: center; }
   .cat-name-cell { display: flex; align-items: center; gap: 8px; }
   .cat-icon { font-size: 18px; }
+  .cat-icon-img { width: 24px; height: 24px; object-fit: cover; border-radius: 4px; }
   .cat-icon-placeholder { font-size: 16px; opacity: 0.5; }
+  /* 图标输入行:图标选择器 + 图片选择器并排 */
+  .icon-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
   .cat-name { font-weight: 500; }
   .cat-desc-tag { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cat-slug { font-family: monospace; font-size: 12px; color: var(--el-text-color-secondary); }

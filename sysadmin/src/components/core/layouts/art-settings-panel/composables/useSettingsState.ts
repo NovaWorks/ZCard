@@ -27,6 +27,8 @@ export function useSettingsState() {
       settingStore.switchMenuStyles(MenuThemeEnum.DESIGN)
       settingStore.setMenuOpen(true)
     }
+    // 布局切换需要重新渲染整套菜单/侧栏结构,刷新页面确保生效
+    settingStore.reload()
   }
 
   return {

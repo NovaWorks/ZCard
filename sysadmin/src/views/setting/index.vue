@@ -12,7 +12,7 @@
               <ElInput v-model="form.site_url" placeholder="https://example.com" />
             </ElFormItem>
             <ElFormItem :label="t('zcard.setting.siteLogo')">
-              <ElInput v-model="form.site_logo" :placeholder="t('zcard.setting.siteLogoPlaceholder')" />
+              <ImagePicker v-model="form.site_logo" />
             </ElFormItem>
             <ElFormItem :label="t('zcard.setting.siteDescription')">
               <ElInput v-model="form.site_description" type="textarea" :rows="2" :placeholder="t('zcard.setting.siteDescriptionPlaceholder')" maxlength="120" show-word-limit />
@@ -370,6 +370,7 @@
   import { useI18n } from 'vue-i18n'
   import { getSettings, updateSettings, type Settings } from '@/api/settings'
   import { getCurrencies, type Currency } from '@/api/currency'
+  import ImagePicker from '@/components/business/image-picker/index.vue'
 
   defineOptions({ name: 'SettingIndex' })
 

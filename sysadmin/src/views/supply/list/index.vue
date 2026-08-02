@@ -160,12 +160,16 @@
           </ElSelect>
         </ElFormItem>
         <ElFormItem v-if="formData.settings.default_pricing_mode === 'percent'" :label="t('zcard.supply.markupPercent')">
-          <ElInputNumber v-model="formData.settings.default_markup_percent" :min="0" :max="500" :precision="0" controls-position="right" style="width: 100%" />
-          <span class="unit">%</span>
+          <div class="input-with-unit">
+            <ElInputNumber v-model="formData.settings.default_markup_percent" :min="0" :max="500" :precision="0" controls-position="right" />
+            <span class="unit">%</span>
+          </div>
         </ElFormItem>
         <ElFormItem v-if="formData.settings.default_pricing_mode === 'fixed'" :label="t('zcard.supply.markupAmount')">
-          <ElInputNumber v-model="formData.settings.default_markup_amount" :min="0" :precision="2" controls-position="right" style="width: 100%" />
-          <span class="unit">{{ t('zcard.supplierAccount.yuan') }}</span>
+          <div class="input-with-unit">
+            <ElInputNumber v-model="formData.settings.default_markup_amount" :min="0" :precision="2" controls-position="right" />
+            <span class="unit">{{ t('zcard.supplierAccount.yuan') }}</span>
+          </div>
         </ElFormItem>
         <ElFormItem :label="t('zcard.supply.autoList')">
           <ElSwitch v-model="formData.settings.auto_list" />
@@ -470,6 +474,17 @@
 </script>
 
 <style scoped>
+  /* input + 单位(元/%)同行排列 */
+  .input-with-unit {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .unit {
+    color: var(--el-text-color-secondary);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
   .supply-page {
     padding: 0;
   }

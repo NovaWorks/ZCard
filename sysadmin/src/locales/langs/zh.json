@@ -1215,6 +1215,7 @@
     },
     "common": {
       "id": "ID",
+      "imageUrl": "图片URL",
       "actions": "操作",
       "search": "搜索",
       "collapse": "收起",
