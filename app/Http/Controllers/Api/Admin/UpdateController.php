@@ -31,7 +31,7 @@ class UpdateController extends Controller
     public function check(): JsonResponse
     {
         $repo = config('zcard.update.repo', 'NovaWorks/ZCard');
-        $currentVersion = config('app.version', '0.0.0');
+        $currentVersion = \App\Support\AppHelper::version();
 
         try {
             // 先尝试 /releases/latest(只返回正式版,不含 prerelease)
@@ -111,7 +111,7 @@ class UpdateController extends Controller
      */
     public function update(Request $request): JsonResponse
     {
-        $currentVersion = config('app.version', '0.0.0');
+        $currentVersion = \App\Support\AppHelper::version();
 
         // 防止并发更新
         $lockFile = storage_path('app/update.lock');
@@ -169,7 +169,8 @@ class UpdateController extends Controller
             $output = shell_exec('cd ' . base_path() . '/storefront && pnpm install --frozen-lockfile 2>&1 && pnpm run build 2>&1');
             $this->log($logFile, $output);
 
-            // Step 8: 新版本号
+            // Step 8: 新版本号(清缓存确保读到 git pull 后的新 tag)
+            \App\Support\AppHelper::clearVersionCache();
             $newVersion = \App\Support\AppHelper::version();
             $this->log($logFile, '新版本: ' . $newVersion);
 
@@ -257,6 +258,8 @@ class UpdateController extends Controller
             Artisan::call('view:cache');
             Artisan::call('up');
 
+            // 清版本缓存确保读到 git reset 后的 tag
+            \App\Support\AppHelper::clearVersionCache();
             $version = \App\Support\AppHelper::version();
             $this->log($logFile, "回退完成! 当前版本: {$version}");
 

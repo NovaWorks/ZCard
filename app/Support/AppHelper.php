@@ -2,19 +2,83 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Facades\Cache;
+use Symfony\Component\Process\Process;
+
 /**
  * 应用辅助:版本号等。
- * 版本号从 config/app.php 读取,git pull 后自动更新。
+ *
+ * 版本号优先从 git tag 读取(git describe --tags),这样 git pull / 拉取新 release
+ * tag 后本地版本号自动跟上 GitHub Release,无需手动改 config。
+ * 无 git 或无 tag 时回退 config/app.php 的 version(默认 1.0.0)。
+ * 结果缓存 5 分钟,避免每次请求都起子进程。
  */
 class AppHelper
 {
     /**
-     * 当前应用版本(从 config 读取)。
-     * 部署时通过 GitHub tag 或 config/app.php 的 version 字段管理。
+     * 当前应用版本。
+     * 优先级:git describe --tags → config/app.php version → 1.0.0。
+     * 缓存 5 分钟;缓存后端不可用时直接计算(不抛异常,版本号是基础信息)。
      */
     public static function version(): string
     {
+        try {
+            return Cache::remember('app:version', 300, function () {
+                return self::resolveVersion();
+            });
+        } catch (\Throwable) {
+            // 缓存后端不可用(如测试环境无 DB)→ 直接计算
+            return self::resolveVersion();
+        }
+    }
+
+    private static function resolveVersion(): string
+    {
+        $gitVersion = self::versionFromGit();
+        if ($gitVersion !== null) {
+            return $gitVersion;
+        }
+
         return config('app.version', '1.0.0');
+    }
+
+    /**
+     * 从 git describe --tags 读取版本号。
+     * - 命中 tag 返回纯净版本(如 v1.0.1 → 1.0.1)
+     * - tag 之后有提交返回带后缀(如 1.0.1-28-g00ba1fb),取首段版本号
+     * - 无 git/无 tag 返回 null(回退 config)
+     */
+    private static function versionFromGit(): ?string
+    {
+        try {
+            $process = Process::fromShellCommandline(
+                'git describe --tags --always 2>/dev/null',
+                base_path(),
+            );
+            $process->run();
+            $output = trim($process->getOutput());
+
+            if ($process->isSuccessful() && $output !== '' && ! str_starts_with($output, 'v0.0.0')) {
+                // 形如 v1.0.1 或 1.0.1-28-g00ba1fb → 取首段并去 v 前缀
+                $first = explode('-', $output)[0];
+
+                return ltrim($first, 'vV');
+            }
+        } catch (\Throwable) {
+            // 无 git 或执行失败 → 回退 config
+        }
+
+        return null;
+    }
+
+    /** 清除版本缓存(更新/回滚后调用,确保下次读到新版本) */
+    public static function clearVersionCache(): void
+    {
+        try {
+            Cache::forget('app:version');
+        } catch (\Throwable) {
+            // 缓存后端不可用 → 无需清理
+        }
     }
 
     /**

@@ -50,7 +50,7 @@ export const systemRoutes: AppRouteRecord = {
       component: '/update/index',
       meta: {
         title: 'menus.update.title',
-        icon: 'ri:upgrade-line',
+        icon: 'ri:download-cloud-2-line',
         keepAlive: false,
       },
     },

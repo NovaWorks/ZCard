@@ -196,7 +196,7 @@ class InstallController extends Controller
 
             // Step 10: 安装锁(最后一步,确保全部成功后才写)
             file_put_contents(storage_path('app/installed'), json_encode([
-                'version' => config('app.version', '1.0.0'),
+                'version' => \App\Support\AppHelper::version(),
                 'installed_at' => now()->toIso8601String(),
             ]));
 

@@ -118,7 +118,7 @@ class InstallCommand extends Command
 
         // ─── 安装锁 ───
         file_put_contents(storage_path('app/installed'), json_encode([
-            'version' => config('app.version', '1.0.0'),
+            'version' => \App\Support\AppHelper::version(),
             'installed_at' => now()->toIso8601String(),
         ]));
 

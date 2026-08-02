@@ -2,7 +2,8 @@
 
 return [
 
-    // ZCard 版本号(git pull 后由部署脚本/CI 更新;UpdateController 读取此值对比 GitHub Release)
+    // ZCard 版本号(兜底值)。运行时 AppHelper::version() 优先读 git describe --tags,
+    // git pull/拉取新 release tag 后自动跟上版本号;无 git 或无 tag 时回退此值。
     'version' => env('APP_VERSION', '1.0.0'),
 
     /*
