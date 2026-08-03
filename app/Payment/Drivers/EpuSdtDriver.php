@@ -58,6 +58,8 @@ class EpuSdtDriver implements PaymentDriver
         $pid = $config['pid'] ?? '';
         $secretKey = $config['secret_key'] ?? '';
         $currency = $config['currency'] ?? 'cny';
+        $token = $config['token'] ?? 'USDT';
+        $network = $config['network'] ?? 'TRC20';
 
         $notifyUrl = $this->namedUrl('payment.notify', ['channel' => 'epusdt']);
         $redirectUrl = $this->namedUrl('payment.return', ['code' => 'epusdt']) . '?order_no=' . $order->getPayableKey();
@@ -70,6 +72,9 @@ class EpuSdtDriver implements PaymentDriver
             'notify_url' => $notifyUrl,
             'redirect_url' => $redirectUrl,
             'name' => $order->getPayableKey(),
+            // 区块链网络 + 支付代币(epusdt 新版支持,旧版忽略这两个字段不影响)
+            'network' => $network,
+            'token' => $token,
         ];
 
         $params['signature'] = $this->sign($params, $secretKey);
@@ -148,6 +153,25 @@ class EpuSdtDriver implements PaymentDriver
                 'options' => ['cny' => '人民币(CNY)', 'usd' => '美元(USD)'],
                 'required' => true,
                 'default' => 'cny',
+            ],
+            'network' => [
+                'label' => '区块链网络',
+                'type' => 'select',
+                'options' => [
+                    'TRC20' => 'TRC20 (波场 / Tron)',
+                    'ERC20' => 'ERC20 (以太坊 / Ethereum)',
+                    'BEP20' => 'BEP20 (币安链 / BSC)',
+                ],
+                'required' => true,
+                'default' => 'TRC20',
+                'help' => '选择收款 USDT 所在的链。TRC20 手续费最低,推荐。需 epusdt 服务端已启用对应链。',
+            ],
+            'token' => [
+                'label' => '支付代币',
+                'type' => 'text',
+                'required' => true,
+                'default' => 'USDT',
+                'help' => '收款代币符号,通常为 USDT(可改为 USDC/USDP 等稳定币,需服务端支持)。',
             ],
             'target_currency' => [
                 'label' => '收款货币',

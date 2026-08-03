@@ -7,8 +7,35 @@ use App\Payment\Contracts\PaymentDriver;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
 
+/**
+ * USDT 链上转账支付驱动(无第三方网关,直接展示收款地址二维码)。
+ *
+ * 支持多链选择(TRC20/ERC20/BSC 等),根据所选链生成对应的钱包 URI,
+ * 钱包 App 识别后可自动填入收款地址与金额。
+ */
 class UsdtDriver implements PaymentDriver
 {
+    /**
+     * 支持的区块链网络:code → [协议 scheme, 显示名]。
+     * scheme 用于生成钱包 URI(钱包 App 靠它识别网络)。
+     */
+    public const CHAINS = [
+        'trx'   => ['tron',      'TRC20 (波场 / Tron)'],
+        'eth'   => ['ethereum',  'ERC20 (以太坊 / Ethereum)'],
+        'bsc'   => ['ethereum',  'BEP20 (币安链 / BSC)'],
+        'poly'  => ['ethereum',  'Polygon (Matic)'],
+        'arb'   => ['ethereum',  'Arbitrum One'],
+        'op'    => ['ethereum',  'Optimism'],
+        'tron'  => ['tron',      'TRC20 (波场,旧名)'],
+    ];
+
+    /** 取链的钱包 URI scheme(默认 tron) */
+    protected function chainScheme(array $config): string
+    {
+        $chain = strtolower((string) ($config['chain'] ?? 'trx'));
+        return self::CHAINS[$chain][0] ?? 'tron';
+    }
+
     /**
      * 将法币金额按配置汇率换算成 USDT。
      */
@@ -22,12 +49,14 @@ class UsdtDriver implements PaymentDriver
     public function pay(Payable $order, array $config): PaymentResult
     {
         $wallet = $config['wallet_address'] ?? '';
+        $scheme = $this->chainScheme($config);
         // order->amount 是分,先转元再÷汇率
         $yuan = bcdiv((string) $order->getPayableAmount(), '100', 2);
         $usdt = $this->toUsdt((float) $yuan, $config);
 
-        // 形如 tron:Txxx...?amount=1.234567，钱包 App 识别后可自动填金额。
-        $content = 'tron:' . $wallet . '?amount=' . $usdt;
+        // 钱包 URI:trc20→tron:Txxx...?amount=1.234567;erc20→ethereum:0x...?value=...
+        // 各钱包 App 据此识别网络并自动填入地址与金额。
+        $content = $scheme . ':' . $wallet . '?amount=' . $usdt;
 
         return PaymentResult::qrcode($content);
     }
@@ -63,11 +92,29 @@ class UsdtDriver implements PaymentDriver
 
     public function getConfigFields(): array
     {
+        // 链类型选项(从 CHAINS 常量生成 code => 显示名,后端会归一化成 [{value,label}])
+        $chainOptions = [];
+        foreach (self::CHAINS as $code => $meta) {
+            [$scheme, $label] = $meta;
+            if (! isset($chainOptions[$code])) {
+                $chainOptions[$code] = $label;
+            }
+        }
+
         return [
+            'chain' => [
+                'label' => '收款链/网络',
+                'type' => 'select',
+                'options' => $chainOptions,
+                'required' => true,
+                'default' => 'trx',
+                'help' => '选择 USDT 所在的区块链网络。TRC20 手续费最低、到账最快,推荐使用。',
+            ],
             'wallet_address' => [
-                'label' => 'USDT (TRC20) 收款钱包地址',
+                'label' => 'USDT 收款钱包地址',
                 'type' => 'text',
                 'required' => true,
+                'help' => '上面所选链网络的 USDT 收款地址(务必与所选链匹配,否则转账将丢失)。',
             ],
             'api_key' => [
                 'label' => '回调签名密钥(API Key)',
@@ -114,3 +161,4 @@ class UsdtDriver implements PaymentDriver
         return ['USDT'];
     }
 }
+
