@@ -78,8 +78,9 @@ const handleExport = async () => {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
     ElMessage.success(t('zcard.coupon.exportDone'))
-  } catch {
-    ElMessage.error(t('zcard.coupon.exportFailed'))
+  } catch (e: any) {
+    const msg = e?.message || t('zcard.coupon.exportFailed')
+    ElMessage.error(msg)
   } finally {
     exporting.value = false
   }

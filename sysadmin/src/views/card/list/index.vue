@@ -865,8 +865,8 @@
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
       ElMessage.success(t('zcard.card.exportDone'))
-    } catch {
-      ElMessage.error(t('zcard.card.exportFailed'))
+    } catch (e: any) {
+      ElMessage.error(e?.message || t('zcard.card.exportFailed'))
     } finally {
       exporting.value = false
     }

@@ -41,13 +41,17 @@ const clearIcon = () => {
   modelValue.value = ''
   visible.value = false
 }
+
+/** 判断值是否是图片URL(而非 emoji) */
+const isImageUrl = (v: string) => /^https?:\/\/|^\/storage\//.test(v)
 </script>
 
 <template>
   <ElPopover v-model:visible="visible" placement="bottom-start" :width="320" trigger="click">
     <template #reference>
       <div class="icon-trigger" @click="visible = true">
-        <span v-if="modelValue" class="icon-preview">{{ modelValue }}</span>
+        <img v-if="isImageUrl(modelValue)" :src="modelValue" class="icon-preview-img" />
+        <span v-else-if="modelValue" class="icon-preview">{{ modelValue }}</span>
         <span v-else class="icon-placeholder">😀</span>
       </div>
     </template>
@@ -98,10 +102,16 @@ const clearIcon = () => {
   border-radius: 6px;
   cursor: pointer;
   flex-shrink: 0;
+  overflow: hidden;
   transition: all 0.2s;
   &:hover {
     border-color: var(--el-color-primary);
   }
+}
+.icon-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .icon-preview {
   font-size: 20px;

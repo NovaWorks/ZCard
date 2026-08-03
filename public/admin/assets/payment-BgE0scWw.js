@@ -1,0 +1,1 @@
+import{b2 as a}from"./index-B8kejo3s.js";const n=()=>a.get({url:"/admin/payment-channels"}),e=(n,e)=>a.put({url:`/admin/payment-channels/${n}`,data:e}),s=n=>a.get({url:`/admin/payment-channels/${n}/config-fields`});export{s as a,n as g,e as u};

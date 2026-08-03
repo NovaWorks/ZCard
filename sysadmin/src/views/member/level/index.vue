@@ -215,9 +215,9 @@ onMounted(() => {
     <ElDialog
       v-model="dialogVisible"
       :title="isEdit ? t('zcard.member.edit') : t('zcard.member.add')"
-      width="480px"
+      width="520px"
     >
-      <ElForm :model="formData" label-width="100px">
+      <ElForm :model="formData" label-width="130px">
         <ElFormItem :label="t('zcard.member.name')" required>
           <ElInput v-model="formData.name" :placeholder="t('zcard.member.namePlaceholder')" />
         </ElFormItem>

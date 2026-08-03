@@ -64,22 +64,39 @@ export const toggleCoupon = (id: number) =>
 export const deleteCoupon = (id: number) =>
   http.del({ url: `/admin/coupons/${id}` })
 
-/** 导出筛选后的优惠券为 CSV(直接用 axios+blob,不走封装 http) */
+/** 导出筛选后的优惠券为 CSV(用 axios+blob,带超时和错误透传) */
 export const exportCoupons = async (params: CouponListParams): Promise<{ filename: string; blob: Blob }> => {
   const { VITE_API_URL } = import.meta.env
   const { accessToken } = useUserStore()
 
-  const res = await axios.get(`${VITE_API_URL}/admin/coupons/export`, {
-    params,
-    responseType: 'blob',
-    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
-  })
+  try {
+    const res = await axios.get(`${VITE_API_URL}/admin/coupons/export`, {
+      params,
+      responseType: 'blob',
+      timeout: 60000, // 导出允许 60s
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {}
+    })
 
-  let filename = `coupons-export-${Date.now()}.csv`
-  const cd = res.headers['content-disposition'] as string | undefined
-  if (cd) {
-    const match = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i)
-    if (match) filename = decodeURIComponent(match[1])
+    let filename = `coupons-export-${Date.now()}.csv`
+    const cd = res.headers['content-disposition'] as string | undefined
+    if (cd) {
+      const match = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i)
+      if (match) filename = decodeURIComponent(match[1])
+    }
+    return { filename, blob: res.data as Blob }
+  } catch (error: any) {
+    // blob 模式下错误体也是 Blob,需要读取出来才能拿到后端的 message
+    const blob = error?.response?.data
+    if (blob instanceof Blob) {
+      const text = await blob.text()
+      try {
+        const json = JSON.parse(text)
+        throw new Error(json.message || text)
+      } catch (e) {
+        if (e instanceof Error && e.message !== text) throw e
+        throw new Error(text.slice(0, 200))
+      }
+    }
+    throw error
   }
-  return { filename, blob: res.data as Blob }
 }
