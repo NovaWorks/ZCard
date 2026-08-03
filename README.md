@@ -1,6 +1,6 @@
 <p align="center">
   <a href="#">
-    <img src="public/favicon.ico" width="120" height="120" style="border-radius: 20px;" alt="ZCard">
+    <img src="public/logo.png" width="120" height="120" style="border-radius: 20px;" alt="ZCard">
   </a>
 </p>
 

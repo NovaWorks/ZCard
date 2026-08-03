@@ -52,6 +52,7 @@ class PaymentChannelSeeder extends Seeder
             ['code' => 'paypal',    'name' => 'PayPal',       'driver' => \App\Payment\Drivers\PaypalDriver::class],
             ['code' => 'stripe',    'name' => 'Stripe',       'driver' => \App\Payment\Drivers\StripeDriver::class],
             ['code' => 'epusdt',    'name' => 'EpuSdt(USDT)', 'driver' => \App\Payment\Drivers\EpuSdtDriver::class],
+            ['code' => 'bepusdt',   'name' => 'BEpusdt',       'driver' => \App\Payment\Drivers\BEpusdtDriver::class],
         ];
 
         foreach ($channels as $index => $channel) {

@@ -11,6 +11,7 @@ use App\Payment\Drivers\CodePayDriver;
 use App\Payment\Drivers\PaypalDriver;
 use App\Payment\Drivers\StripeDriver;
 use App\Payment\Drivers\EpuSdtDriver;
+use App\Payment\Drivers\BEpusdtDriver;
 
 /**
  * 预置默认支付渠道(系统基础数据,非演示数据)。
@@ -73,6 +74,7 @@ return new class extends Migration {
             ['code' => 'paypal',    'name' => 'PayPal',       'driver' => PaypalDriver::class],
             ['code' => 'stripe',    'name' => 'Stripe',       'driver' => StripeDriver::class],
             ['code' => 'epusdt',    'name' => 'EpuSdt(USDT)', 'driver' => EpuSdtDriver::class],
+            ['code' => 'bepusdt',    'name' => 'BEpusdt',       'driver' => BEpusdtDriver::class],
         ];
 
         foreach ($channels as $index => $channel) {
