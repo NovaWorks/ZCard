@@ -92,6 +92,22 @@
               :value="opt.value"
             />
           </ElSelect>
+          <ElSelect
+            v-else-if="field.type === 'multiselect'"
+            v-model="configForm.values[field.key]"
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
+            :placeholder="t('zcard.payment.selectPlaceholder')"
+            style="width: 100%"
+          >
+            <ElOption
+              v-for="opt in field.options || []"
+              :key="String(opt.value)"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </ElSelect>
           <ElInput
             v-else-if="field.type === 'textarea'"
             v-model="configForm.values[field.key]"
@@ -189,6 +205,10 @@
       configFields.value.forEach((f) => {
         if (isSensitive(f.key)) {
           configForm.values[f.key] = '' // 不回显,留空表示保留
+        } else if (f.type === 'multiselect') {
+          // 多选字段值必须是数组:优先已保存值,其次默认值,最后空数组
+          const val = saved[f.key] ?? f.default ?? []
+          configForm.values[f.key] = Array.isArray(val) ? [...val] : (val ? [val] : [])
         } else if (saved[f.key] !== undefined) {
           configForm.values[f.key] = saved[f.key]
         } else if (f.default !== undefined) {

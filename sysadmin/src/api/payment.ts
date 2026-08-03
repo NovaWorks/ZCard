@@ -26,7 +26,7 @@ export interface ConfigField {
   /** 显示名称 */
   label: string
   /** 字段类型 */
-  type?: 'text' | 'textarea' | 'password' | 'number' | 'select' | 'switch'
+  type?: 'text' | 'textarea' | 'password' | 'number' | 'select' | 'multiselect' | 'switch'
   /** 占位提示 */
   placeholder?: string
   /** 选项（type=select 时使用） */

@@ -67,7 +67,13 @@ class BEpusdtDriver implements PaymentDriver
         $apiUrl = rtrim($config['api_url'] ?? '', '/');
         $apiToken = $config['api_token'] ?? '';
         $fiat = strtolower($config['fiat'] ?? 'cny');
-        $currencies = $config['currencies'] ?? '';
+        // currencies 配置为数组(后台多选),下单时拼成 BEpusdt 要求的逗号分隔串
+        // 如 ['USDT','USDC'] → 'USDT,USDC';留空则不传(不限币种,用户在收银台自选)
+        $currencyList = $config['currencies'] ?? [];
+        if (is_string($currencyList)) {
+            $currencyList = array_filter(array_map('trim', explode(',', $currencyList)));
+        }
+        $currencies = implode(',', array_filter((array) $currencyList, fn ($v) => $v !== ''));
         $timeout = (int) ($config['timeout'] ?? 0);
 
         $notifyUrl = $this->namedUrl('payment.notify', ['channel' => 'bepusdt']);
@@ -168,11 +174,20 @@ class BEpusdtDriver implements PaymentDriver
                 'default' => 'CNY',
             ],
             'currencies' => [
-                'label' => '限定加密货币',
-                'type' => 'text',
+                'label' => '支持的加密货币(多选)',
+                'type' => 'multiselect',
+                'options' => [
+                    'USDT' => 'USDT (泰达币)',
+                    'USDC' => 'USDC (美元币)',
+                    'TRX' => 'TRX (波场)',
+                    'ETH' => 'ETH (以太坊)',
+                    'BNB' => 'BNB (币安币)',
+                    'TON' => 'TON (Toncoin)',
+                    'GRAM' => 'GRAM (Ton 原生)',
+                ],
                 'required' => false,
-                'placeholder' => '如 USDT,USDC(留空则不限)',
-                'help' => '限定收款的加密货币,逗号分隔(如 USDT,USDC);以 - 开头为黑名单(如 -ETH);留空表示不限。',
+                'default' => ['USDT'],
+                'help' => '勾选允许用户支付的加密货币(可多选)。用户在 BEpusdt 收银台自选具体网络(如 TRC20/ERC20)。留空则不限制。具体可用币种以 BEpusdt 服务端配置为准。',
             ],
             'timeout' => [
                 'label' => '订单超时(秒)',

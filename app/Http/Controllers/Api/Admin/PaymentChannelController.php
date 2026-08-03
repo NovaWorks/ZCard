@@ -84,8 +84,9 @@ class PaymentChannelController extends Controller
         foreach ($rawFields as $key => $field) {
             $f = is_array($field) ? $field : [];
             $f['key'] = $key;
-            // select 选项归一:驱动返回 ['value' => 'label'],前端要 [{value,label}]
-            if (($f['type'] ?? null) === 'select' && isset($f['options']) && is_array($f['options'])) {
+            // select / multiselect 选项归一:驱动返回 ['value' => 'label'],前端要 [{value,label}]
+            $type = $f['type'] ?? null;
+            if (in_array($type, ['select', 'multiselect'], true) && isset($f['options']) && is_array($f['options'])) {
                 $opts = [];
                 foreach ($f['options'] as $val => $label) {
                     $opts[] = ['value' => $val, 'label' => $label];
