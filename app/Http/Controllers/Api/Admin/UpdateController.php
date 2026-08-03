@@ -142,6 +142,13 @@ class UpdateController extends Controller
 
             // 检测致命错误(网络问题、文件权限等),必须在 restoreUserFiles 之前:
             // 否则 .env 恢复时的权限异常会掩盖真正的 git 失败原因。
+            if (str_contains($output, 'insufficient permission') && str_contains($output, '.git/objects')) {
+                throw new \RuntimeException(
+                    'Git 目录权限不足: PHP 进程无权写入 .git/objects(宝塔环境 .git 属主可能不是 www)。'
+                    . '请在服务器 SSH 执行(需 root): chown -R www:www ' . base_path()
+                    . ' 然后重新点击在线更新。'
+                );
+            }
             if (str_contains($output, 'fatal:') || str_contains($output, 'Could not resolve host') || str_contains($output, 'Permission denied')) {
                 throw new \RuntimeException('Git pull 失败: ' . $output);
             }
@@ -529,20 +536,30 @@ class UpdateController extends Controller
     }
 
     /**
-     * 解决 git "dubious ownership" 问题。
+     * 解决 git "dubious ownership" 问题 + 修复 .git 目录权限。
      *
-     * chown -R www:www 后,git 目录属主变为 www,但执行 git 命令的 PHP-FPM 进程
-     * 身份可能不一致(或以 root 跑),git 出于安全拒绝操作:
-     *   fatal: detected dubious ownership in repository at '...'
-     *
-     * 解决:把项目目录加入 safe.directory(全局,幂等,可重复执行)。
+     * 两个层面的问题:
+     * 1. dubious ownership — git 出于安全拒绝操作,加入 safe.directory 解决
+     * 2. 文件权限不足 — 宝塔环境 .git/ 目录属主可能是 root,PHP-FPM 以 www 运行
+     *    报 "insufficient permission for adding an object to repository database .git/objects"
+     *    用 chmod -R 让 .git 和整个项目可读写解决
      */
     private function ensureGitSafeDirectory(): void
     {
         try {
-            $this->shell('git config --global --add safe.directory ' . base_path() . ' 2>/dev/null');
+            $base = base_path();
+            // 1. 加入 safe.directory(解决 dubious ownership)
+            $this->shell('git config --global --add safe.directory ' . $base . ' 2>/dev/null');
+
+            // 2. 修复 .git 目录权限(解决 insufficient permission)
+            //    宝塔: .git 属主可能是 root, PHP-FPM 以 www 运行 → chmod 放开读写
+            $this->shell('chmod -R u+rwX,go+rwX ' . escapeshellarg($base . '/.git') . ' 2>/dev/null');
+
+            // 3. 如果当前用户不是目录属主(如 www 运行但属主是 root),
+            //    尝试 chown(可能需要 sudo/root,失败则跳过,chmod 通常已够用)
+            $this->shell('chown -R $(id -u):$(id -g) ' . escapeshellarg($base . '/.git') . ' 2>/dev/null');
         } catch (\Throwable $e) {
-            // 函数被禁用或 config 不可写 → 忽略,git pull 会自行报错
+            // 函数被禁用或权限不足 → 忽略,git 操作会自行报错
         }
     }
 
