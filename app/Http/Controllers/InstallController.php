@@ -163,33 +163,61 @@ class InstallController extends Controller
                 \Spatie\Permission\Models\Role::firstOrCreate(['name' => $role]);
             }
 
-            // Step 7: 管理员账号(检查 email 或 username=admin 已存在)
-            $admin = \App\Models\User::where('email', $data['admin_email'])->first();
-            if (! $admin) {
-                $admin = \App\Models\User::where('username', 'admin')->first();
+            // Step 7: 管理员账号
+            // 注意:User 用 SoftDeletes,User::where/firstOrCreate 会漏掉软删除记录 → 撞
+            // username/email 的 unique 约束(1062)。故用 DB 门面直接操作(查询含软删除记录)。
+            //
+            // 全新安装时,migrate 阶段的 seed_default_payment_channels 迁移会先创建一个占位
+            // admin(密码 admin123456),这里必须用客户输入的密码覆盖,否则客户登录失败。
+            $now = now();
+            $adminRow = DB::table('users')->where('username', 'admin')->first();
+            if (! $adminRow) {
+                $adminRow = DB::table('users')->where('email', $data['admin_email'])->first();
             }
-            if ($admin) {
-                // 已存在,确保角色
-                if (! $admin->hasRole('super_admin')) {
-                    $admin->assignRole('super_admin');
-                }
-            } else {
-                $admin = \App\Models\User::create([
+            if ($adminRow) {
+                // 已存在(含迁移预置的占位 admin 或软删除记录)→ 用客户输入的密码覆盖,
+                // 并恢复为正常状态(清除软删除标记)。
+                DB::table('users')->where('id', $adminRow->id)->update([
                     'username' => 'admin',
-                    'name' => 'Super Admin',
                     'email' => $data['admin_email'],
-                    'password' => $data['admin_password'],
+                    'password' => \Illuminate\Support\Facades\Hash::make($data['admin_password']),
+                    'name' => 'Super Admin',
+                    'status' => 1,
+                    'deleted_at' => null,
+                    'password_changed_at' => null,
+                    'updated_at' => $now,
+                ]);
+                $adminId = $adminRow->id;
+            } else {
+                $adminId = DB::table('users')->insertGetId([
+                    'username' => 'admin',
+                    'email' => $data['admin_email'],
+                    'password' => \Illuminate\Support\Facades\Hash::make($data['admin_password']),
+                    'name' => 'Super Admin',
                     'status' => 1,
                     'password_changed_at' => null,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ]);
+            }
+            // 确保 super_admin 角色(用 Eloquent 实例绑定 Spatie 角色)
+            $admin = \App\Models\User::find($adminId);
+            if ($admin && ! $admin->hasRole('super_admin')) {
                 $admin->assignRole('super_admin');
             }
 
-            // Step 8: 默认商户
-            \App\Models\Merchant::firstOrCreate(
-                ['slug' => 'default'],
-                ['user_id' => $admin->id, 'name' => '默认商户', 'status' => 1, 'commission_rate' => 0]
-            );
+            // Step 8: 默认商户(DB 门面,幂等,避免软删除冲突)
+            if (! DB::table('merchants')->where('slug', 'default')->exists()) {
+                DB::table('merchants')->insert([
+                    'user_id' => $adminId,
+                    'name' => '默认商户',
+                    'slug' => 'default',
+                    'status' => 1,
+                    'commission_rate' => 0,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
 
             // Step 9: 缓存优化(失败不中断安装)
             try {
