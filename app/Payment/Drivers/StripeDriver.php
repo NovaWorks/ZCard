@@ -2,7 +2,7 @@
 
 namespace App\Payment\Drivers;
 
-use App\Models\Order;
+use App\Payment\Contracts\Payable;
 use App\Payment\Contracts\PaymentDriver;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
@@ -25,7 +25,7 @@ class StripeDriver implements PaymentDriver
         return URL::current();
     }
 
-    public function pay(Order $order, array $config): PaymentResult
+    public function pay(Payable $order, array $config): PaymentResult
     {
         Stripe::setApiKey($config['secret_key'] ?? '');
 
@@ -35,16 +35,16 @@ class StripeDriver implements PaymentDriver
                 'price_data' => [
                     'currency' => strtolower($config['currency'] ?? 'usd'),
                     'product_data' => [
-                        'name' => $order->order_no,
+                        'name' => $order->getPayableKey(),
                     ],
-                    'unit_amount' => (int) $order->amount, // Stripe 用分,order->amount 已是分
+                    'unit_amount' => (int) $order->getPayableAmount(), // Stripe 用分,order->amount 已是分
                 ],
                 'quantity' => 1,
             ]],
             'mode' => 'payment',
-            'client_reference_id' => $order->order_no,
-            'success_url' => $this->namedUrl('payment.return', ['code' => 'stripe']) . '?order_no=' . $order->order_no . '&session_id={CHECKOUT_SESSION_ID}',
-            'cancel_url' => $this->namedUrl('payment.cancel', ['code' => 'stripe']) . '?order_no=' . $order->order_no,
+            'client_reference_id' => $order->getPayableKey(),
+            'success_url' => $this->namedUrl('payment.return', ['code' => 'stripe']) . '?order_no=' . $order->getPayableKey() . '&session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url' => $this->namedUrl('payment.cancel', ['code' => 'stripe']) . '?order_no=' . $order->getPayableKey(),
         ]);
 
         return PaymentResult::redirect($session->url);

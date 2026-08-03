@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
+use App\Payment\Contracts\Payable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Order extends Model
+class Order extends Model implements Payable
 {
     protected $fillable = [
         'order_no', 'merchant_id', 'user_id', 'product_id', 'quantity',
@@ -37,5 +38,22 @@ class Order extends Model
     public function orderDeliveries(): HasMany
     {
         return $this->hasMany(OrderDelivery::class);
+    }
+
+    // ===== Payable 实现 =====
+
+    public function getPayableKey(): string
+    {
+        return $this->order_no;
+    }
+
+    public function getPayableAmount(): int
+    {
+        return (int) $this->amount;
+    }
+
+    public function getPayableType(): string
+    {
+        return 'order';
     }
 }

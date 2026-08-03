@@ -2,7 +2,7 @@
 
 namespace App\Payment\Drivers;
 
-use App\Models\Order;
+use App\Payment\Contracts\Payable;
 use App\Payment\Contracts\PaymentDriver;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
@@ -48,21 +48,21 @@ class PaypalDriver implements PaymentDriver
         return (string) $tokenRes->json('access_token');
     }
 
-    public function pay(Order $order, array $config): PaymentResult
+    public function pay(Payable $order, array $config): PaymentResult
     {
         $token = $this->accessToken($config);
 
-        $returnUrl = $this->namedUrl('payment.return', ['code' => 'paypal']) . '?order_no=' . $order->order_no;
-        $cancelUrl = $this->namedUrl('payment.cancel', ['code' => 'paypal']) . '?order_no=' . $order->order_no;
+        $returnUrl = $this->namedUrl('payment.return', ['code' => 'paypal']) . '?order_no=' . $order->getPayableKey();
+        $cancelUrl = $this->namedUrl('payment.cancel', ['code' => 'paypal']) . '?order_no=' . $order->getPayableKey();
 
         $payload = [
             'intent' => 'CAPTURE',
             'purchase_units' => [
                 [
-                    'reference_id' => $order->order_no,
+                    'reference_id' => $order->getPayableKey(),
                     'amount' => [
                         'currency_code' => 'USD',
-                        'value' => bcdiv((string) $order->amount, '100', 2), // 分→元
+                        'value' => bcdiv((string) $order->getPayableAmount(), '100', 2), // 分→元
                     ],
                 ],
             ],

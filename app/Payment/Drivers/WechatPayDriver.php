@@ -2,7 +2,7 @@
 
 namespace App\Payment\Drivers;
 
-use App\Models\Order;
+use App\Payment\Contracts\Payable;
 use App\Payment\Contracts\PaymentDriver;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
@@ -33,15 +33,15 @@ class WechatPayDriver implements PaymentDriver
         ];
     }
 
-    public function pay(Order $order, array $config): PaymentResult
+    public function pay(Payable $order, array $config): PaymentResult
     {
         Pay::config($this->buildConfig($config));
 
         $result = Pay::wechat()->scan([
-            'out_trade_no' => $order->order_no,
-            'description' => $order->order_no,
+            'out_trade_no' => $order->getPayableKey(),
+            'description' => $order->getPayableKey(),
             'amount' => [
-                'total' => (int) $order->amount, // 微信 V3 用分,order->amount 已是分
+                'total' => (int) $order->getPayableAmount(), // 微信 V3 用分,order->amount 已是分
                 'currency' => 'CNY',
             ],
         ]);

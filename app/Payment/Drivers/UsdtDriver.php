@@ -2,7 +2,7 @@
 
 namespace App\Payment\Drivers;
 
-use App\Models\Order;
+use App\Payment\Contracts\Payable;
 use App\Payment\Contracts\PaymentDriver;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
@@ -19,11 +19,11 @@ class UsdtDriver implements PaymentDriver
         return $rate > 0 ? bcdiv((string) $amount, (string) $rate, 6) : (string) $amount;
     }
 
-    public function pay(Order $order, array $config): PaymentResult
+    public function pay(Payable $order, array $config): PaymentResult
     {
         $wallet = $config['wallet_address'] ?? '';
         // order->amount 是分,先转元再÷汇率
-        $yuan = bcdiv((string) $order->amount, '100', 2);
+        $yuan = bcdiv((string) $order->getPayableAmount(), '100', 2);
         $usdt = $this->toUsdt((float) $yuan, $config);
 
         // 形如 tron:Txxx...?amount=1.234567，钱包 App 识别后可自动填金额。

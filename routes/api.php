@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\CurrencyController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\RechargeController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\StorefrontSettingsController;
@@ -50,6 +51,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // 提现(需登录)
     Route::post('/withdrawals', [WithdrawalController::class, 'request'])->name('api.withdrawals.request');
     Route::get('/withdrawals/history', [WithdrawalController::class, 'history'])->name('api.withdrawals.history');
+
+    // 充值到余额(需登录):创建充值单 / 历史 / 状态查询
+    Route::post('/recharges', [RechargeController::class, 'create'])->name('api.recharges.create');
+    Route::get('/recharges/history', [RechargeController::class, 'history'])->name('api.recharges.history');
+    Route::get('/recharges/{rechargeNo}/status', [RechargeController::class, 'status'])->name('api.recharges.status');
 
     // 分站主自助控制台(只在主站)
     Route::middleware('require.main.site')->prefix('subsite-console')->group(function () {
@@ -268,7 +274,12 @@ Route::post('/payments/callback/{channel}', [PaymentController::class, 'callback
 
 // 支付同步跳回(第三方支付完成后浏览器跳转,重定向到前台结果页)
 // 驱动用 payment.return / payment.cancel / payment.notify 命名路由拼接跳回地址
+// order_no 参数实际为商户业务单号:RCH 前缀=充值单,跳充值页;否则为订单,跳支付结果页
 Route::get('/payments/return/{code}', function (Request $request, string $code) {
+    $bizNo = $request->query('order_no') ?: $request->query('out_trade_no');
+    if (is_string($bizNo) && str_starts_with($bizNo, 'RCH')) {
+        return redirect('/recharge/result?recharge_no=' . urlencode($bizNo));
+    }
     $query = http_build_query(array_filter([
         'code' => $code,
         'order_no' => $request->query('order_no'),
@@ -279,6 +290,10 @@ Route::get('/payments/return/{code}', function (Request $request, string $code) 
 })->name('payment.return');
 
 Route::get('/payments/cancel/{code}', function (Request $request, string $code) {
+    $bizNo = $request->query('order_no') ?: $request->query('out_trade_no');
+    if (is_string($bizNo) && str_starts_with($bizNo, 'RCH')) {
+        return redirect('/recharge/result?status=cancel&recharge_no=' . urlencode($bizNo));
+    }
     $query = http_build_query(array_filter([
         'code' => $code,
         'order_no' => $request->query('order_no'),

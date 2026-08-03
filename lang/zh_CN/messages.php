@@ -40,6 +40,11 @@ return [
 
     'payment.channel_disabled' => '该支付通道未启用',
 
+    // ===== 余额充值 =====
+    'recharge.amount_invalid' => '充值金额必须大于 0',
+    'recharge.not_found' => '充值单不存在',
+    'recharge.credit' => '余额充值(:no)',
+
     'mail.disabled' => '邮件功能未开启',
 
     'insufficient_stock_short' => '库存不足',

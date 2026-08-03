@@ -40,6 +40,11 @@ return [
 
     'payment.channel_disabled' => 'This payment channel is not enabled.',
 
+    // ===== Balance recharge =====
+    'recharge.amount_invalid' => 'Recharge amount must be greater than 0',
+    'recharge.not_found' => 'Recharge order not found',
+    'recharge.credit' => 'Balance recharge (:no)',
+
     'mail.disabled' => 'Mail service is not enabled.',
 
     'insufficient_stock_short' => 'Insufficient stock.',

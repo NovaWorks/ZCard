@@ -2,13 +2,17 @@
 
 namespace App\Payment\Contracts;
 
-use App\Models\Order;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
 
 interface PaymentDriver
 {
-    public function pay(Order $order, array $config): PaymentResult;
+    /**
+     * 向网关发起收款。
+     * $payable 可能是订单(Order)或充值单(Recharge),两者都实现 Payable 接口,
+     * 驱动只需读取单号与金额。
+     */
+    public function pay(Payable $payable, array $config): PaymentResult;
     public function verifyCallback(Request $request, array $config): ?array;
     public function getConfigFields(): array;
     public function getInfo(): array;

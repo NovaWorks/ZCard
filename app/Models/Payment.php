@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Payment extends Model
 {
     protected $fillable = [
-        'order_id', 'channel', 'channel_order_no', 'amount', 'status', 'paid_at', 'raw',
+        'order_id', 'recharge_id', 'channel', 'channel_order_no', 'amount', 'status', 'paid_at', 'raw',
         'charged_currency', 'charged_amount', 'channel_exchange_rate',
     ];
 
@@ -24,5 +24,10 @@ class Payment extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
+    }
+
+    public function recharge(): BelongsTo
+    {
+        return $this->belongsTo(Recharge::class);
     }
 }

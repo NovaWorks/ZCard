@@ -129,10 +129,16 @@ onMounted(loadData)
           <div class="mt-6 bg-white/15 rounded-field p-4 backdrop-blur-sm">
             <div class="text-white/80 text-xs">{{ t('userCenter.balance') }}</div>
             <div class="text-3xl font-extrabold mt-1">{{ formatMoney(balance, prefs.currentCurrency) }}</div>
-            <button @click="go('withdraw')"
-              class="mt-3 bg-white/90 text-primary text-sm font-semibold px-4 py-1.5 rounded-pill hover:bg-white transition">
-              {{ t('userCenter.withdraw') }}
-            </button>
+            <div class="mt-3 flex gap-2">
+              <button @click="go('recharge')"
+                class="bg-white/90 text-primary text-sm font-semibold px-4 py-1.5 rounded-pill hover:bg-white transition">
+                {{ t('userCenter.recharge') }}
+              </button>
+              <button @click="go('withdraw')"
+                class="bg-white/20 text-white text-sm font-semibold px-4 py-1.5 rounded-pill hover:bg-white/30 transition border border-white/30">
+                {{ t('userCenter.withdraw') }}
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -146,9 +152,9 @@ onMounted(loadData)
             <div class="text-xs font-medium text-ink">{{ t('userCenter.myOrders') }}</div>
             <div class="text-[10px] text-ink-muted mt-0.5">{{ orders.length }} {{ t('userCenter.orderCount') }}</div>
           </button>
-          <button @click="go('withdraw')" class="bg-white rounded-field border border-border p-4 text-center hover:shadow-card-hover transition">
-            <div class="text-2xl mb-1">💸</div>
-            <div class="text-xs font-medium text-ink">{{ t('userCenter.withdraw') }}</div>
+          <button @click="go('recharge')" class="bg-white rounded-field border border-border p-4 text-center hover:shadow-card-hover transition">
+            <div class="text-2xl mb-1">💰</div>
+            <div class="text-xs font-medium text-ink">{{ t('userCenter.recharge') }}</div>
             <div class="text-[10px] text-ink-muted mt-0.5">{{ formatMoney(balance, prefs.currentCurrency) }}</div>
           </button>
           <button @click="go('distribution')" class="bg-white rounded-field border border-border p-4 text-center hover:shadow-card-hover transition">

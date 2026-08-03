@@ -2,7 +2,7 @@
 
 namespace App\Payment\Drivers;
 
-use App\Models\Order;
+use App\Payment\Contracts\Payable;
 use App\Payment\Contracts\PaymentDriver;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
@@ -52,7 +52,7 @@ class EpuSdtDriver implements PaymentDriver
         return hash_hmac('sha256', implode('&', $pairs), $secretKey);
     }
 
-    public function pay(Order $order, array $config): PaymentResult
+    public function pay(Payable $order, array $config): PaymentResult
     {
         $apiUrl = rtrim($config['api_url'] ?? '', '/');
         $pid = $config['pid'] ?? '';
@@ -60,16 +60,16 @@ class EpuSdtDriver implements PaymentDriver
         $currency = $config['currency'] ?? 'cny';
 
         $notifyUrl = $this->namedUrl('payment.notify', ['channel' => 'epusdt']);
-        $redirectUrl = $this->namedUrl('payment.return', ['code' => 'epusdt']) . '?order_no=' . $order->order_no;
+        $redirectUrl = $this->namedUrl('payment.return', ['code' => 'epusdt']) . '?order_no=' . $order->getPayableKey();
 
         $params = [
             'pid' => (string) $pid,
-            'order_id' => $order->order_no,
+            'order_id' => $order->getPayableKey(),
             'currency' => $currency,
-            'amount' => bcdiv((string) $order->amount, '100', 2), // 分→元
+            'amount' => bcdiv((string) $order->getPayableAmount(), '100', 2), // 分→元
             'notify_url' => $notifyUrl,
             'redirect_url' => $redirectUrl,
-            'name' => $order->order_no,
+            'name' => $order->getPayableKey(),
         ];
 
         $params['signature'] = $this->sign($params, $secretKey);

@@ -2,7 +2,7 @@
 
 namespace App\Payment\Drivers;
 
-use App\Models\Order;
+use App\Payment\Contracts\Payable;
 use App\Payment\Contracts\PaymentDriver;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
@@ -32,14 +32,14 @@ class AlipayDriver implements PaymentDriver
         ];
     }
 
-    public function pay(Order $order, array $config): PaymentResult
+    public function pay(Payable $order, array $config): PaymentResult
     {
         Pay::config($this->buildConfig($config));
 
         $result = Pay::alipay()->web([
-            'out_trade_no' => $order->order_no,
-            'total_amount' => bcdiv((string) $order->amount, '100', 2), // 分→元
-            'subject' => $order->order_no,
+            'out_trade_no' => $order->getPayableKey(),
+            'total_amount' => bcdiv((string) $order->getPayableAmount(), '100', 2), // 分→元
+            'subject' => $order->getPayableKey(),
         ]);
 
         // yansongda alipay web 返回的是一段可自动提交的 HTML 表单。

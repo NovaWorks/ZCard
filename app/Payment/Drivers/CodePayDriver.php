@@ -2,7 +2,7 @@
 
 namespace App\Payment\Drivers;
 
-use App\Models\Order;
+use App\Payment\Contracts\Payable;
 use App\Payment\Contracts\PaymentDriver;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
@@ -40,7 +40,7 @@ class CodePayDriver implements PaymentDriver
         return md5($query . $key);
     }
 
-    public function pay(Order $order, array $config): PaymentResult
+    public function pay(Payable $order, array $config): PaymentResult
     {
         $pid = $config['pid'] ?? '';
         $key = $config['key'] ?? '';
@@ -49,11 +49,11 @@ class CodePayDriver implements PaymentDriver
         $params = [
             'pid' => $pid,
             'type' => $config['type'] ?? 'alipay',
-            'out_trade_no' => $order->order_no,
+            'out_trade_no' => $order->getPayableKey(),
             'notify_url' => $this->namedUrl('payment.notify', ['channel' => 'codepay']),
-            'return_url' => $this->namedUrl('payment.return', ['code' => 'codepay']) . '?order_no=' . $order->order_no,
-            'name' => $order->order_no,
-            'money' => bcdiv((string) $order->amount, '100', 2), // 分→元
+            'return_url' => $this->namedUrl('payment.return', ['code' => 'codepay']) . '?order_no=' . $order->getPayableKey(),
+            'name' => $order->getPayableKey(),
+            'money' => bcdiv((string) $order->getPayableAmount(), '100', 2), // 分→元
         ];
 
         $params['sign'] = $this->sign($params, $key);
