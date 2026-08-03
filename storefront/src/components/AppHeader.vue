@@ -121,12 +121,12 @@ const mobileMenuOpen = ref(false)
         <RouterLink to="/login" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-primary hover:bg-primary-light transition text-sm">{{ t('nav.login') }}</RouterLink>
         <RouterLink to="/register" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field bg-primary text-white hover:bg-primary-hover transition text-sm text-center">{{ t('nav.register') }}</RouterLink>
       </template>
-      <!-- 货币 + 语言切换 -->
-      <div class="flex items-center gap-2 pt-2 border-t border-border">
-        <select v-model="currencySel" class="flex-1 px-2 py-1.5 rounded-field border border-border text-xs text-ink-soft bg-white">
+      <!-- 货币 + 语言切换(仅多种时显示) -->
+      <div v-if="prefs.currencies.length > 1 || prefs.languages.length > 1" class="flex items-center gap-2 pt-2 border-t border-border">
+        <select v-if="prefs.currencies.length > 1" v-model="currencySel" class="flex-1 px-2 py-1.5 rounded-field border border-border text-xs text-ink-soft bg-white">
           <option v-for="c in prefs.currencies" :key="c.code" :value="c.code">{{ c.code }}</option>
         </select>
-        <select v-model="langSel" class="flex-1 px-2 py-1.5 rounded-field border border-border text-xs text-ink-soft bg-white">
+        <select v-if="prefs.languages.length > 1" v-model="langSel" class="flex-1 px-2 py-1.5 rounded-field border border-border text-xs text-ink-soft bg-white">
           <option v-for="lang in prefs.languages" :key="lang" :value="lang">{{ languageLabel(lang) }}</option>
         </select>
       </div>
