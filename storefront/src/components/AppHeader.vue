@@ -49,9 +49,9 @@ const mobileMenuOpen = ref(false)
 <template>
   <!-- 顶部品牌条 (深蓝渐变) -->
   <div class="bg-gradient-to-r from-primary-hover to-primary text-white text-xs">
-    <div class="max-w-6xl mx-auto px-4 h-8 flex items-center justify-between">
-      <span class="opacity-90">{{ t('nav.brandBar.slogan') }}</span>
-      <div class="flex items-center gap-3 opacity-90">
+    <div class="max-w-6xl mx-auto px-4 h-8 flex items-center justify-between overflow-hidden">
+      <span class="opacity-90 truncate">{{ t('nav.brandBar.slogan') }}</span>
+      <div class="hidden sm:flex items-center gap-3 opacity-90 shrink-0">
         <span>{{ t('nav.brandBar.securePay') }}</span>
         <span>{{ t('nav.brandBar.privacy') }}</span>
       </div>
@@ -71,12 +71,12 @@ const mobileMenuOpen = ref(false)
       <nav class="hidden md:flex items-center gap-1 text-sm">
         <RouterLink to="/" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.home') }}</RouterLink>
         <RouterLink to="/orders/query" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.orders') }}</RouterLink>
-        <!-- 货币切换器 -->
-        <select v-model="currencySel" class="px-2 py-1 ml-1 rounded-field border border-border text-xs text-ink-soft bg-white">
+        <!-- 货币切换器(仅多种货币时显示) -->
+        <select v-if="prefs.currencies.length > 1" v-model="currencySel" class="px-2 py-1 ml-1 rounded-field border border-border text-xs text-ink-soft bg-white">
           <option v-for="c in prefs.currencies" :key="c.code" :value="c.code">{{ c.code }}</option>
         </select>
-        <!-- 语言切换器 (vue-i18n 响应式,无需刷新) -->
-        <select v-model="langSel" class="px-2 py-1 ml-1 rounded-field border border-border text-xs text-ink-soft bg-white">
+        <!-- 语言切换器(仅多种语言时显示;vue-i18n 响应式) -->
+        <select v-if="prefs.languages.length > 1" v-model="langSel" class="px-2 py-1 ml-1 rounded-field border border-border text-xs text-ink-soft bg-white">
           <option v-for="lang in prefs.languages" :key="lang" :value="lang">{{ languageLabel(lang) }}</option>
         </select>
         <template v-if="authStore.isLoggedIn">
