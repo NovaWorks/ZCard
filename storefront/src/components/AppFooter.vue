@@ -56,30 +56,30 @@ function isExternal(url: string) {
     <!-- 信任徽章 -->
     <div class="border-b border-border">
       <div class="max-w-6xl mx-auto px-4 py-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="flex items-center gap-3">
-          <span class="w-11 h-11 bg-primary-light text-primary rounded-card flex items-center justify-center text-xl">🚀</span>
-          <div>
+        <div class="flex items-center gap-2 sm:gap-3">
+          <span class="w-9 h-9 sm:w-11 sm:h-11 bg-primary-light text-primary rounded-card flex items-center justify-center text-lg sm:text-xl shrink-0">🚀</span>
+          <div class="min-w-0">
             <div class="text-xs font-semibold text-ink">{{ t('footer.badge.fastTitle') }}</div>
-            <div class="text-[10px] text-ink-muted mt-0.5">{{ t('footer.badge.fastHint') }}</div>
+            <div class="text-[10px] text-ink-muted mt-0.5 truncate">{{ t('footer.badge.fastHint') }}</div>
           </div>
         </div>
-        <div class="flex items-center gap-3">
-          <span class="w-11 h-11 bg-green-50 text-success rounded-card flex items-center justify-center text-xl">🔒</span>
-          <div>
+        <div class="flex items-center gap-2 sm:gap-3">
+          <span class="w-9 h-9 sm:w-11 sm:h-11 bg-green-50 text-success rounded-card flex items-center justify-center text-lg sm:text-xl shrink-0">🔒</span>
+          <div class="min-w-0">
             <div class="text-xs font-semibold text-ink">{{ t('footer.badge.secureTitle') }}</div>
-            <div class="text-[10px] text-ink-muted mt-0.5">{{ t('footer.badge.secureHint') }}</div>
+            <div class="text-[10px] text-ink-muted mt-0.5 truncate">{{ t('footer.badge.secureHint') }}</div>
           </div>
         </div>
-        <div class="flex items-center gap-3">
-          <span class="w-11 h-11 bg-orange-50 text-warning rounded-card flex items-center justify-center text-xl">⏰</span>
-          <div>
+        <div class="flex items-center gap-2 sm:gap-3">
+          <span class="w-9 h-9 sm:w-11 sm:h-11 bg-orange-50 text-warning rounded-card flex items-center justify-center text-lg sm:text-xl shrink-0">⏰</span>
+          <div class="min-w-0">
             <div class="text-xs font-semibold text-ink">{{ t('footer.badge.onlineTitle') }}</div>
-            <div class="text-[10px] text-ink-muted mt-0.5">{{ t('footer.badge.onlineHint') }}</div>
+            <div class="text-[10px] text-ink-muted mt-0.5 truncate">{{ t('footer.badge.onlineHint') }}</div>
           </div>
         </div>
-        <div class="flex items-center gap-3">
-          <span class="w-11 h-11 bg-blue-50 text-primary rounded-card flex items-center justify-center text-xl">💬</span>
-          <div>
+        <div class="flex items-center gap-2 sm:gap-3">
+          <span class="w-9 h-9 sm:w-11 sm:h-11 bg-blue-50 text-primary rounded-card flex items-center justify-center text-lg sm:text-xl shrink-0">💬</span>
+          <div class="min-w-0">
             <div class="text-xs font-semibold text-ink">{{ t('footer.badge.supportTitle') }}</div>
             <div class="text-[10px] text-ink-muted mt-0.5">{{ t('footer.badge.supportHint') }}</div>
           </div>
@@ -87,11 +87,11 @@ function isExternal(url: string) {
       </div>
     </div>
 
-    <!-- 主体:四栏布局 -->
-    <div class="max-w-6xl mx-auto px-4 py-10">
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-        <!-- 栏 1:品牌介绍 -->
-        <div class="lg:col-span-1">
+    <!-- 主体:四栏布局(手机2列,桌面4列) -->
+    <div class="max-w-6xl mx-auto px-4 py-8 sm:py-10">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
+        <!-- 栏 1:品牌介绍(手机占整行) -->
+        <div class="col-span-2 lg:col-span-1">
           <div class="flex items-center gap-2 mb-3">
             <span class="w-8 h-8 bg-gradient-to-br from-primary to-primary-hover rounded-[8px] text-white font-extrabold flex items-center justify-center">Z</span>
             <span class="text-lg font-extrabold text-ink">{{ siteName }}</span>
@@ -150,9 +150,9 @@ function isExternal(url: string) {
 
     <!-- 版权栏 -->
     <div class="border-t border-border">
-      <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row items-center justify-between gap-2">
-        <span class="text-xs text-ink-muted">{{ copyright }}</span>
-        <div class="flex items-center gap-4 text-[10px] text-ink-muted">
+      <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row items-center justify-between gap-2 text-center md:text-left">
+        <span class="text-xs text-ink-muted break-all">{{ copyright }}</span>
+        <div class="flex items-center gap-4 text-[10px] text-ink-muted shrink-0">
           <span>{{ t('footer.poweredBy') }}</span>
           <span class="hidden md:inline">·</span>
           <span class="hidden md:inline">{{ t('footer.autoDelivery') }}</span>

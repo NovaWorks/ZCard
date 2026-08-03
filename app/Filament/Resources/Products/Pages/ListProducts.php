@@ -52,12 +52,21 @@ class ListProducts extends ListRecords
                         return;
                     }
                     $service = app(CardImportService::class);
-                    $import = $service->import(
-                        $data['product_id'],
-                        auth()->id(),
-                        $content,
-                        ['source' => 'filament']
-                    );
+                    try {
+                        $import = $service->import(
+                            $data['product_id'],
+                            auth()->id(),
+                            $content,
+                            ['source' => 'filament']
+                        );
+                    } catch (\Throwable $e) {
+                        Notification::make()
+                            ->title('导入失败')
+                            ->body($e->getMessage())
+                            ->danger()
+                            ->send();
+                        return;
+                    }
                     $fresh = $import->fresh();
                     $body = "成功 {$fresh->success_count} / 总数 {$fresh->total}";
                     if ($fresh->skipped_count > 0) {
