@@ -23,3 +23,13 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# SPA 入口 HTML 不缓存(防止更新后旧 index.html 引用已删除的 hash JS → 404 白屏)
+# hash 命名的 assets(JS/CSS)仍可长缓存,仅 index.html 每次验证。
+<IfModule mod_headers.c>
+    <FilesMatch "\.(html|htm)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+</IfModule>

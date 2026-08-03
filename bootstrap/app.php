@@ -17,6 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // 必须在 StartSession 之前,否则 session(driver=database) 查表会崩
         $middleware->prepend(\App\Http\Middleware\EnsureInstalled::class);
 
+        // SPA 入口 HTML 不缓存(防止更新后旧 index.html 引用已删除的 hash JS → 404 白屏)
+        $middleware->append(\App\Http\Middleware\NoCacheHtml::class);
+
         // API 路由加入 Session 支持(mews/captcha 验证码需要 session 存储)
         $middleware->api(prepend: [
             \Illuminate\Session\Middleware\StartSession::class,
