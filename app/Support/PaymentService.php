@@ -63,8 +63,10 @@ class PaymentService
         ];
         if ($payable instanceof Recharge) {
             $payload['recharge_id'] = $payable->id;
-        } else {
+        } elseif ($payable instanceof Order) {
             $payload['order_id'] = $payable->id;
+        } else {
+            throw new \RuntimeException('不支持的 Payable 类型: ' . get_class($payable));
         }
         Payment::create($payload);
 
@@ -168,33 +170,34 @@ class PaymentService
             return 'fail: amount mismatch';
         }
 
-        // 标记支付流水 + 充值单为已支付,再入账(BillService 内部有行锁 + 幂等保护)
-        $rechargeLock = \Illuminate\Support\Facades\DB::transaction(function () use ($recharge, $channelCode, $request) {
+        // 标记支付流水 + 充值单为已支付 → 入账余额,全部在同一事务内,
+        // 保证原子性(任一步失败整体回滚,避免"已标 paid 但未入账"或"入账成功但回滚状态"的不一致)。
+        // 事务返回值:null=并发已处理(幂等直接返回 success),非 null=本次完成转换。
+        $converted = \Illuminate\Support\Facades\DB::transaction(function () use ($recharge, $channelCode, $request) {
             $locked = Recharge::where('id', $recharge->id)->lockForUpdate()->firstOrFail();
+            // 并发回调:另一请求已将状态改为 paid → 本次不重复入账
             if ($locked->status !== Recharge::STATUS_PENDING) {
-                return $locked; // 已被并发处理
+                return null;
             }
             $locked->update(['status' => Recharge::STATUS_PAID, 'paid_at' => now()]);
             Payment::where('recharge_id', $locked->id)->where('channel', $channelCode)
                 ->update(['status' => 'success', 'paid_at' => now(), 'raw' => $request->all()]);
+
+            // 入账(同事务):BillService::record 内部 DB::transaction 会退化为保存点,
+            // 抛异常时整体回滚(recharge + payment + bill + balance 一起回退)。
+            BillService::record(
+                $locked->user_id,
+                (int) $locked->amount,
+                \App\Models\Bill::TYPE_INCOME,
+                __('messages.recharge.credit', ['no' => $locked->recharge_no]),
+            );
+
             return $locked;
         });
 
-        if ($rechargeLock->status === Recharge::STATUS_PAID) {
-            try {
-                BillService::record(
-                    $recharge->user_id,
-                    (int) $recharge->amount,
-                    \App\Models\Bill::TYPE_INCOME,
-                    __('messages.recharge.credit', ['no' => $recharge->recharge_no]),
-                );
-            } catch (\Throwable $e) {
-                // 余额入账异常:回滚充值单状态,让第三方重试回调
-                \Illuminate\Support\Facades\Log::error('充值入账失败: ' . $rechargeNo . ' ' . $e->getMessage());
-                Recharge::where('id', $recharge->id)->where('status', Recharge::STATUS_PAID)
-                    ->update(['status' => Recharge::STATUS_PENDING, 'paid_at' => null]);
-                throw $e;
-            }
+        // 并发已处理 → 幂等返回 success(让第三方停止重试)
+        if ($converted === null) {
+            return 'success';
         }
 
         return 'success';

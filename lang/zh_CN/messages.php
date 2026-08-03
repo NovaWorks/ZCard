@@ -43,6 +43,7 @@ return [
     // ===== 余额充值 =====
     'recharge.amount_invalid' => '充值金额必须大于 0',
     'recharge.not_found' => '充值单不存在',
+    'recharge.login_required' => '请先登录后再充值',
     'recharge.credit' => '余额充值(:no)',
 
     'mail.disabled' => '邮件功能未开启',

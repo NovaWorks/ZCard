@@ -46,7 +46,12 @@ class PaymentController extends Controller
 
         // 按单号前缀解析业务对象(订单 / 充值单)
         if (str_starts_with($bizNo, 'RCH')) {
-            $payable = Recharge::where('recharge_no', $bizNo)->first();
+            // 充值单强归属:必须登录,且只能为本人充值单发起支付(防越权)
+            $userId = $request->user()?->id;
+            if (! $userId) {
+                return response()->json(['message' => __('messages.recharge.login_required')], 401);
+            }
+            $payable = Recharge::where('recharge_no', $bizNo)->where('user_id', $userId)->first();
             if (! $payable) {
                 return response()->json(['message' => __('messages.recharge.not_found')], 404);
             }

@@ -43,6 +43,7 @@ return [
     // ===== Balance recharge =====
     'recharge.amount_invalid' => 'Recharge amount must be greater than 0',
     'recharge.not_found' => 'Recharge order not found',
+    'recharge.login_required' => 'Please log in before recharging',
     'recharge.credit' => 'Balance recharge (:no)',
 
     'mail.disabled' => 'Mail service is not enabled.',

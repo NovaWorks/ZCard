@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Recharge;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -26,9 +25,10 @@ class RechargeController extends Controller
             'amount' => 'required|numeric|min:0.01',
         ]);
 
-        // 最低/最高限制(基础货币:元),防止异常金额
+        // 金额限制:下限 0.01 元,上限可后台配置(默认 50000 元),防止异常金额刷会员等级/套现
         $amountYuan = (float) $data['amount'];
-        if ($amountYuan < 0.01) {
+        $maxYuan = (float) (\App\Support\StorefrontConfig::get('recharge_max_amount') ?? 50000);
+        if ($amountYuan < 0.01 || $amountYuan > $maxYuan) {
             return response()->json(['message' => __('messages.recharge.amount_invalid')], 422);
         }
         $amountFen = (int) round($amountYuan * 100);
