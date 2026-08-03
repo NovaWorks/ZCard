@@ -172,6 +172,10 @@ class UpdateController extends Controller
             $this->buildFrontend($logFile, 'sysadmin');
             $this->buildFrontend($logFile, 'storefront');
 
+            // Step 7.5: 校验前端产物完整性(防止 index.html 和 assets 不同步导致 404 白屏)
+            $this->verifyFrontendAssets($logFile, 'admin');
+            $this->verifyFrontendAssets($logFile, 'storefront');
+
             // Step 8: 新版本号(清缓存确保读到 git pull 后的新 tag)
             \App\Support\AppHelper::clearVersionCache();
             $newVersion = \App\Support\AppHelper::version();
@@ -254,6 +258,10 @@ class UpdateController extends Controller
             // Step 5: 前端构建
             $this->buildFrontend($logFile, 'sysadmin');
             $this->buildFrontend($logFile, 'storefront');
+
+            // Step 5.5: 校验前端产物完整性
+            $this->verifyFrontendAssets($logFile, 'admin');
+            $this->verifyFrontendAssets($logFile, 'storefront');
 
             // Step 6: 清缓存 + 上线
             Artisan::call('config:clear');
@@ -609,6 +617,78 @@ class UpdateController extends Controller
         } catch (\Throwable $e) {
             // 函数被禁用或构建失败,跳过(编译产物已在仓库)
             $this->log($logFile, "{$dir} 构建跳过({$e->getMessage()}),使用仓库已有编译产物");
+        }
+    }
+
+    /**
+     * 校验前端产物完整性:检查 index.html 引用的 JS/CSS 文件是否实际存在。
+     *
+     * 每次构建产物文件名带 hash(如 index-AbCd1234.js),如果 git pull/reset
+     * 只更新了部分文件(如 index.html 更新了但 assets 没同步,或反之),
+     * 浏览器加载的 index.html 会引用不存在的 JS/CSS → 404 白屏。
+     *
+     * 修复:如果校验失败(有引用的文件不存在),用 git checkout 强制同步
+     * 整个 public/{dir}/ 目录到当前 HEAD 版本,确保 index.html 和 assets 一致。
+     */
+    private function verifyFrontendAssets(string $logFile, string $dir): void
+    {
+        $publicDir = base_path("public/{$dir}");
+        $indexHtml = "{$publicDir}/index.html";
+
+        if (! file_exists($indexHtml)) {
+            $this->log($logFile, "{$dir} 校验跳过(无 index.html)");
+            return;
+        }
+
+        $html = file_get_contents($indexHtml);
+        // 提取所有 assets/*.js 和 *.css 引用
+        preg_match_all('/(?:src|href)=(["|\x27])([^\\"|\x27]+\.(?:js|css))\1/', $html, $matches);
+        // $matches[2] 是文件路径(不含引号)
+        $assetUrls = $matches[2];
+
+        $missing = [];
+        foreach ($assetUrls as $assetUrl) {
+            // assetUrl 可能是 /admin/assets/xxx.js 或 assets/xxx.js
+            $relativePath = $assetUrl;
+            // 去掉开头的 /{dir}/ 前缀,得到 public/{dir}/ 下的相对路径
+            $relativePath = preg_replace('#^/?' . preg_quote($dir, '#') . '/#', '', $relativePath);
+            $fullPath = "{$publicDir}/{$relativePath}";
+
+            if (! file_exists($fullPath)) {
+                $missing[] = $assetUrl;
+            }
+        }
+
+        if (empty($missing)) {
+            $this->log($logFile, "{$dir} 产物校验通过(" . count($assetUrls) . ' 个文件)');
+            return;
+        }
+
+        // 校验失败:index.html 引用的文件缺失,强制从 git 同步整个目录
+        $this->log($logFile, "{$dir} 产物校验失败! 缺失 " . count($missing) . ' 个文件: ' . implode(', ', array_slice($missing, 0, 5)));
+        $this->log($logFile, "{$dir} 强制从 git 同步 public/{$dir}/ ...");
+
+        try {
+            // git checkout HEAD -- public/{dir}/ 强制恢复整个目录
+            $output = $this->shell('cd ' . base_path() . ' && git checkout HEAD -- public/' . escapeshellarg($dir) . '/ 2>&1');
+            $this->log($logFile, "{$dir} git 同步完成: " . trim($output));
+
+            // 再次校验
+            $stillMissing = [];
+            foreach ($missing as $assetUrl) {
+                $relativePath = preg_replace('#^/?' . preg_quote($dir, '#') . '/#', '', $assetUrl);
+                if (! file_exists("{$publicDir}/{$relativePath}")) {
+                    $stillMissing[] = $assetUrl;
+                }
+            }
+
+            if (empty($stillMissing)) {
+                $this->log($logFile, "{$dir} 产物校验修复成功!");
+            } else {
+                $this->log($logFile, "{$dir} 产物校验仍有缺失(可能 HEAD 版本本身缺文件): " . implode(', ', array_slice($stillMissing, 0, 3)));
+            }
+        } catch (\Throwable $e) {
+            $this->log($logFile, "{$dir} git 同步失败: " . $e->getMessage());
         }
     }
 }
