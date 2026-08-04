@@ -97,12 +97,19 @@ class SupplySourceController extends Controller
         }
     }
 
-    /** POST /api/admin/supply-sources/{source}/sync 触发商品同步 */
+    /** POST /api/admin/supply-sources/{source}/sync 触发商品同步(同步执行,不走队列) */
     public function sync(Request $request, SupplySource $supplySource): JsonResponse
     {
         $mode = in_array($request->input('mode'), ['full', 'incremental']) ? $request->input('mode') : 'incremental';
-        SyncSupplySourceProducts::dispatch($supplySource->id, $mode);
-        return response()->json(['ok' => true, 'message' => '同步任务已派发', 'mode' => $mode]);
+        try {
+            // 同步执行(原为异步 dispatch,但生产环境常无 queue:worker 导致任务永不执行,
+            // 用户点同步无反应。改为同步执行,立即返回结果)。
+            $job = new SyncSupplySourceProducts($supplySource->id, $mode);
+            $job->handle(app(SupplyManager::class), app(\App\Supply\SupplySyncService::class));
+            return response()->json(['ok' => true, 'message' => '同步完成', 'mode' => $mode]);
+        } catch (\Throwable $e) {
+            return response()->json(['ok' => false, 'message' => $e->getMessage(), 'mode' => $mode], 500);
+        }
     }
 
     /** GET /api/admin/supply-sources/{source}/sync-status */
@@ -113,6 +120,104 @@ class SupplySourceController extends Controller
             'last_synced_at' => $supplySource->last_synced_at,
             'last_error' => $supplySource->last_error,
         ]);
+    }
+
+    /**
+     * GET /api/admin/supply-sources/{source}/products/preview
+     * 实时拉取上游商品(同步,不走队列),按分类组织成树供后台勾选导入。
+     * 返回结构:[{category_code, category_name, products:[{code,name,price,cover,stock,already_imported}]}]
+     */
+    public function previewProducts(SupplySource $supplySource): JsonResponse
+    {
+        try {
+            $driver = app(SupplyManager::class)->driver($supplySource);
+            $result = $driver->listProducts(null, 1);
+            $items = $result['items'] ?? [];
+
+            // 已导入本地的商品 code 集合(判断 already_imported)
+            $importedCodes = \App\Models\Product::where('upstream_source_id', $supplySource->id)
+                ->pluck('upstream_product_code')->toArray();
+
+            // 按上游分类聚合(没有分类的归到"未分类")
+            $tree = [];
+            $bucket = [];
+            foreach ($items as $p) {
+                $catCode = $p->categoryCode ?? '_uncategorized';
+                if (! isset($bucket[$catCode])) {
+                    $bucket[$catCode] = [];
+                }
+                $bucket[$catCode][] = [
+                    'code' => $p->code,
+                    'name' => $p->name,
+                    'price' => $p->price,            // 分
+                    'factory_price' => $p->factoryPrice, // 分
+                    'cover' => $p->cover,
+                    'stock' => $p->stockQuantity,
+                    'already_imported' => in_array($p->code, $importedCodes, true),
+                ];
+            }
+            foreach ($bucket as $catCode => $products) {
+                $tree[] = [
+                    'category_code' => $catCode === '_uncategorized' ? null : $catCode,
+                    'category_name' => $catCode === '_uncategorized' ? '未分类' : ('分类 #' . $catCode),
+                    'products' => $products,
+                ];
+            }
+
+            return response()->json([
+                'ok' => true,
+                'total' => count($items),
+                'categories' => $tree,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * POST /api/admin/supply-sources/{source}/products/import
+     * 勾选导入:接收商品 code 列表,实时 upsert 到本地。
+     * body: { codes: ['CODE1','CODE2',...] }
+     */
+    public function importProducts(Request $request, SupplySource $supplySource): JsonResponse
+    {
+        $data = $request->validate([
+            'codes' => 'required|array|min:1',
+            'codes.*' => 'string',
+        ]);
+
+        try {
+            $driver = app(SupplyManager::class)->driver($supplySource);
+            $sync = app(\App\Supply\SupplySyncService::class);
+            $imported = 0;
+            $skipped = 0;
+
+            // 拉取上游全部商品,按 code 索引(只拉一次,避免逐个 getProduct 打多次请求)
+            $result = $driver->listProducts(null, 1);
+            $map = collect($result['items'] ?? [])->keyBy('code');
+
+            foreach ($data['codes'] as $code) {
+                $dto = $map->get($code);
+                if (! $dto) {
+                    $skipped++;
+                    continue;
+                }
+                $sync->upsertProduct($supplySource, $dto);
+                $imported++;
+            }
+
+            $supplySource->update(['last_synced_at' => now(), 'last_error' => null]);
+
+            return response()->json([
+                'ok' => true,
+                'imported' => $imported,
+                'skipped' => $skipped,
+                'message' => "成功导入 {$imported} 个商品" . ($skipped > 0 ? "(跳过 {$skipped} 个)" : ''),
+            ]);
+        } catch (\Throwable $e) {
+            $supplySource->update(['last_error' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
     }
 
     private function validateSource(Request $request, ?SupplySource $existing = null): array

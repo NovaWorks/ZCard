@@ -1412,7 +1412,17 @@
       "markupPercent": "Markup Percent",
       "markupAmount": "Markup Amount",
       "autoList": "Auto-list After Sync",
-      "autoListTip": "Auto-publish newly synced products; disable for manual review"
+      "autoListTip": "Auto-publish newly synced products; disable for manual review",
+      "pullProducts": "Pull Products",
+      "previewTitle": "Pull Upstream Products (Select to Import)",
+      "previewSummary": "{total} products, {selected} selected",
+      "selectAll": "Select All",
+      "imported": "Imported",
+      "noProducts": "No products available upstream",
+      "previewFailed": "Failed to pull upstream products",
+      "importSelected": "Import Selected ({n})",
+      "importSuccess": "Import succeeded",
+      "importFailed": "Import failed"
     },
     "supplierAccount": {
       "title": "Supplier Accounts",

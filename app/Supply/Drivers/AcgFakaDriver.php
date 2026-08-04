@@ -33,13 +33,19 @@ class AcgFakaDriver implements SupplyDriver
         return ['name' => 'ACG发卡(acg-faka)', 'icon' => '🎴'];
     }
 
-    /** acg-faka MD5 签名(spec §3.3):md5(ksort去空值参数+&key=app_key) */
+    /**
+     * acg-faka MD5 签名(spec §3.3,与官方 SharedValidation 一致):
+     * 参数(含 app_id,不含 app_key/sign/空值)ksort → http_build_query → urldecode
+     * → 末尾接 &key=app_key → md5。
+     *
+     * 关键:app_key 绝不参与签名参数(也绝不放入请求 body),服务端用数据库里的
+     * app_key 重算签名校验。把 app_key 当业务参数传会导致签名永远不匹配。
+     */
     private function sign(array $params): string
     {
         $creds = $this->credentials();
         $params['app_id'] = $creds['app_id'];
-        $params['app_key'] = $creds['app_key'];
-        unset($params['sign']);
+        unset($params['sign'], $params['app_key']);
         ksort($params);
         $params = array_filter($params, fn ($v) => $v !== '' && $v !== null);
         return md5(urldecode(http_build_query($params)) . '&key=' . $creds['app_key']);
@@ -49,7 +55,7 @@ class AcgFakaDriver implements SupplyDriver
     {
         $creds = $this->credentials();
         $params['app_id'] = $creds['app_id'];
-        $params['app_key'] = $creds['app_key'];
+        // 注意:不传 app_key(服务端用数据库里的 app_key 校验,客户端不外泄)
         $params['sign'] = $this->sign($params);
         $resp = Http::asForm()->timeout($this->requestTimeout())->post($this->baseUrl() . $path, $params);
         if (! $resp->successful()) throw new \RuntimeException("上游请求失败: HTTP {$resp->status()}");

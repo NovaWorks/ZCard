@@ -1412,7 +1412,17 @@
       "markupPercent": "加价比例",
       "markupAmount": "加价金额",
       "autoList": "同步后自动上架",
-      "autoListTip": "开启后新同步的商品自动上架;关闭则需手动上架"
+      "autoListTip": "开启后新同步的商品自动上架;关闭则需手动上架",
+      "pullProducts": "拉取商品",
+      "previewTitle": "拉取上游商品(勾选导入)",
+      "previewSummary": "共 {total} 个商品,已选 {selected} 个",
+      "selectAll": "全选",
+      "imported": "已导入",
+      "noProducts": "上游暂无可拉取的商品",
+      "previewFailed": "拉取上游商品失败",
+      "importSelected": "导入选中({n})",
+      "importSuccess": "导入成功",
+      "importFailed": "导入失败"
     },
     "supplierAccount": {
       "title": "供货账号管理",

@@ -93,3 +93,36 @@ export const syncSupplySource = (id: number, mode: 'full' | 'incremental' = 'inc
 /** 查询同步状态/进度 */
 export const getSupplySyncStatus = (id: number) =>
   request.get<SupplySyncStatus>({ url: `/admin/supply-sources/${id}/sync-status` })
+
+/** 上游商品(预览拉取,供勾选导入) */
+export interface UpstreamProductItem {
+  code: string
+  name: string
+  price: number          // 分
+  factory_price: number  // 分
+  cover: string | null
+  stock: number
+  already_imported: boolean
+}
+export interface UpstreamCategory {
+  category_code: string | null
+  category_name: string
+  products: UpstreamProductItem[]
+}
+export interface SupplyPreviewResult {
+  ok: boolean
+  total: number
+  categories: UpstreamCategory[]
+  error?: string
+}
+
+/** 实时拉取上游商品(按分类树,供勾选导入) */
+export const previewSupplyProducts = (id: number) =>
+  request.get<SupplyPreviewResult>({ url: `/admin/supply-sources/${id}/products/preview` })
+
+/** 勾选导入商品到本地 */
+export const importSupplyProducts = (id: number, codes: string[]) =>
+  request.post<{ ok: boolean; imported: number; skipped: number; message: string; error?: string }>({
+    url: `/admin/supply-sources/${id}/products/import`,
+    data: { codes }
+  })

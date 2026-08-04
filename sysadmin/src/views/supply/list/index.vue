@@ -51,6 +51,9 @@
             <ElButton text type="primary" :loading="syncingId === row.id" @click="handleSync(row)">
               {{ t('zcard.supply.sync') }}
             </ElButton>
+            <ElButton text type="primary" :loading="previewingId === row.id" @click="openPreview(row)">
+              {{ t('zcard.supply.pullProducts') }}
+            </ElButton>
             <ElButton text type="primary" @click="openEdit(row)">{{ t('zcard.common.edit') }}</ElButton>
             <ElButton text type="danger" @click="handleDelete(row)">{{ t('zcard.common.delete') }}</ElButton>
           </template>
@@ -181,6 +184,54 @@
         <ElButton type="primary" :loading="saving" @click="handleSubmit">{{ t('zcard.common.ok') }}</ElButton>
       </template>
     </ElDialog>
+
+    <!-- 拉取/勾选导入商品弹窗 -->
+    <ElDialog
+      v-model="previewVisible"
+      :title="t('zcard.supply.previewTitle')"
+      width="780px"
+      top="5vh"
+      destroy-on-close
+    >
+      <div v-loading="previewLoading" class="preview-wrap">
+        <div v-if="previewError" class="preview-error">{{ previewError }}</div>
+        <template v-else>
+          <div class="preview-toolbar">
+            <span class="preview-summary">
+              {{ t('zcard.supply.previewSummary', { total: previewTotal, selected: selectedCodes.size }) }}
+            </span>
+            <ElCheckbox v-model="checkAll" :indeterminate="isIndeterminate" @change="handleCheckAll">
+              {{ t('zcard.supply.selectAll') }}
+            </ElCheckbox>
+          </div>
+          <div class="preview-list">
+            <div v-for="cat in previewCategories" :key="cat.category_code ?? '_'" class="preview-cat">
+              <div class="preview-cat-head">{{ cat.category_name }} ({{ cat.products.length }})</div>
+              <ElCheckboxGroup v-model="previewChecked" class="preview-cat-body">
+                <div v-for="p in cat.products" :key="p.code" class="preview-product">
+                  <ElCheckbox :value="p.code">
+                    <div class="pp-content">
+                      <span class="pp-name">{{ p.name }}</span>
+                      <span class="pp-meta">
+                        <span class="pp-price">¥{{ (p.factory_price / 100).toFixed(2) }}</span>
+                        <ElTag v-if="p.already_imported" size="small" type="success" effect="plain">{{ t('zcard.supply.imported') }}</ElTag>
+                      </span>
+                    </div>
+                  </ElCheckbox>
+                </div>
+              </ElCheckboxGroup>
+            </div>
+            <div v-if="previewCategories.length === 0" class="preview-empty">{{ t('zcard.supply.noProducts') }}</div>
+          </div>
+        </template>
+      </div>
+      <template #footer>
+        <ElButton @click="previewVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
+        <ElButton type="primary" :loading="importing" :disabled="previewChecked.length === 0" @click="handleImport">
+          {{ t('zcard.supply.importSelected', { n: previewChecked.length }) }}
+        </ElButton>
+      </template>
+    </ElDialog>
   </div>
 </template>
 
@@ -189,15 +240,18 @@
   import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
   import { useI18n } from 'vue-i18n'
   import {
+    getSupplyDrivers,
     getSupplySources,
     createSupplySource,
     updateSupplySource,
     deleteSupplySource,
-    getSupplyDrivers,
     testSupplySource,
     syncSupplySource,
+    previewSupplyProducts,
+    importSupplyProducts,
     type SupplySource,
     type SupplyDriver,
+    type UpstreamCategory
   } from '@/api/supply'
 
   defineOptions({ name: 'SupplySourceList' })
@@ -455,6 +509,85 @@
     }
   }
 
+  /** ===== 拉取商品 + 勾选导入 ===== */
+  const previewingId = ref<number | null>(null)
+  const previewVisible = ref(false)
+  const previewLoading = ref(false)
+  const previewError = ref('')
+  const previewCategories = ref<UpstreamCategory[]>([])
+  const previewTotal = ref(0)
+  /** 当前勾选的商品 code 列表(ElCheckboxGroup v-model) */
+  const previewChecked = ref<string[]>([])
+  const importing = ref(false)
+  /** 当前操作的货源 id(导入时用) */
+  const previewSourceId = ref<number | null>(null)
+
+  /** 全部商品 code 集合(用于全选) */
+  const allProductCodes = computed(() =>
+    previewCategories.value.flatMap((c) => c.products.map((p) => p.code))
+  )
+  /** 已勾选 + 全部 → 计算全选/半选态 */
+  const checkAll = computed({
+    get: () => allProductCodes.value.length > 0 && previewChecked.value.length === allProductCodes.value.length,
+    set: () => {} // 由 handleCheckAll 处理
+  })
+  const isIndeterminate = computed(() =>
+    previewChecked.value.length > 0 && previewChecked.value.length < allProductCodes.value.length
+  )
+  /** selectedCodes 别名(模板用) */
+  const selectedCodes = computed(() => new Set(previewChecked.value))
+
+  const handleCheckAll = (val: any) => {
+    previewChecked.value = val ? [...allProductCodes.value] : []
+  }
+
+  /** 打开预览弹窗:实时拉取上游商品 */
+  const openPreview = async (row: SupplySource) => {
+    previewingId.value = row.id
+    previewSourceId.value = row.id
+    previewVisible.value = true
+    previewLoading.value = true
+    previewError.value = ''
+    previewCategories.value = []
+    previewChecked.value = []
+    previewTotal.value = 0
+    try {
+      const res = await previewSupplyProducts(row.id)
+      if (res.ok) {
+        previewCategories.value = res.categories || []
+        previewTotal.value = res.total || 0
+      } else {
+        previewError.value = res.error || t('zcard.supply.previewFailed')
+      }
+    } catch (e: any) {
+      previewError.value = e?.message || t('zcard.supply.previewFailed')
+    } finally {
+      previewLoading.value = false
+      previewingId.value = null
+    }
+  }
+
+  /** 勾选导入 */
+  const handleImport = async () => {
+    if (!previewSourceId.value || previewChecked.value.length === 0) return
+    importing.value = true
+    try {
+      const res = await importSupplyProducts(previewSourceId.value, [...previewChecked.value])
+      if (res.ok) {
+        ElMessage.success(res.message || t('zcard.supply.importSuccess'))
+        previewVisible.value = false
+        fetchData()
+      } else {
+        ElMessage.error(res.error || t('zcard.supply.importFailed'))
+      }
+    } catch {
+      // 拦截器处理
+    } finally {
+      importing.value = false
+    }
+  }
+
+
   /** 工具:分转元展示 */
   const formatFen = (fen: number | null | undefined) => {
     if (fen === null || fen === undefined) return '—'
@@ -513,5 +646,84 @@
     line-height: 1.5;
     margin-top: 4px;
     display: block;
+  }
+
+  /* 拉取商品弹窗 */
+  .preview-wrap {
+    min-height: 200px;
+  }
+  .preview-error {
+    color: var(--el-color-danger);
+    font-size: 13px;
+    padding: 16px;
+    text-align: center;
+  }
+  .preview-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+  }
+  .preview-summary {
+    font-size: 13px;
+    color: var(--el-text-color-secondary);
+  }
+  .preview-list {
+    max-height: 55vh;
+    overflow-y: auto;
+  }
+  .preview-cat {
+    margin-bottom: 16px;
+  }
+  .preview-cat-head {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+    margin-bottom: 8px;
+    padding-left: 4px;
+  }
+  .preview-cat-body {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+  .preview-product {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--el-border-color-extra-light);
+  }
+  .preview-product :deep(.el-checkbox__label) {
+    width: 100%;
+  }
+  .pp-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+  .pp-name {
+    font-size: 13px;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pp-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .pp-price {
+    font-size: 13px;
+    color: var(--el-color-danger);
+    font-weight: 600;
+  }
+  .preview-empty {
+    text-align: center;
+    color: var(--el-text-color-placeholder);
+    padding: 40px;
+    font-size: 13px;
   }
 </style>
