@@ -220,6 +220,49 @@ class SupplySourceController extends Controller
         }
     }
 
+    /**
+     * GET /api/admin/supply-sources/{source}/products/debug
+     * 调试用:直接发起 items 请求,返回上游原始响应(含 HTTP 状态码、响应头、响应体),
+     * 供排查"测试连通成功但拉取商品失败"的问题。
+     */
+    public function debugProducts(SupplySource $supplySource): JsonResponse
+    {
+        $creds = $supplySource->credentials ?? [];
+        $baseUrl = rtrim($supplySource->base_url, '/');
+        $appId = $creds['app_id'] ?? '';
+        $appKey = $creds['app_key'] ?? '';
+
+        // 构造与 AcgFakaDriver 完全一致的签名
+        $params = ['app_id' => $appId, 'app_key' => $appKey];
+        unset($params['sign']);
+        ksort($params);
+        $params = array_filter($params, fn ($v) => $v !== '' && $v !== null);
+        $sign = md5(urldecode(http_build_query($params)) . '&key=' . $appKey);
+        $params['sign'] = $sign;
+
+        $url = $baseUrl . '/shared/commodity/items';
+        $resp = \Illuminate\Support\Facades\Http::asForm()->timeout(30)->post($url, $params);
+
+        return response()->json([
+            'request' => [
+                'url' => $url,
+                'method' => 'POST (application/x-www-form-urlencoded)',
+                'app_id' => $appId,
+                'app_key_masked' => $appKey ? ('••••' . substr($appKey, -4)) : '(空)',
+                'sign' => $sign,
+            ],
+            'response' => [
+                'http_status' => $resp->status(),
+                'content_type' => $resp->header('Content-Type'),
+                'body_preview' => mb_substr($resp->body(), 0, 2000),
+                'json' => $resp->json(),
+            ],
+            'hint' => '如果 http_status=404:上游未配置伪静态/URL重写。'
+                . '如果 json.code!=200:看 json.msg(如"密钥错误"=凭证问题,"商户ID不存在"=app_id 错)。'
+                . '如果 json.data 为空数组:商品未开启 API 上架(api_status=1)。',
+        ]);
+    }
+
     private function validateSource(Request $request, ?SupplySource $existing = null): array
     {
         return $request->validate([

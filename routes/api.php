@@ -224,9 +224,10 @@ Route::middleware(['auth:sanctum', 'admin.role'])->prefix('admin')->group(functi
     Route::post('supply-sources/{supplySource}/test', [\App\Http\Controllers\Api\Admin\SupplySourceController::class, 'test']);
     Route::post('supply-sources/{supplySource}/sync', [\App\Http\Controllers\Api\Admin\SupplySourceController::class, 'sync']);
     Route::get('supply-sources/{supplySource}/sync-status', [\App\Http\Controllers\Api\Admin\SupplySourceController::class, 'syncStatus']);
-    // 商品预览(实时拉取上游,供勾选) + 勾选导入
+    // 商品预览(实时拉取上游,供勾选) + 勾选导入 + 调试
     Route::get('supply-sources/{supplySource}/products/preview', [\App\Http\Controllers\Api\Admin\SupplySourceController::class, 'previewProducts']);
     Route::post('supply-sources/{supplySource}/products/import', [\App\Http\Controllers\Api\Admin\SupplySourceController::class, 'importProducts']);
+    Route::get('supply-sources/{supplySource}/products/debug', [\App\Http\Controllers\Api\Admin\SupplySourceController::class, 'debugProducts']);
 });
 
 // 公开货币列表(供前台货币切换器,不需要 display.currency 中间件)

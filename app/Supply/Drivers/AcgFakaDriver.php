@@ -87,7 +87,8 @@ class AcgFakaDriver implements SupplyDriver
         try {
             $data = $this->signedPost('/shared/authentication/connect', []);
             $ok = ($data['code'] ?? 0) == 200;
-            return ['connected' => $ok, 'name' => $data['data']['shop']['name'] ?? null, 'balance' => isset($data['data']['balance']) ? (int) round((float) $data['data']['balance'] * 100) : null];
+            // connect 返回 {shopName, balance}(注意是 shopName 不是 shop.name)
+            return ['connected' => $ok, 'name' => $data['data']['shopName'] ?? null, 'balance' => isset($data['data']['balance']) ? (int) round((float) $data['data']['balance'] * 100) : null];
         } catch (\Throwable $e) { return ['connected' => false, 'error' => $e->getMessage()]; }
     }
 
