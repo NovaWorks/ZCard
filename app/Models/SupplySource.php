@@ -57,6 +57,9 @@ class SupplySource extends Model
         $this->attributes['credentials'] = is_array($value)
             ? \Illuminate\Support\Facades\Crypt::encryptString(json_encode($value))
             : $value;
+        // 失效内存缓存,避免 update 后读到的还是旧解密值
+        $this->credentialsDecoded = false;
+        $this->decodedCredentials = null;
     }
 
     /** credentials 是否因密钥变更而无法解密(用于提示用户重新配置) */

@@ -38,8 +38,11 @@ class DashboardController extends Controller
         $profit = $paidAmount - $totalCost;
         $profitMargin = $paidAmount > 0 ? round($profit / $paidAmount * 100, 1) : 0;
         $pendingAmount = (clone $orderQuery)->where('status', 'pending')->sum('amount');
-        $paymentSuccess = Payment::where('created_at', '>=', $since)->where('status', 'success')->count();
-        $paymentFailed = Payment::where('created_at', '>=', $since)->where('status', 'failed')->count();
+        // 支付成功率仅统计订单支付(排除充值支付流水 order_id=null)
+        $paymentSuccess = Payment::where('created_at', '>=', $since)
+            ->where('status', 'success')->whereNotNull('order_id')->count();
+        $paymentFailed = Payment::where('created_at', '>=', $since)
+            ->where('status', 'failed')->whereNotNull('order_id')->count();
         $paymentRate = ($paymentSuccess + $paymentFailed) > 0
             ? round($paymentSuccess / ($paymentSuccess + $paymentFailed) * 100, 1) : 0;
 

@@ -261,7 +261,7 @@ class PaymentService
     private function credentialsConfigured(array $config): bool
     {
         $sensitiveKeys = ['key', 'secret', 'secret_key', 'private_key', 'public_key',
-            'app_secret', 'api_key', 'client_secret', 'webhook_secret', 'mch_secret_key'];
+            'app_secret', 'api_key', 'api_token', 'client_secret', 'webhook_secret', 'mch_secret_key'];
         foreach ($sensitiveKeys as $k) {
             if (! empty($config[$k])) {
                 return true;

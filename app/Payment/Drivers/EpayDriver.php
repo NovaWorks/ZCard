@@ -94,6 +94,28 @@ class EpayDriver implements PaymentDriver
         return base64_encode($signature);
     }
 
+    /**
+     * RSA(SHA256WithRSA)验签:用平台公钥校验回调签名。
+     * 注意方向与签名相反 —— 下单用商户私钥签,回调用平台公钥验。
+     */
+    protected function rsaVerify(string $data, string $publicKey, string $sign): bool
+    {
+        $pem = $publicKey;
+        if (! str_contains($pem, '-----BEGIN')) {
+            $pem = "-----BEGIN PUBLIC KEY-----\n"
+                . wordwrap($publicKey, 64, "\n", true)
+                . "\n-----END PUBLIC KEY-----";
+        }
+
+        $key = openssl_pkey_get_public($pem);
+        if ($key === false) {
+            return false;
+        }
+
+        $result = openssl_verify($data, base64_decode($sign), $key, OPENSSL_ALGO_SHA256);
+        return $result === 1;
+    }
+
     public function pay(Payable $order, array $config): PaymentResult
     {
         $pid = $config['pid'] ?? '';
@@ -144,11 +166,26 @@ class EpayDriver implements PaymentDriver
             return null;
         }
 
-        $expected = $this->sign($data, $key, $signType);
-        $provided = $data['sign'] ?? '';
+        $provided = (string) ($data['sign'] ?? '');
 
-        if (!hash_equals($expected, (string) $provided)) {
-            return null;
+        // 验签:MD5 用共享密钥(商户 key)重签比对;RSA 用平台公钥校验(方向相反)
+        if ($signType === 'RSA') {
+            $platformPublicKey = $config['platform_public_key'] ?? '';
+            if ($platformPublicKey === '') {
+                return null; // RSA 模式未配平台公钥 → 无法验签
+            }
+            // 重现签名原文(与 sign() 内部一致)
+            $params = Arr::where($data, fn ($v, $k) => $k !== 'sign' && $k !== 'sign_type' && $v !== '' && $v !== null);
+            ksort($params);
+            $query = implode('&', array_map(fn ($k, $v) => $k . '=' . $v, array_keys($params), $params));
+            if (! $this->rsaVerify($query, $platformPublicKey, $provided)) {
+                return null;
+            }
+        } else {
+            $expected = $this->sign($data, $key, $signType);
+            if (! hash_equals($expected, $provided)) {
+                return null;
+            }
         }
 
         return [
@@ -182,7 +219,13 @@ class EpayDriver implements PaymentDriver
                 'label' => '商户密钥 / 私钥',
                 'type' => 'textarea',
                 'required' => true,
-                'help' => 'MD5 方式:填商户密钥(KEY);RSA 方式:填 PKCS#8 商户私钥(不含 PEM 头尾的纯字符串亦可)。',
+                'help' => 'MD5 方式:填商户密钥(KEY);RSA 方式:填 PKCS#8 商户私钥(不含 PEM 头尾的纯字符串亦可),用于下单签名。',
+            ],
+            'platform_public_key' => [
+                'label' => '平台公钥(仅 RSA)',
+                'type' => 'textarea',
+                'required' => false,
+                'help' => 'RSA 方式必填:易支付平台公钥,用于校验回调签名。MD5 方式留空。',
             ],
             'url' => [
                 'label' => '易支付网关地址',
