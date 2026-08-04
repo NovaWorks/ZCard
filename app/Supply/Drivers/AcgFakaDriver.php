@@ -34,18 +34,19 @@ class AcgFakaDriver implements SupplyDriver
     }
 
     /**
-     * acg-faka MD5 签名(spec §3.3,与官方 SharedValidation 一致):
-     * 参数(含 app_id,不含 app_key/sign/空值)ksort → http_build_query → urldecode
+     * acg-faka MD5 签名(完全对齐官方 Str::generateSignature + 客户端 Shared::post):
+     * 参数(含 app_id、app_key,去掉 sign/空值)ksort → http_build_query → urldecode
      * → 末尾接 &key=app_key → md5。
      *
-     * 关键:app_key 绝不参与签名参数(也绝不放入请求 body),服务端用数据库里的
-     * app_key 重算签名校验。把 app_key 当业务参数传会导致签名永远不匹配。
+     * 官方客户端 post() 会把 app_id + app_key 都放入 body 再签名,服务端 unsafePost()
+     * 收到同样参数用数据库 app_key 重算,两边一致。故此处保持与官方完全相同的行为。
      */
     private function sign(array $params): string
     {
         $creds = $this->credentials();
         $params['app_id'] = $creds['app_id'];
-        unset($params['sign'], $params['app_key']);
+        $params['app_key'] = $creds['app_key'];
+        unset($params['sign']);
         ksort($params);
         $params = array_filter($params, fn ($v) => $v !== '' && $v !== null);
         return md5(urldecode(http_build_query($params)) . '&key=' . $creds['app_key']);
@@ -54,12 +55,31 @@ class AcgFakaDriver implements SupplyDriver
     private function signedPost(string $path, array $params): array
     {
         $creds = $this->credentials();
+        // 与官方客户端 Shared::post 一致:app_id + app_key + sign 都放入 body
         $params['app_id'] = $creds['app_id'];
-        // 注意:不传 app_key(服务端用数据库里的 app_key 校验,客户端不外泄)
+        $params['app_key'] = $creds['app_key'];
         $params['sign'] = $this->sign($params);
         $resp = Http::asForm()->timeout($this->requestTimeout())->post($this->baseUrl() . $path, $params);
-        if (! $resp->successful()) throw new \RuntimeException("上游请求失败: HTTP {$resp->status()}");
-        return $resp->json();
+
+        if (! $resp->successful()) {
+            $hint = $resp->status() === 404
+                ? '(可能是上游未配置伪静态/URL重写,请确认 acg-faka 站点地址正确且伪静态已启用)'
+                : '';
+            throw new \RuntimeException("上游请求失败: HTTP {$resp->status()} {$hint}");
+        }
+
+        $data = $resp->json();
+        // acg-faka 业务错误:code != 200 时 msg 含具体原因(如"密钥错误""商户ID不存在")
+        if (isset($data['code']) && (int) $data['code'] !== 200) {
+            throw new \RuntimeException('上游返回错误: ' . ($data['msg'] ?? '未知错误'));
+        }
+        // 响应不是预期 JSON 结构(可能是 WAF 拦截返回 HTML)
+        if (! isset($data['code'])) {
+            $body = $resp->body();
+            throw new \RuntimeException('上游返回格式异常(可能被 WAF 拦截或 URL 错误): ' . mb_substr($body, 0, 120));
+        }
+
+        return $data;
     }
 
     public function ping(): array
