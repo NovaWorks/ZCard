@@ -1086,7 +1086,17 @@
       "copy": "Copy",
       "copied": "Copied",
       "sensitivePlaceholder": "Sensitive info is not shown; leave blank to keep saved value",
-      "sensitiveTip": "Security: this is sensitive data and will not be displayed; leave blank to keep the saved value"
+      "sensitiveTip": "Security: this is sensitive data and will not be displayed; leave blank to keep the saved value",
+      "addChannel": "Add Payment Channel",
+      "addChannelTitle": "Select channels to enable",
+      "addChannelTip": "Check the channels to enable, uncheck to remove. Enabled ones are pre-checked.",
+      "notConfigured": "Not Configured",
+      "configured": "Configured",
+      "deleteChannel": "Delete Channel",
+      "deleteConfirm": "Delete this payment channel? It will be hidden from the page and its config lost. You can re-add it later.",
+      "deleteSuccess": "Payment channel deleted",
+      "addSuccess": "Payment channel added",
+      "noChange": "No changes"
     },
     "setting": {
       "title": "Settings",

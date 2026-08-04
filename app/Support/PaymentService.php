@@ -212,6 +212,47 @@ class PaymentService
         return new $driverClass();
     }
 
+    /**
+     * 扫描所有可用支付驱动(代码层面),返回 code → 驱动元信息。
+     * 用于后台「添加支付渠道」弹窗:展示系统支持的全部渠道供勾选,
+     * 与数据库 payment_channels 表解耦(被删除的渠道也能重新添加)。
+     *
+     * @return array<int, array{code: string, name: string, driver: string, icon: string}>
+     */
+    public function discoverDrivers(): array
+    {
+        $dir = app_path('Payment/Drivers');
+        if (! is_dir($dir)) {
+            return [];
+        }
+
+        $drivers = [];
+        foreach (glob($dir . '/*Driver.php') as $file) {
+            $className = 'App\\Payment\\Drivers\\' . basename($file, '.php');
+            if (! class_exists($className) || ! is_subclass_of($className, PaymentDriver::class)) {
+                continue;
+            }
+            try {
+                /** @var PaymentDriver $instance */
+                $instance = new $className();
+                $info = $instance->getInfo();
+                // code 从类名派生(如 AlipayDriver → alipay),与预置 seed 保持一致
+                $code = strtolower(str_replace('Driver', '', basename($file, '.php')));
+                $drivers[] = [
+                    'code' => $code,
+                    'name' => $info['name'] ?? $code,
+                    'driver' => $className,
+                    'icon' => $info['icon'] ?? '💳',
+                ];
+            } catch (\Throwable) {
+                // 驱动实例化失败(如缺依赖)→ 跳过,不影响其他驱动展示
+                continue;
+            }
+        }
+
+        return $drivers;
+    }
+
 
     /**
      * 检查凭据是否已配置(至少有一个敏感字段非空)。

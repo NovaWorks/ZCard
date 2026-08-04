@@ -182,7 +182,8 @@ Route::middleware(['auth:sanctum', 'admin.role'])->prefix('admin')->group(functi
     Route::get('cards/import-batches', [AdminCardController::class, 'importBatches']);
 
     // 支付通道配置
-    Route::apiResource('payment-channels', AdminPaymentChannelController::class)->only(['index', 'update']);
+    Route::get('payment-channels/drivers', [AdminPaymentChannelController::class, 'drivers']);
+    Route::apiResource('payment-channels', AdminPaymentChannelController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::get('payment-channels/{id}/config-fields', [AdminPaymentChannelController::class, 'configFields']);
 
     // 店铺外观配置

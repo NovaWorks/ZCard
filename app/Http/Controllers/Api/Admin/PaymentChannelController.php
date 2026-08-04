@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\PaymentChannel;
 use App\Payment\Contracts\PaymentDriver;
+use App\Support\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * 后台支付通道管理。列表(含 driver 信息)、保存 config、切换 enabled,
@@ -14,6 +16,74 @@ use Illuminate\Http\Request;
  */
 class PaymentChannelController extends Controller
 {
+    /**
+     * 扫描系统支持的全部支付驱动(代码层面),供「添加支付渠道」弹窗勾选。
+     * 返回每个驱动的 code/name/icon + 是否已在 payment_channels 表中存在(added)。
+     */
+    public function drivers(PaymentService $service): JsonResponse
+    {
+        $all = $service->discoverDrivers();
+        // 标记哪些已添加到数据库(按 code 匹配)
+        $existingCodes = PaymentChannel::pluck('code')->toArray();
+
+        $list = array_map(fn ($d) => array_merge($d, [
+            'added' => in_array($d['code'], $existingCodes, true),
+        ]), $all);
+
+        return response()->json($list);
+    }
+
+    /**
+     * 添加支付渠道(按驱动 code 创建 payment_channels 记录,幂等)。
+     * 用于「添加支付渠道」弹窗勾选后提交。
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'code' => 'required|string|max:50',
+        ]);
+
+        // 从驱动目录找到对应驱动(防止伪造不存在的 code)
+        $service = app(PaymentService::class);
+        $driver = collect($service->discoverDrivers())
+            ->firstWhere('code', $data['code']);
+
+        if (! $driver) {
+            return response()->json(['message' => '未知的支付驱动: ' . $data['code']], 422);
+        }
+
+        // 幂等:已存在同 code 渠道则直接返回(可能是之前被删除的,恢复显示)
+        $channel = PaymentChannel::where('code', $data['code'])->first();
+        if (! $channel) {
+            $sort = (int) PaymentChannel::max('sort') + 1;
+            $channel = PaymentChannel::create([
+                'merchant_id' => 1,
+                'code' => $driver['code'],
+                'name' => $driver['name'],
+                'driver' => $driver['driver'],
+                'config' => null,
+                'fee' => 0,
+                'fee_type' => 'percent',
+                'sort' => $sort,
+                'enabled' => false,
+            ]);
+        }
+
+        return response()->json($channel, 201);
+    }
+
+    /**
+     * 删除支付渠道(物理删除,页面即不再显示)。
+     * 重新「添加」时按 code 用 firstOrCreate 恢复。
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        $channel = PaymentChannel::findOrFail($id);
+        $channel->delete();
+
+        return response()->json(['message' => '已删除']);
+    }
+
     public function index(): JsonResponse
     {
         $channels = PaymentChannel::orderBy('sort')

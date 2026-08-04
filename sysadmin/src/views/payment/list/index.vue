@@ -1,6 +1,14 @@
-<!-- 支付渠道 - 后台管理（卡片式） -->
+<!-- 支付渠道 - 后台管理（卡片式 + 添加渠道弹窗） -->
 <template>
   <div class="payment-page art-full-height">
+    <!-- 顶部操作栏 -->
+    <div class="page-toolbar">
+      <ElButton type="primary" :icon="Plus" @click="openAddDialog">
+        {{ t('zcard.payment.addChannel') }}
+      </ElButton>
+    </div>
+
+    <!-- 已添加的渠道卡片 -->
     <div v-loading="loading" class="channel-grid">
       <ElCard
         v-for="channel in channels"
@@ -17,18 +25,44 @@
             <div class="channel-name">{{ channel.name }}</div>
             <div class="channel-code">{{ channel.code }}</div>
           </div>
-          <ElTag :type="channel.enabled ? 'success' : 'info'" effect="light">
-            {{ channel.enabled ? t('zcard.payment.enabled') : t('zcard.payment.disabled') }}
+          <ElTag :type="isConfigured(channel) ? 'success' : 'warning'" effect="light">
+            {{ isConfigured(channel) ? t('zcard.payment.configured') : t('zcard.payment.notConfigured') }}
           </ElTag>
         </div>
 
         <div class="channel-actions">
           <ElButton type="primary" plain @click="openConfig(channel)">{{ t('zcard.payment.config') }}</ElButton>
+          <ElButton type="danger" text :icon="Delete" @click="handleDelete(channel)" />
         </div>
       </ElCard>
 
       <div v-if="!loading && channels.length === 0" class="empty-state">{{ t('zcard.payment.empty') }}</div>
     </div>
+
+    <!-- 添加支付渠道弹窗(勾选式) -->
+    <ElDialog
+      v-model="addVisible"
+      :title="t('zcard.payment.addChannelTitle')"
+      width="520px"
+      destroy-on-close
+    >
+      <div class="add-tip">{{ t('zcard.payment.addChannelTip') }}</div>
+      <div v-loading="driversLoading" class="driver-list">
+        <ElCheckbox
+          v-for="d in availableDrivers"
+          :key="d.code"
+          v-model="addChecked[d.code]"
+          class="driver-item"
+        >
+          <span class="driver-icon">{{ d.icon }}</span>
+          <span class="driver-name">{{ d.name }}</span>
+        </ElCheckbox>
+      </div>
+      <template #footer>
+        <ElButton @click="addVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
+        <ElButton type="primary" :loading="adding" @click="handleAddSave">{{ t('zcard.common.confirm') }}</ElButton>
+      </template>
+    </ElDialog>
 
     <!-- 配置弹窗 -->
     <ElDialog
@@ -135,15 +169,19 @@
 </template>
 
 <script setup lang="ts">
-  import { Wallet } from '@element-plus/icons-vue'
-  import { ElMessage } from 'element-plus'
+  import { Wallet, Plus, Delete } from '@element-plus/icons-vue'
+  import { ElMessage, ElMessageBox } from 'element-plus'
   import { useI18n } from 'vue-i18n'
   import {
     getChannels,
     updateChannel,
     getConfigFields,
+    getDrivers,
+    createChannel,
+    deleteChannel,
     type PaymentChannel,
-    type ConfigField
+    type ConfigField,
+    type AvailableDriver
   } from '@/api/payment'
 
   defineOptions({ name: 'PaymentList' })
@@ -163,6 +201,94 @@
       channels.value = []
     } finally {
       loading.value = false
+    }
+  }
+
+  /** 判断渠道是否已配置(有 config 且非空) */
+  const isConfigured = (channel: PaymentChannel): boolean => {
+    const cfg = channel.config
+    if (!cfg || typeof cfg !== 'object') return false
+    // 至少有一个非空值才算已配置
+    return Object.values(cfg).some((v) => v !== '' && v !== null && v !== undefined)
+  }
+
+  /** ===== 添加支付渠道弹窗(勾选式) ===== */
+  const addVisible = ref(false)
+  const driversLoading = ref(false)
+  const adding = ref(false)
+  const availableDrivers = ref<AvailableDriver[]>([])
+  /** code → 是否勾选(基于 added 状态初始化) */
+  const addChecked = reactive<Record<string, boolean>>({})
+
+  /** 打开添加弹窗:拉取全部驱动 + 标记已添加的为勾选 */
+  const openAddDialog = async () => {
+    addVisible.value = true
+    driversLoading.value = true
+    try {
+      const res = await getDrivers()
+      availableDrivers.value = Array.isArray(res) ? res : []
+      // 已添加的预勾选
+      Object.keys(addChecked).forEach((k) => delete addChecked[k])
+      availableDrivers.value.forEach((d) => {
+        addChecked[d.code] = !!d.added
+      })
+    } catch {
+      availableDrivers.value = []
+    } finally {
+      driversLoading.value = false
+    }
+  }
+
+  /** 保存勾选变更:新增被勾选的、删除取消勾选的 */
+  const handleAddSave = async () => {
+    adding.value = true
+    try {
+      // 当前已存在渠道的 code 集合
+      const existingCodes = new Set(channels.value.map((c) => c.code))
+      // 需新增的:勾选了但数据库还没有的
+      const toAdd = availableDrivers.value.filter(
+        (d) => addChecked[d.code] && !existingCodes.has(d.code)
+      )
+      // 需删除的:数据库有但取消勾选的
+      const toRemove = channels.value.filter((c) => !addChecked[c.code])
+
+      await Promise.all([
+        ...toAdd.map((d) => createChannel(d.code)),
+        ...toRemove.map((c) => deleteChannel(c.id)),
+      ])
+
+      const changed = toAdd.length + toRemove.length
+      if (changed > 0) {
+        ElMessage.success(t('zcard.payment.addSuccess'))
+      } else {
+        ElMessage.info(t('zcard.payment.noChange'))
+      }
+      addVisible.value = false
+      await fetchChannels()
+    } catch {
+      // 拦截器处理错误
+    } finally {
+      adding.value = false
+    }
+  }
+
+  /** 删除渠道(卡片上的删除按钮) */
+  const handleDelete = async (channel: PaymentChannel) => {
+    try {
+      await ElMessageBox.confirm(
+        t('zcard.payment.deleteConfirm'),
+        t('zcard.payment.deleteChannel'),
+        { type: 'warning', confirmButtonText: t('zcard.common.confirm'), cancelButtonText: t('zcard.common.cancel') }
+      )
+    } catch {
+      return // 用户取消
+    }
+    try {
+      await deleteChannel(channel.id)
+      ElMessage.success(t('zcard.payment.deleteSuccess'))
+      await fetchChannels()
+    } catch {
+      // 拦截器处理
     }
   }
 
@@ -271,6 +397,41 @@
   .payment-page {
     display: flex;
     flex-direction: column;
+  }
+
+  .page-toolbar {
+    margin-bottom: 16px;
+  }
+
+  .add-tip {
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+
+  .driver-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .driver-item {
+    display: flex;
+    align-items: center;
+    height: 40px;
+    margin-right: 0;
+    padding: 0 12px;
+    border: 1px solid var(--el-border-color);
+    border-radius: 6px;
+
+    .driver-icon {
+      margin-right: 8px;
+      font-size: 18px;
+    }
+
+    .driver-name {
+      font-size: 13px;
+    }
   }
 
   .channel-grid {

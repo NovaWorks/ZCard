@@ -47,6 +47,27 @@ export const getChannels = () =>
 export const updateChannel = (id: number, data: Partial<PaymentChannel>) =>
   request.put<PaymentChannel>({ url: `/admin/payment-channels/${id}`, data })
 
+/** 可用驱动(供「添加支付渠道」弹窗勾选) */
+export interface AvailableDriver {
+  code: string
+  name: string
+  driver: string
+  icon: string
+  added: boolean
+}
+
+/** 扫描系统支持的全部支付驱动 */
+export const getDrivers = () =>
+  request.get<AvailableDriver[]>({ url: '/admin/payment-channels/drivers' })
+
+/** 添加支付渠道(按 code 创建,幂等) */
+export const createChannel = (code: string) =>
+  request.post<PaymentChannel>({ url: '/admin/payment-channels', data: { code } })
+
+/** 删除支付渠道 */
+export const deleteChannel = (id: number) =>
+  request.del<{ message: string }>({ url: `/admin/payment-channels/${id}` })
+
 /** config-fields 接口返回结构 */
 export interface ConfigFieldsResult {
   channel_id: number

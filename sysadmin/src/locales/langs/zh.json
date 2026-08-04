@@ -1086,7 +1086,17 @@
       "copy": "复制",
       "copied": "已复制",
       "sensitivePlaceholder": "敏感信息不回显,留空表示保留已保存的值",
-      "sensitiveTip": "安全提示:此为敏感信息,不会回显;留空表示保留已保存的值"
+      "sensitiveTip": "安全提示:此为敏感信息,不会回显;留空表示保留已保存的值",
+      "addChannel": "添加支付渠道",
+      "addChannelTitle": "选择要开通的支付渠道",
+      "addChannelTip": "勾选要开通的支付渠道,取消勾选可移除。已开通的会预选中。",
+      "notConfigured": "未配置",
+      "configured": "已配置",
+      "deleteChannel": "删除渠道",
+      "deleteConfirm": "确定删除该支付渠道吗?删除后页面不再显示,配置将丢失,可重新添加。",
+      "deleteSuccess": "已删除该支付渠道",
+      "addSuccess": "已添加支付渠道",
+      "noChange": "没有变更"
     },
     "setting": {
       "title": "店铺设置",
