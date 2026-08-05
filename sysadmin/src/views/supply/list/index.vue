@@ -215,11 +215,13 @@
                   @click.stop
                 >
                   <span class="cat-title">{{ cat.category_name }}</span>
-                  <span class="cat-count">({{ cat.products.length }})</span>
                 </ElCheckbox>
-                <ElIcon class="cat-arrow" :class="{ expanded: isCategoryExpanded(cat) }">
-                  <ArrowDown />
-                </ElIcon>
+                <div class="cat-right">
+                  <span class="cat-count">{{ t('zcard.supply.catProductCount', { n: cat.products.length }) }}</span>
+                  <ElIcon class="cat-arrow" :class="{ expanded: isCategoryExpanded(cat) }">
+                    <ArrowDown />
+                  </ElIcon>
+                </div>
               </div>
               <ElCheckboxGroup
                 v-show="isCategoryExpanded(cat)"
@@ -770,10 +772,16 @@
     font-weight: 600;
     color: var(--el-text-color-primary);
   }
+  .cat-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
   .cat-count {
     font-size: 12px;
     color: var(--el-text-color-secondary);
-    margin-left: 4px;
   }
   .cat-arrow {
     flex-shrink: 0;

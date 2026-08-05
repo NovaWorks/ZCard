@@ -1416,6 +1416,7 @@
       "pullProducts": "Pull Products",
       "previewTitle": "Pull Upstream Products (Select to Import)",
       "previewSummary": "{total} products, {selected} selected",
+      "catProductCount": "{n} products",
       "selectAll": "Select All",
       "imported": "Imported",
       "noProducts": "No products available upstream",

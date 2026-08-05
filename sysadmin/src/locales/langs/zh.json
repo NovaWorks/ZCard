@@ -1416,6 +1416,7 @@
       "pullProducts": "拉取商品",
       "previewTitle": "拉取上游商品(勾选导入)",
       "previewSummary": "共 {total} 个商品,已选 {selected} 个",
+      "catProductCount": "共 {n} 个商品",
       "selectAll": "全选",
       "imported": "已导入",
       "noProducts": "上游暂无可拉取的商品",
