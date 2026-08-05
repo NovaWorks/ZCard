@@ -18,6 +18,13 @@ const selectedSku = ref<number | null>(null)
 const qty = ref(1)
 const currentImg = ref(0)
 
+/** 详情图:优先 images,为空时用封面兜底(上游导入的商品可能只有 cover) */
+const galleryImages = computed(() => {
+  const imgs = (product.value?.images || []).filter((i) => i)
+  if (imgs.length) return imgs
+  return product.value?.cover ? [product.value.cover] : []
+})
+
 /**
  * 商品描述支持 HTML 渲染(v-html)。做基本 XSS 过滤:
  * 移除 script/iframe/style 等危险标签与 on* 事件属性。
@@ -79,11 +86,11 @@ function buy() {
       <!-- 左:配图 -->
       <div>
         <div class="aspect-square rounded-card border border-border bg-gradient-to-br from-primary-soft to-primary-light flex items-center justify-center overflow-hidden">
-          <img v-if="product.images?.[currentImg]" :src="product.images[currentImg]" class="w-full h-full object-cover" />
+          <img v-if="galleryImages[currentImg]" :src="galleryImages[currentImg]" class="w-full h-full object-cover" />
           <span v-else class="text-primary/40">{{ t('common.noImage') }}</span>
         </div>
         <div class="flex gap-2 mt-2">
-          <div v-for="(img, i) in (product.images || [])" :key="i" @click="currentImg = i"
+          <div v-for="(img, i) in galleryImages" :key="i" @click="currentImg = i"
             :class="['w-14 h-14 rounded border-2 cursor-pointer', currentImg === i ? 'border-primary' : 'border-transparent']">
             <img :src="img" class="w-full h-full object-cover rounded" />
           </div>

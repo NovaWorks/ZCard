@@ -70,7 +70,7 @@ const handleCheck = async () => {
             <span style="font-family:monospace;font-size:22px;font-weight:800;color:var(--el-color-success);">v${checkResult.value.latest_version}</span>
           </div>
           ${checkResult.value.release_notes ? `
-          <div style="margin:8px 0;padding:14px 16px;background:var(--el-fill-color-light);border-radius:8px;max-height:calc(100vh - 430px);overflow:auto;border:1px solid var(--el-border-color-lighter);">
+          <div style="margin:8px 0;padding:14px 16px;background:var(--el-fill-color-light);border-radius:8px;max-height:calc(100vh - 320px);overflow:auto;border:1px solid var(--el-border-color-lighter);">
             <div style="font-size:12px;font-weight:600;color:var(--el-text-color-secondary);margin-bottom:8px;">${t('zcard.update.releaseNotes')}</div>
             <div class="markdown-body" style="margin:0;font-size:13px;line-height:1.7;color:var(--el-text-color-regular);">${renderMd(checkResult.value.release_notes)}</div>
           </div>` : ''}
@@ -86,7 +86,9 @@ const handleCheck = async () => {
         type: 'success',
         showCancelButton: true,
         closeOnClickModal: false,
-      })
+        // 宽度随视口自适应,保证更新日志完整展示
+        width: 'min(720px, 92vw)',
+      } as any)
         .then(() => performUpdate())
         .catch(() => ElMessage.info(t('zcard.update.updateCancelled')))
     } else {

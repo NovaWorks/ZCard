@@ -62,6 +62,7 @@ class SupplySyncService
                 'name' => $dto->name,
                 'description' => $dto->description,
                 'cover' => $this->normalizeCover($source, $dto->cover),
+                'images' => $this->normalizeImages($source, $dto->images, $dto->cover),
                 'factory_price' => $dto->factoryPrice,
                 'stock_cache' => $dto->stockQuantity, // 上游库存缓存
                 'category_id' => $this->resolveCategoryId($source, $dto->categoryCode, $categoryMap),
@@ -104,6 +105,7 @@ class SupplySyncService
             'slug' => $this->uniqueSlug($dto->name, $dto->code, $unique),
             'description' => $dto->description,
             'cover' => $this->normalizeCover($source, $dto->cover),
+            'images' => $this->normalizeImages($source, $dto->images, $dto->cover),
             'price' => $price ?? 0,
             'factory_price' => $dto->factoryPrice,
             'stock_type' => 'card',
@@ -155,6 +157,24 @@ class SupplySyncService
         }
 
         return rtrim($source->base_url, '/') . '/' . ltrim($cover, '/');
+    }
+
+    /**
+     * 详情图数组归一化:相对路径拼上游 base_url;为空时用 cover 兜底
+     * (acg-faka 等上游 items 不返回 images,只返回 cover,保证详情页有图)。
+     */
+    private function normalizeImages(SupplySource $source, array $images, ?string $cover): array
+    {
+        $normalized = array_values(array_filter(array_map(
+            fn ($img) => $this->normalizeCover($source, $img),
+            $images
+        )));
+
+        if (empty($normalized) && $cover) {
+            $normalized = [$this->normalizeCover($source, $cover)];
+        }
+
+        return $normalized;
     }
 
     /**
