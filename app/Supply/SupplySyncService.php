@@ -39,7 +39,7 @@ class SupplySyncService
             $update = [
                 'name' => $dto->name,
                 'description' => $dto->description,
-                'cover' => $dto->cover,
+                'cover' => $this->normalizeCover($source, $dto->cover),
                 'factory_price' => $dto->factoryPrice,
                 'stock_cache' => $dto->stockQuantity, // 上游库存缓存
                 'category_id' => $this->resolveCategoryId($source, $dto->categoryCode),
@@ -61,7 +61,7 @@ class SupplySyncService
             'name' => $dto->name,
             'slug' => $this->uniqueSlug($dto->name, $dto->code),
             'description' => $dto->description,
-            'cover' => $dto->cover,
+            'cover' => $this->normalizeCover($source, $dto->cover),
             'price' => $price ?? 0,
             'factory_price' => $dto->factoryPrice,
             'stock_type' => 'card',
@@ -92,6 +92,19 @@ class SupplySyncService
             'pending' => null,
             default => (int) round($base * 1.1),
         };
+    }
+
+    /**
+     * 封面图 URL 归一化:上游返回的相对路径(/assets/... 或 assets/...)在
+     * 本站浏览器会解析成本站域名 → 404。拼上上游 base_url 成为完整 URL。
+     */
+    private function normalizeCover(SupplySource $source, ?string $cover): ?string
+    {
+        if (! $cover || preg_match('/^https?:\/\//i', $cover)) {
+            return $cover;
+        }
+
+        return rtrim($source->base_url, '/') . '/' . ltrim($cover, '/');
     }
 
     private function resolveCategoryId(SupplySource $source, ?string $upstreamCatCode): ?int
