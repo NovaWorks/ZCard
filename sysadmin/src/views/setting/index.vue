@@ -154,16 +154,6 @@
             <ElFormItem :label="t('zcard.setting.tradeCaptcha')">
               <ElSwitch v-model="form.trade_captcha" />
             </ElFormItem>
-            <ElFormItem :label="t('zcard.setting.cardEncryptionKey')">
-              <ElInput
-                v-model="cardEncryptionKey"
-                type="password"
-                show-password
-                :placeholder="t('zcard.setting.cardEncryptionKeyPlaceholder')"
-                style="width: 320px"
-              />
-              <div class="field-help">{{ t('zcard.setting.cardEncryptionKeyTip') }}</div>
-            </ElFormItem>
             <ElFormItem :label="t('zcard.setting.allowPostReview')">
               <ElSwitch v-model="form.allow_post_review" />
             </ElFormItem>
@@ -199,6 +189,16 @@
                 <ElOption label="邮箱找回" value="email" />
                 <ElOption label="手机找回" value="sms" />
               </ElSelect>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.cardEncryptionKey')">
+              <ElInput
+                v-model="cardEncryptionKey"
+                type="password"
+                show-password
+                :placeholder="t('zcard.setting.cardEncryptionKeyPlaceholder')"
+                style="width: 320px"
+              />
+              <div class="field-help">{{ t('zcard.setting.cardEncryptionKeyTip') }}</div>
             </ElFormItem>
           </ElForm>
         </ElTabPane>
