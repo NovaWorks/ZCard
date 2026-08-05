@@ -1,1 +1,0 @@
-import{t as e}from"./request-Bcg6USuH.js";var t=t=>e.post(`/recharges`,{amount:t}),n=()=>e.get(`/recharges/history`),r=t=>e.get(`/recharges/${t}/status`),i=(t,n)=>e.post(`/payments/create`,{order_no:t,channel_id:n});export{r as i,i as n,n as r,t};

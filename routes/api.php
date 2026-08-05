@@ -57,6 +57,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/recharges/history', [RechargeController::class, 'history'])->name('api.recharges.history');
     Route::get('/recharges/{rechargeNo}/status', [RechargeController::class, 'status'])->name('api.recharges.status');
 
+    // 自助供货对接(个人中心 API 对接):获取/查看供货凭证
+    Route::prefix('supplier-account')->group(function () {
+        Route::get('/me', [\App\Http\Controllers\Api\MySupplyController::class, 'me'])->name('api.mysupply.me');
+        Route::get('/secret', [\App\Http\Controllers\Api\MySupplyController::class, 'showSecret'])->name('api.mysupply.secret');
+        Route::post('/regenerate', [\App\Http\Controllers\Api\MySupplyController::class, 'regenerate'])->name('api.mysupply.regenerate');
+    });
+
     // 分站主自助控制台(只在主站)
     Route::middleware('require.main.site')->prefix('subsite-console')->group(function () {
         Route::get('/', [SubsiteConsoleController::class, 'mySubsite']);

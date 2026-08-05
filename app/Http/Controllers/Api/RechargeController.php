@@ -23,6 +23,7 @@ class RechargeController extends Controller
     {
         $data = $request->validate([
             'amount' => 'required|numeric|min:0.01',
+            'target' => 'sometimes|in:balance,supply',
         ]);
 
         // 金额限制:下限 0.01 元,上限可后台配置(默认 50000 元),防止异常金额刷会员等级/套现
@@ -38,12 +39,14 @@ class RechargeController extends Controller
             'user_id' => $request->user()->id,
             'amount' => $amountFen,
             'status' => Recharge::STATUS_PENDING,
+            'target' => $data['target'] ?? Recharge::TARGET_BALANCE,
         ]);
 
         return response()->json([
             'recharge_no' => $recharge->recharge_no,
             'amount' => $recharge->amount,
             'status' => $recharge->status,
+            'target' => $recharge->target,
         ], 201);
     }
 

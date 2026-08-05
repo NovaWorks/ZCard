@@ -11,9 +11,12 @@ export interface RechargeRecord {
   paid_at?: string
 }
 
-/** 创建充值单(amount 单位为元) */
-export const createRecharge = (amount: number) =>
-  request.post<unknown, { recharge_no: string; amount: number; status: string }>('/recharges', { amount })
+/** 创建充值单(amount 单位为元,target: balance=个人余额 / supply=供货余额) */
+export const createRecharge = (amount: number, target: 'balance' | 'supply' = 'balance') =>
+  request.post<unknown, { recharge_no: string; amount: number; status: string; target: string }>(
+    '/recharges',
+    { amount, target }
+  )
 
 /** 充值历史 */
 export const getRechargeHistory = () =>

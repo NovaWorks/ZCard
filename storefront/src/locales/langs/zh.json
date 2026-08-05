@@ -151,7 +151,12 @@
     "resultCancelHint": "您已取消本次充值",
     "resultSuccessTitle": "充值成功",
     "resultProcessingTitle": "充值处理中",
-    "resultProcessingHint": "支付已收到,正在确认到账,请稍后在充值记录或个人中心查看余额"
+    "resultProcessingHint": "支付已收到,正在确认到账,请稍后在充值记录或个人中心查看余额",
+    "selectTarget": "充值目标",
+    "targetBalance": "个人余额",
+    "targetBalanceTip": "用于购买商品、分销提现等",
+    "targetSupply": "供货余额",
+    "targetSupplyTip": "用于 API 对接供货,预存扣款"
   },
   "common": {
     "buy": "购买",
@@ -457,5 +462,29 @@
     "profileSaved": "资料保存成功",
     "loginRequired": "请先登录",
     "ordersEmpty": "暂无订单记录"
+  },
+  "supply": {
+    "title": "API 对接",
+    "subtitle": "自助供货 · 充值即用",
+    "notOpened": "开通 API 对接凭证后,即可对接本站供货接口,自助充值、复制凭证使用",
+    "open": "立即开通",
+    "balance": "供货余额",
+    "recharge": "充值",
+    "apiBaseUrl": "接口地址",
+    "appId": "App ID",
+    "appSecret": "App Key",
+    "copy": "复制",
+    "show": "显示",
+    "hide": "隐藏",
+    "regenerate": "重置",
+    "docTitle": "对接文档",
+    "docStep1": "请求头携带 X-Supply-Key(App ID)、X-Supply-Timestamp(时间戳)、X-Supply-Nonce(随机串)、X-Supply-Signature(签名)",
+    "docStep2": "签名串: METHOD\\nPATH\\n时间戳\\nNonce\\nmd5(body), 用 App Key 做 HMAC-SHA256",
+    "docStep3": "调用接口: POST /api/supply/ping 测试连接; GET /api/supply/products 拉取商品",
+    "docStep4": "下单调用 POST /api/supply/orders,货款从供货余额扣减,余额不足时需先充值",
+    "created": "已开通 API 对接凭证",
+    "regenerateConfirm": "重置 App Key 后旧密钥立即失效,确认重置?",
+    "regenerated": "App Key 已重置",
+    "copied": "已复制"
   }
 }

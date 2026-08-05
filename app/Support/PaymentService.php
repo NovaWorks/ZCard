@@ -185,12 +185,25 @@ class PaymentService
 
             // 入账(同事务):BillService::record 内部 DB::transaction 会退化为保存点,
             // 抛异常时整体回滚(recharge + payment + bill + balance 一起回退)。
-            BillService::record(
-                $locked->user_id,
-                (int) $locked->amount,
-                \App\Models\Bill::TYPE_INCOME,
-                __('messages.recharge.credit', ['no' => $locked->recharge_no]),
-            );
+            if ($locked->target === \App\Models\Recharge::TARGET_SUPPLY) {
+                // 供货余额充值:入账到用户的供货账号(自助 API 对接预存)。
+                $supplier = \App\Models\SupplierAccount::where('user_id', $locked->user_id)->firstOrFail();
+                $supplier->increment('balance', (int) $locked->amount);
+                \App\Models\SupplierLedgerEntry::create([
+                    'supplier_account_id' => $supplier->id,
+                    'type' => \App\Models\SupplierLedgerEntry::TYPE_RECHARGE,
+                    'amount' => (int) $locked->amount,
+                    'balance_after' => $supplier->balance,
+                    'remark' => __('messages.recharge.credit', ['no' => $locked->recharge_no]),
+                ]);
+            } else {
+                BillService::record(
+                    $locked->user_id,
+                    (int) $locked->amount,
+                    \App\Models\Bill::TYPE_INCOME,
+                    __('messages.recharge.credit', ['no' => $locked->recharge_no]),
+                );
+            }
 
             return $locked;
         });

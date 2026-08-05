@@ -7,11 +7,101 @@ import { usePreferencesStore } from '@/stores/preferences'
 import { formatMoney } from '@/utils/money'
 import { getMyOrders, type OrderDetail } from '@/api/orders'
 import { updatePassword, updateProfile } from '@/api/auth'
+import {
+  getMySupplyAccount,
+  getMySupplySecret,
+  regenerateMySupplySecret,
+  type MySupplyAccount,
+} from '@/api/supplier'
 
 const { t } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
 const prefs = usePreferencesStore()
+
+// ===== 自助 API 对接(供货) =====
+const supplyAccount = ref<MySupplyAccount | null>(null)
+const supplySecretVisible = ref(false)
+const supplySecretPlain = ref('')
+const supplyDocOpen = ref(false)
+const supplyCreating = ref(false)
+const supplyRegenerating = ref(false)
+const supplyMsg = ref('')
+
+function notify(msg: string) {
+  supplyMsg.value = msg
+  setTimeout(() => (supplyMsg.value = ''), 2500)
+}
+
+const apiBaseUrl = computed(() => `${window.location.origin}/api/supply`)
+
+async function loadSupply() {
+  try {
+    supplyAccount.value = await getMySupplyAccount()
+  } catch {
+    supplyAccount.value = null
+  }
+}
+
+async function createSupply() {
+  supplyCreating.value = true
+  try {
+    const acc = await getMySupplyAccount()
+    supplyAccount.value = acc
+    if (acc.is_new) {
+      supplySecretPlain.value = acc.api_secret
+      supplySecretVisible.value = true
+      notify(t('supply.created'))
+    }
+  } catch {
+    // 拦截器提示
+  } finally {
+    supplyCreating.value = false
+  }
+}
+
+async function toggleSupplySecret() {
+  if (supplySecretVisible.value) {
+    supplySecretVisible.value = false
+    return
+  }
+  try {
+    const res = await getMySupplySecret()
+    supplySecretPlain.value = res.api_secret
+    supplySecretVisible.value = true
+  } catch {
+    // 拦截器提示
+  }
+}
+
+async function regenerateSupplySecret() {
+  if (!confirm(t('supply.regenerateConfirm'))) return
+  supplyRegenerating.value = true
+  try {
+    const res = await regenerateMySupplySecret()
+    supplySecretPlain.value = res.api_secret
+    supplySecretVisible.value = true
+    if (supplyAccount.value) supplyAccount.value.api_secret_masked = `••••••••${res.api_secret.slice(-4)}`
+    notify(t('supply.regenerated'))
+  } catch {
+    // 拦截器提示
+  } finally {
+    supplyRegenerating.value = false
+  }
+}
+
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+    notify(t('supply.copied'))
+  } catch {
+    // 忽略
+  }
+}
+
+function goRechargeSupply() {
+  router.push({ name: 'recharge', query: { target: 'supply' } })
+}
 
 const orders = ref<OrderDetail[]>([])
 const loadingOrders = ref(true)
@@ -50,6 +140,8 @@ async function loadData() {
   } finally {
     loadingOrders.value = false
   }
+  // 自助 API 对接
+  loadSupply()
 }
 
 async function handleSaveProfile() {
@@ -168,13 +260,105 @@ onMounted(loadData)
         </div>
       </section>
 
+      <!-- API 对接(自助供货) -->
+      <section class="bg-white rounded-card border border-border overflow-hidden">
+        <div class="px-5 py-3 border-b border-border flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-ink flex items-center gap-1.5">🔗 {{ t('supply.title') }}</h2>
+          <span v-if="supplyAccount" class="text-[11px] text-ink-muted">{{ t('supply.subtitle') }}</span>
+        </div>
+        <div class="p-5">
+          <!-- 全局提示 -->
+          <div v-if="supplyMsg" class="mb-3 text-xs text-primary font-medium">{{ supplyMsg }}</div>
+
+          <!-- 未开通凭证 -->
+          <div v-if="!supplyAccount" class="text-center py-6">
+            <div class="text-5xl mb-3 opacity-30">🔗</div>
+            <p class="text-ink-soft text-sm mb-4">{{ t('supply.notOpened') }}</p>
+            <button
+              @click="createSupply"
+              :disabled="supplyCreating"
+              class="bg-primary text-white px-6 py-2 rounded-field text-sm font-medium hover:opacity-90 transition disabled:opacity-60"
+            >
+              {{ supplyCreating ? '...' : t('supply.open') }}
+            </button>
+          </div>
+
+          <!-- 已开通 -->
+          <template v-else>
+            <!-- 余额 + 充值 -->
+            <div class="flex items-center justify-between bg-surface-subtle rounded-field p-4">
+              <div>
+                <div class="text-xs text-ink-muted">{{ t('supply.balance') }}</div>
+                <div class="text-2xl font-extrabold text-ink mt-0.5">{{ formatMoney(supplyAccount.balance, prefs.currentCurrency) }}</div>
+              </div>
+              <button
+                @click="goRechargeSupply"
+                class="bg-primary text-white text-sm font-semibold px-5 py-2 rounded-pill hover:opacity-90 transition"
+              >
+                {{ t('supply.recharge') }}
+              </button>
+            </div>
+
+            <!-- 凭证 -->
+            <div class="mt-3 space-y-2 text-sm">
+              <div class="flex items-center justify-between bg-surface-subtle rounded-field px-4 py-2.5">
+                <span class="text-xs text-ink-muted shrink-0 mr-2">{{ t('supply.apiBaseUrl') }}</span>
+                <code class="flex-1 min-w-0 text-xs text-ink font-mono truncate text-right">{{ apiBaseUrl }}</code>
+                <button class="ml-2 text-primary text-xs hover:opacity-70" @click="copyText(apiBaseUrl)">{{ t('supply.copy') }}</button>
+              </div>
+              <div class="flex items-center justify-between bg-surface-subtle rounded-field px-4 py-2.5">
+                <span class="text-xs text-ink-muted shrink-0 mr-2">{{ t('supply.appId') }}</span>
+                <code class="flex-1 min-w-0 text-xs text-ink font-mono truncate text-right">{{ supplyAccount.api_key }}</code>
+                <button class="ml-2 text-primary text-xs hover:opacity-70" @click="copyText(supplyAccount!.api_key)">{{ t('supply.copy') }}</button>
+              </div>
+              <div class="flex items-center justify-between bg-surface-subtle rounded-field px-4 py-2.5">
+                <span class="text-xs text-ink-muted shrink-0 mr-2">{{ t('supply.appSecret') }}</span>
+                <code v-if="supplySecretVisible" class="flex-1 min-w-0 text-xs text-ink font-mono truncate text-right break-all">{{ supplySecretPlain }}</code>
+                <code v-else class="text-xs text-ink-muted font-mono">{{ supplyAccount.api_secret_masked }}</code>
+                <div class="flex items-center gap-1 ml-2 shrink-0">
+                  <button class="text-primary text-xs hover:opacity-70" @click="toggleSupplySecret">
+                    {{ supplySecretVisible ? t('supply.hide') : t('supply.show') }}
+                  </button>
+                  <button
+                    v-if="supplySecretVisible"
+                    class="text-primary text-xs hover:opacity-70"
+                    @click="copyText(supplySecretPlain)"
+                  >
+                    {{ t('supply.copy') }}
+                  </button>
+                  <button class="text-ink-muted text-xs hover:opacity-70" @click="regenerateSupplySecret">
+                    {{ supplyRegenerating ? '...' : t('supply.regenerate') }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 对接文档(可折叠) -->
+            <div class="mt-3 border border-border rounded-field overflow-hidden">
+              <button
+                @click="supplyDocOpen = !supplyDocOpen"
+                class="w-full px-4 py-2.5 flex items-center justify-between text-left text-xs font-medium text-ink-soft hover:bg-surface-subtle/50 transition"
+              >
+                <span>📖 {{ t('supply.docTitle') }}</span>
+                <span class="transition-transform" :class="supplyDocOpen ? 'rotate-180' : ''">▾</span>
+              </button>
+              <div v-show="supplyDocOpen" class="px-4 pb-3 text-[11px] text-ink-muted leading-relaxed space-y-1.5">
+                <p>1. {{ t('supply.docStep1') }}</p>
+                <p>2. {{ t('supply.docStep2') }}</p>
+                <p>3. {{ t('supply.docStep3') }}</p>
+                <p>4. {{ t('supply.docStep4') }}</p>
+              </div>
+            </div>
+          </template>
+        </div>
+      </section>
+
       <!-- 最近订单 -->
       <section class="bg-white rounded-card border border-border overflow-hidden">
         <div class="px-5 py-3 border-b border-border flex items-center justify-between">
           <h2 class="text-sm font-semibold text-ink">{{ t('userCenter.myOrders') }}</h2>
           <button @click="go('my-orders')" class="text-xs text-primary hover:underline">{{ t('userCenter.myOrders') }} →</button>
-        </div>
-        <div v-loading="loadingOrders">
+        </div>        <div v-loading="loadingOrders">
           <div v-if="orders.length === 0" class="text-center py-10 text-ink-muted text-sm">
             {{ t('userCenter.ordersEmpty') }}
           </div>

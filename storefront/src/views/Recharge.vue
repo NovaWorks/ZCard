@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { usePreferencesStore } from '@/stores/preferences'
@@ -9,6 +9,7 @@ import { createRecharge, getRechargeHistory, type RechargeRecord } from '@/api/r
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 const prefs = usePreferencesStore()
 
@@ -20,6 +21,7 @@ const customAmount = ref('')
 const isCustom = ref(false)
 const submitting = ref(false)
 const err = ref('')
+const target = ref<'balance' | 'supply'>(route.query.target === 'supply' ? 'supply' : 'balance')
 
 const history = ref<RechargeRecord[]>([])
 const loadingHistory = ref(true)
@@ -57,7 +59,7 @@ async function submit() {
   }
   submitting.value = true
   try {
-    const res = await createRecharge(amount)
+    const res = await createRecharge(amount, target.value)
     // 跳转到充值支付页(选通道 + 付款)
     router.push({ name: 'recharge-pay', params: { rechargeNo: res.recharge_no } })
   } catch (e: any) {
@@ -108,6 +110,35 @@ onMounted(() => {
 
     <!-- 充值卡 -->
     <div class="bg-white rounded-card border border-border p-4 mb-4">
+      <!-- 充值目标(大厂风格:双卡片切换) -->
+      <div class="text-sm font-semibold text-ink mb-3">{{ t('recharge.selectTarget') }}</div>
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <button
+          type="button"
+          @click="target = 'balance'"
+          class="rounded-card border p-3 text-left transition"
+          :class="target === 'balance'
+            ? 'border-primary ring-2 ring-primary/20 bg-primary-light'
+            : 'border-border hover:border-primary'"
+        >
+          <div class="text-2xl">💳</div>
+          <div class="text-sm font-semibold text-ink mt-1">{{ t('recharge.targetBalance') }}</div>
+          <div class="text-[11px] text-ink-muted mt-0.5">{{ t('recharge.targetBalanceTip') }}</div>
+        </button>
+        <button
+          type="button"
+          @click="target = 'supply'"
+          class="rounded-card border p-3 text-left transition"
+          :class="target === 'supply'
+            ? 'border-primary ring-2 ring-primary/20 bg-primary-light'
+            : 'border-border hover:border-primary'"
+        >
+          <div class="text-2xl">🔗</div>
+          <div class="text-sm font-semibold text-ink mt-1">{{ t('recharge.targetSupply') }}</div>
+          <div class="text-[11px] text-ink-muted mt-0.5">{{ t('recharge.targetSupplyTip') }}</div>
+        </button>
+      </div>
+
       <div class="text-sm font-semibold text-ink mb-3">{{ t('recharge.selectAmount') }}</div>
 
       <!-- 快捷金额 -->

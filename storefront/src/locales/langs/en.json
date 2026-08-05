@@ -151,7 +151,12 @@
     "resultCancelHint": "You have cancelled this recharge",
     "resultSuccessTitle": "Recharge Successful",
     "resultProcessingTitle": "Recharge Processing",
-    "resultProcessingHint": "Payment received, confirming the credit. Please check your balance later."
+    "resultProcessingHint": "Payment received, confirming the credit. Please check your balance later.",
+    "selectTarget": "Recharge Target",
+    "targetBalance": "Personal Balance",
+    "targetBalanceTip": "For purchases, withdrawals, etc.",
+    "targetSupply": "Supply Balance",
+    "targetSupplyTip": "For API supply, prepaid deduction"
   },
   "common": {
     "buy": "Buy",
@@ -457,5 +462,29 @@
     "profileSaved": "Profile saved successfully",
     "loginRequired": "Please log in first",
     "ordersEmpty": "No orders yet"
+  },
+  "supply": {
+    "title": "API Access",
+    "subtitle": "Self-serve supply · recharge & go",
+    "notOpened": "Open API credentials to integrate with our supply API. Recharge and copy credentials to start.",
+    "open": "Open Now",
+    "balance": "Supply Balance",
+    "recharge": "Recharge",
+    "apiBaseUrl": "API Base URL",
+    "appId": "App ID",
+    "appSecret": "App Key",
+    "copy": "Copy",
+    "show": "Show",
+    "hide": "Hide",
+    "regenerate": "Reset",
+    "docTitle": "Integration Docs",
+    "docStep1": "Headers: X-Supply-Key, X-Supply-Timestamp, X-Supply-Nonce, X-Supply-Signature",
+    "docStep2": "Signature: METHOD\\nPATH\\ntimestamp\\nnonce\\nmd5(body) HMAC-SHA256 with App Key",
+    "docStep3": "Endpoints: POST /api/supply/ping (test), GET /api/supply/products (list)",
+    "docStep4": "POST /api/supply/orders to place orders, deducted from supply balance",
+    "created": "API credentials created",
+    "regenerateConfirm": "Resetting App Key invalidates the old key immediately. Continue?",
+    "regenerated": "App Key reset",
+    "copied": "Copied"
   }
 }

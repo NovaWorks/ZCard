@@ -15,8 +15,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Recharge extends Model implements Payable
 {
     protected $fillable = [
-        'recharge_no', 'user_id', 'amount', 'status', 'paid_at',
+        'recharge_no', 'user_id', 'amount', 'status', 'paid_at', 'target',
     ];
+
+    /** 充值目标: balance=个人余额(默认), supply=供货余额 */
+    public const TARGET_BALANCE = 'balance';
+    public const TARGET_SUPPLY = 'supply';
 
     protected function casts(): array
     {
