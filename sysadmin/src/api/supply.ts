@@ -124,7 +124,11 @@ export const previewSupplyProducts = (id: number) =>
 export const importSupplyProducts = (
   id: number,
   codes: string[],
-  options?: { pricing?: { mode?: string; markup_percent?: number; markup_amount?: number }; save_default?: boolean }
+  options?: {
+    pricing?: { mode?: string; markup_percent?: number; markup_amount?: number }
+    save_default?: boolean
+    category_map?: Record<string, number | null>
+  }
 ) =>
   request.post<{ ok: boolean; imported: number; skipped: number; message: string; error?: string }>({
     url: `/admin/supply-sources/${id}/products/import`,

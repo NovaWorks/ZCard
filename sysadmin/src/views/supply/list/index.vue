@@ -199,6 +199,7 @@
           <div class="preview-toolbar">
             <span class="preview-summary">
               {{ t('zcard.supply.previewSummary', { total: previewTotal, selected: selectedCodes.size }) }}
+              <span class="summary-imported">{{ t('zcard.supply.previewImported', { n: importedCount }) }}</span>
             </span>
             <ElCheckbox v-model="checkAll" :indeterminate="isIndeterminate" @change="handleCheckAll">
               {{ t('zcard.supply.selectAll') }}
@@ -231,6 +232,58 @@
             </ElCheckbox>
           </div>
 
+          <!-- 分类映射:上游分类 → 本地分类 -->
+          <div class="preview-map">
+            <div class="map-head">
+              <span class="map-title">{{ t('zcard.supply.categoryMapTitle') }}</span>
+              <ElButton
+                v-if="unmappedCount > 0"
+                type="primary"
+                link
+                :loading="creatingMappings"
+                @click="createAllMissingCategories"
+              >
+                {{ t('zcard.supply.categoryMapCreateAll') }}
+              </ElButton>
+            </div>
+            <div class="map-list">
+              <div v-for="cat in previewCategories" :key="'map-' + (cat.category_code ?? '_')" class="map-row">
+                <span class="map-upstream">
+                  {{ cat.category_name }}
+                  <span class="map-count">({{ cat.products.length }})</span>
+                </span>
+                <span class="map-arrow">→</span>
+                <div class="map-target">
+                  <ElTreeSelect
+                    v-model="categoryMapping[cat.category_code as string]"
+                    :data="localCategories"
+                    :props="{ label: 'name', value: 'id', children: 'children' }"
+                    node-key="id"
+                    check-strictly
+                    clearable
+                    filterable
+                    :placeholder="t('zcard.supply.categoryMapPlaceholder')"
+                    class="map-select"
+                  />
+                  <ElButton v-if="cat.category_code" link type="primary" @click="createCategoryForUpstream(cat)">
+                    {{ t('zcard.supply.categoryMapCreate') }}
+                  </ElButton>
+                  <ElTag
+                    v-if="categoryMapping[cat.category_code as string]"
+                    type="success"
+                    size="small"
+                    effect="plain"
+                    class="map-tag"
+                  >
+                    {{ mappedName(cat.category_code as string) }}
+                  </ElTag>
+                </div>
+              </div>
+              <div v-if="previewCategories.length === 0" class="map-empty">{{ t('zcard.supply.noProducts') }}</div>
+            </div>
+            <div class="map-tip">{{ t('zcard.supply.categoryMapTip') }}</div>
+          </div>
+
           <div class="preview-list">
             <div v-for="cat in previewCategories" :key="cat.category_code ?? '_'" class="preview-cat">
               <div class="preview-cat-head" @click="toggleCategoryExpand(cat)">
@@ -255,16 +308,28 @@
                 v-model="previewChecked"
                 class="preview-cat-body"
               >
-                <div v-for="p in cat.products" :key="p.code" class="preview-product">
+                <div
+                  v-for="p in cat.products"
+                  :key="p.code"
+                  class="preview-product"
+                  :class="{ 'is-imported': p.already_imported }"
+                >
                   <ElCheckbox :value="p.code">
                       <div class="pp-content">
-                        <span class="pp-name">{{ p.name }}</span>
+                        <span class="pp-name">
+                          <ElTag v-if="p.already_imported" size="small" type="success" effect="light" round class="pp-status">
+                            {{ t('zcard.supply.imported') }}
+                          </ElTag>
+                          <ElTag v-else size="small" type="primary" effect="plain" round class="pp-status">
+                            {{ t('zcard.supply.notImported') }}
+                          </ElTag>
+                          {{ p.name }}
+                        </span>
                         <span class="pp-meta">
                           <span class="pp-base">¥{{ (pricingBase(p) / 100).toFixed(2) }}</span>
                           <span class="pp-arrow">→</span>
                           <span v-if="calcPrice(p) !== null" class="pp-price">¥{{ ((calcPrice(p) ?? 0) / 100).toFixed(2) }}</span>
                           <span v-else class="pp-price pending">{{ t('zcard.supply.pricingPendingTip') }}</span>
-                          <ElTag v-if="p.already_imported" size="small" type="success" effect="plain">{{ t('zcard.supply.imported') }}</ElTag>
                         </span>
                       </div>
                   </ElCheckbox>
@@ -290,6 +355,7 @@
   import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
   import { useI18n } from 'vue-i18n'
   import { useListTableHeight } from '@/hooks'
+  import { getAllCategories, createCategory, type Category } from '@/api/categories'
   import {
     getSupplyDrivers,
     getSupplySources,
@@ -590,6 +656,11 @@
   /** selectedCodes 别名(模板用) */
   const selectedCodes = computed(() => new Set(previewChecked.value))
 
+  /** 已对接(已导入本地)的商品数 */
+  const importedCount = computed(() =>
+    previewCategories.value.reduce((n, c) => n + c.products.filter((p) => p.already_imported).length, 0)
+  )
+
   const handleCheckAll = (val: any) => {
     previewChecked.value = val ? [...allProductCodes.value] : []
   }
@@ -620,6 +691,86 @@
     markupPercent.value = s.default_markup_percent ?? 10
     markupAmountYuan.value = Number(s.default_markup_amount) || 0
     saveDefaultPricing.value = false
+  }
+
+  /** ===== 分类映射:上游分类 → 本地分类 ===== */
+  /** 本地分类树(打开弹窗时加载) */
+  const localCategories = ref<Category[]>([])
+  /** 上游分类 code → 本地分类 id(未映射为 null) */
+  const categoryMapping = ref<Record<string, number | null>>({})
+  /** 一键创建中 */
+  const creatingMappings = ref(false)
+
+  const loadLocalCategories = async () => {
+    try {
+      localCategories.value = (await getAllCategories()) || []
+    } catch {
+      localCategories.value = []
+    }
+  }
+
+  /** 未映射的上游分类(供一键创建 + 统计) */
+  const unmappedCategories = computed(() =>
+    previewCategories.value.filter(
+      (c) => (c.category_code ?? '_uncategorized') !== '_uncategorized' && ! categoryMapping.value[c.category_code as string]
+    )
+  )
+  const unmappedCount = computed(() => unmappedCategories.value.length)
+
+  /** 单个上游分类:一键创建同名本地分类并映射 */
+  const createCategoryForUpstream = async (cat: UpstreamCategory) => {
+    const key = cat.category_code as string
+    if (!key) return
+    // 先查是否已有同名本地分类
+    const existing = localCategories.value.find((c) => c.name === cat.category_name)
+    if (existing) {
+      categoryMapping.value = { ...categoryMapping.value, [key]: existing.id }
+      ElMessage.success(t('zcard.supply.categoryMapped', { name: cat.category_name }))
+      return
+    }
+    try {
+      const created = await createCategory({ name: cat.category_name, status: true } as any)
+      categoryMapping.value = { ...categoryMapping.value, [key]: created.id }
+      await loadLocalCategories()
+      ElMessage.success(t('zcard.supply.categoryCreated', { name: cat.category_name }))
+    } catch {
+      // 拦截器已提示
+    }
+  }
+
+  /** 一键为所有未映射上游分类创建同名本地分类 */
+  const createAllMissingCategories = async () => {
+    if (unmappedCount.value === 0) return
+    creatingMappings.value = true
+    try {
+      for (const cat of unmappedCategories.value) {
+        await createCategoryForUpstream(cat)
+      }
+    } finally {
+      creatingMappings.value = false
+    }
+  }
+
+  /** 映射变更 */
+  const setCategoryMapping = (cat: UpstreamCategory, val: number | null) => {
+    const key = cat.category_code as string
+    if (!key) return
+    categoryMapping.value = { ...categoryMapping.value, [key]: val }
+  }
+
+  /** 映射到的本地分类名(扁平化树查找) */
+  const mappedName = (code: string): string => {
+    const id = categoryMapping.value[code]
+    if (!id) return ''
+    const find = (nodes: Category[]): string => {
+      for (const n of nodes || []) {
+        if (n.id === id) return n.name
+        const child = find(n.children || [])
+        if (child) return child
+      }
+      return ''
+    }
+    return find(localCategories.value)
   }
 
   /** ===== 分类折叠 + 分类全选 ===== */
@@ -669,7 +820,9 @@
     previewCategories.value = []
     previewChecked.value = []
     previewTotal.value = 0
+    categoryMapping.value = {}
     initPricingFromSource(row)
+    loadLocalCategories()
     try {
       const res = await previewSupplyProducts(row.id)
       if (res.ok) {
@@ -701,6 +854,7 @@
       const res = await importSupplyProducts(previewSourceId.value, [...previewChecked.value], {
         pricing,
         save_default: saveDefaultPricing.value,
+        category_map: categoryMapping.value,
       })
       if (res.ok) {
         ElMessage.success(res.message || t('zcard.supply.importSuccess'))
@@ -799,6 +953,11 @@
     font-size: 13px;
     color: var(--el-text-color-secondary);
   }
+  .summary-imported {
+    margin-left: 8px;
+    color: var(--el-color-success);
+    font-weight: 600;
+  }
   /* 定价策略区 */
   .preview-pricing {
     display: flex;
@@ -829,6 +988,75 @@
   .pricing-save {
     margin-left: auto;
     flex-shrink: 0;
+  }
+  /* 分类映射面板 */
+  .preview-map {
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+  }
+  .map-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .map-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+  }
+  .map-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .map-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+  }
+  .map-upstream {
+    font-size: 13px;
+    color: var(--el-text-color-primary);
+    flex-shrink: 0;
+    min-width: 120px;
+  }
+  .map-count {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+  .map-arrow {
+    color: var(--el-text-color-placeholder);
+    flex-shrink: 0;
+  }
+  .map-target {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+  }
+  .map-select {
+    flex: 1;
+    min-width: 0;
+    max-width: 220px;
+  }
+  .map-tag {
+    flex-shrink: 0;
+  }
+  .map-empty {
+    color: var(--el-text-color-placeholder);
+    font-size: 12px;
+    padding: 8px 0;
+  }
+  .map-tip {
+    font-size: 12px;
+    color: var(--el-text-color-placeholder);
+    margin-top: 6px;
+    line-height: 1.5;
   }
   .preview-list {
     max-height: 55vh;
@@ -898,6 +1126,12 @@
   .preview-product {
     padding: 6px 8px;
     border-bottom: 1px solid var(--el-border-color-extra-light);
+    border-radius: 4px;
+    transition: background-color 0.2s;
+  }
+  /* 已对接(已导入本地)的商品行:浅绿底色弱化,突出新货源 */
+  .preview-product.is-imported {
+    background: var(--el-color-success-light-9);
   }
   .preview-product :deep(.el-checkbox__label) {
     width: 100%;
@@ -907,13 +1141,20 @@
     justify-content: space-between;
     align-items: center;
     width: 100%;
+    gap: 8px;
   }
   .pp-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     font-size: 13px;
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .pp-status {
+    flex-shrink: 0;
   }
   .pp-meta {
     display: flex;

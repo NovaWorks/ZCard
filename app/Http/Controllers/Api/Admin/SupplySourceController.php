@@ -189,6 +189,8 @@ class SupplySourceController extends Controller
             'pricing.markup_percent' => 'sometimes|numeric|min:0',
             'pricing.markup_amount' => 'sometimes|numeric|min:0',
             'save_default' => 'sometimes|boolean',
+            'category_map' => 'nullable|array',
+            'category_map.*' => 'nullable|integer',
         ]);
 
         try {
@@ -226,7 +228,7 @@ class SupplySourceController extends Controller
                     $skipped++;
                     continue;
                 }
-                $sync->upsertProduct($supplySource, $dto, $pricing);
+                $sync->upsertProduct($supplySource, $dto, $pricing, $data['category_map'] ?? null);
                 $imported++;
             }
 

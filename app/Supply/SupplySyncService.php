@@ -34,8 +34,9 @@ class SupplySyncService
      *                                'markup_percent'=>int,
      *                                'markup_amount'=>float(元)]
      *                               为 null 时走货源 settings 默认定价。
+     * @param  array|null  $categoryMap  上游分类 code → 本地分类 id 映射(勾选导入时)
      */
-    public function upsertProduct(SupplySource $source, UpstreamProduct $dto, ?array $pricing = null): Product
+    public function upsertProduct(SupplySource $source, UpstreamProduct $dto, ?array $pricing = null, ?array $categoryMap = null): Product
     {
         $existing = Product::where('upstream_source_id', $source->id)
             ->where('upstream_product_code', $dto->code)
@@ -51,7 +52,7 @@ class SupplySyncService
                 'cover' => $this->normalizeCover($source, $dto->cover),
                 'factory_price' => $dto->factoryPrice,
                 'stock_cache' => $dto->stockQuantity, // 上游库存缓存
-                'category_id' => $this->resolveCategoryId($source, $dto->categoryCode),
+                'category_id' => $this->resolveCategoryId($source, $dto->categoryCode, $categoryMap),
                 'upstream_synced_at' => now(),
                 'hide' => ! $dto->isActive ? true : $existing->hide, // 上游下架→标隐藏,不删
             ];
@@ -81,7 +82,7 @@ class SupplySyncService
             'stock_type' => 'card',
             'status' => ($price === null || ! ($source->settings['auto_list'] ?? true)) ? 0 : 1,
             'hide' => ! $dto->isActive ? true : false,
-            'category_id' => $this->resolveCategoryId($source, $dto->categoryCode),
+            'category_id' => $this->resolveCategoryId($source, $dto->categoryCode, $categoryMap),
             'upstream_source_id' => $source->id,
             'upstream_product_code' => $dto->code,
             'stock_cache' => $dto->stockQuantity, // 上游库存缓存(-1=无限)
@@ -129,12 +130,20 @@ class SupplySyncService
         return rtrim($source->base_url, '/') . '/' . ltrim($cover, '/');
     }
 
-    private function resolveCategoryId(SupplySource $source, ?string $upstreamCatCode): ?int
+    /**
+     * 解析商品应归入的本地分类 id。
+     * 优先级:勾选导入时的显式映射(category_map) > 上游分类 code 匹配本地 slug > null。
+     */
+    private function resolveCategoryId(SupplySource $source, ?string $upstreamCatCode, ?array $categoryMap = null): ?int
     {
+        if ($upstreamCatCode !== null && $categoryMap !== null && isset($categoryMap[$upstreamCatCode])) {
+            return (int) $categoryMap[$upstreamCatCode] ?: null;
+        }
         if (! $upstreamCatCode) {
             return null;
         }
         $cat = Category::where('slug', $upstreamCatCode)->first();
+
         return $cat?->id;
     }
 
