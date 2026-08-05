@@ -1,1 +1,0 @@
-import{b2 as r}from"./index-C7G3IcW6.js";const a=()=>r.get({url:"/admin/currencies"}),e=a=>r.post({url:"/admin/currencies",data:a}),s=(a,e)=>r.put({url:`/admin/currencies/${a}`,data:e}),c=a=>r.del({url:`/admin/currencies/${a}`});export{e as c,c as d,a as g,s as u};

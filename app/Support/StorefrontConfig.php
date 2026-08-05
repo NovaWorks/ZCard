@@ -54,6 +54,9 @@ class StorefrontConfig
             'username_min_length' => 3,
             'forget_type' => 'email',
 
+            // 卡密加密密钥(后台可配置,存 Crypt 密文;变更会导致已加密卡密无法解密)
+            'card_encryption_key' => '',
+
             // 系统运维
             'maintenance_mode' => false,
             'maintenance_message' => '系统维护中,请稍后再来访问。',
@@ -155,6 +158,11 @@ class StorefrontConfig
             }
         }
         // value 列是 json cast,pluck 后可能是 array
+        // 敏感密钥脱敏:不向任何调用方暴露 card_encryption_key 真实值(含前台 settings API)
+        if (! empty($merged['card_encryption_key'])) {
+            $merged['card_encryption_key'] = '••••••••';
+        }
+
         return $merged;
     }
 

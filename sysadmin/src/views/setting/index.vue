@@ -154,6 +154,16 @@
             <ElFormItem :label="t('zcard.setting.tradeCaptcha')">
               <ElSwitch v-model="form.trade_captcha" />
             </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.cardEncryptionKey')">
+              <ElInput
+                v-model="cardEncryptionKey"
+                type="password"
+                show-password
+                :placeholder="t('zcard.setting.cardEncryptionKeyPlaceholder')"
+                style="width: 320px"
+              />
+              <div class="field-help">{{ t('zcard.setting.cardEncryptionKeyTip') }}</div>
+            </ElFormItem>
             <ElFormItem :label="t('zcard.setting.allowPostReview')">
               <ElSwitch v-model="form.allow_post_review" />
             </ElFormItem>
@@ -573,6 +583,8 @@
   const raw = ref<Settings>({})
   const loading = ref(false)
   const saving = ref(false)
+  /** 卡密加密密钥输入(不回显,留空=保持) */
+  const cardEncryptionKey = ref('')
   const currencies = ref<Currency[]>([])
 
   const coerceBool = (value: any, fallback: boolean): boolean => {
@@ -745,8 +757,13 @@
       delete (payload as any).footerContactJson
       delete (payload as any).footerSocialJson
       delete (payload as any).hotTagCategoriesJson
+      // 卡密加密密钥:仅在填写时提交(留空=保持原值);回显值为脱敏占位,不得覆盖
+      if (cardEncryptionKey.value.trim()) {
+        payload.card_encryption_key = cardEncryptionKey.value.trim()
+      }
       await updateSettings(payload)
       raw.value = payload
+      cardEncryptionKey.value = ''
       ElMessage.success(t('zcard.setting.saveSuccess'))
     } catch (e) {
       // 拦截器处理
@@ -794,6 +811,12 @@
   }
 
   /* 常见问题(FAQ)编辑器 */
+  .field-help {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+    line-height: 1.5;
+    margin-top: 4px;
+  }
   .faq-editor {
     width: 100%;
     display: flex;

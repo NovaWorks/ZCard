@@ -26,8 +26,24 @@ class SettingController extends Controller
 
         // 兼容直接传 key-value 或包成 settings
         $kv = $data['settings'] ?? $request->except('settings');
+
+        // 卡密加密密钥:敏感字段,存 Crypt 密文(不回显明文)
+        if (isset($kv['card_encryption_key'])) {
+            if ($kv['card_encryption_key'] === '' || $kv['card_encryption_key'] === null) {
+                unset($kv['card_encryption_key']); // 留空=保持原值
+            } else {
+                $kv['card_encryption_key'] = \Illuminate\Support\Facades\Crypt::encryptString((string) $kv['card_encryption_key']);
+            }
+        }
+
         StorefrontConfig::setMany($kv);
 
-        return response()->json(StorefrontConfig::all());
+        // 回显时脱敏密钥
+        $all = StorefrontConfig::all();
+        if (! empty($all['card_encryption_key'])) {
+            $all['card_encryption_key'] = '••••••••';
+        }
+
+        return response()->json($all);
     }
 }
