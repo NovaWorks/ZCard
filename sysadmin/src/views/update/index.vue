@@ -36,8 +36,6 @@ const successResult = ref<UpdateResult | null>(null)
 const failedVisible = ref(false)
 const failedResult = ref<{ message: string; log: string } | null>(null)
 
-// 弹窗状态
-const latestNotesVisible = ref(false)
 const versionDetailVisible = ref(false)
 const versionDetailData = ref<VersionInfo | null>(null)
 
@@ -52,6 +50,21 @@ const formatDate = (iso?: string) => {
 
 const openVersionDetail = (ver: VersionInfo) => {
   versionDetailData.value = ver
+  versionDetailVisible.value = true
+}
+
+/** 查看当前版本的更新说明(从版本历史中匹配) */
+const openCurrentVersion = async () => {
+  if (!checkResult.value?.current_version) return
+  if (!versions.value.length) await loadVersions()
+  const ver = versions.value.find((v) => v.version === checkResult.value?.current_version)
+  versionDetailData.value = ver ?? {
+    version: checkResult.value.current_version,
+    url: '',
+    notes: checkResult.value.release_notes || '',
+    published_at: checkResult.value.published_at,
+    prerelease: false,
+  }
   versionDetailVisible.value = true
 }
 
@@ -179,6 +192,9 @@ onMounted(() => {
           <div class="hero-version-box">
             <div class="hero-version-label">{{ t('zcard.update.currentVersion') }}</div>
             <div class="hero-version-num current">v{{ checkResult?.current_version || '...' }}</div>
+            <ElButton text type="primary" size="small" round class="hero-view-notes" @click="openCurrentVersion">
+              📄 {{ t('zcard.update.viewCurrentNotes') }}
+            </ElButton>
           </div>
           <div class="hero-arrow" v-if="checkResult?.has_update">→</div>
           <div class="hero-version-box" v-if="checkResult?.has_update">
@@ -212,26 +228,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- ========== Section 2: 最新版本更新日志(仅版本号,点击弹窗看详情) ========== -->
-    <ElCard v-if="checkResult" class="art-table-card" shadow="never">
-      <template #header>
-        <div class="card-header">
-          <span class="header-title">📋 {{ t('zcard.update.releaseNotes') }}</span>
-        </div>
-      </template>
-      <div class="changelog-trigger" @click="latestNotesVisible = true">
-        <div class="changelog-trigger-left">
-          <span class="version-badge large">v{{ checkResult.latest_version }}</span>
-          <ElTag v-if="checkResult.has_update" type="warning" size="small" effect="plain">🆕</ElTag>
-        </div>
-        <div class="changelog-trigger-right">
-          <span class="changelog-hint">{{ t('zcard.update.viewDetail') }}</span>
-          <ElIcon><ArrowRight /></ElIcon>
-        </div>
-      </div>
-    </ElCard>
-
-    <!-- ========== Section 3: 版本历史(时间线式,仅版本号,点击弹窗) ========== -->
+    <!-- ========== Section 2: 版本历史(时间线式,仅版本号,点击弹窗) ========== -->
     <ElCard class="art-table-card" shadow="never">
       <template #header>
         <div class="card-header">
@@ -267,26 +264,7 @@ onMounted(() => {
       </div>
     </ElCard>
 
-    <!-- ========== 版本详情弹窗(通用,最新日志 + 历史版本共用) ========== -->
-    <ElDialog
-      v-model="latestNotesVisible"
-      :title="checkResult ? `v${checkResult.latest_version} ${t('zcard.update.releaseNotes')}` : ''"
-      width="720px"
-      align-center
-      append-to-body
-      class="notes-dialog"
-    >
-      <div v-if="checkResult" class="detail-dialog-body">
-        <div class="detail-dialog-meta">
-          <span class="version-badge large">v{{ checkResult.latest_version }}</span>
-          <ElTag v-if="checkResult.has_update" type="warning" effect="plain">🆕 New</ElTag>
-          <span class="detail-date">{{ formatDate(checkResult.published_at) }}</span>
-        </div>
-        <div v-if="checkResult.release_notes" class="markdown-body detail-notes-full" v-html="renderMd(checkResult.release_notes)"></div>
-        <pre v-else class="detail-notes-full">(无更新说明)</pre>
-      </div>
-    </ElDialog>
-
+    <!-- ========== 版本详情弹窗(当前版本 + 历史版本共用) ========== -->
     <ElDialog
       v-model="versionDetailVisible"
       :title="versionDetailData ? `v${versionDetailData.version} ${t('zcard.update.releaseNotes')}` : ''"
@@ -430,6 +408,11 @@ export default { components: { Loading, CircleCheckFilled, CircleCloseFilled, Ar
     line-height: 1.2;
     &.current { color: var(--el-color-primary); }
     &.latest { color: var(--el-color-success); }
+  }
+  .hero-view-notes {
+    align-self: flex-start;
+    padding-left: 0;
+    height: auto;
   }
   .hero-arrow {
     font-size: 28px;

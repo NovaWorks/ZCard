@@ -152,8 +152,8 @@ function isExternal(url: string) {
       </div>
     </div>
 
-    <!-- 版权栏 -->
-    <div class="border-t border-border">
+    <!-- 版权栏(固定底部,滚动不消失) -->
+    <div class="sticky bottom-0 z-10 border-t border-border bg-surface-subtle">
       <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row items-center justify-between gap-3 text-center md:text-left">
         <span class="text-xs text-ink-muted break-all">{{ copyright }}</span>
         <div class="flex items-center gap-4 text-[10px] text-ink-muted shrink-0 flex-wrap justify-center">

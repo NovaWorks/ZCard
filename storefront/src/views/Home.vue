@@ -11,6 +11,7 @@ import CategoryNav from '@/components/CategoryNav.vue'
 import ViewSwitcher from '@/components/ViewSwitcher.vue'
 import ProductCard from '@/components/ProductCard.vue'
 import HotTags from '@/components/HotTags.vue'
+import { getCategories, type Category } from '@/api/categories'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -26,6 +27,8 @@ const order = ref('')
 const featured = ref<Product[]>([])
 const keyword = ref('')
 const keywordInput = ref('')
+/** 移动端分类横向条(sidebar 模式在移动端隐藏,这里兜底) */
+const topCats = ref<Category[]>([])
 
 async function load() {
   await settings.load()
@@ -43,7 +46,14 @@ async function load() {
     }
   }
 }
-onMounted(load)
+onMounted(async () => {
+  load()
+  try {
+    topCats.value = await getCategories()
+  } catch {
+    topCats.value = []
+  }
+})
 watch(category, load)
 
 function doSearch() {
@@ -106,6 +116,32 @@ function goProduct(p: Product) {
     <!-- 热门标签 -->
     <div class="max-w-6xl mx-auto px-4 mt-3">
       <HotTags v-if="settings.config?.show_hot_tags" :ids="settings.config?.hot_tag_categories || []" />
+    </div>
+
+    <!-- 移动端分类条(sidebar 模式移动端隐藏左侧树,这里兜底显示一级分类) -->
+    <div
+      v-if="settings.config?.category_nav_style === 'sidebar'"
+      class="md:hidden bg-white border-b border-border overflow-x-auto scrollbar-hide flex items-center gap-2 px-4 py-2.5"
+    >
+      <button
+        @click="category = null"
+        :class="[
+          'shrink-0 px-3.5 py-1.5 rounded-pill text-xs font-medium whitespace-nowrap transition',
+          category === null ? 'bg-primary text-white shadow-sm' : 'bg-surface-subtle text-ink-soft'
+        ]"
+      >{{ t('category.all') }}</button>
+      <button
+        v-for="c in topCats"
+        :key="c.id"
+        @click="category = c.id"
+        :class="[
+          'shrink-0 px-3.5 py-1.5 rounded-pill text-xs font-medium whitespace-nowrap transition inline-flex items-center gap-1',
+          category === c.id ? 'bg-primary text-white shadow-sm' : 'bg-surface-subtle text-ink-soft'
+        ]"
+      >
+        <img v-if="c.icon && /^https?:\/\/|^\/storage\//.test(c.icon)" :src="c.icon" alt="" class="w-3.5 h-3.5 object-contain" />
+        <span v-else-if="c.icon">{{ c.icon }}</span>{{ c.name }}
+      </button>
     </div>
 
     <!-- pills/combo:全宽顶行(flex 之外),分类在搜索框上方 -->
@@ -173,3 +209,13 @@ function goProduct(p: Product) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+</style>

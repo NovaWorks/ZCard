@@ -297,14 +297,14 @@
             </ElFormItem>
 
             <ElFormItem :label="t('zcard.product.description')">
-              <ElInput
+              <MdEditor
                 v-model="formData.description"
-                type="textarea"
-                :rows="5"
-                :placeholder="t('zcard.product.description')"
-                maxlength="2000"
-                show-word-limit
+                style="width: 100%"
+                :height="320"
+                :toolbars-exclude="['katex', 'mermaid']"
+                :placeholder="t('zcard.product.descriptionPlaceholder')"
               />
+              <span class="form-hint">{{ t('zcard.product.descriptionHint') }}</span>
             </ElFormItem>
 
             <ElFormItem :label="t('zcard.product.cover')">
@@ -811,6 +811,9 @@
   } from '@/api/products'
   import { getAllCategories, type Category } from '@/api/categories'
   import { uploadImage } from '@/api/upload'
+  import { MdEditor } from 'md-editor-v3'
+  import 'md-editor-v3/lib/style.css'
+  import { marked } from 'marked'
   import {
     getSkus,
     createSku,
@@ -1654,7 +1657,7 @@
       name: formData.name,
       slug: formData.slug || undefined,
       category_id: formData.category_id,
-      description: formData.description,
+      description: marked.parse(formData.description || ''),
       cover: formData.cover || undefined,
       images: galleryUrls.value.length ? galleryUrls.value : undefined,
       price: Math.round(formData.priceYuan * 100),
