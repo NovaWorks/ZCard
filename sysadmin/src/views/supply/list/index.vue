@@ -206,8 +206,26 @@
           </div>
           <div class="preview-list">
             <div v-for="cat in previewCategories" :key="cat.category_code ?? '_'" class="preview-cat">
-              <div class="preview-cat-head">{{ cat.category_name }} ({{ cat.products.length }})</div>
-              <ElCheckboxGroup v-model="previewChecked" class="preview-cat-body">
+              <div class="preview-cat-head" @click="toggleCategoryExpand(cat)">
+                <ElCheckbox
+                  :model-value="isCategoryAllChecked(cat)"
+                  :indeterminate="isCategoryIndeterminate(cat)"
+                  class="cat-check"
+                  @change="(val: any) => toggleCategory(cat, !!val)"
+                  @click.stop
+                >
+                  <span class="cat-title">{{ cat.category_name }}</span>
+                  <span class="cat-count">({{ cat.products.length }})</span>
+                </ElCheckbox>
+                <ElIcon class="cat-arrow" :class="{ expanded: isCategoryExpanded(cat) }">
+                  <ArrowDown />
+                </ElIcon>
+              </div>
+              <ElCheckboxGroup
+                v-show="isCategoryExpanded(cat)"
+                v-model="previewChecked"
+                class="preview-cat-body"
+              >
                 <div v-for="p in cat.products" :key="p.code" class="preview-product">
                   <ElCheckbox :value="p.code">
                     <div class="pp-content">
@@ -236,7 +254,7 @@
 </template>
 
 <script setup lang="ts">
-  import { Plus } from '@element-plus/icons-vue'
+  import { Plus, ArrowDown } from '@element-plus/icons-vue'
   import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
   import { useI18n } from 'vue-i18n'
   import { useListTableHeight } from '@/hooks'
@@ -544,6 +562,43 @@
     previewChecked.value = val ? [...allProductCodes.value] : []
   }
 
+  /** ===== 分类折叠 + 分类全选 ===== */
+  /** 展开中的分类 code 集合(自定义折叠,不用 el-collapse 避免 header 插槽 memo 不刷新) */
+  const expandedCategories = ref<string[]>([])
+
+  const isCategoryExpanded = (cat: UpstreamCategory) =>
+    expandedCategories.value.includes(cat.category_code ?? '_')
+
+  const toggleCategoryExpand = (cat: UpstreamCategory) => {
+    const key = cat.category_code ?? '_'
+    expandedCategories.value = expandedCategories.value.includes(key)
+      ? expandedCategories.value.filter((k) => k !== key)
+      : [...expandedCategories.value, key]
+  }
+
+  const categoryCodes = (cat: UpstreamCategory) => cat.products.map((p) => p.code)
+
+  /** 该分类是否全部勾选 */
+  const isCategoryAllChecked = (cat: UpstreamCategory) => {
+    const codes = categoryCodes(cat)
+    return codes.length > 0 && codes.every((c) => previewChecked.value.includes(c))
+  }
+
+  /** 该分类是否半选 */
+  const isCategoryIndeterminate = (cat: UpstreamCategory) => {
+    const codes = categoryCodes(cat)
+    const n = codes.filter((c) => previewChecked.value.includes(c)).length
+    return n > 0 && n < codes.length
+  }
+
+  /** 勾选/取消勾选整个分类的产品 */
+  const toggleCategory = (cat: UpstreamCategory, val: boolean) => {
+    const codes = categoryCodes(cat)
+    previewChecked.value = val
+      ? [...new Set([...previewChecked.value, ...codes])]
+      : previewChecked.value.filter((c) => !codes.includes(c))
+  }
+
   /** 打开预览弹窗:实时拉取上游商品 */
   const openPreview = async (row: SupplySource) => {
     previewingId.value = row.id
@@ -559,6 +614,8 @@
       if (res.ok) {
         previewCategories.value = res.categories || []
         previewTotal.value = res.total || 0
+        // 默认展开所有分类
+        expandedCategories.value = previewCategories.value.map((c) => c.category_code ?? '_')
       } else {
         previewError.value = res.error || t('zcard.supply.previewFailed')
       }
@@ -677,20 +734,60 @@
     max-height: 55vh;
     overflow-y: auto;
   }
+  .preview-collapse {
+    border: none;
+  }
   .preview-cat {
-    margin-bottom: 16px;
+    margin-bottom: 4px;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 6px;
+    overflow: hidden;
   }
   .preview-cat-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 8px 10px;
+    cursor: pointer;
+    background: var(--el-fill-color-lighter);
+    user-select: none;
+  }
+  .preview-cat-head:hover {
+    background: var(--el-fill-color-light);
+  }
+  .preview-cat-head :deep(.el-checkbox) {
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+  .cat-check {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cat-title {
     font-size: 13px;
     font-weight: 600;
     color: var(--el-text-color-primary);
-    margin-bottom: 8px;
-    padding-left: 4px;
+  }
+  .cat-count {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+    margin-left: 4px;
+  }
+  .cat-arrow {
+    flex-shrink: 0;
+    transition: transform 0.2s;
+    color: var(--el-text-color-secondary);
+  }
+  .cat-arrow.expanded {
+    transform: rotate(180deg);
   }
   .preview-cat-body {
     display: flex;
     flex-direction: column;
     width: 100%;
+    padding: 4px 8px;
   }
   .preview-product {
     padding: 6px 8px;

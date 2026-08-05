@@ -159,15 +159,20 @@
             {{ row.stock ?? 0 }}
           </template>
         </ElTableColumn>
-        <ElTableColumn :label="t('zcard.product.status')" width="110" align="center">
+        <ElTableColumn :label="t('zcard.product.status')" width="150" align="center">
           <template #default="{ row }">
-            <ElSwitch
-              :model-value="!!row.status"
-              :active-value="true"
-              :inactive-value="false"
-              :loading="row._statusLoading"
-              @change="(val) => handleStatusToggle(row, !!val)"
-            />
+            <div class="status-cell">
+              <ElSwitch
+                :model-value="!!row.status"
+                :active-value="true"
+                :inactive-value="false"
+                :loading="row._statusLoading"
+                @change="(val) => handleStatusToggle(row, !!val)"
+              />
+              <span class="status-text" :class="row.status ? 'is-on' : 'is-off'">
+                {{ row.status ? t('zcard.product.statusOn') : t('zcard.product.statusOff') }}
+              </span>
+            </div>
           </template>
         </ElTableColumn>
         <ElTableColumn :label="t('zcard.product.featured')" width="100" align="center">
@@ -1698,6 +1703,25 @@
     display: flex;
     justify-content: flex-end;
     margin-top: 16px;
+  }
+
+  /* 上架/下架状态:绿色=上架,红色=下架 */
+  .status-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .status-text {
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .status-text.is-on {
+    color: var(--el-color-success);
+  }
+  .status-text.is-off {
+    color: var(--el-color-danger);
   }
 
   .price-pair {
