@@ -23,6 +23,8 @@ function toggle(id: number) {
   else expanded.value.add(id)
 }
 function hasChildren(c: Category) { return c.children && c.children.length > 0 }
+/** icon 是图片 URL(http/https 或 /storage/ 开头)则用 img 渲染,否则是 emoji 直接显示 */
+function isImgIcon(v?: string) { return !!v && /^https?:\/\/|^\/storage\//.test(v) }
 /** combo:点击一级分类时选中并切换子分类面板(移动端无 hover,点击也能展开) */
 function onCatClick(c: Category) {
   select(c.id)
@@ -49,7 +51,8 @@ function onCatHover(c: Category) { dropdownCat.value = c }
             ? 'bg-primary text-white shadow-sm'
             : 'bg-surface-subtle text-ink-soft hover:bg-primary-light hover:text-primary'
         ]">
-          <span v-if="c.icon" class="mr-1">{{ c.icon }}</span>{{ c.name }}
+          <img v-if="isImgIcon(c.icon)" :src="c.icon" alt="" class="cat-icon-img" />
+          <span v-else-if="c.icon" class="mr-1">{{ c.icon }}</span>{{ c.name }}
         </button>
       </div>
     </div>
@@ -84,7 +87,8 @@ function onCatHover(c: Category) { dropdownCat.value = c }
               ? 'bg-primary text-white font-medium shadow-sm'
               : 'text-ink-soft hover:bg-primary-light hover:text-primary'
           ]">
-            <span v-if="c.icon" class="text-xs">{{ c.icon }}</span>
+            <img v-if="isImgIcon(c.icon)" :src="c.icon" alt="" class="cat-icon-img" />
+            <span v-else-if="c.icon" class="text-xs">{{ c.icon }}</span>
             <span v-else class="text-xs opacity-50">📄</span>
             <span class="flex-1 text-left truncate">{{ c.name }}</span>
             <!-- 子分类展开按钮 -->
@@ -128,7 +132,8 @@ function onCatHover(c: Category) { dropdownCat.value = c }
               ? 'bg-primary text-white shadow-sm'
               : 'bg-surface-subtle text-ink-soft hover:bg-primary-light hover:text-primary'
           ]">
-            <span v-if="c.icon" class="mr-0.5">{{ c.icon }}</span>{{ c.name }}
+            <img v-if="isImgIcon(c.icon)" :src="c.icon" alt="" class="cat-icon-img" />
+            <span v-else-if="c.icon" class="mr-0.5">{{ c.icon }}</span>{{ c.name }}
             <span v-if="hasChildren(c)" class="text-[8px] opacity-60">▼</span>
           </button>
         </div>
@@ -142,7 +147,8 @@ function onCatHover(c: Category) { dropdownCat.value = c }
       >
         <div class="flex items-center justify-between mb-3">
           <span class="text-sm font-bold text-ink flex items-center gap-1">
-            <span v-if="dropdownCat.icon">{{ dropdownCat.icon }}</span>{{ dropdownCat.name }}
+            <img v-if="isImgIcon(dropdownCat.icon)" :src="dropdownCat.icon" alt="" class="cat-icon-img" />
+            <span v-else-if="dropdownCat.icon">{{ dropdownCat.icon }}</span>{{ dropdownCat.name }}
           </span>
           <button
             @click="select(dropdownCat.id); dropdownCat = null"
@@ -174,5 +180,14 @@ function onCatHover(c: Category) { dropdownCat.value = c }
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+/* 分类图标图片(后台 ImagePicker 上传,相对 /storage 或完整 URL) */
+.cat-icon-img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  border-radius: 4px;
+  margin-right: 2px;
+  vertical-align: -3px;
 }
 </style>

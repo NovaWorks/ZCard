@@ -28,6 +28,10 @@ export default defineConfig(({ mode }) => {
           target: 'http://localhost:8092',
           changeOrigin: true,
         },
+        '/storage': {
+          target: 'http://localhost:8092',
+          changeOrigin: true,
+        },
       },
     },
   }
