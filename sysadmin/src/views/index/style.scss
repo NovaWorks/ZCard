@@ -91,3 +91,51 @@
     }
   }
 }
+
+/* ===== 混合(TOP_LEFT) / 顶栏(TOP) 布局 ===== */
+.app-layout.layout-top-left,
+.app-layout.layout-top {
+  flex-direction: column;
+
+  .app-mixed-header {
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--default-bg-color);
+    box-shadow: 0 1px 0 var(--el-border-color-lighter);
+  }
+
+  .app-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+
+    #app-sidebar {
+      flex-shrink: 0;
+    }
+
+    #app-main {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      min-width: 0;
+      height: calc(100vh - 88px);
+      overflow: auto;
+    }
+
+    #app-main.no-sidebar {
+      height: calc(100vh - 88px);
+    }
+
+    #app-content {
+      flex: 1;
+
+      :deep(.layout-content) {
+        box-sizing: border-box;
+        width: calc(100% - 40px);
+        margin: auto;
+      }
+    }
+  }
+}
