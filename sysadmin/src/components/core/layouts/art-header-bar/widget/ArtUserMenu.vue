@@ -85,10 +85,10 @@
   }
 
   /**
-   * 打开文档页面
+   * 打开安装文档页面
    */
   const toDocs = (): void => {
-    window.open(WEB_LINKS.DOCS)
+    window.open(WEB_LINKS.INSTALL_DOC)
   }
 
   /**

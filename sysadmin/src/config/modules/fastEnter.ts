@@ -20,49 +20,22 @@ const fastEnterConfig: FastEnterConfig = {
       routeName: 'Console'
     },
     {
-      name: '分析页',
-      description: '数据分析与可视化',
-      icon: 'ri:game-line',
-      iconColor: '#ff3b30',
-      enabled: true,
-      order: 2,
-      routeName: 'Analysis'
-    },
-    {
-      name: '礼花效果',
-      description: '动画特效展示',
-      icon: 'ri:loader-line',
-      iconColor: '#7A7FFF',
-      enabled: true,
-      order: 3,
-      routeName: 'Fireworks'
-    },
-    {
-      name: '聊天',
-      description: '即时通讯功能',
-      icon: 'ri:user-line',
-      iconColor: '#13DEB9',
-      enabled: true,
-      order: 4,
-      routeName: 'Chat'
-    },
-    {
-      name: '官方文档',
-      description: '使用指南与开发文档',
-      icon: 'ri:bill-line',
+      name: '安装文档',
+      description: '安装部署指南',
+      icon: 'ri:book-line',
       iconColor: '#ffb100',
       enabled: true,
-      order: 5,
-      link: WEB_LINKS.DOCS
+      order: 2,
+      link: WEB_LINKS.INSTALL_DOC
     },
     {
       name: '技术支持',
-      description: '技术支持与问题反馈',
-      icon: 'ri:user-location-line',
+      description: 'Telegram 技术支持',
+      icon: 'ri:telegram-line',
       iconColor: '#ff6b6b',
       enabled: true,
-      order: 6,
-      link: WEB_LINKS.COMMUNITY
+      order: 3,
+      link: WEB_LINKS.SUPPORT_TELEGRAM
     },
     {
       name: '更新日志',
@@ -70,17 +43,8 @@ const fastEnterConfig: FastEnterConfig = {
       icon: 'ri:gamepad-line',
       iconColor: '#38C0FC',
       enabled: true,
-      order: 7,
-      routeName: 'ChangeLog'
-    },
-    {
-      name: '哔哩哔哩',
-      description: '技术分享与交流',
-      icon: 'ri:bilibili-line',
-      iconColor: '#FB7299',
-      enabled: true,
-      order: 8,
-      link: WEB_LINKS.BILIBILI
+      order: 4,
+      link: WEB_LINKS.RELEASE_NOTES
     }
   ],
   // 快速链接
