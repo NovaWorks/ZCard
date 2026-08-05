@@ -1082,7 +1082,7 @@
     }
   }
 
-  onMounted(() => {
+  onActivated(() => {
     loadProducts()
     fetchData()
     fetchStats()

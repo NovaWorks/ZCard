@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onActivated } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { getBills, getBillStats, adjustBalance, type Bill, type BillStats } from '@/api/bills'
@@ -86,7 +86,7 @@ const handleAdjust = async () => {
   } finally { adjustSaving.value = false }
 }
 
-onMounted(fetchData)
+onActivated(fetchData)
 </script>
 
 <template>

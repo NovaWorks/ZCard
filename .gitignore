@@ -44,3 +44,6 @@ Thumbs.db
 # AI 上下文文档(本地开发辅助,不进仓库)
 CLAUDE.md
 /.claude/
+
+# Playwright 临时产物
+/.playwright-mcp/

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onActivated } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { getCoupons, getCouponStats, createCoupons, toggleCoupon, deleteCoupon, exportCoupons, type Coupon, type CouponStats } from '@/api/coupons'
@@ -130,7 +130,7 @@ const handleDelete = (row: Coupon) => {
     }).catch(() => {})
 }
 
-onMounted(fetchData)
+onActivated(fetchData)
 </script>
 
 <template>

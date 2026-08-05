@@ -388,7 +388,7 @@
     }
   }
 
-  onMounted(() => {
+  onActivated(() => {
     fetchChannels()
   })
 </script>

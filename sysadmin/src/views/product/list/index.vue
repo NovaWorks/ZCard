@@ -1558,7 +1558,7 @@
   // 暴露给模板使用的图标(避免 lint 未使用告警)
   void Document
 
-  onMounted(() => {
+  onActivated(() => {
     loadCategories()
     fetchData()
     fetchStats()

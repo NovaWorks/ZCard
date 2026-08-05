@@ -530,7 +530,7 @@
       })
   }
 
-  onMounted(() => {
+  onActivated(() => {
     loadGroups()
     fetchData()
     fetchStats()

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onActivated } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import {
@@ -202,7 +202,7 @@ const stats = computed(() => {
   return { total, active, inactive: total - active }
 })
 
-onMounted(loadData)
+onActivated(loadData)
 </script>
 
 <template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onActivated } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { getUserGroups, createUserGroup, updateUserGroup, deleteUserGroup } from '@/api/userGroup'
@@ -123,7 +123,7 @@ const handleSubmit = async () => {
   }
 }
 
-onMounted(() => {
+onActivated(() => {
   loadData()
   loadBasis()
 })

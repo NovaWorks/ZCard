@@ -446,7 +446,7 @@
     }
   }
 
-  onMounted(() => {
+  onActivated(() => {
     fetchChannels()
     fetchAll()
   })
