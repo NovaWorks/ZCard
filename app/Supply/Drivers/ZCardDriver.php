@@ -33,13 +33,19 @@ class ZCardDriver implements SupplyDriver
         return ['name' => 'ZCard', 'icon' => '🃏'];
     }
 
-    /** 本系统自定义 HMAC 四头签名(同 /api/supply/* 协议,spec §4.2) */
-    private function signedHeaders(string $method, string $path, string $body = ''): array
+    /**
+     * 本系统自定义 HMAC 四头签名(同 /api/supply/* 协议,spec §4.2)。
+     *
+     * $rawBody 传「原始请求体字符串」,md5 只在这里做一次 —— 与服务端
+     * SupplyAuth::handle() 的 md5($request->getContent()) 严格对齐。
+     * 调用方不要预先 md5(曾因此变成双重哈希,导致恒定 invalid_signature)。
+     */
+    private function signedHeaders(string $method, string $path, string $rawBody = ''): array
     {
         $creds = $this->credentials();
         $ts = (string) time();
         $nonce = 'zcard_' . uniqid();
-        $ss = HmacSigner::buildSignString($method, $path, $ts, $nonce, md5($body));
+        $ss = HmacSigner::buildSignString($method, $path, $ts, $nonce, md5($rawBody));
         return [
             'X-Supply-Key' => $creds['api_key'],
             'X-Supply-Timestamp' => $ts,
@@ -52,7 +58,7 @@ class ZCardDriver implements SupplyDriver
     {
         try {
             $path = '/api/supply/ping';
-            $data = $this->postJson($path, [], $this->signedHeaders('POST', $path));
+            $data = $this->postRaw($path, '', $this->signedHeaders('POST', $path));
             return ['connected' => $data['ok'] ?? false, 'name' => $data['name'] ?? null, 'balance' => $data['balance'] ?? null, 'currency' => $data['currency'] ?? 'CNY'];
         } catch (\Throwable $e) { return ['connected' => false, 'error' => $e->getMessage()]; }
     }
@@ -60,7 +66,7 @@ class ZCardDriver implements SupplyDriver
     public function listCategories(): array
     {
         $path = '/api/supply/categories';
-        $data = $this->postJson($path, [], $this->signedHeaders('POST', $path));
+        $data = $this->postRaw($path, '', $this->signedHeaders('POST', $path));
         return collect($data['categories'] ?? [])->map(fn ($c) => new UpstreamCategory(code: (string) $c['id'], name: $c['name'], parentCode: isset($c['parent_id']) ? (string) $c['parent_id'] : null))->all();
     }
 
@@ -96,9 +102,9 @@ class ZCardDriver implements SupplyDriver
     public function createOrder(array $params): UpstreamOrder
     {
         $path = '/api/supply/orders';
-        $body = ['product_id' => (int) $params['product_code'], 'quantity' => $params['quantity'], 'downstream_order_no' => $params['downstream_order_no']];
-        $bodyStr = json_encode($body);
-        $data = $this->postJson($path, $body, $this->signedHeaders('POST', $path, md5($bodyStr)));
+        // 签名与发送共用 $bodyStr,保证服务端 md5(原始 body) 与本地口径一致
+        $bodyStr = $this->encodeBody(['product_id' => (int) $params['product_code'], 'quantity' => $params['quantity'], 'downstream_order_no' => $params['downstream_order_no']]);
+        $data = $this->postRaw($path, $bodyStr, $this->signedHeaders('POST', $path, $bodyStr));
         $cards = $data['fulfillment']['cards'] ?? [];
         return new UpstreamOrder(id: (string) $data['supply_order_id'], status: $data['fulfillment']['status'] ?? 'pending', amount: $data['amount'] ?? 0, fulfillment: $cards ? new UpstreamFulfillment(status: 'delivered', cards: $cards) : null);
     }
@@ -114,7 +120,7 @@ class ZCardDriver implements SupplyDriver
     public function cancelOrder(string $upstreamOrderId): bool
     {
         $path = "/api/supply/orders/{$upstreamOrderId}/cancel";
-        $data = $this->postJson($path, [], $this->signedHeaders('POST', $path));
+        $data = $this->postRaw($path, '', $this->signedHeaders('POST', $path));
         return $data['ok'] ?? false;
     }
 

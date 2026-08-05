@@ -32,12 +32,19 @@ class DujiaoNextDriver implements SupplyDriver
         return ['name' => '独角数卡(dujiao-next)', 'icon' => '🦄'];
     }
 
-    /** dujiao-next HMAC 三头签名(spec §3.3) */
-    private function signedHeaders(string $method, string $path, string $body = ''): array
+    /**
+     * dujiao-next HMAC 三头签名(spec §3.3):
+     * sign = hex(HMAC_SHA256(api_secret, "METHOD\nPATH\nts\nmd5(body)"))
+     *
+     * $rawBody 传「原始请求体字符串」,md5 只在这里做一次 —— 与本驱动
+     * verifyCallback() 里 md5($request->getContent()) 的口径保持一致。
+     * 调用方不要预先 md5(曾因此变成双重哈希)。
+     */
+    private function signedHeaders(string $method, string $path, string $rawBody = ''): array
     {
         $creds = $this->credentials();
         $ts = (string) time();
-        $signString = implode("\n", [$method, $path, $ts, md5($body)]);
+        $signString = implode("\n", [$method, $path, $ts, md5($rawBody)]);
         $sig = hash_hmac('sha256', $signString, $creds['api_secret']);
         return [
             'Dujiao-Next-Api-Key' => $creds['api_key'],
@@ -50,8 +57,7 @@ class DujiaoNextDriver implements SupplyDriver
     {
         try {
             $path = '/api/v1/upstream/ping';
-            $headers = $this->signedHeaders('POST', $path, md5(''));
-            $data = $this->postJson($path, [], $headers);
+            $data = $this->postRaw($path, '', $this->signedHeaders('POST', $path));
             return [
                 'connected' => $data['ok'] ?? false,
                 'name' => $data['name'] ?? null,
@@ -99,14 +105,14 @@ class DujiaoNextDriver implements SupplyDriver
     public function createOrder(array $params): UpstreamOrder
     {
         $path = '/api/v1/upstream/orders';
-        $body = [
+        // 签名与发送共用 $bodyStr,保证上游 md5(原始 body) 与本地口径一致
+        $bodyStr = $this->encodeBody([
             'sku_id' => (int) $params['product_code'],
             'quantity' => $params['quantity'],
             'downstream_order_no' => $params['downstream_order_no'],
             'callback_url' => $params['callback_url'] ?? null,
-        ];
-        $bodyStr = json_encode($body);
-        $data = $this->postJson($path, $body, $this->signedHeaders('POST', $path, md5($bodyStr)));
+        ]);
+        $data = $this->postRaw($path, $bodyStr, $this->signedHeaders('POST', $path, $bodyStr));
         return new UpstreamOrder(
             id: (string) ($data['order_id'] ?? ''),
             status: $data['status'] ?? 'pending',
@@ -138,7 +144,7 @@ class DujiaoNextDriver implements SupplyDriver
     public function cancelOrder(string $upstreamOrderId): bool
     {
         $path = "/api/v1/upstream/orders/{$upstreamOrderId}/cancel";
-        $data = $this->postJson($path, [], $this->signedHeaders('POST', $path, md5('')));
+        $data = $this->postRaw($path, '', $this->signedHeaders('POST', $path));
         return $data['ok'] ?? false;
     }
 
