@@ -17,12 +17,18 @@ const err = ref('')
 const selectedSku = ref<number | null>(null)
 const qty = ref(1)
 const currentImg = ref(0)
-/** 图片放大预览(lightbox) */
+/** 图片放大预览(lightbox,支持缩放/旋转) */
 const lightboxOpen = ref(false)
+const lightboxScale = ref(1)
+const lightboxRotate = ref(0)
 function openLightbox() { lightboxOpen.value = true; document.body.style.overflow = 'hidden' }
-function closeLightbox() { lightboxOpen.value = false; document.body.style.overflow = '' }
-function prevImg() { currentImg.value = (currentImg.value - 1 + galleryImages.value.length) % galleryImages.value.length }
-function nextImg() { currentImg.value = (currentImg.value + 1) % galleryImages.value.length }
+function closeLightbox() { lightboxOpen.value = false; document.body.style.overflow = ''; lightboxScale.value = 1; lightboxRotate.value = 0 }
+function prevImg() { currentImg.value = (currentImg.value - 1 + galleryImages.value.length) % galleryImages.value.length; lightboxScale.value = 1; lightboxRotate.value = 0 }
+function nextImg() { currentImg.value = (currentImg.value + 1) % galleryImages.value.length; lightboxScale.value = 1; lightboxRotate.value = 0 }
+function zoomIn() { lightboxScale.value = Math.min(lightboxScale.value + 0.5, 4) }
+function zoomOut() { lightboxScale.value = Math.max(lightboxScale.value - 0.5, 0.5) }
+function rotateRight() { lightboxRotate.value = (lightboxRotate.value + 90) % 360 }
+function resetTransform() { lightboxScale.value = 1; lightboxRotate.value = 0 }
 onMounted(() => { window.addEventListener('keydown', onKeydown) })
 onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown); document.body.style.overflow = '' })
 function onKeydown(e: KeyboardEvent) {
@@ -111,21 +117,35 @@ function buy() {
         </div>
       </div>
 
-      <!-- 图片放大预览(全屏遮罩,点击/ESC/左右键关闭切换) -->
+      <!-- 图片放大预览(全屏遮罩,支持缩放/旋转,点击/ESC/左右键操作) -->
       <Teleport to="body">
         <div v-if="lightboxOpen && galleryImages[currentImg]" class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center" @click.self="closeLightbox">
+          <!-- 顶部工具条 -->
+          <div class="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white/10 backdrop-blur rounded-full px-2 py-1.5 z-10">
+            <button @click="zoomIn" class="w-8 h-8 rounded-full text-white text-sm hover:bg-white/20 transition" title="放大">＋</button>
+            <button @click="zoomOut" class="w-8 h-8 rounded-full text-white text-sm hover:bg-white/20 transition" title="缩小">－</button>
+            <button @click="rotateRight" class="w-8 h-8 rounded-full text-white text-sm hover:bg-white/20 transition" title="旋转 90°">↻</button>
+            <button @click="resetTransform" class="w-8 h-8 rounded-full text-white text-xs hover:bg-white/20 transition" title="还原">⟲</button>
+          </div>
           <button @click="closeLightbox" class="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white text-xl hover:bg-white/25 transition flex items-center justify-center z-10" aria-label="关闭">✕</button>
           <button
             v-if="galleryImages.length > 1"
             @click="prevImg"
             class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 text-white text-xl hover:bg-white/25 transition flex items-center justify-center z-10"
             aria-label="上一张">‹</button>
-          <img :src="galleryImages[currentImg]" class="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl" @click="closeLightbox" />
+          <img
+            :src="galleryImages[currentImg]"
+            class="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl cursor-zoom-out select-none"
+            :style="{ transform: `scale(${lightboxScale}) rotate(${lightboxRotate}deg)`, transition: 'transform .25s ease' }"
+            @click="closeLightbox"
+          />
           <button
             v-if="galleryImages.length > 1"
             @click="nextImg"
             class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 text-white text-xl hover:bg-white/25 transition flex items-center justify-center z-10"
             aria-label="下一张">›</button>
+          <!-- 底部比例提示 -->
+          <span class="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/60 text-xs">{{ Math.round(lightboxScale * 100) }}% · {{ lightboxRotate }}°</span>
         </div>
       </Teleport>
 

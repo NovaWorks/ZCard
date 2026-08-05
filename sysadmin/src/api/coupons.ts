@@ -64,6 +64,10 @@ export const toggleCoupon = (id: number) =>
 export const deleteCoupon = (id: number) =>
   http.del({ url: `/admin/coupons/${id}` })
 
+/** 批量删除(已使用的自动跳过) */
+export const batchDeleteCoupons = (ids: number[]) =>
+  http.post<{ deleted: number; skipped: number }>({ url: '/admin/coupons/batch-delete', data: { ids } })
+
 /** 导出筛选后的优惠券为 CSV(用 axios+blob,带超时和错误透传) */
 export const exportCoupons = async (params: CouponListParams): Promise<{ filename: string; blob: Blob }> => {
   const { VITE_API_URL } = import.meta.env

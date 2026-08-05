@@ -14,7 +14,7 @@ class CategoryController extends Controller
             ->where('status', true)
             ->orderBy('sort')
             ->with(['children' => fn ($q) => $q->where('status', true)->orderBy('sort')])
-            ->get(['id', 'name', 'slug', 'parent_id']);
+            ->get(['id', 'name', 'slug', 'parent_id', 'icon']);
 
         return response()->json($tree);
     }

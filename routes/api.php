@@ -158,10 +158,11 @@ Route::middleware(['auth:sanctum', 'admin.role'])->prefix('admin')->group(functi
     Route::post('withdrawals/{id}/approve', [AdminWithdrawalController::class, 'approve']);
     Route::post('withdrawals/{id}/reject', [AdminWithdrawalController::class, 'reject']);
 
-    // 优惠券管理(CRUD + 导出)
+    // 优惠券管理(CRUD + 导出 + 批量删除)
     Route::get('coupons/export', [AdminCouponController::class, 'export']);
     Route::get('coupons/stats', [AdminCouponController::class, 'stats']);
     Route::post('coupons/toggle/{id}', [AdminCouponController::class, 'toggle']);
+    Route::post('coupons/batch-delete', [AdminCouponController::class, 'batchDelete']);
     Route::apiResource('coupons', AdminCouponController::class)->only(['index', 'store', 'destroy']);
 
     // 订单管理(列表/详情/关单/统计/导出/清理)

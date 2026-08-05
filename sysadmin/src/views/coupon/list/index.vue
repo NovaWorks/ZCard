@@ -3,7 +3,7 @@ import { ref, computed, onActivated } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { useListTableHeight } from '@/hooks'
-import { getCoupons, getCouponStats, createCoupons, toggleCoupon, deleteCoupon, exportCoupons, type Coupon, type CouponStats } from '@/api/coupons'
+import { getCoupons, getCouponStats, createCoupons, toggleCoupon, deleteCoupon, batchDeleteCoupons, exportCoupons, type Coupon, type CouponStats } from '@/api/coupons'
 
 defineOptions({ name: 'CouponList' })
 
@@ -133,6 +133,26 @@ const handleDelete = (row: Coupon) => {
     }).catch(() => {})
 }
 
+/** 批量删除(已使用的跳过) */
+const selectedRows = ref<Coupon[]>([])
+const handleSelectionChange = (rows: Coupon[]) => { selectedRows.value = rows }
+const handleBatchDelete = () => {
+  if (!selectedRows.value.length) return
+  ElMessageBox.confirm(
+    t('zcard.coupon.batchDeleteConfirm', { n: selectedRows.value.length }),
+    t('zcard.common.tips'),
+    { type: 'warning' },
+  )
+    .then(async () => {
+      try {
+        const res = await batchDeleteCoupons(selectedRows.value.map((r) => r.id))
+        const msg = t('zcard.coupon.batchDeleteDone', { deleted: res.deleted, skipped: res.skipped })
+        ElMessage.success(msg)
+        fetchData()
+      } catch (e: any) { ElMessage.error(e?.response?.data?.message || 'Failed') }
+    }).catch(() => {})
+}
+
 onActivated(fetchData)
 </script>
 
@@ -167,12 +187,20 @@ onActivated(fetchData)
           <ElButton @click="resetSearch">{{ t('zcard.common.reset') }}</ElButton>
         </div>
         <div class="toolbar-right">
+          <ElButton
+            v-if="selectedRows.length"
+            type="danger"
+            plain
+            :disabled="!selectedRows.length"
+            @click="handleBatchDelete"
+          >🗑 {{ t('zcard.coupon.batchDelete') }} ({{ selectedRows.length }})</ElButton>
           <ElButton :loading="exporting" @click="handleExport">📥 {{ t('zcard.coupon.exportFiltered') }}</ElButton>
           <ElButton type="primary" @click="openGen">🎫 {{ t('zcard.coupon.generate') }}</ElButton>
         </div>
       </div>
 
-      <ElTable ref="tableRef" :data="list" v-loading="loading" :height="tableHeight" border stripe>
+      <ElTable ref="tableRef" :data="list" v-loading="loading" :height="tableHeight" border stripe @selection-change="handleSelectionChange">
+        <ElTableColumn type="selection" width="45" align="center" />
         <ElTableColumn :label="t('zcard.coupon.code')" min-width="140">
           <template #default="{ row }">
             <div class="code-cell">

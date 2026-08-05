@@ -164,35 +164,35 @@ onActivated(() => {
       </ElButton>
     </div>
 
-    <!-- 等级列表 -->
-    <ElTable v-loading="loading" :data="list" border row-key="id">
-      <ElTableColumn prop="id" :label="t('zcard.common.id')" width="60" align="center" />
-      <ElTableColumn prop="name" :label="t('zcard.member.name')" min-width="120">
+    <!-- 等级列表(表头不换行,列宽自适应) -->
+    <ElTable v-loading="loading" :data="list" border row-key="id" :header-cell-style="{ whiteSpace: 'nowrap' }">
+      <ElTableColumn prop="id" :label="t('zcard.common.id')" min-width="60" align="center" />
+      <ElTableColumn prop="name" :label="t('zcard.member.name')" min-width="120" show-overflow-tooltip>
         <template #default="{ row }">
           <ElTag :type="row.id === 1 ? 'info' : 'warning'" size="small" effect="light">
             {{ row.name }}
           </ElTag>
         </template>
       </ElTableColumn>
-      <ElTableColumn :label="t('zcard.member.discount')" width="120" align="center">
+      <ElTableColumn :label="t('zcard.member.discount')" min-width="120" align="center">
         <template #default="{ row }">
           <span :class="row.discount < 100 ? 'text-green-600 font-bold' : 'text-gray-500'">
             {{ row.discount }}%
           </span>
         </template>
       </ElTableColumn>
-      <ElTableColumn :label="t('zcard.member.minRecharge')" width="140" align="center">
+      <ElTableColumn :label="t('zcard.member.minRecharge')" min-width="140" align="center" show-overflow-tooltip>
         <template #default="{ row }">
           ¥{{ (Number(row.min_recharge) / 100).toFixed(2) }}
         </template>
       </ElTableColumn>
-      <ElTableColumn :label="t('zcard.member.minConsumption')" width="140" align="center">
+      <ElTableColumn :label="t('zcard.member.minConsumption')" min-width="140" align="center" show-overflow-tooltip>
         <template #default="{ row }">
           ¥{{ (Number(row.min_consumption ?? 0) / 100).toFixed(2) }}
         </template>
       </ElTableColumn>
-      <ElTableColumn prop="sort" :label="t('zcard.member.sort')" width="80" align="center" />
-      <ElTableColumn :label="t('zcard.member.status')" width="100" align="center">
+      <ElTableColumn prop="sort" :label="t('zcard.member.sort')" min-width="80" align="center" />
+      <ElTableColumn :label="t('zcard.member.status')" min-width="100" align="center">
         <template #default="{ row }">
           <ElTag :type="row.status ? 'success' : 'info'" size="small">
             {{ row.status ? t('zcard.member.enabled') : t('zcard.member.disabled') }}

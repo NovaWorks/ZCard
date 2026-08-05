@@ -157,4 +157,28 @@ class CouponController extends Controller
         $coupon->delete();
         return response()->json(null, 204);
     }
+
+    /** 批量删除(已使用的跳过) */
+    public function batchDelete(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer',
+        ]);
+
+        $coupons = Coupon::whereIn('id', $validated['ids'])->get();
+        $skipped = 0;
+        foreach ($coupons as $coupon) {
+            if ($coupon->status === Coupon::STATUS_USED) {
+                $skipped++;
+                continue;
+            }
+            $coupon->delete();
+        }
+
+        return response()->json([
+            'deleted' => $coupons->count() - $skipped,
+            'skipped' => $skipped,
+        ]);
+    }
 }

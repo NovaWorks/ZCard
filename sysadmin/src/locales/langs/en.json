@@ -500,6 +500,7 @@
       "priceUnit": "Unit: Yuan",
       "coverUploaded": "Cover uploaded",
       "coverReplace": "Replace",
+      "coverPreview": "Click to preview",
       "coverUpload": "Click to upload",
       "coverRemove": "Remove",
       "galleryHint": "Multiple allowed",
@@ -920,6 +921,9 @@
       "disable": "Disable",
       "toggled": "Status toggled",
       "deleteConfirm": "Delete coupon \"{code}\"?",
+      "batchDelete": "Batch Delete",
+      "batchDeleteConfirm": "Delete the selected {n} coupons? Used ones will be skipped automatically.",
+      "batchDeleteDone": "{deleted} deleted, {skipped} used ones skipped.",
       "valueRequired": "Value required"
     },
     "card": {

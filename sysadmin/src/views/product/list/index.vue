@@ -314,10 +314,10 @@
                 accept="image/*"
                 :before-upload="beforeUpload"
               >
-                <div v-if="formData.cover" class="cover-preview">
+                <div v-if="formData.cover" class="cover-preview" @click.stop="handleCoverPreview">
                   <ElImage :src="formData.cover" fit="cover" class="cover-img" />
                   <div class="cover-mask">
-                    <span>{{ t('zcard.product.coverReplace') }}</span>
+                    <span>{{ t('zcard.product.coverPreview') }}</span>
                   </div>
                 </div>
                 <div v-else class="cover-placeholder">
@@ -336,6 +336,7 @@
                 list-type="picture-card"
                 :http-request="handleGalleryUpload"
                 :on-remove="handleGalleryRemove"
+                :on-preview="handleGalleryPreview"
                 accept="image/*"
                 :before-upload="beforeUpload"
                 multiple
@@ -768,6 +769,15 @@
         </ElButton>
       </template>
     </ElDrawer>
+
+    <!-- 图片查看器(放大/旋转/关闭) -->
+    <ElImageViewer
+      v-if="viewerVisible"
+      :url-list="viewerUrls"
+      :initial-index="viewerIndex"
+      teleported
+      @close="viewerVisible = false"
+    />
   </div>
 </template>
 
@@ -1329,6 +1339,25 @@
     galleryUrls.value = galleryUrls.value.filter((u) => u !== url)
     galleryFileList.value = galleryFileList.value.filter((f) => f.url !== url)
   }
+
+  /** 图片查看器(ElImageViewer 内置放大/旋转/关闭) */
+  const viewerVisible = ref(false)
+  const viewerUrls = ref<string[]>([])
+  const viewerIndex = ref(0)
+  const openViewer = (urls: string[], index = 0) => {
+    const list = urls.filter(Boolean)
+    if (!list.length) return
+    viewerUrls.value = list
+    viewerIndex.value = Math.min(index, list.length - 1)
+    viewerVisible.value = true
+  }
+  /** 详情图点击预览 */
+  const handleGalleryPreview = (file: UploadFile) => {
+    const idx = galleryFileList.value.findIndex((f) => f.url === (file.url || ''))
+    openViewer(galleryUrls.value, idx >= 0 ? idx : 0)
+  }
+  /** 封面点击放大 */
+  const handleCoverPreview = () => openViewer([formData.cover], 0)
 
   /** SKU 列表编辑行 */
   interface SkuRow extends Sku {

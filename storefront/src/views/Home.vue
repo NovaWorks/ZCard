@@ -108,9 +108,19 @@ function goProduct(p: Product) {
       <HotTags v-if="settings.config?.show_hot_tags" :ids="settings.config?.hot_tag_categories || []" />
     </div>
 
+    <!-- pills/combo:全宽顶行(flex 之外),分类在搜索框上方 -->
+    <CategoryNav
+      v-if="settings.config && settings.config.category_nav_style !== 'sidebar'"
+      v-model="category"
+      :style="settings.config.category_nav_style"
+    />
     <div class="flex max-w-6xl mx-auto mt-2">
-      <!-- 分类导航 + 列表 -->
-      <CategoryNav v-if="settings.config" v-model="category" :style="settings.config.category_nav_style" />
+      <!-- sidebar:左侧树(与右侧内容并排) -->
+      <CategoryNav
+        v-if="settings.config && settings.config.category_nav_style === 'sidebar'"
+        v-model="category"
+        :style="settings.config.category_nav_style"
+      />
       <div class="flex-1 min-w-0">
         <!-- 搜索框 -->
         <div class="px-4 pt-3">

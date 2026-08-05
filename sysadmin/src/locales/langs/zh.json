@@ -500,6 +500,7 @@
       "priceUnit": "单位:元",
       "coverUploaded": "封面上传成功",
       "coverReplace": "点击替换",
+      "coverPreview": "点击放大预览",
       "coverUpload": "点击上传",
       "coverRemove": "移除",
       "galleryHint": "可上传多张",
@@ -920,6 +921,9 @@
       "disable": "禁用",
       "toggled": "状态已切换",
       "deleteConfirm": "确认删除券码 \"{code}\"?",
+      "batchDelete": "批量删除",
+      "batchDeleteConfirm": "确定删除选中的 {n} 张优惠券吗？已使用的将自动跳过。",
+      "batchDeleteDone": "已删除 {deleted} 张，跳过 {skipped} 张已使用的。",
       "valueRequired": "请输入折扣值"
     },
     "card": {
