@@ -38,10 +38,15 @@ class SupplySyncService
      */
     public function upsertProduct(SupplySource $source, UpstreamProduct $dto, ?array $pricing = null, ?array $categoryMap = null): Product
     {
-        // 含软删除查找:删除过的商品重新导入时恢复原记录(否则新建 slug 撞唯一索引 1062)
+        // 含软删除查找:删除过的商品重新导入时恢复原记录(否则新建 slug 撞唯一索引 1062)。
+        // 匹配条件放宽:同货源下按 上游code 或 生成的slug 匹配 ——
+        // 上游商品 code/name 变化时也能命中原记录,避免走新建导致 slug 冲突。
         $existing = Product::withTrashed()
             ->where('upstream_source_id', $source->id)
-            ->where('upstream_product_code', $dto->code)
+            ->where(function ($q) use ($dto) {
+                $q->where('upstream_product_code', $dto->code)
+                  ->orWhere('slug', Str::slug($dto->name) ?: ('p-' . $dto->code));
+            })
             ->first();
 
         if ($existing) {
@@ -78,10 +83,25 @@ class SupplySyncService
         // 新建:按定价规则算初始 price
         $price = $this->computeInitialPrice($source, $dto->factoryPrice, $dto->price, $pricing);
 
+        // 唯一索引(merchant_id+slug)冲突终极兜底:极少数情况下(如并发/边缘数据)
+        // uniqueSlug 检查后仍撞库,捕获后换随机后缀重试一次,保证导入不中断。
+        try {
+            return $this->createProduct($source, $dto, $price, $pricing, $categoryMap);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if (! str_contains($e->getMessage(), 'Duplicate entry')) {
+                throw $e;
+            }
+        }
+
+        return $this->createProduct($source, $dto, $price, $pricing, $categoryMap, unique: true);
+    }
+
+    private function createProduct(SupplySource $source, UpstreamProduct $dto, ?int $price, ?array $pricing, ?array $categoryMap, bool $unique = false): Product
+    {
         return Product::create([
             'merchant_id' => self::MAIN_MERCHANT_ID,
             'name' => $dto->name,
-            'slug' => $this->uniqueSlug($dto->name, $dto->code),
+            'slug' => $this->uniqueSlug($dto->name, $dto->code, $unique),
             'description' => $dto->description,
             'cover' => $this->normalizeCover($source, $dto->cover),
             'price' => $price ?? 0,
@@ -154,14 +174,15 @@ class SupplySyncService
         return $cat?->id;
     }
 
-    private function uniqueSlug(string $name, string $code): string
+    private function uniqueSlug(string $name, string $code, bool $forceUnique = false): string
     {
         $base = Str::slug($name) ?: ('p-' . $code);
         $slug = $base;
         $i = 1;
-        // 必须含软删除:软删商品仍占用唯一索引(merchant_id+slug),否则重新导入会 1062 冲突
-        while (Product::withTrashed()->where('slug', $slug)->exists()) {
-            $slug = $base . '-' . $i++;
+        // 必须含软删除:软删商品仍占用唯一索引(merchant_id+slug),否则重新导入会 1062 冲突。
+        // forceUnique=true 时额外追加随机后缀,彻底避免边缘冲突。
+        while (Product::withTrashed()->where('slug', $slug)->exists() || ($forceUnique && $i === 1)) {
+            $slug = $base . '-' . ($forceUnique ? $i++ . '-' . Str::random(4) : $i++);
         }
         return $slug;
     }
