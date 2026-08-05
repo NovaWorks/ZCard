@@ -60,7 +60,7 @@ class DujiaoNextDriver implements SupplyDriver
             $data = $this->postRaw($path, '', $this->signedHeaders('POST', $path));
             return [
                 'connected' => $data['ok'] ?? false,
-                'name' => $data['name'] ?? null,
+                'name' => $data['site_name'] ?? null, // 上游返回 site_name
                 'balance' => isset($data['balance']) ? (int) round((float) $data['balance'] * 100) : null,
                 'currency' => $data['currency'] ?? 'CNY',
             ];
@@ -105,9 +105,18 @@ class DujiaoNextDriver implements SupplyDriver
     public function createOrder(array $params): UpstreamOrder
     {
         $path = '/api/v1/upstream/orders';
+
+        // dujiao-next 按 sku_id 下单(不是商品 id)!先拉商品详情取第一个启用 SKU 的 id。
+        // 显式传入的 sku_code 优先,否则用商品第一个 SKU。
+        $skuId = $params['sku_code'] ?? null;
+        if (! $skuId) {
+            $product = $this->getProduct((string) $params['product_code']);
+            $skuId = ! empty($product->skus) ? $product->skus[0]['code'] : null;
+        }
+
         // 签名与发送共用 $bodyStr,保证上游 md5(原始 body) 与本地口径一致
         $bodyStr = $this->encodeBody([
-            'sku_id' => (int) $params['product_code'],
+            'sku_id' => (int) ($skuId ?? $params['product_code']),
             'quantity' => $params['quantity'],
             'downstream_order_no' => $params['downstream_order_no'],
             'callback_url' => $params['callback_url'] ?? null,
@@ -153,7 +162,9 @@ class DujiaoNextDriver implements SupplyDriver
         $creds = $this->credentials();
         $sig = $request->header('Dujiao-Next-Signature');
         $ts = $request->header('Dujiao-Next-Timestamp');
-        $path = $request->getPathInfo();
+        // 上游(dujiao-next)发回调时签名 path 固定为 /api/v1/upstream/callback,
+        // 不是我们接收回调的实际路径,否则签名校验恒失败。
+        $path = '/api/v1/upstream/callback';
         $expected = hash_hmac('sha256', implode("\n", ['POST', $path, $ts, md5($request->getContent())]), $creds['api_secret']);
         if (! hash_equals($expected, $sig)) return null;
         $data = $request->json()->all();
@@ -169,16 +180,37 @@ class DujiaoNextDriver implements SupplyDriver
 
     private function mapProduct(array $p): UpstreamProduct
     {
+        // dujiao-next 库存/价格在 SKU 层,商品级 price_amount 为默认售价。
+        // 填充 skus(取启用的 SKU),stockQuantity 取第一个启用 SKU。
+        $skus = [];
+        foreach (($p['skus'] ?? []) as $s) {
+            if (empty($s['is_active'])) {
+                continue;
+            }
+            $skus[] = [
+                'code' => (string) ($s['id'] ?? ''),          // SKU id,下单用
+                'name' => $s['sku_code'] ?? (string) ($s['id'] ?? ''),
+                'price' => isset($s['price_amount']) ? (int) round((float) $s['price_amount'] * 100) : 0,
+                'stock_quantity' => (int) ($s['stock_quantity'] ?? -1),
+                'is_active' => true,
+            ];
+        }
+
         return new UpstreamProduct(
             code: (string) ($p['id'] ?? ''),
             name: $p['title'] ?? '',
             price: isset($p['price_amount']) ? (int) round((float) $p['price_amount'] * 100) : 0,
-            factoryPrice: isset($p['wholesale_prices'][0]) ? (int) round((float) $p['wholesale_prices'][0] * 100) : (isset($p['price_amount']) ? (int) round((float) $p['price_amount'] * 100) : 0),
+            // wholesale_prices 是批发价阶梯 {min_quantity, unit_price},取第一档 unit_price 作为拿货价
+            factoryPrice: isset($p['wholesale_prices'][0]['unit_price'])
+                ? (int) round((float) $p['wholesale_prices'][0]['unit_price'] * 100)
+                : (isset($p['price_amount']) ? (int) round((float) $p['price_amount'] * 100) : 0),
             categoryCode: isset($p['category_id']) ? (string) $p['category_id'] : null,
             description: $p['description'] ?? null,
             cover: $p['images'][0] ?? null,
             images: $p['images'] ?? [],
             isActive: $p['is_active'] ?? true,
+            skus: $skus,
+            stockQuantity: ! empty($skus) ? $skus[0]['stock_quantity'] : -1,
         );
     }
 }

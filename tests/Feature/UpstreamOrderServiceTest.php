@@ -25,7 +25,11 @@ class UpstreamOrderServiceTest extends TestCase
 
     public function test_write_cards_marks_order_delivered(): void
     {
-        StorefrontConfig::setMany(['supply_enabled' => true]);
+        StorefrontConfig::setMany([
+            'supply_enabled' => true,
+            // 本用例验证「加密存储」路径,显式开启卡密加密(密钥走 phpunit.xml 固定 CARD_ENCRYPTION_KEY)
+            'card_encryption_enabled' => true,
+        ]);
         $merchant = $this->makeMerchant();
         $source = SupplySource::create(['name' => 'S', 'driver' => 'dujiao_next', 'base_url' => 'https://x.com', 'credentials' => [], 'status' => 'active']);
         $product = Product::create(['merchant_id' => $merchant->id, 'name' => 'P', 'slug' => 'p1', 'price' => 500, 'factory_price' => 400, 'stock_type' => 'card', 'status' => 1, 'upstream_source_id' => $source->id, 'upstream_product_code' => 'UP1']);
