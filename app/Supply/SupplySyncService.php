@@ -38,11 +38,18 @@ class SupplySyncService
      */
     public function upsertProduct(SupplySource $source, UpstreamProduct $dto, ?array $pricing = null, ?array $categoryMap = null): Product
     {
-        $existing = Product::where('upstream_source_id', $source->id)
+        // 含软删除查找:删除过的商品重新导入时恢复原记录(否则新建 slug 撞唯一索引 1062)
+        $existing = Product::withTrashed()
+            ->where('upstream_source_id', $source->id)
             ->where('upstream_product_code', $dto->code)
             ->first();
 
         if ($existing) {
+            // 软删除的记录先恢复(回到正常状态,slug 沿用原值)
+            if ($existing->trashed()) {
+                $existing->restore();
+            }
+
             // 已有:更新上游拥有字段,默认不动 price(售价保护)。
             // 例外1:price<=0 是导入定价失败的脏数据,重算。
             // 例外2:勾选导入显式传了 pricing → 按本次所选策略重新定价。
@@ -152,7 +159,8 @@ class SupplySyncService
         $base = Str::slug($name) ?: ('p-' . $code);
         $slug = $base;
         $i = 1;
-        while (Product::where('slug', $slug)->exists()) {
+        // 必须含软删除:软删商品仍占用唯一索引(merchant_id+slug),否则重新导入会 1062 冲突
+        while (Product::withTrashed()->where('slug', $slug)->exists()) {
             $slug = $base . '-' . $i++;
         }
         return $slug;
