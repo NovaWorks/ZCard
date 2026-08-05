@@ -62,6 +62,12 @@
               <ElOption :label="t('zcard.product.stockCode')" value="code" />
             </ElSelect>
           </ElFormItem>
+          <ElFormItem :label="t('zcard.product.stockStatus')">
+            <ElSelect v-model="searchForm.stock_status" :placeholder="t('zcard.product.all')" clearable style="width: 120px">
+              <ElOption :label="t('zcard.product.stockOut')" value="out" />
+              <ElOption :label="t('zcard.product.stockAvailable')" value="available" />
+            </ElSelect>
+          </ElFormItem>
           <ElFormItem>
             <ElButton type="primary" @click="handleSearch">{{ t('zcard.common.search') }}</ElButton>
             <ElButton @click="handleReset">{{ t('zcard.common.reset') }}</ElButton>
@@ -779,6 +785,7 @@
   defineOptions({ name: 'ProductList' })
 
   const { t } = useI18n()
+  const route = useRoute()
 
   /** 金额分 -> 元(两位小数) */
   const formatPrice = (fen: number): string => ((Number(fen) || 0) / 100).toFixed(2)
@@ -816,12 +823,14 @@
     category_id?: number
     is_featured?: number
     stock_type?: string
+    stock_status?: string
   }>({
     keyword: undefined,
     status: undefined,
     category_id: undefined,
     is_featured: undefined,
-    stock_type: undefined
+    stock_type: undefined,
+    stock_status: undefined
   })
 
   /** 分类列表(扁平化后供下拉使用) */
@@ -871,7 +880,8 @@
         status: searchForm.status,
         category_id: searchForm.category_id,
         is_featured: searchForm.is_featured,
-        stock_type: searchForm.stock_type
+        stock_type: searchForm.stock_type,
+        stock_status: searchForm.stock_status
       })
       tableData.value = (res.data || []).map((p) => ({
         ...p,
@@ -900,6 +910,7 @@
     searchForm.category_id = undefined
     searchForm.is_featured = undefined
     searchForm.stock_type = undefined
+    searchForm.stock_status = undefined
     pagination.page = 1
     fetchData()
   }
@@ -1641,6 +1652,10 @@
   void Document
 
   onActivated(() => {
+    // 工作台"缺货商品"跳转携带 ?low_stock=1 → 自动勾选缺货筛选
+    if (route.query.low_stock) {
+      searchForm.stock_status = 'out'
+    }
     loadCategories()
     fetchData()
     fetchStats()

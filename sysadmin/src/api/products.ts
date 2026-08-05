@@ -52,6 +52,7 @@ export interface ProductListParams {
   category_id?: number
   is_featured?: number
   stock_type?: string
+  stock_status?: string
 }
 
 /** 获取商品列表 */

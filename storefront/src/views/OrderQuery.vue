@@ -21,12 +21,18 @@ const expanded = ref<Set<string>>(new Set())
 /** 当前展开的 FAQ 索引,-1 表示全部收起 */
 const faqOpen = ref(-1)
 
-/** 发卡系统客户高频问题 */
+/** 发卡系统客户高频问题:优先读后台配置(可自定义),未配置时回退内置文案 */
 const faqKeys = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6'] as const
-const faqList = computed(() => faqKeys.map(k => ({
-  q: t(`order.query.faq.${k}`),
-  a: t(`order.query.faq.a${k.slice(1)}`),
-})))
+const faqList = computed(() => {
+  const configured = settings.config?.order_query_faqs
+  if (Array.isArray(configured) && configured.length > 0) {
+    return configured.filter((f) => f.q?.trim()).map((f) => ({ q: f.q, a: f.a }))
+  }
+  return faqKeys.map((k) => ({
+    q: t(`order.query.faq.${k}`),
+    a: t(`order.query.faq.a${k.slice(1)}`),
+  }))
+})
 
 const needPassword = computed(() => !!settings.config?.order_query_password)
 const hasSearched = computed(() => searched.value)

@@ -30,6 +30,14 @@ class ProductController extends Controller
         if ($stockType = $request->input('stock_type')) {
             $query->where('stock_type', $stockType);
         }
+        // 库存筛选:out=缺货(无未用卡),available=有货
+        if ($stockStatus = $request->input('stock_status')) {
+            if ($stockStatus === 'out') {
+                $query->whereDoesntHave('cards', fn ($q) => $q->where('status', 'unused'));
+            } elseif ($stockStatus === 'available') {
+                $query->whereHas('cards', fn ($q) => $q->where('status', 'unused'));
+            }
+        }
 
         $products = $query->orderByDesc('id')->paginate($request->input('pageSize', 15));
 

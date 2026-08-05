@@ -27,6 +27,7 @@ export interface StorefrontSettings {
   hot_tag_categories: number[]
   // 交易
   order_query_password: boolean
+  order_query_faqs: { q: string; a: string }[]
   trade_captcha: boolean
   order_close_minutes: number
   contact_type: string

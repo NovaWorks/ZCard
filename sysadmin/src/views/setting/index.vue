@@ -127,6 +127,30 @@
             <ElFormItem :label="t('zcard.setting.orderQueryPassword')">
               <ElSwitch v-model="form.order_query_password" />
             </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.orderQueryFaqs')">
+              <div class="faq-editor">
+                <div v-for="(item, idx) in form.order_query_faqs" :key="idx" class="faq-item">
+                  <div class="faq-item-head">
+                    <span class="faq-index">#{{ idx + 1 }}</span>
+                    <ElButton link type="danger" size="small" @click="removeFaq(idx)">
+                      {{ t('zcard.setting.faqRemove') }}
+                    </ElButton>
+                  </div>
+                  <ElInput v-model="item.q" :placeholder="t('zcard.setting.faqQuestion')" size="small" />
+                  <ElInput
+                    v-model="item.a"
+                    type="textarea"
+                    :rows="2"
+                    :placeholder="t('zcard.setting.faqAnswer')"
+                    size="small"
+                    class="faq-answer"
+                  />
+                </div>
+                <ElButton type="primary" plain size="small" class="faq-add" @click="addFaq">
+                  + {{ t('zcard.setting.faqAdd') }}
+                </ElButton>
+              </div>
+            </ElFormItem>
             <ElFormItem :label="t('zcard.setting.tradeCaptcha')">
               <ElSwitch v-model="form.trade_captcha" />
             </ElFormItem>
@@ -408,6 +432,7 @@
     require_contact: boolean
     contact_type: string
     order_query_password: boolean
+    order_query_faqs: { q: string; a: string }[]
     trade_captcha: boolean
     allow_post_review: boolean
     review_need_audit: boolean
@@ -494,6 +519,7 @@
     require_contact: true,
     contact_type: 'email',
     order_query_password: true,
+    order_query_faqs: [] as { q: string; a: string }[],
     trade_captcha: true,
     allow_post_review: true,
     review_need_audit: true,
@@ -627,6 +653,9 @@
         require_contact: coerceBool(data.require_contact, d.require_contact),
         contact_type: coerce(data.contact_type, d.contact_type),
         order_query_password: coerceBool(data.order_query_password, d.order_query_password),
+        order_query_faqs: Array.isArray(data.order_query_faqs)
+          ? data.order_query_faqs.map((f: any) => ({ q: String(f.q || ''), a: String(f.a || '') }))
+          : [],
         trade_captcha: coerceBool(data.trade_captcha, d.trade_captcha),
         allow_post_review: coerceBool(data.allow_post_review, d.allow_post_review),
         review_need_audit: coerceBool(data.review_need_audit, d.review_need_audit),
@@ -683,6 +712,14 @@
     } finally {
       loading.value = false
     }
+  }
+
+  /** 常见问题(FAQ)编辑器 */
+  const addFaq = () => {
+    form.order_query_faqs.push({ q: '', a: '' })
+  }
+  const removeFaq = (idx: number) => {
+    form.order_query_faqs.splice(idx, 1)
   }
 
   const handleSave = async () => {
@@ -754,6 +791,39 @@
   .setting-form {
     max-width: 640px;
     padding-top: 8px;
+  }
+
+  /* 常见问题(FAQ)编辑器 */
+  .faq-editor {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .faq-item {
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 6px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--el-fill-color-lighter);
+  }
+  .faq-item-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .faq-index {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--el-text-color-secondary);
+  }
+  .faq-answer {
+    width: 100%;
+  }
+  .faq-add {
+    align-self: flex-start;
   }
 
   .form-footer {

@@ -925,7 +925,7 @@
   }
   .field-help {
     font-size: 12px;
-    color: var(--el-text-color-placeholder);
+    color: var(--el-text-color-secondary);
     line-height: 1.5;
     margin-top: 4px;
     display: block;

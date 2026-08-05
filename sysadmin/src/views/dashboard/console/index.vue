@@ -303,7 +303,7 @@ const statCards = computed<StatCard[]>(() => {
 })
 
 // ===== 跳转 =====
-const goProducts = () => router.push('/product/list')
+const goProducts = () => router.push({ path: '/product/list', query: { low_stock: '1' } })
 const goWithdrawals = () => router.push('/withdrawal/list')
 
 // ===== 表格辅助 =====

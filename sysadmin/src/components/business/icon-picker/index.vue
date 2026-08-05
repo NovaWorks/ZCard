@@ -49,7 +49,9 @@ const isImageUrl = (v: string) => /^https?:\/\/|^\/storage\//.test(v)
 <template>
   <ElPopover v-model:visible="visible" placement="bottom-start" :width="320" trigger="click">
     <template #reference>
-      <div class="icon-trigger" @click="visible = true">
+      <!-- 注意:ElPopover trigger="click" 自身管理显隐,这里不能再 @click 手动置 true,
+           否则与 trigger 的切换逻辑冲突(点一下立即关闭,无法选择图标)。 -->
+      <div class="icon-trigger">
         <img v-if="isImageUrl(modelValue)" :src="modelValue" class="icon-preview-img" />
         <span v-else-if="modelValue" class="icon-preview">{{ modelValue }}</span>
         <span v-else class="icon-placeholder">😀</span>
