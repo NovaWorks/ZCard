@@ -18,6 +18,20 @@ const selectedSku = ref<number | null>(null)
 const qty = ref(1)
 const currentImg = ref(0)
 
+/**
+ * 商品描述支持 HTML 渲染(v-html)。做基本 XSS 过滤:
+ * 移除 script/iframe/style 等危险标签与 on* 事件属性。
+ */
+const sanitizedDescription = computed(() => {
+  const html = product.value?.description || ''
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<link[\s\S]*?>/gi, '')
+    .replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+})
+
 // 真实 + 虚拟合并评价(由后端 getProductRating 合并)
 const reviewRating = ref(0)
 const reviewCount = ref(0)
@@ -141,7 +155,12 @@ function buy() {
     <!-- 商品描述 -->
     <div v-if="settings.config?.show_description !== false" class="mt-6 border-t-4 border-surface-subtle pt-4">
       <h2 class="text-sm font-bold mb-3 border-l-2 border-primary pl-2">{{ t('product.detail.detailTitle') }}</h2>
-      <div class="text-xs text-ink-soft leading-relaxed border border-border rounded-card p-4 bg-white whitespace-pre-wrap">{{ product.description || t('product.detail.noDescription') }}</div>
+      <div
+        v-if="sanitizedDescription"
+        class="rich-content border border-border rounded-card p-4 bg-white"
+        v-html="sanitizedDescription"
+      ></div>
+      <div v-else class="text-xs text-ink-soft leading-relaxed border border-border rounded-card p-4 bg-white whitespace-pre-wrap">{{ t('product.detail.noDescription') }}</div>
     </div>
 
     <!-- 用户评价(真实 + 虚拟,若 show_reviews) -->
@@ -161,3 +180,88 @@ function buy() {
   </div>
   <div v-else class="text-center text-ink-muted py-20">{{ t('product.detail.loading') }}</div>
 </template>
+
+<style scoped>
+/* 商品描述富文本排版(description 支持 HTML) */
+.rich-content {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--color-ink, #333);
+  word-break: break-word;
+}
+.rich-content :deep(p) {
+  margin: 0 0 10px;
+}
+.rich-content :deep(p:last-child) {
+  margin-bottom: 0;
+}
+.rich-content :deep(h1),
+.rich-content :deep(h2),
+.rich-content :deep(h3),
+.rich-content :deep(h4) {
+  font-weight: 700;
+  margin: 14px 0 8px;
+  line-height: 1.4;
+}
+.rich-content :deep(h1) { font-size: 1.4em; }
+.rich-content :deep(h2) { font-size: 1.25em; }
+.rich-content :deep(h3) { font-size: 1.1em; }
+.rich-content :deep(h4) { font-size: 1em; }
+.rich-content :deep(ul),
+.rich-content :deep(ol) {
+  padding-left: 20px;
+  margin: 0 0 10px;
+}
+.rich-content :deep(ul) { list-style: disc; }
+.rich-content :deep(ol) { list-style: decimal; }
+.rich-content :deep(li) {
+  margin: 2px 0;
+}
+.rich-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+.rich-content :deep(a) {
+  color: #377dff;
+  text-decoration: underline;
+}
+.rich-content :deep(strong),
+.rich-content :deep(b) {
+  font-weight: 700;
+}
+.rich-content :deep(em),
+.rich-content :deep(i) {
+  font-style: italic;
+}
+.rich-content :deep(code) {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.rich-content :deep(pre) {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 10px 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0 0 10px;
+}
+.rich-content :deep(blockquote) {
+  border-left: 3px solid #ddd;
+  padding-left: 12px;
+  color: #888;
+  margin: 0 0 10px;
+}
+.rich-content :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 10px;
+}
+.rich-content :deep(th),
+.rich-content :deep(td) {
+  border: 1px solid #eee;
+  padding: 6px 10px;
+  text-align: left;
+}
+</style>
