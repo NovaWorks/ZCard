@@ -661,13 +661,40 @@
             </ElFormItem>
 
             <ElFormItem :label="t('zcard.product.virtualReviews')">
-              <ElInput
-                v-model="virtualReviewsText"
-                type="textarea"
-                :rows="6"
-                :placeholder="t('zcard.product.virtualReviewsHint')"
-              />
-              <span class="form-hint">{{ t('zcard.product.virtualReviewsHint') }}</span>
+              <div class="w-full space-y-2">
+                <div
+                  v-for="(r, i) in virtualReviews"
+                  :key="i"
+                  class="border border-border rounded-card p-2 space-y-2"
+                >
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <ElInput
+                      v-model="r.name"
+                      :placeholder="t('zcard.product.virtualReviewName')"
+                      size="small"
+                      style="width: 160px"
+                    />
+                    <ElRate v-model="r.rating" :max="5" size="small" />
+                    <ElButton
+                      type="danger"
+                      link
+                      size="small"
+                      class="ml-auto"
+                      @click="virtualReviews.splice(i, 1)"
+                    >{{ t('zcard.product.virtualReviewDelete') }}</ElButton>
+                  </div>
+                  <ElInput
+                    v-model="r.content"
+                    type="textarea"
+                    :rows="2"
+                    :placeholder="t('zcard.product.virtualReviewContent')"
+                  />
+                </div>
+                <ElButton type="primary" plain size="small" @click="addVirtualReview">
+                  ＋ {{ t('zcard.product.virtualReviewAdd') }}
+                </ElButton>
+                <div class="form-hint">{{ t('zcard.product.virtualReviewsHint') }}</div>
+              </div>
             </ElFormItem>
 
             <ElFormItem :label="t('zcard.product.levelDisable')">
@@ -1086,6 +1113,13 @@
     options: string
   }
 
+  /** 虚拟评论行(表单式编辑,保存时序列化为 {rating,count,list}) */
+  interface VirtualReview {
+    name: string
+    rating: number
+    content: string
+  }
+
   interface ProductForm {
     name: string
     slug: string
@@ -1201,7 +1235,37 @@
     }
     return Object.keys(result).length ? result : undefined
   }
-  const virtualReviewsText = ref('')
+  const virtualReviews = ref<VirtualReview[]>([])
+  /** 添加一条虚拟评论(表单式,非手写 JSON) */
+  const addVirtualReview = () => {
+    virtualReviews.value.push({ name: '', rating: 5, content: '' })
+  }
+  /** 虚拟评价 → 后端存储结构 {rating, count, list} */
+  const serializeVirtualReviews = (): Record<string, unknown> | undefined => {
+    const list = virtualReviews.value
+      .filter((r) => r.name.trim() || r.content.trim())
+      .map((r) => ({ name: r.name.trim() || '匿名用户', rating: Math.max(1, Math.min(5, r.rating)), content: r.content.trim() }))
+    if (!list.length) return undefined
+    const rating = +(list.reduce((s, r) => s + r.rating, 0) / list.length).toFixed(1)
+    return { rating, count: list.length, list }
+  }
+  /** 兼容解析后端返回的虚拟评价({rating,count,list} 或纯数组) */
+  const hydrateVirtualReviews = (raw: unknown) => {
+    virtualReviews.value = []
+    if (Array.isArray(raw)) {
+      virtualReviews.value = raw.map((r: Record<string, unknown>) => ({
+        name: String(r.name ?? ''),
+        rating: Number(r.rating ?? 5),
+        content: String(r.content ?? ''),
+      }))
+    } else if (raw && typeof raw === 'object' && Array.isArray((raw as Record<string, unknown>).list)) {
+      virtualReviews.value = ((raw as Record<string, unknown>).list as Record<string, unknown>[]).map((r) => ({
+        name: String(r.name ?? ''),
+        rating: Number(r.rating ?? 5),
+        content: String(r.content ?? ''),
+      }))
+    }
+  }
   const controlList = ref<ControlRow[]>([])
 
   const formRules = computed<FormRules>(() => ({
@@ -1439,7 +1503,7 @@
     actualStock.value = 0
     Object.assign(formData, createEmptyForm())
     populateMemberLevels(null)
-    virtualReviewsText.value = ''
+    virtualReviews.value = []
     controlList.value = []
     galleryUrls.value = []
     galleryFileList.value = []
@@ -1479,7 +1543,7 @@
     galleryUrls.value = [...imgs]
     galleryFileList.value = imgs.map((url, i) => ({ name: `image-${i}`, url }))
     controlList.value = []
-    virtualReviewsText.value = ''
+    virtualReviews.value = []
     populateMemberLevels(null)
     actualStock.value = row.stock ?? 0
     drawerVisible.value = true
@@ -1518,10 +1582,8 @@
       }
       // 控件回填
       hydrateControls(detail.control_config)
-      // 虚拟评价回填
-      if (detail.virtual_reviews && typeof detail.virtual_reviews === 'object') {
-        virtualReviewsText.value = JSON.stringify(detail.virtual_reviews)
-      }
+      // 虚拟评价回填(兼容 {rating,count,list} 与纯数组)
+      hydrateVirtualReviews(detail.virtual_reviews)
       // 实际库存(详情接口中的 cards count 通常不在 show,以列表 stock 兜底)
       if (typeof detail.stock === 'number') actualStock.value = detail.stock
     } catch {
@@ -1535,7 +1597,7 @@
     formRef.value?.resetFields()
     Object.assign(formData, createEmptyForm())
     populateMemberLevels(null)
-    virtualReviewsText.value = ''
+    virtualReviews.value = []
     controlList.value = []
     galleryUrls.value = []
     galleryFileList.value = []
@@ -1556,23 +1618,8 @@
     // 会员价(从可视化等级表序列化)
     const memberPrice = serializeMemberPrice()
 
-    // 解析虚拟评价 JSON(可选)
-    let virtualReviews: Record<string, unknown> | undefined
-    const vrText = virtualReviewsText.value.trim()
-    if (vrText) {
-      try {
-        const parsed = JSON.parse(vrText)
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          virtualReviews = parsed as Record<string, unknown>
-        } else {
-          ElMessage.error(t('zcard.product.virtualReviewsHint'))
-          return
-        }
-      } catch {
-        ElMessage.error(t('zcard.product.virtualReviewsHint'))
-        return
-      }
-    }
+    // 虚拟评价(表单式列表 → {rating,count,list})
+    const virtualReviewsPayload = serializeVirtualReviews()
 
     const payload: Record<string, unknown> = {
       name: formData.name,
@@ -1605,7 +1652,7 @@
       control_config: serializeControls()
     }
     if (memberPrice) payload.member_price = memberPrice
-    if (virtualReviews) payload.virtual_reviews = virtualReviews
+    if (virtualReviewsPayload) payload.virtual_reviews = virtualReviewsPayload
 
     submitting.value = true
     try {

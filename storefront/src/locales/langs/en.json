@@ -422,7 +422,8 @@
   "category": {
     "all": "All",
     "title": "Categories",
-    "allProducts": "All Products"
+    "allProducts": "All Products",
+    "viewAll": "View All"
   },
   "view": {
     "grid": "Grid",

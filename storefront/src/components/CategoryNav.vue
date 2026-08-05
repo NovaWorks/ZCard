@@ -8,6 +8,8 @@ const emit = defineEmits<{ (e: 'update:modelValue', v: number | null): void }>()
 const { t } = useI18n()
 const cats = ref<Category[]>([])
 const expanded = ref<Set<number>>(new Set())
+// combo 模式当前展开子分类面板的分类(悬停或点击展开)
+const dropdownCat = ref<Category | null>(null)
 
 onMounted(async () => {
   cats.value = await getCategories()
@@ -21,6 +23,13 @@ function toggle(id: number) {
   else expanded.value.add(id)
 }
 function hasChildren(c: Category) { return c.children && c.children.length > 0 }
+/** combo:点击一级分类时选中并切换子分类面板(移动端无 hover,点击也能展开) */
+function onCatClick(c: Category) {
+  select(c.id)
+  dropdownCat.value = dropdownCat.value?.id === c.id ? null : c
+}
+/** combo:桌面悬停直接展开子分类面板 */
+function onCatHover(c: Category) { dropdownCat.value = c }
 </script>
 
 <template>
@@ -100,18 +109,20 @@ function hasChildren(c: Category) { return c.children && c.children.length > 0 }
     </div>
   </aside>
 
-  <!-- combo: 混合模式(顶部横排 + 可展开下拉子分类) -->
+  <!-- combo: 混合模式(顶部横排 + 独立子分类面板)。
+       子分类面板必须挂在无 overflow 的外层容器上,避免被横向滚动容器裁剪导致显示不全 -->
   <div v-else class="bg-white border-b border-border">
-    <div class="max-w-6xl mx-auto px-4">
+    <div class="max-w-6xl mx-auto px-4 relative">
       <div class="flex items-center gap-2 py-3 overflow-x-auto scrollbar-hide">
-        <button @click="select(null)" :class="[
+        <button @click="select(null); dropdownCat = null" :class="[
           'shrink-0 px-4 py-1.5 rounded-pill text-sm font-medium transition-all whitespace-nowrap',
           modelValue === null
             ? 'bg-primary text-white shadow-sm'
             : 'bg-surface-subtle text-ink-soft hover:bg-primary-light hover:text-primary'
         ]">{{ t('category.all') }}</button>
-        <div v-for="c in cats" :key="c.id" class="shrink-0 relative group">
-          <button @click="select(c.id)" :class="[
+        <div v-for="c in cats" :key="c.id" class="shrink-0"
+          @mouseenter="onCatHover(c)">
+          <button @click="onCatClick(c)" :class="[
             'px-4 py-1.5 rounded-pill text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1',
             modelValue === c.id
               ? 'bg-primary text-white shadow-sm'
@@ -120,13 +131,36 @@ function hasChildren(c: Category) { return c.children && c.children.length > 0 }
             <span v-if="c.icon" class="mr-0.5">{{ c.icon }}</span>{{ c.name }}
             <span v-if="hasChildren(c)" class="text-[8px] opacity-60">▼</span>
           </button>
-          <!-- 下拉子分类 -->
-          <div v-if="hasChildren(c)" class="absolute top-full left-0 mt-1 bg-white border border-border rounded-card shadow-pop py-1 min-w-[140px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
-            <button v-for="ch in c.children" :key="ch.id" @click="select(ch.id)" :class="[
-              'w-full text-left px-3 py-1.5 text-xs transition',
-              modelValue === ch.id ? 'text-primary font-semibold bg-primary-light' : 'text-ink-soft hover:bg-primary-light hover:text-primary'
-            ]">{{ ch.name }}</button>
-          </div>
+        </div>
+      </div>
+
+      <!-- 子分类面板:absolute 挂外层(无 overflow),完整展示不被裁剪 -->
+      <div
+        v-if="dropdownCat && hasChildren(dropdownCat)"
+        class="absolute left-4 right-4 top-full z-30 bg-white border border-border rounded-card shadow-pop p-4"
+        @mouseleave="dropdownCat = null"
+      >
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-sm font-bold text-ink flex items-center gap-1">
+            <span v-if="dropdownCat.icon">{{ dropdownCat.icon }}</span>{{ dropdownCat.name }}
+          </span>
+          <button
+            @click="select(dropdownCat.id); dropdownCat = null"
+            class="text-xs text-primary hover:text-primary-hover transition shrink-0 ml-2"
+          >{{ t('category.viewAll') }} →</button>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="ch in dropdownCat.children"
+            :key="ch.id"
+            @click="select(ch.id); dropdownCat = null"
+            :class="[
+              'px-3 py-1.5 rounded-field text-xs border transition',
+              modelValue === ch.id
+                ? 'border-primary bg-primary-light text-primary font-medium'
+                : 'border-border text-ink-soft hover:border-primary/40 hover:text-primary'
+            ]"
+          >{{ ch.name }}</button>
         </div>
       </div>
     </div>

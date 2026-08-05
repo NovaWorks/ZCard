@@ -71,14 +71,6 @@ const mobileMenuOpen = ref(false)
       <nav class="hidden md:flex items-center gap-1 text-sm">
         <RouterLink to="/" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.home') }}</RouterLink>
         <RouterLink to="/orders/query" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.orders') }}</RouterLink>
-        <!-- 货币切换器(仅多种货币时显示) -->
-        <select v-if="prefs.currencies.length > 1" v-model="currencySel" class="px-2 py-1 ml-1 rounded-field border border-border text-xs text-ink-soft bg-white">
-          <option v-for="c in prefs.currencies" :key="c.code" :value="c.code">{{ c.code }}</option>
-        </select>
-        <!-- 语言切换器(仅多种语言时显示;vue-i18n 响应式) -->
-        <select v-if="prefs.languages.length > 1" v-model="langSel" class="px-2 py-1 ml-1 rounded-field border border-border text-xs text-ink-soft bg-white">
-          <option v-for="lang in prefs.languages" :key="lang" :value="lang">{{ languageLabel(lang) }}</option>
-        </select>
         <template v-if="authStore.isLoggedIn">
           <RouterLink to="/orders/mine" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.mine') }}</RouterLink>
           <RouterLink v-if="settings.config?.distribution_enabled" to="/distribution" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.distribution') }}</RouterLink>
@@ -94,6 +86,18 @@ const mobileMenuOpen = ref(false)
           <RouterLink to="/register"
             class="ml-1 px-4 py-1.5 rounded-field bg-primary text-white hover:bg-primary-hover transition shadow-sm">{{ t('nav.register') }}</RouterLink>
         </template>
+        <!-- 右侧尾部:货币 + 语言切换器(加载完成且多于1种时显示,避免首帧空数组闪烁) -->
+        <div
+          v-if="prefs.loaded && (prefs.currencies.length > 1 || prefs.languages.length > 1)"
+          class="flex items-center gap-1 ml-2 pl-2 border-l border-border"
+        >
+          <select v-if="prefs.currencies.length > 1" v-model="currencySel" class="px-2 py-1 rounded-field border border-border text-xs text-ink-soft bg-white cursor-pointer">
+            <option v-for="c in prefs.currencies" :key="c.code" :value="c.code">{{ c.code }}</option>
+          </select>
+          <select v-if="prefs.languages.length > 1" v-model="langSel" class="px-2 py-1 rounded-field border border-border text-xs text-ink-soft bg-white cursor-pointer">
+            <option v-for="lang in prefs.languages" :key="lang" :value="lang">{{ languageLabel(lang) }}</option>
+          </select>
+        </div>
       </nav>
 
       <!-- 移动端汉堡按钮 (md 以下显示) -->
@@ -121,8 +125,8 @@ const mobileMenuOpen = ref(false)
         <RouterLink to="/login" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-primary hover:bg-primary-light transition text-sm">{{ t('nav.login') }}</RouterLink>
         <RouterLink to="/register" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field bg-primary text-white hover:bg-primary-hover transition text-sm text-center">{{ t('nav.register') }}</RouterLink>
       </template>
-      <!-- 货币 + 语言切换(仅多种时显示) -->
-      <div v-if="prefs.currencies.length > 1 || prefs.languages.length > 1" class="flex items-center gap-2 pt-2 border-t border-border">
+      <!-- 货币 + 语言切换(加载完成且多于1种时显示;避免加载前闪烁) -->
+      <div v-if="prefs.loaded && (prefs.currencies.length > 1 || prefs.languages.length > 1)" class="flex items-center gap-2 pt-2 border-t border-border">
         <select v-if="prefs.currencies.length > 1" v-model="currencySel" class="flex-1 px-2 py-1.5 rounded-field border border-border text-xs text-ink-soft bg-white">
           <option v-for="c in prefs.currencies" :key="c.code" :value="c.code">{{ c.code }}</option>
         </select>

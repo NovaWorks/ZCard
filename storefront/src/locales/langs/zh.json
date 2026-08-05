@@ -422,7 +422,8 @@
   "category": {
     "all": "全部",
     "title": "商品分类",
-    "allProducts": "全部商品"
+    "allProducts": "全部商品",
+    "viewAll": "查看全部"
   },
   "view": {
     "grid": "网格",

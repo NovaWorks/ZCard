@@ -15,11 +15,11 @@ export interface MySupplyAccount {
 }
 
 /** 获取/创建当前用户的供货账号 */
-export const getMySupplyAccount = () => request.get<MySupplyAccount>('/supplier-account/me')
+export const getMySupplyAccount = () => request.get<MySupplyAccount, MySupplyAccount>('/supplier-account/me')
 
 /** 查看 api_secret 明文 */
-export const getMySupplySecret = () => request.get<{ api_secret: string }>('/supplier-account/secret')
+export const getMySupplySecret = () => request.get<{ api_secret: string }, { api_secret: string }>('/supplier-account/secret')
 
 /** 重置 api_secret */
 export const regenerateMySupplySecret = () =>
-  request.post<{ api_secret: string; warning: string }>('/supplier-account/regenerate')
+  request.post<{ api_secret: string; warning: string }, { api_secret: string; warning: string }>('/supplier-account/regenerate')

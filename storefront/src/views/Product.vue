@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getProduct, type Product } from '@/api/products'
@@ -17,6 +17,20 @@ const err = ref('')
 const selectedSku = ref<number | null>(null)
 const qty = ref(1)
 const currentImg = ref(0)
+/** 图片放大预览(lightbox) */
+const lightboxOpen = ref(false)
+function openLightbox() { lightboxOpen.value = true; document.body.style.overflow = 'hidden' }
+function closeLightbox() { lightboxOpen.value = false; document.body.style.overflow = '' }
+function prevImg() { currentImg.value = (currentImg.value - 1 + galleryImages.value.length) % galleryImages.value.length }
+function nextImg() { currentImg.value = (currentImg.value + 1) % galleryImages.value.length }
+onMounted(() => { window.addEventListener('keydown', onKeydown) })
+onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown); document.body.style.overflow = '' })
+function onKeydown(e: KeyboardEvent) {
+  if (!lightboxOpen.value) return
+  if (e.key === 'Escape') closeLightbox()
+  else if (e.key === 'ArrowLeft') prevImg()
+  else if (e.key === 'ArrowRight') nextImg()
+}
 
 /** 详情图:优先 images,为空时用封面兜底(上游导入的商品可能只有 cover) */
 const galleryImages = computed(() => {
@@ -66,7 +80,7 @@ const price = computed(() => {
 })
 /** 展示币种最小单位(优先用 _display 字段,缺失则回退基础金额) */
 const priceDisplay = computed(() => {
-  if (!product.value) return product.value?.price ?? 0
+  if (!product.value) return 0
   const sku = product.value.skus?.find(s => s.id === selectedSku.value)
   if (sku) return sku.price_display ?? sku.price
   return product.value.price_display ?? product.value.price
@@ -85,7 +99,7 @@ function buy() {
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <!-- 左:配图 -->
       <div>
-        <div class="aspect-square rounded-card border border-border bg-gradient-to-br from-primary-soft to-primary-light flex items-center justify-center overflow-hidden">
+        <div @click="openLightbox" class="aspect-square rounded-card border border-border bg-gradient-to-br from-primary-soft to-primary-light flex items-center justify-center overflow-hidden cursor-zoom-in">
           <img v-if="galleryImages[currentImg]" :src="galleryImages[currentImg]" class="w-full h-full object-cover" />
           <span v-else class="text-primary/40">{{ t('common.noImage') }}</span>
         </div>
@@ -96,6 +110,24 @@ function buy() {
           </div>
         </div>
       </div>
+
+      <!-- 图片放大预览(全屏遮罩,点击/ESC/左右键关闭切换) -->
+      <Teleport to="body">
+        <div v-if="lightboxOpen && galleryImages[currentImg]" class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center" @click.self="closeLightbox">
+          <button @click="closeLightbox" class="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white text-xl hover:bg-white/25 transition flex items-center justify-center z-10" aria-label="关闭">✕</button>
+          <button
+            v-if="galleryImages.length > 1"
+            @click="prevImg"
+            class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 text-white text-xl hover:bg-white/25 transition flex items-center justify-center z-10"
+            aria-label="上一张">‹</button>
+          <img :src="galleryImages[currentImg]" class="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl" @click="closeLightbox" />
+          <button
+            v-if="galleryImages.length > 1"
+            @click="nextImg"
+            class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 text-white text-xl hover:bg-white/25 transition flex items-center justify-center z-10"
+            aria-label="下一张">›</button>
+        </div>
+      </Teleport>
 
       <!-- 右:购买区 -->
       <div>
@@ -110,12 +142,12 @@ function buy() {
           </div>
         </div>
 
-        <!-- 评分汇总 -->
+        <!-- 评分汇总(销量/库存受后台开关控制) -->
         <div class="flex border-t border-b border-border py-3 my-3 text-center text-xs text-ink-muted">
           <div class="flex-1 border-r border-border"><span class="block text-sm font-bold text-ink">{{ reviewRating || '—' }}</span>{{ t('product.detail.ratingLabel') }}</div>
-          <div class="flex-1 border-r border-border"><span class="block text-sm font-bold text-ink">{{ reviewCount || 0 }}</span>{{ t('product.detail.reviewLabel') }}</div>
-          <div class="flex-1 border-r border-border"><span class="block text-sm font-bold text-price">{{ product.sales }}</span>{{ t('common.sold') }}</div>
-          <div class="flex-1"><span class="block text-sm font-bold text-ink">{{ product.stock }}</span>{{ t('common.stock') }}</div>
+          <div v-if="settings.config?.show_reviews" class="flex-1 border-r border-border"><span class="block text-sm font-bold text-ink">{{ reviewCount || 0 }}</span>{{ t('product.detail.reviewLabel') }}</div>
+          <div v-if="settings.config?.show_sales" class="flex-1 border-r border-border"><span class="block text-sm font-bold text-price">{{ product.sales }}</span>{{ t('common.sold') }}</div>
+          <div v-if="settings.config?.show_stock" class="flex-1"><span class="block text-sm font-bold text-ink">{{ product.stock }}</span>{{ t('common.stock') }}</div>
         </div>
 
         <!-- 服务保障 -->

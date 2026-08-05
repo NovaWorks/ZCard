@@ -46,7 +46,7 @@ export const usePreferencesStore = defineStore('preferences', {
             const dl = cfg.default_language || 'zh'
             this.language = dl
             localStorage.setItem('zcard_language', dl)
-            i18n.global.locale.value = dl
+            i18n.global.locale.value = dl as 'zh' | 'en'
           }
         }
       } catch {
@@ -61,7 +61,7 @@ export const usePreferencesStore = defineStore('preferences', {
     setLanguage(lang: string) {
       this.language = lang
       localStorage.setItem('zcard_language', lang)
-      i18n.global.locale.value = lang
+      i18n.global.locale.value = lang as 'zh' | 'en'
     },
   },
 })
