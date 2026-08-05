@@ -1,7 +1,7 @@
 <!-- 货源管理 - 对接上游供货系统(dujiao-next / acg-faka / ZCard) -->
 <template>
   <div class="supply-page art-full-height">
-    <ElCard class="art-table-card" shadow="never">
+    <ElCard ref="cardRef" class="art-table-card" shadow="never">
       <div class="toolbar">
         <div class="toolbar-left">
           <ElSelect v-model="filterStatus" :placeholder="t('zcard.supply.filterStatus')" clearable style="width: 160px" @change="fetchData">
@@ -15,7 +15,7 @@
         </div>
       </div>
 
-      <ElTable v-loading="loading" :data="tableData" row-key="id" border stripe>
+      <ElTable ref="tableRef" v-loading="loading" :data="tableData" :height="tableHeight" row-key="id" border stripe>
         <ElTableColumn :label="t('zcard.common.id')" prop="id" width="60" />
         <ElTableColumn :label="t('zcard.supply.name')" prop="name" min-width="120" show-overflow-tooltip />
         <ElTableColumn :label="t('zcard.supply.platform')" width="160">
@@ -60,7 +60,7 @@
         </ElTableColumn>
       </ElTable>
 
-      <div class="pagination-wrap">
+      <div ref="paginationRef" class="pagination-wrap">
         <ElPagination
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.pageSize"
@@ -239,6 +239,7 @@
   import { Plus } from '@element-plus/icons-vue'
   import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
   import { useI18n } from 'vue-i18n'
+  import { useListTableHeight } from '@/hooks'
   import {
     getSupplyDrivers,
     getSupplySources,
@@ -263,6 +264,8 @@
   const tableData = ref<SupplySource[]>([])
   const filterStatus = ref('')
   const pagination = reactive({ page: 1, pageSize: 15, total: 0 })
+  // 表格高度自适应:数据满页时表格内容撑高会被卡片裁掉分页栏,固定表格高度使其内部滚动
+  const { cardRef, tableRef, paginationRef, tableHeight } = useListTableHeight()
   /** 列表里有 last_error 的行(展示告警) */
   const errorRows = computed(() => tableData.value.filter((r) => r.last_error))
 

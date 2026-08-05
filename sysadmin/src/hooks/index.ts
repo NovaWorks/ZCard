@@ -30,3 +30,6 @@ export { useChart, useChartComponent, useChartOps } from './core/useChart'
 
 // 布局高度
 export { useLayoutHeight, useAutoLayoutHeight } from './core/useLayoutHeight'
+
+// 列表页表格高度自适应(原生 ElTable + art-table-card)
+export { useListTableHeight } from './core/useListTableHeight'

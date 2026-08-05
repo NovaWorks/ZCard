@@ -21,7 +21,7 @@
       </div>
     </div>
 
-    <ElCard class="art-table-card" shadow="never">
+    <ElCard ref="cardRef" class="art-table-card" shadow="never">
       <ElTabs v-model="activeTab" class="page-tabs">
         <ElTabPane :label="t('zcard.card.list')" name="cards">
           <!-- 搜索栏 -->
@@ -141,8 +141,10 @@
 
           <!-- 表格 -->
           <ElTable
+            ref="tableRef"
             v-loading="loading"
             :data="tableData"
+            :height="tableHeight"
             border
             stripe
             style="width: 100%"
@@ -250,7 +252,7 @@
           </ElTable>
 
           <!-- 分页 -->
-          <div class="pagination-bar">
+          <div ref="paginationRef" class="pagination-bar">
             <ElPagination
               v-model:current-page="pagination.page"
               v-model:page-size="pagination.pageSize"
@@ -472,6 +474,7 @@
   import { ElMessage, ElMessageBox } from 'element-plus'
   import { Lock, Unlock, Delete, Upload } from '@element-plus/icons-vue'
   import { useI18n } from 'vue-i18n'
+  import { useListTableHeight } from '@/hooks'
   import {
     getCards,
     getCardStats,
@@ -614,6 +617,8 @@
   const loading = ref(false)
   const tableData = ref<Card[]>([])
   const pagination = reactive({ page: 1, pageSize: 15, total: 0 })
+  // 表格高度自适应:数据满页时表格内容撑高会被卡片裁掉分页栏,固定表格高度使其内部滚动
+  const { cardRef, tableRef, paginationRef, tableHeight } = useListTableHeight()
 
   const searchForm = reactive<{
     product_id?: number

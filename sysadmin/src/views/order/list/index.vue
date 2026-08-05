@@ -12,7 +12,7 @@
       </div>
     </div>
 
-    <ElCard class="art-table-card" shadow="never">
+    <ElCard ref="cardRef" class="art-table-card" shadow="never">
       <!-- 工具栏 -->
       <div class="toolbar">
         <div class="toolbar-left">
@@ -86,7 +86,7 @@
       </ElCollapseTransition>
 
       <!-- 表格 -->
-      <ElTable :data="orders" v-loading="loading" border stripe class="order-table">
+      <ElTable ref="tableRef" :data="orders" v-loading="loading" :height="tableHeight" border stripe class="order-table">
         <ElTableColumn :label="t('zcard.order.orderNo')" min-width="190">
           <template #default="{ row }">
             <div class="order-no-cell">
@@ -156,7 +156,7 @@
       </ElTable>
 
       <!-- 分页 -->
-      <div class="pagination-wrap">
+      <div ref="paginationRef" class="pagination-wrap">
         <ElPagination
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.pageSize"
@@ -210,6 +210,7 @@
   import { CopyDocument } from '@element-plus/icons-vue'
   import { ElMessage, ElMessageBox } from 'element-plus'
   import { useI18n } from 'vue-i18n'
+  import { useListTableHeight } from '@/hooks'
   import {
     getOrders,
     getOrder,
@@ -234,6 +235,8 @@
   const channels = ref<PaymentChannel[]>([])
 
   const pagination = reactive({ page: 1, pageSize: 15, total: 0 })
+  // 表格高度自适应:数据满页时表格内容撑高会被卡片裁掉分页栏,固定表格高度使其内部滚动
+  const { cardRef, tableRef, paginationRef, tableHeight } = useListTableHeight()
   const searchForm = reactive({
     keyword: '',
     status: '' as OrderStatus | '',

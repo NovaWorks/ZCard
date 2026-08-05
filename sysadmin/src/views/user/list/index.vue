@@ -18,7 +18,7 @@
       </ElCol>
     </ElRow>
 
-    <ElCard class="art-table-card" shadow="never">
+    <ElCard ref="cardRef" class="art-table-card" shadow="never">
       <!-- 搜索栏：自动触发搜索 -->
       <div class="search-bar">
         <ElForm :inline="true" :model="searchForm" @submit.prevent>
@@ -73,8 +73,10 @@
 
       <!-- 表格 -->
       <ElTable
+        ref="tableRef"
         v-loading="loading"
         :data="tableData"
+        :height="tableHeight"
         border
         stripe
         style="width: 100%"
@@ -139,7 +141,7 @@
       </ElTable>
 
       <!-- 分页 -->
-      <div class="pagination-bar">
+      <div ref="paginationRef" class="pagination-bar">
         <ElPagination
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.pageSize"
@@ -227,6 +229,7 @@
   import { User as UserIcon, CircleCheck, CircleClose, TrendCharts } from '@element-plus/icons-vue'
   import { useDebounceFn } from '@vueuse/core'
   import { useI18n } from 'vue-i18n'
+  import { useListTableHeight } from '@/hooks'
   import {
     getUsers,
     getUserStats,
@@ -262,6 +265,8 @@
     pageSize: 15,
     total: 0
   })
+  // 表格高度自适应:数据满页时表格内容撑高会被卡片裁掉分页栏,固定表格高度使其内部滚动
+  const { cardRef, tableRef, paginationRef, tableHeight } = useListTableHeight()
 
   /** 会员等级下拉 */
   const groupOptions = ref<UserGroup[]>([])

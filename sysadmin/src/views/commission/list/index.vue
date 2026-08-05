@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useListTableHeight } from '@/hooks'
 import {
   getCommissions,
   getCommissionStats,
@@ -18,6 +19,8 @@ const tierFilter = ref<number | ''>('')
 const statusFilter = ref<string>('')
 
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
+// 表格高度自适应:数据满页时表格内容撑高会被卡片裁掉分页栏,固定表格高度使其内部滚动
+const { cardRef, tableRef, paginationRef, tableHeight } = useListTableHeight()
 const stats = ref<CommissionStats>({
   total_amount: 0,
   total_count: 0,
@@ -100,7 +103,7 @@ onMounted(fetchData)
       </div>
     </div>
 
-    <ElCard class="art-table-card" shadow="never">
+    <ElCard ref="cardRef" class="art-table-card" shadow="never">
       <!-- 工具栏 -->
       <div class="toolbar">
         <div class="toolbar-left">
@@ -130,7 +133,7 @@ onMounted(fetchData)
       </div>
 
       <!-- 表格 -->
-      <ElTable :data="list" v-loading="loading" border stripe>
+      <ElTable ref="tableRef" :data="list" v-loading="loading" :height="tableHeight" border stripe>
         <ElTableColumn label="ID" width="70" align="center">
           <template #default="{ row }">{{ row.id }}</template>
         </ElTableColumn>
@@ -167,7 +170,7 @@ onMounted(fetchData)
         </ElTableColumn>
       </ElTable>
 
-      <div class="pagination-wrap">
+      <div ref="paginationRef" class="pagination-wrap">
         <ElPagination
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.pageSize"

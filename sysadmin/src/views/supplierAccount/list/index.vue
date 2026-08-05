@@ -1,7 +1,7 @@
 <!-- 供货账号管理 - 对外供货:为下游生成对接 key、充值预存、查账本 -->
 <template>
   <div class="supplier-account-page art-full-height">
-    <ElCard class="art-table-card" shadow="never">
+    <ElCard ref="cardRef" class="art-table-card" shadow="never">
       <div class="toolbar">
         <div class="toolbar-left">
           <ElSelect v-model="filterStatus" :placeholder="t('zcard.supplierAccount.filterStatus')" clearable style="width: 160px" @change="fetchData">
@@ -15,7 +15,7 @@
         </div>
       </div>
 
-      <ElTable v-loading="loading" :data="tableData" row-key="id" border stripe>
+      <ElTable ref="tableRef" v-loading="loading" :data="tableData" :height="tableHeight" row-key="id" border stripe>
         <ElTableColumn :label="t('zcard.common.id')" prop="id" width="60" />
         <ElTableColumn :label="t('zcard.supplierAccount.name')" prop="name" min-width="120" show-overflow-tooltip />
         <ElTableColumn :label="t('zcard.supplierAccount.apiKey')" prop="api_key" min-width="200" show-overflow-tooltip />
@@ -45,7 +45,7 @@
         </ElTableColumn>
       </ElTable>
 
-      <div class="pagination-wrap">
+      <div ref="paginationRef" class="pagination-wrap">
         <ElPagination
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.pageSize"
@@ -165,6 +165,7 @@
   import { Plus } from '@element-plus/icons-vue'
   import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
   import { useI18n } from 'vue-i18n'
+import { useListTableHeight } from '@/hooks'
   import {
     getSupplierAccounts,
     createSupplierAccount,
@@ -187,6 +188,8 @@
   const tableData = ref<SupplierAccount[]>([])
   const filterStatus = ref('')
   const pagination = reactive({ page: 1, pageSize: 15, total: 0 })
+  // 表格高度自适应:数据满页时表格内容撑高会被卡片裁掉分页栏,固定表格高度使其内部滚动
+  const { cardRef, tableRef, paginationRef, tableHeight } = useListTableHeight()
   /** 余额低于此值(分)飘红 */
   const lowThreshold = 1000
 

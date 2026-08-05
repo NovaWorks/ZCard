@@ -2,6 +2,7 @@
 import { ref, computed, onActivated } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
+import { useListTableHeight } from '@/hooks'
 import {
   getWithdrawals, getWithdrawalStats, approveWithdrawal, rejectWithdrawal,
   type Withdrawal, type WithdrawalStats,
@@ -17,6 +18,8 @@ const statusFilter = ref('')
 const methodFilter = ref('')
 const dateRange = ref<[string, string] | null>(null)
 const pagination = reactive({ page: 1, pageSize: 15, total: 0 })
+// 表格高度自适应:数据满页时表格内容撑高会被卡片裁掉分页栏,固定表格高度使其内部滚动
+const { cardRef, tableRef, paginationRef, tableHeight } = useListTableHeight()
 const stats = ref<WithdrawalStats>({ pending_count: 0, approved_count: 0, rejected_count: 0, pending_amount: 0, approved_amount: 0, total_count: 0 })
 
 const statCards = computed(() => [
@@ -94,7 +97,7 @@ onActivated(fetchData)
       </div>
     </div>
 
-    <ElCard class="art-table-card" shadow="never">
+    <ElCard ref="cardRef" class="art-table-card" shadow="never">
       <div class="toolbar">
         <div class="toolbar-left">
           <ElInput v-model="keyword" :placeholder="t('zcard.withdrawal.searchPlaceholder')" clearable style="width: 200px" @keyup.enter="handleSearch" @clear="resetSearch" />
@@ -116,7 +119,7 @@ onActivated(fetchData)
         </div>
       </div>
 
-      <ElTable :data="list" v-loading="loading" border stripe>
+      <ElTable ref="tableRef" :data="list" v-loading="loading" :height="tableHeight" border stripe>
         <ElTableColumn :label="t('zcard.withdrawal.user')" min-width="120">
           <template #default="{ row }">{{ row.user?.username || `#${row.user_id}` }}</template>
         </ElTableColumn>
@@ -156,7 +159,7 @@ onActivated(fetchData)
         </ElTableColumn>
       </ElTable>
 
-      <div class="pagination-wrap">
+      <div ref="paginationRef" class="pagination-wrap">
         <ElPagination v-model:current-page="pagination.page" v-model:page-size="pagination.pageSize"
           :total="pagination.total" :page-sizes="[15, 30, 50, 100]"
           layout="total, sizes, prev, pager, next" @size-change="fetchData" @current-change="fetchData" />
