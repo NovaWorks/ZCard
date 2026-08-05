@@ -24,18 +24,24 @@ class CurrencyService
     /** 启用货币集合(带缓存)。 */
     public function getEnabledCurrencies(): Collection
     {
-        return Cache::remember(self::CACHE_KEY, self::CACHE_TTL, function () {
+        // 注意:缓存「纯数组」而非 Eloquent 对象。database cache 存的是 PHP serialize
+        // 的二进制(Eloquent 对象含 \0 字节),MySQL 存取会破坏数据,反序列化成
+        // __PHP_Incomplete_Class → TypeError。数组序列化是纯 ASCII,任何 driver 都安全。
+        return collect(Cache::remember(self::CACHE_KEY, self::CACHE_TTL, function () {
             // 基础货币始终包含(即使误关)
             return Currency::where('is_enabled', true)
                 ->orWhere('is_base', true)
                 ->orderBy('sort')
-                ->get();
-        });
+                ->get()
+                ->toArray();
+        }));
     }
 
     public function getCurrency(string $code): ?Currency
     {
-        return $this->getEnabledCurrencies()->firstWhere('code', strtoupper($code));
+        $item = $this->getEnabledCurrencies()->firstWhere('code', strtoupper($code));
+        // 缓存里是数组,用 hydrate 构造模型(无 DB 查询,casts 生效)
+        return $item ? Currency::hydrate([$item])->first() : null;
     }
 
     /**

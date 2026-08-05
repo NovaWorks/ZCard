@@ -25,14 +25,17 @@ class ResolveSubsite
         $merchant = null;
 
         if ($host) {
+            // 缓存 merchant_id 标量而非 Eloquent 对象:database cache 存 PHP serialize
+            // 的二进制(Eloquent 对象含 \0 字节)会被 MySQL 存坏成 __PHP_Incomplete_Class。
             $cached = Cache::remember("subsite:domain:{$host}", 300, function () use ($host) {
                 $domain = SubsiteDomain::where('domain', $host)
                     ->where('status', 'active')
                     ->where('verification_status', 'verified')
                     ->first();
-                return $domain ? Merchant::find($domain->merchant_id) : false;
+
+                return $domain ? (int) $domain->merchant_id : false;
             });
-            $merchant = ($cached instanceof Merchant) ? $cached : null;
+            $merchant = $cached ? Merchant::find($cached) : null;
         }
 
         $request->attributes->set('subsite', $merchant);

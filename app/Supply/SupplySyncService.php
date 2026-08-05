@@ -33,8 +33,10 @@ class SupplySyncService
             ->first();
 
         if ($existing) {
-            // 已有:更新上游拥有字段,不动 price(售价保护)
-            $existing->update([
+            // 已有:更新上游拥有字段,不动 price(售价保护)。
+            // 例外:price<=0 是导入定价失败的脏数据(上游 factory_price 为 0 时),
+            // 下次同步用上游售价重算,否则售价永远停留在 0。
+            $update = [
                 'name' => $dto->name,
                 'description' => $dto->description,
                 'cover' => $dto->cover,
@@ -43,12 +45,16 @@ class SupplySyncService
                 'category_id' => $this->resolveCategoryId($source, $dto->categoryCode),
                 'upstream_synced_at' => now(),
                 'hide' => ! $dto->isActive ? true : $existing->hide, // 上游下架→标隐藏,不删
-            ]);
+            ];
+            if ((int) $existing->price <= 0) {
+                $update['price'] = $this->computeInitialPrice($source, $dto->factoryPrice, $dto->price) ?? 0;
+            }
+            $existing->update($update);
             return $existing->fresh();
         }
 
         // 新建:按定价规则算初始 price
-        $price = $this->computeInitialPrice($source, $dto->factoryPrice);
+        $price = $this->computeInitialPrice($source, $dto->factoryPrice, $dto->price);
 
         return Product::create([
             'merchant_id' => self::MAIN_MERCHANT_ID,
@@ -71,17 +77,20 @@ class SupplySyncService
 
     /**
      * 按定价规则算初始售价(spec §5.1,仅首次同步 price 为空时)。
+     * 基础价优先取上游成本价 factoryPrice;上游未设成本(0)时回退到上游售价 price,
+     * 否则(如 acg-faka)下游会把 0 成本加成后仍卖出 0 元。
      * 返回 null 表示待审(pending 模式)。
      */
-    private function computeInitialPrice(SupplySource $source, int $factoryPrice): ?int
+    private function computeInitialPrice(SupplySource $source, int $factoryPrice, int $upstreamPrice): ?int
     {
+        $base = $factoryPrice > 0 ? $factoryPrice : $upstreamPrice;
         $mode = $source->settings['default_pricing_mode'] ?? 'percent';
         return match ($mode) {
-            'fixed' => $factoryPrice + (int) ($source->settings['default_markup_amount'] ?? 0),
-            'percent' => (int) round($factoryPrice * (1 + (int) ($source->settings['default_markup_percent'] ?? 10) / 100)),
-            'equal' => $factoryPrice,
+            'fixed' => $base + (int) ($source->settings['default_markup_amount'] ?? 0),
+            'percent' => (int) round($base * (1 + (int) ($source->settings['default_markup_percent'] ?? 10) / 100)),
+            'equal' => $base,
             'pending' => null,
-            default => (int) round($factoryPrice * 1.1),
+            default => (int) round($base * 1.1),
         };
     }
 
