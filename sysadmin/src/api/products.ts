@@ -87,10 +87,14 @@ export interface ProductStats {
 export const getProductStats = () => request.get<ProductStats>({ url: '/admin/products/stats' })
 
 /** 批量操作商品 */
-export const batchAction = (ids: number[], action: 'activate' | 'deactivate' | 'delete') =>
+export const batchAction = (
+  ids: number[],
+  action: 'activate' | 'deactivate' | 'delete' | 'set_category',
+  extra?: { category_id?: number }
+) =>
   request.post<{ message: string; affected: number }>({
     url: '/admin/products/batch',
-    data: { ids, action }
+    data: { ids, action, ...extra }
   })
 
 /** 会员等级(user_groups)实体(用于会员价编辑器下拉) */

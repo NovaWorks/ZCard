@@ -90,6 +90,14 @@
             {{ t('zcard.product.batchDeactivate') }}
           </ElButton>
           <ElButton
+            type="primary"
+            :disabled="selectedIds.length === 0"
+            :loading="batchLoading"
+            @click="openSetCategory"
+          >
+            {{ t('zcard.product.setCategory') }}
+          </ElButton>
+          <ElButton
             type="danger"
             :disabled="selectedIds.length === 0"
             :loading="batchLoading"
@@ -209,6 +217,39 @@
         />
       </div>
     </ElCard>
+
+    <!-- 批量设置分类弹窗(单选树形分类) -->
+    <ElDialog
+      v-model="setCategoryVisible"
+      :title="t('zcard.product.setCategoryTitle')"
+      width="420px"
+      destroy-on-close
+    >
+      <ElForm label-width="90px" @submit.prevent>
+        <ElFormItem :label="t('zcard.category.title')">
+          <ElTreeSelect
+            v-model="setCategoryId"
+            :data="categoryTreeData"
+            :placeholder="t('zcard.product.setCategoryPlaceholder')"
+            :props="{ label: 'name', value: 'id', children: 'children' }"
+            node-key="id"
+            check-strictly
+            style="width: 100%"
+          />
+        </ElFormItem>
+      </ElForm>
+      <template #footer>
+        <ElButton @click="setCategoryVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
+        <ElButton
+          type="primary"
+          :loading="batchLoading"
+          :disabled="setCategoryId === null || selectedIds.length === 0"
+          @click="handleSetCategory"
+        >
+          {{ t('zcard.common.ok') }}
+        </ElButton>
+      </template>
+    </ElDialog>
 
     <!-- 新增/编辑抽屉 -->
     <ElDrawer
@@ -941,6 +982,36 @@
       .catch(() => {
         // 用户取消
       })
+  }
+
+  /** 批量设置分类:单选树形分类,确认后变更选中商品的 category_id */
+  const setCategoryVisible = ref(false)
+  const setCategoryId = ref<number | null>(null)
+
+  const openSetCategory = () => {
+    if (!selectedIds.value.length) {
+      ElMessage.warning(t('zcard.product.selectFirst'))
+      return
+    }
+    setCategoryId.value = null
+    setCategoryVisible.value = true
+  }
+
+  const handleSetCategory = async () => {
+    if (setCategoryId.value === null || !selectedIds.value.length) return
+    batchLoading.value = true
+    try {
+      await batchAction([...selectedIds.value], 'set_category', { category_id: setCategoryId.value })
+      ElMessage.success(t('zcard.product.batchSuccess'))
+      selectedIds.value = []
+      setCategoryVisible.value = false
+      fetchData()
+      fetchStats()
+    } catch {
+      // 错误消息由 http 拦截器统一提示
+    } finally {
+      batchLoading.value = false
+    }
   }
 
   /** 行内状态切换 */

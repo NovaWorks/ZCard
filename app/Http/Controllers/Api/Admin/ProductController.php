@@ -165,7 +165,8 @@ class ProductController extends Controller
         $data = $request->validate([
             'ids' => 'required|array',
             'ids.*' => 'integer',
-            'action' => 'required|in:activate,deactivate,delete',
+            'action' => 'required|in:activate,deactivate,delete,set_category',
+            'category_id' => 'required_if:action,set_category|integer',
         ]);
 
         $ids = $data['ids'];
@@ -183,6 +184,10 @@ class ProductController extends Controller
             case 'delete':
                 Product::whereIn('id', $ids)->delete();
                 $msg = '删除成功';
+                break;
+            case 'set_category':
+                Product::whereIn('id', $ids)->update(['category_id' => $data['category_id']]);
+                $msg = '分类设置成功';
                 break;
         }
 
