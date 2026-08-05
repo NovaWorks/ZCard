@@ -48,6 +48,11 @@
         </div>
       </main>
     </template>
+
+    <!-- 全局组件(设置面板/水印等,各布局共用) -->
+    <div id="app-global">
+      <ArtGlobalComponent />
+    </div>
   </div>
 </template>
 
