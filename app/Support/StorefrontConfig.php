@@ -54,7 +54,9 @@ class StorefrontConfig
             'username_min_length' => 3,
             'forget_type' => 'email',
 
-            // 卡密加密密钥(后台可配置,存 Crypt 密文;变更会导致已加密卡密无法解密)
+            // 卡密加密(默认关闭:明文存储,正常导入;开启需填密钥,加密存储)
+            'card_encryption_enabled' => false,
+            // 卡密加密密钥(存 Crypt 密文;开启时必填;变更会导致已加密卡密无法解密)
             'card_encryption_key' => '',
 
             // 系统运维

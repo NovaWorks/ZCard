@@ -190,14 +190,29 @@
                 <ElOption label="手机找回" value="sms" />
               </ElSelect>
             </ElFormItem>
-            <ElFormItem :label="t('zcard.setting.cardEncryptionKey')">
-              <ElInput
-                v-model="cardEncryptionKey"
-                type="password"
-                show-password
-                :placeholder="t('zcard.setting.cardEncryptionKeyPlaceholder')"
-                style="width: 320px"
-              />
+            <ElFormItem :label="t('zcard.setting.cardEncryption')">
+              <div class="encrypt-control">
+                <ElSwitch v-model="form.card_encryption_enabled" @change="onEncryptionToggle" />
+                <span v-if="form.card_encryption_enabled" class="encrypt-hint">
+                  {{ t('zcard.setting.cardEncryptionOnTip') }}
+                </span>
+                <span v-else class="encrypt-hint">{{ t('zcard.setting.cardEncryptionOffTip') }}</span>
+              </div>
+              <div v-if="encryptionRiskCards > 0" class="encrypt-risk">
+                ⚠️ {{ t('zcard.setting.cardEncryptionRisk', { n: encryptionRiskCards }) }}
+              </div>
+            </ElFormItem>
+            <ElFormItem v-if="form.card_encryption_enabled" :label="t('zcard.setting.cardEncryptionKey')">
+              <div class="encrypt-control">
+                <ElInput
+                  v-model="cardEncryptionKey"
+                  type="password"
+                  show-password
+                  :placeholder="t('zcard.setting.cardEncryptionKeyPlaceholder')"
+                  style="width: 320px"
+                />
+                <ElButton @click="generateEncryptionKey">{{ t('zcard.setting.cardEncryptionRandom') }}</ElButton>
+              </div>
               <div class="field-help">{{ t('zcard.setting.cardEncryptionKeyTip') }}</div>
             </ElFormItem>
           </ElForm>
@@ -400,7 +415,7 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage } from 'element-plus'
+  import { ElMessage, ElMessageBox } from 'element-plus'
   import { useI18n } from 'vue-i18n'
   import { getSettings, updateSettings, type Settings } from '@/api/settings'
   import { getCurrencies, type Currency } from '@/api/currency'
@@ -444,6 +459,7 @@
     order_query_password: boolean
     order_query_faqs: { q: string; a: string }[]
     trade_captcha: boolean
+    card_encryption_enabled: boolean
     allow_post_review: boolean
     review_need_audit: boolean
     // 安全设置
@@ -531,6 +547,7 @@
     order_query_password: true,
     order_query_faqs: [] as { q: string; a: string }[],
     trade_captcha: true,
+    card_encryption_enabled: false,
     allow_post_review: true,
     review_need_audit: true,
     register_open: true,
@@ -585,6 +602,31 @@
   const saving = ref(false)
   /** 卡密加密密钥输入(不回显,留空=保持) */
   const cardEncryptionKey = ref('')
+  /** 开启加密时的历史卡密数量(>0 则提示风险) */
+  const encryptionRiskCards = ref(0)
+
+  /** 随机生成 32 字节 base64 密钥(与 .env 的 CARD_ENCRYPTION_KEY 同格式) */
+  const generateEncryptionKey = () => {
+    const bytes = new Uint8Array(32)
+    crypto.getRandomValues(bytes)
+    const base64 = btoa(String.fromCharCode(...bytes))
+    cardEncryptionKey.value = 'base64:' + base64
+  }
+
+  /** 开启加密开关:若已有历史卡密,前端先提示风险 */
+  const onEncryptionToggle = (val: string | number | boolean) => {
+    if (val && encryptionRiskCards.value > 0) {
+      ElMessageBox.confirm(
+        t('zcard.setting.cardEncryptionRisk', { n: encryptionRiskCards.value }) + '\n' + t('zcard.setting.cardEncryptionRiskConfirm'),
+        t('zcard.common.tips'),
+        { type: 'warning', confirmButtonText: t('zcard.common.ok'), cancelButtonText: t('zcard.common.cancel') }
+      )
+        .then(() => {})
+        .catch(() => {
+          form.card_encryption_enabled = false
+        })
+    }
+  }
   const currencies = ref<Currency[]>([])
 
   const coerceBool = (value: any, fallback: boolean): boolean => {
@@ -637,6 +679,8 @@
         getCurrencies().catch(() => [] as Currency[]),
       ])
       raw.value = data || {}
+      // 历史卡密数量(开启加密时的风险提示依据)
+      encryptionRiskCards.value = Number(data?.card_count) || 0
       currencies.value = currencyList || []
       const d = defaultForm()
       Object.assign(form, {
@@ -669,6 +713,7 @@
           ? data.order_query_faqs.map((f: any) => ({ q: String(f.q || ''), a: String(f.a || '') }))
           : [],
         trade_captcha: coerceBool(data.trade_captcha, d.trade_captcha),
+        card_encryption_enabled: coerceBool(data.card_encryption_enabled, d.card_encryption_enabled),
         allow_post_review: coerceBool(data.allow_post_review, d.allow_post_review),
         review_need_audit: coerceBool(data.review_need_audit, d.review_need_audit),
         register_open: coerceBool(data.register_open, d.register_open),
@@ -816,6 +861,22 @@
     color: var(--el-text-color-secondary);
     line-height: 1.5;
     margin-top: 4px;
+  }
+  /* 卡密加密配置 */
+  .encrypt-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .encrypt-hint {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+  .encrypt-risk {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--el-color-danger);
+    line-height: 1.5;
   }
   .faq-editor {
     width: 100%;

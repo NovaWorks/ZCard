@@ -16,11 +16,19 @@ use Illuminate\Encryption\Encrypter;
  */
 class CardCipher
 {
+    /**
+     * 是否开启卡密加密(后台配置,默认关闭=明文存储,正常导入)。
+     */
+    public static function isEnabled(): bool
+    {
+        return (bool) \App\Support\StorefrontConfig::get('card_encryption_enabled');
+    }
+
     private static function encrypter(): Encrypter
     {
         $key = self::resolveKey();
         if ($key === '') {
-            throw new \RuntimeException('卡密加密密钥未配置，请到后台「店铺设置 → 卡密加密」配置。');
+            throw new \RuntimeException('卡密加密已开启但密钥未配置，请到后台「店铺设置 → 安全设置」配置密钥。');
         }
 
         // 与 Laravel APP_KEY 同约定：base64: 前缀表示需先 base64 解码为原始字节。
@@ -51,16 +59,37 @@ class CardCipher
         return (string) config('zcard.card_encryption_key');
     }
 
-    /** 加密单条明文卡密 → 密文 */
+    /**
+     * 加密单条明文卡密 → 密文。
+     * 未开启加密时原样返回(明文存储,正常导入)。
+     */
     public static function encrypt(string $plain): string
     {
+        if (! self::isEnabled()) {
+            return $plain;
+        }
+
         return self::encrypter()->encryptString($plain);
     }
 
-    /** 解密单条密文 → 明文（发货/展示时用） */
+    /**
+     * 解密单条密文 → 明文(发货/展示时用)。
+     * 兼容两种状态:
+     * - 未开启加密:新卡密为明文原样返回;历史加密卡密尝试用已配置密钥解密(失败则视为明文)
+     * - 已开启加密:AES 解密;解密失败(历史明文/密钥变更)降级返回原值,避免展示/发货报错
+     */
     public static function decrypt(string $cipher): string
     {
-        return self::encrypter()->decryptString($cipher);
+        try {
+            if (self::isEnabled()) {
+                return self::encrypter()->decryptString($cipher);
+            }
+
+            // 未开启:若是历史密文则尝试解密(有 key 才可能成功),否则按明文返回
+            return self::encrypter()->decryptString($cipher);
+        } catch (\Throwable) {
+            return $cipher;
+        }
     }
 
     /** 明文 → sha256 hash（用于去重索引 content_hash） */
