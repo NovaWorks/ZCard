@@ -1,1 +1,0 @@
-import{b2 as s}from"./index-SkLUjG30.js";const r=()=>s.get({url:"/admin/user-groups"}),u=r=>s.post({url:"/admin/user-groups",data:r}),a=(r,u)=>s.put({url:`/admin/user-groups/${r}`,data:u}),d=r=>s.del({url:`/admin/user-groups/${r}`});export{u as c,d,r as g,a as u};

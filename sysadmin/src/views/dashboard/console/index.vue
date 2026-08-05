@@ -486,6 +486,8 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /* 内容超出固定高度(100vh - header)时内部滚动,避免溢出到底部固定栏 */
+  overflow-y: auto;
 }
 
 // 工具栏

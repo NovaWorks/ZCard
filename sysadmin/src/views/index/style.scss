@@ -26,6 +26,8 @@
 
     #app-content {
       flex: 1;
+      box-sizing: border-box;
+      padding-bottom: 56px;
 
       :deep(.layout-content) {
         box-sizing: border-box;
@@ -130,6 +132,8 @@
 
     #app-content {
       flex: 1;
+      box-sizing: border-box;
+      padding-bottom: 56px;
 
       :deep(.layout-content) {
         box-sizing: border-box;

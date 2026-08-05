@@ -24,7 +24,11 @@
 
 <style lang="scss" scoped>
   .app-footer {
-    flex-shrink: 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
     width: 100%;
     border-top: 1px solid var(--el-border-color-lighter);
     background: var(--default-bg-color);
