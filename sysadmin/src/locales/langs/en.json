@@ -1272,7 +1272,8 @@
       "confirmDelete": "Confirm delete?",
       "noData": "No data",
       "tips": "Tips",
-      "ok": "OK"
+      "ok": "OK",
+      "telegramGroup": "Telegram Group"
     },
     "dashboard": {
       "title": "ZCard Admin",

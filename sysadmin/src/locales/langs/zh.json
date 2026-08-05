@@ -1272,7 +1272,8 @@
       "confirmDelete": "确认删除？",
       "noData": "暂无数据",
       "tips": "提示",
-      "ok": "确定"
+      "ok": "确定",
+      "telegramGroup": "Telegram 群"
     },
     "dashboard": {
       "title": "ZCard 管理后台",

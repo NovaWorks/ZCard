@@ -18,6 +18,10 @@ const links = computed(() => cfg.value?.footer_links || [])
 const contacts = computed(() => cfg.value?.footer_contact || [])
 const copyright = computed(() => cfg.value?.footer_copyright || `© ${new Date().getFullYear()} ${siteName.value}`)
 
+/** 底部固定入口:GitHub 仓库 + 群组(新窗口打开) */
+const GITHUB_URL = 'https://github.com/NovaWorks/ZCard'
+const GROUP_URL = 'http://t.me/ZhonCard'
+
 /** 社交链接:只显示有 url 的 */
 const socials = computed(() =>
   (cfg.value?.footer_social || []).filter(s => s.url && s.url.trim())
@@ -150,12 +154,22 @@ function isExternal(url: string) {
 
     <!-- 版权栏 -->
     <div class="border-t border-border">
-      <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row items-center justify-between gap-2 text-center md:text-left">
+      <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row items-center justify-between gap-3 text-center md:text-left">
         <span class="text-xs text-ink-muted break-all">{{ copyright }}</span>
-        <div class="flex items-center gap-4 text-[10px] text-ink-muted shrink-0">
+        <div class="flex items-center gap-4 text-[10px] text-ink-muted shrink-0 flex-wrap justify-center">
+          <a
+            :href="GITHUB_URL"
+            target="_blank"
+            rel="noopener"
+            class="inline-flex items-center gap-1 hover:text-primary transition"
+          >GitHub ↗</a>
+          <a
+            :href="GROUP_URL"
+            target="_blank"
+            rel="noopener"
+            class="inline-flex items-center gap-1 hover:text-primary transition"
+          >{{ t('footer.telegramGroup') }} ↗</a>
           <span>{{ t('footer.poweredBy') }}</span>
-          <span class="hidden md:inline">·</span>
-          <span class="hidden md:inline">{{ t('footer.autoDelivery') }}</span>
         </div>
       </div>
     </div>

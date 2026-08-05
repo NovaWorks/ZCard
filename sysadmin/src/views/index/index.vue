@@ -15,6 +15,7 @@
           <div id="app-content">
             <ArtPageContent />
           </div>
+          <ArtFooterBar />
         </main>
       </div>
     </template>
@@ -30,6 +31,7 @@
           <div id="app-content">
             <ArtPageContent />
           </div>
+          <ArtFooterBar />
         </main>
       </div>
     </template>
@@ -46,6 +48,7 @@
         <div id="app-content">
           <ArtPageContent />
         </div>
+        <ArtFooterBar />
       </main>
     </template>
 
@@ -61,6 +64,7 @@
   import { MenuTypeEnum } from '@/enums/appEnum'
   import { useSettingStore } from '@/store/modules/setting'
   import { useMenuStore } from '@/store/modules/menu'
+  import ArtFooterBar from '@/components/core/layouts/art-footer-bar/index.vue'
 
   defineOptions({ name: 'AppLayout' })
 
