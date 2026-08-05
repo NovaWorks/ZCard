@@ -1157,6 +1157,7 @@
       "navDrawer": "Drawer",
       "viewGrid": "Grid",
       "viewList": "List",
+      "viewDual": "Dual Column",
       "showPrice": "Show Price",
       "showDescription": "Show Description",
       "featuredLimit": "Featured Count",

@@ -189,8 +189,8 @@
     <ElDialog
       v-model="previewVisible"
       :title="t('zcard.supply.previewTitle')"
-      width="780px"
-      top="5vh"
+      width="880px"
+      top="4vh"
       destroy-on-close
     >
       <div v-loading="previewLoading" class="preview-wrap">
@@ -208,28 +208,32 @@
 
           <!-- 定价策略:实时计算导入售价 -->
           <div class="preview-pricing">
-            <span class="pricing-label">{{ t('zcard.supply.pricingStrategy') }}</span>
-            <ElRadioGroup v-model="pricingMode" class="pricing-modes">
-              <ElRadio value="percent">{{ t('zcard.supply.pricingPercent') }}</ElRadio>
-              <ElRadio value="fixed">{{ t('zcard.supply.pricingFixed') }}</ElRadio>
-              <ElRadio value="equal">{{ t('zcard.supply.pricingEqual') }}</ElRadio>
-              <ElRadio value="pending">{{ t('zcard.supply.pricingPending') }}</ElRadio>
-            </ElRadioGroup>
-            <template v-if="pricingMode === 'percent'">
-              <div class="input-with-unit pricing-param">
-                <ElInputNumber v-model="markupPercent" :min="0" :max="500" :precision="0" controls-position="right" size="small" style="width: 90px" />
-                <span class="unit">%</span>
-              </div>
-            </template>
-            <template v-if="pricingMode === 'fixed'">
-              <div class="input-with-unit pricing-param">
-                <ElInputNumber v-model="markupAmountYuan" :min="0" :precision="2" :step="0.5" controls-position="right" size="small" style="width: 110px" />
-                <span class="unit">{{ t('zcard.supplierAccount.yuan') }}</span>
-              </div>
-            </template>
-            <ElCheckbox v-model="saveDefaultPricing" class="pricing-save">
-              {{ t('zcard.supply.saveDefaultPricing') }}
-            </ElCheckbox>
+            <div class="pricing-row">
+              <span class="pricing-label">{{ t('zcard.supply.pricingStrategy') }}</span>
+              <ElRadioGroup v-model="pricingMode" class="pricing-modes">
+                <ElRadio value="percent">{{ t('zcard.supply.pricingPercent') }}</ElRadio>
+                <ElRadio value="fixed">{{ t('zcard.supply.pricingFixed') }}</ElRadio>
+                <ElRadio value="equal">{{ t('zcard.supply.pricingEqual') }}</ElRadio>
+                <ElRadio value="pending">{{ t('zcard.supply.pricingPending') }}</ElRadio>
+              </ElRadioGroup>
+              <template v-if="pricingMode === 'percent'">
+                <div class="input-with-unit pricing-param">
+                  <ElInputNumber v-model="markupPercent" :min="0" :max="500" :precision="0" controls-position="right" size="small" style="width: 90px" />
+                  <span class="unit">%</span>
+                </div>
+              </template>
+              <template v-if="pricingMode === 'fixed'">
+                <div class="input-with-unit pricing-param">
+                  <ElInputNumber v-model="markupAmountYuan" :min="0" :precision="2" :step="0.5" controls-position="right" size="small" style="width: 110px" />
+                  <span class="unit">{{ t('zcard.supplierAccount.yuan') }}</span>
+                </div>
+              </template>
+            </div>
+            <div class="pricing-row pricing-actions">
+              <ElCheckbox v-model="saveDefaultPricing" class="pricing-save">
+                {{ t('zcard.supply.saveDefaultPricing') }}
+              </ElCheckbox>
+            </div>
           </div>
 
           <!-- 分类映射:上游分类 → 本地分类 -->
@@ -961,33 +965,46 @@
   /* 定价策略区 */
   .preview-pricing {
     display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    background: var(--el-fill-color-lighter);
+    border-radius: 8px;
+  }
+  .pricing-row {
+    display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 10px;
-    padding: 8px 10px;
-    margin-bottom: 10px;
-    background: var(--el-fill-color-lighter);
-    border-radius: 6px;
+  }
+  .pricing-row + .pricing-row {
+    border-top: 1px dashed var(--el-border-color-lighter);
+    padding-top: 8px;
   }
   .pricing-label {
     font-size: 13px;
     font-weight: 600;
     color: var(--el-text-color-primary);
     flex-shrink: 0;
+    min-width: 76px;
   }
   .pricing-modes {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
   }
   .pricing-modes :deep(.el-radio) {
-    margin-right: 14px;
+    margin-right: 18px;
   }
   .pricing-param {
-    margin-left: 4px;
+    margin-left: 6px;
   }
   .pricing-save {
-    margin-left: auto;
     flex-shrink: 0;
+  }
+  .pricing-actions {
+    justify-content: flex-start;
   }
   /* 分类映射面板 */
   .preview-map {
@@ -1015,14 +1032,19 @@
   .map-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 4px 0;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 7px 0;
   }
   .map-upstream {
     font-size: 13px;
     color: var(--el-text-color-primary);
     flex-shrink: 0;
-    min-width: 120px;
+    min-width: 150px;
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .map-count {
     font-size: 12px;
@@ -1035,14 +1057,15 @@
   .map-target {
     display: flex;
     align-items: center;
-    gap: 6px;
+    flex-wrap: wrap;
+    gap: 8px;
     flex: 1;
     min-width: 0;
   }
   .map-select {
     flex: 1;
-    min-width: 0;
-    max-width: 220px;
+    min-width: 200px;
+    max-width: 300px;
   }
   .map-tag {
     flex-shrink: 0;
@@ -1121,10 +1144,10 @@
     display: flex;
     flex-direction: column;
     width: 100%;
-    padding: 4px 8px;
+    padding: 6px 10px;
   }
   .preview-product {
-    padding: 6px 8px;
+    padding: 8px 10px;
     border-bottom: 1px solid var(--el-border-color-extra-light);
     border-radius: 4px;
     transition: background-color 0.2s;
@@ -1141,17 +1164,20 @@
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    gap: 8px;
+    gap: 12px;
   }
   .pp-name {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     font-size: 13px;
     flex: 1;
+    min-width: 0;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
   .pp-status {
     flex-shrink: 0;
@@ -1159,8 +1185,9 @@
   .pp-meta {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     flex-shrink: 0;
+    padding-left: 4px;
   }
   .pp-base {
     font-size: 12px;

@@ -56,6 +56,7 @@
               <ElRadioGroup v-model="form.list_default_view">
                 <ElRadio value="grid">{{ t('zcard.setting.viewGrid') }}</ElRadio>
                 <ElRadio value="list">{{ t('zcard.setting.viewList') }}</ElRadio>
+                <ElRadio value="dual">{{ t('zcard.setting.viewDual') }}</ElRadio>
               </ElRadioGroup>
             </ElFormItem>
             <ElFormItem :label="t('zcard.setting.gridColumns')">
