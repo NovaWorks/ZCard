@@ -173,7 +173,14 @@ class UpdateController extends Controller
             $this->clearBootstrapCache();
             Artisan::call('package:discover');
             Artisan::call('config:cache');
-            Artisan::call('route:cache');
+            // routes/api.php 存在闭包路由(如 payments/return),Laravel 的 route:cache
+            // 无法序列化闭包会抛异常。此时保持"无路由缓存"运行(路由实时编译,新路由立即生效),
+            // 但不能让整个更新流程误报失败,故单独捕获降级。
+            try {
+                Artisan::call('route:cache');
+            } catch (\Throwable $e) {
+                $this->log($logFile, 'route:cache 跳过(存在闭包路由,路由实时加载): ' . $e->getMessage());
+            }
 
             // Step 7: 前端构建(有 pnpm 用 pnpm,否则跳过——编译产物已在仓库)
             $this->buildFrontend($logFile, 'sysadmin');
@@ -275,7 +282,12 @@ class UpdateController extends Controller
             Artisan::call('route:clear');
             Artisan::call('view:clear');
             Artisan::call('config:cache');
-            Artisan::call('route:cache');
+            // 闭包路由无法被 route:cache 序列化,失败即保持实时加载(路由已 route:clear)
+            try {
+                Artisan::call('route:cache');
+            } catch (\Throwable $e) {
+                $this->log($logFile, 'route:cache 跳过(存在闭包路由,路由实时加载): ' . $e->getMessage());
+            }
             Artisan::call('up');
 
             // 清版本缓存确保读到 git reset 后的 tag
