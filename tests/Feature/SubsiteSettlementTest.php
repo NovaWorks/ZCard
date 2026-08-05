@@ -12,6 +12,7 @@ use App\Models\SubsiteLedgerEntry;
 use App\Models\SubsiteProductSetting;
 use App\Models\User;
 use App\Support\CardCipher;
+use App\Support\OrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
@@ -22,7 +23,7 @@ class SubsiteSettlementTest extends TestCase
 
     public function test_payment_posts_profit_to_ledger(): void
     {
-        Currency::create(['code' => 'CNY', 'name' => '人民币', 'symbol' => '¥', 'symbol_position' => 'before', 'decimal_places' => 2, 'exchange_rate' => '1', 'is_base' => true, 'is_enabled' => true, 'sort' => 0]);
+        Currency::firstOrCreate(['code' => 'CNY'], ['name' => '人民币', 'symbol' => '¥', 'symbol_position' => 'before', 'decimal_places' => 2, 'exchange_rate' => '1', 'is_base' => true, 'is_enabled' => true, 'sort' => 0]);
         config(['zcard.features.sub_site' => true]);
         config(['zcard.features.distribution' => false]);
         Cache::flush();
@@ -36,7 +37,7 @@ class SubsiteSettlementTest extends TestCase
             Card::create(array_merge([
                 'product_id' => $product->id,
                 'status' => Card::STATUS_UNUSED,
-            ], CardCipher::encryptWithHash('card-' . $i . uniqid())));
+            ], CardCipher::encryptWithHash('card-'.$i.uniqid())));
         }
         $owner = User::factory()->create();
         $subsite = Merchant::create(['user_id' => $owner->id, 'name' => 'Sub', 'slug' => 'sub', 'status' => 1, 'commission_rate' => 0, 'settings' => ['is_subsite' => true]]);
@@ -45,8 +46,8 @@ class SubsiteSettlementTest extends TestCase
 
         $buyer = User::factory()->create();
         request()->attributes->set('subsite', $subsite);
-        $order = app(\App\Support\OrderService::class)->createOrder($product->id, null, 1, ['contact' => 'b@x.com', 'user_id' => $buyer->id]);
-        app(\App\Support\OrderService::class)->markPaid($order->order_no);
+        $order = app(OrderService::class)->createOrder($product->id, null, 1, ['contact' => 'b@x.com', 'user_id' => $buyer->id]);
+        app(OrderService::class)->markPaid($order->order_no);
 
         $entry = SubsiteLedgerEntry::where('order_id', $order->id)->where('type', 'order_profit')->first();
         $this->assertNotNull($entry, '应有 order_profit ledger 条目');

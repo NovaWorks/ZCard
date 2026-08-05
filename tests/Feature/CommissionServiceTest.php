@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Card;
 use App\Models\Category;
+use App\Models\Commission;
 use App\Models\Currency;
 use App\Models\Merchant;
 use App\Models\Product;
@@ -20,8 +21,8 @@ class CommissionServiceTest extends TestCase
 
     private function seedCurrencies(): void
     {
-        Currency::create([
-            'code' => 'CNY', 'name' => '人民币', 'symbol' => '¥',
+        Currency::firstOrCreate(['code' => 'CNY'], [
+            'name' => '人民币', 'symbol' => '¥',
             'symbol_position' => 'before', 'decimal_places' => 2,
             'exchange_rate' => '1', 'is_base' => true, 'is_enabled' => true, 'sort' => 0,
         ]);
@@ -31,27 +32,28 @@ class CommissionServiceTest extends TestCase
     {
         $u = User::factory()->create();
         $m = Merchant::create([
-            'user_id' => $u->id, 'name' => 'M', 'slug' => 'm' . uniqid(),
+            'user_id' => $u->id, 'name' => 'M', 'slug' => 'm'.uniqid(),
             'status' => 1, 'commission_rate' => 0,
         ]);
         $c = Category::create([
-            'merchant_id' => $m->id, 'name' => 'C', 'slug' => 'c' . uniqid(), 'sort' => 0,
+            'merchant_id' => $m->id, 'name' => 'C', 'slug' => 'c'.uniqid(), 'sort' => 0,
         ]);
         $p = Product::create([
             'merchant_id' => $m->id, 'category_id' => $c->id,
-            'name' => 'P', 'slug' => 'p' . uniqid(),
+            'name' => 'P', 'slug' => 'p'.uniqid(),
             'price' => $price, 'factory_price' => $cost,
             'stock_type' => 'card', 'delivery_mode' => 'status',
             'status' => true, 'sort' => 0,
         ]);
         // 库存卡密(DeliveryService 在同事件中解密 → 必须真加密)
         for ($i = 0; $i < 5; $i++) {
-            $enc = CardCipher::encryptWithHash('card-' . $i . '-' . uniqid());
+            $enc = CardCipher::encryptWithHash('card-'.$i.'-'.uniqid());
             Card::create(array_merge([
                 'product_id' => $p->id,
                 'status' => Card::STATUS_UNUSED,
             ], $enc));
         }
+
         return $p;
     }
 
@@ -104,7 +106,7 @@ class CommissionServiceTest extends TestCase
         // user_id 不传(模拟游客)
         $order = app(OrderService::class)->createOrder($product->id, null, 1, ['contact' => 'g@x.com']);
         app(OrderService::class)->markPaid($order->order_no);
-        $this->assertEquals(0, \App\Models\Commission::where('order_id', $order->id)->count());
+        $this->assertEquals(0, Commission::where('order_id', $order->id)->count());
     }
 
     public function test_disabled_distribution_no_commission(): void
@@ -117,7 +119,7 @@ class CommissionServiceTest extends TestCase
         $product = $this->makeProduct(10000, 6000);
         $order = app(OrderService::class)->createOrder($product->id, null, 1, ['contact' => 'b@x.com', 'user_id' => $buyer->id]);
         app(OrderService::class)->markPaid($order->order_no);
-        $this->assertEquals(0, \App\Models\Commission::count());
+        $this->assertEquals(0, Commission::count());
     }
 
     public function test_feature_flag_off_no_commission(): void
@@ -130,7 +132,7 @@ class CommissionServiceTest extends TestCase
         $product = $this->makeProduct(10000, 6000);
         $order = app(OrderService::class)->createOrder($product->id, null, 1, ['contact' => 'b@x.com', 'user_id' => $buyer->id]);
         app(OrderService::class)->markPaid($order->order_no);
-        $this->assertEquals(0, \App\Models\Commission::count());
+        $this->assertEquals(0, Commission::count());
     }
 
     public function test_idempotent_no_duplicate_on_repeat(): void
@@ -147,6 +149,6 @@ class CommissionServiceTest extends TestCase
             app(OrderService::class)->markPaid($order->order_no);
         } catch (\Throwable $e) {
         }
-        $this->assertEquals(1, \App\Models\Commission::where('order_id', $order->id)->count());
+        $this->assertEquals(1, Commission::where('order_id', $order->id)->count());
     }
 }

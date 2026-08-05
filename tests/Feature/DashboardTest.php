@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Card;
-use App\Support\CardCipher;
 use App\Models\Category;
 use App\Models\Currency;
 use App\Models\Merchant;
@@ -11,7 +10,9 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\CardCipher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -24,23 +25,24 @@ class DashboardTest extends TestCase
     private function adminHeaders(): array
     {
         foreach (['super_admin', 'merchant', 'user'] as $r) {
-            \Spatie\Permission\Models\Role::firstOrCreate(['name' => $r]);
+            Role::firstOrCreate(['name' => $r]);
         }
         $user = User::factory()->create();
         $user->assignRole('super_admin');
-        return ['Authorization' => 'Bearer ' . $user->createToken('test')->plainTextToken];
+
+        return ['Authorization' => 'Bearer '.$user->createToken('test')->plainTextToken];
     }
 
     private function seedData(): void
     {
-        Currency::create(['code' => 'CNY', 'name' => '人民币', 'symbol' => '¥', 'symbol_position' => 'before', 'decimal_places' => 2, 'exchange_rate' => '1', 'is_base' => true, 'is_enabled' => true, 'sort' => 0]);
+        Currency::firstOrCreate(['code' => 'CNY'], ['name' => '人民币', 'symbol' => '¥', 'symbol_position' => 'before', 'decimal_places' => 2, 'exchange_rate' => '1', 'is_base' => true, 'is_enabled' => true, 'sort' => 0]);
         $u = User::factory()->create();
         $m = Merchant::firstOrCreate(['slug' => 'default'], ['user_id' => $u->id, 'name' => 'M', 'status' => 1, 'commission_rate' => 0]);
         $c = Category::create(['merchant_id' => $m->id, 'name' => 'C', 'slug' => 'c', 'sort' => 0]);
         $p = Product::create(['merchant_id' => $m->id, 'category_id' => $c->id, 'name' => 'P', 'slug' => 'p', 'price' => 10000, 'factory_price' => 6000, 'stock_type' => 'card', 'delivery_mode' => 'status', 'status' => true, 'sort' => 0]);
         Card::create(array_merge(
             ['product_id' => $p->id, 'dedup_hash' => null, 'status' => Card::STATUS_UNUSED],
-            CardCipher::encryptWithHash('card-' . uniqid())
+            CardCipher::encryptWithHash('card-'.uniqid())
         ));
 
         // 已付订单

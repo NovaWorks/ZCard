@@ -42,13 +42,13 @@ class DisplayCurrencyResponseTest extends TestCase
      */
     private function seedCurrencies(bool $enableUsd = false): void
     {
-        Currency::create([
-            'code' => 'CNY', 'name' => '人民币', 'symbol' => '¥',
+        Currency::firstOrCreate(['code' => 'CNY'], [
+            'name' => '人民币', 'symbol' => '¥',
             'symbol_position' => 'before', 'decimal_places' => 2,
             'exchange_rate' => '1', 'is_base' => true, 'is_enabled' => true, 'sort' => 0,
         ]);
-        Currency::create([
-            'code' => 'USD', 'name' => '美元', 'symbol' => '$',
+        Currency::updateOrCreate(['code' => 'USD'], [
+            'name' => '美元', 'symbol' => '$',
             'symbol_position' => 'before', 'decimal_places' => 2,
             'exchange_rate' => '0.14000000', 'is_base' => false,
             'is_enabled' => $enableUsd, 'sort' => 1,

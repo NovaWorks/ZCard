@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Card;
-use App\Support\CardCipher;
 use App\Models\Category;
+use App\Models\Commission;
 use App\Models\Currency;
 use App\Models\Merchant;
 use App\Models\Product;
@@ -12,7 +12,10 @@ use App\Models\SubsiteDomain;
 use App\Models\SubsiteLedgerEntry;
 use App\Models\SubsiteProductSetting;
 use App\Models\User;
-use App\Models\Withdrawal;
+use App\Support\CardCipher;
+use App\Support\OrderService;
+use App\Support\StorefrontConfig;
+use App\Support\SubsitePricingService;
 use App\Support\SubsiteWithdrawalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -28,11 +31,11 @@ class SubsiteEndToEndTest extends TestCase
 
     private function setupFullContext(): array
     {
-        Currency::create(['code' => 'CNY', 'name' => '人民币', 'symbol' => '¥', 'symbol_position' => 'before', 'decimal_places' => 2, 'exchange_rate' => '1', 'is_base' => true, 'is_enabled' => true, 'sort' => 0]);
+        Currency::firstOrCreate(['code' => 'CNY'], ['name' => '人民币', 'symbol' => '¥', 'symbol_position' => 'before', 'decimal_places' => 2, 'exchange_rate' => '1', 'is_base' => true, 'is_enabled' => true, 'sort' => 0]);
         config(['zcard.features.sub_site' => true]);
         config(['zcard.features.distribution' => false]);
         config(['zcard.features.multi_merchant' => false]);
-        \App\Support\StorefrontConfig::setMany([
+        StorefrontConfig::setMany([
             'subsite_enabled' => true,
             'subsite_default_confirm_days' => 7,
             'distribution_enabled' => false,
@@ -50,7 +53,7 @@ class SubsiteEndToEndTest extends TestCase
         for ($i = 0; $i < 5; $i++) {
             Card::create(array_merge(
                 ['product_id' => $product->id, 'dedup_hash' => null, 'status' => Card::STATUS_UNUSED],
-                CardCipher::encryptWithHash('steam-key-' . $i . uniqid())
+                CardCipher::encryptWithHash('steam-key-'.$i.uniqid())
             ));
         }
 
@@ -79,10 +82,10 @@ class SubsiteEndToEndTest extends TestCase
     public function test_full_subsite_flow(): void
     {
         [$product, $subsite, $owner, $mainMerchant] = $this->setupFullContext();
-        $orderService = app(\App\Support\OrderService::class);
+        $orderService = app(OrderService::class);
 
         // Step 1: 分站定价正确(100 元 × 1.10 = 110 元)
-        $pricingSvc = app(\App\Support\SubsitePricingService::class);
+        $pricingSvc = app(SubsitePricingService::class);
         $pricing = $pricingSvc->resolveUnitPrice($product, null, $subsite);
         $this->assertSame(11000, $pricing['price'], '分站加价后应为 110 元');
         $this->assertSame('markup_percent', $pricing['mode']);
@@ -135,7 +138,7 @@ class SubsiteEndToEndTest extends TestCase
         $this->assertSame('withdrawn', $finalEntry->status, '审批后 ledger 应为 withdrawn');
 
         // Step 9: 验证不触发分销佣金(互斥)
-        $this->assertEquals(0, \App\Models\Commission::where('order_id', $order->id)->count(), '分站订单不应触发分销佣金');
+        $this->assertEquals(0, Commission::where('order_id', $order->id)->count(), '分站订单不应触发分销佣金');
     }
 
     public function test_subsite_owner_self_purchase_blocks_profit(): void
@@ -144,7 +147,7 @@ class SubsiteEndToEndTest extends TestCase
         request()->attributes->set('subsite', $subsite);
 
         // 分站主自己买
-        $order = app(\App\Support\OrderService::class)->createOrder($product->id, null, 1, [
+        $order = app(OrderService::class)->createOrder($product->id, null, 1, [
             'contact' => $owner->email, 'user_id' => $owner->id,
         ]);
 
@@ -156,7 +159,7 @@ class SubsiteEndToEndTest extends TestCase
         ]);
 
         // 付款后无 ledger(利润被拦截)
-        app(\App\Support\OrderService::class)->markPaid($order->order_no);
+        app(OrderService::class)->markPaid($order->order_no);
         $this->assertEquals(0, SubsiteLedgerEntry::where('order_id', $order->id)->count(), '自购不应产生 ledger');
     }
 }

@@ -3,15 +3,17 @@
 namespace Tests\Feature;
 
 use App\Models\Card;
-use App\Support\CardCipher;
 use App\Models\Category;
 use App\Models\Commission;
 use App\Models\Currency;
 use App\Models\Merchant;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\CardCipher;
+use App\Support\OrderService;
 use App\Support\StorefrontConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -24,7 +26,7 @@ class DistributionEndToEndTest extends TestCase
 
     private function setupContext(): array
     {
-        Currency::create(['code' => 'CNY', 'name' => '人民币', 'symbol' => '¥', 'symbol_position' => 'before', 'decimal_places' => 2, 'exchange_rate' => '1', 'is_base' => true, 'is_enabled' => true, 'sort' => 0]);
+        Currency::firstOrCreate(['code' => 'CNY'], ['name' => '人民币', 'symbol' => '¥', 'symbol_position' => 'before', 'decimal_places' => 2, 'exchange_rate' => '1', 'is_base' => true, 'is_enabled' => true, 'sort' => 0]);
         config(['zcard.features.distribution' => true]);
         config(['zcard.features.sub_site' => false]);
         StorefrontConfig::setMany([
@@ -38,7 +40,7 @@ class DistributionEndToEndTest extends TestCase
 
         // 角色(RefreshDatabase 清空权限表)
         foreach (['super_admin', 'merchant', 'user'] as $r) {
-            \Spatie\Permission\Models\Role::firstOrCreate(['name' => $r]);
+            Role::firstOrCreate(['name' => $r]);
         }
 
         $mainUser = User::factory()->create();
@@ -51,7 +53,7 @@ class DistributionEndToEndTest extends TestCase
         for ($i = 0; $i < 5; $i++) {
             Card::create(array_merge(
                 ['product_id' => $product->id, 'dedup_hash' => null, 'status' => Card::STATUS_UNUSED],
-                CardCipher::encryptWithHash('key-' . $i . uniqid())
+                CardCipher::encryptWithHash('key-'.$i.uniqid())
             ));
         }
 
@@ -79,14 +81,14 @@ class DistributionEndToEndTest extends TestCase
         $this->assertSame($l1->id, $buyer->pid, '新用户 pid 应绑定到推广人 referrer');
 
         // Step 3: 下级下单(售价 100,成本 60,毛利 40)
-        $order = app(\App\Support\OrderService::class)->createOrder(
+        $order = app(OrderService::class)->createOrder(
             $product->id, null, 1,
             ['contact' => 'newbie@test.com', 'user_id' => $buyer->id]
         );
         $this->assertSame(10000, (int) $order->amount);
 
         // Step 4: 付款 → 触发三级佣金
-        app(\App\Support\OrderService::class)->markPaid($order->order_no);
+        app(OrderService::class)->markPaid($order->order_no);
 
         // 毛利 = 10000 - 6000 = 4000 分
         // L1(referrer): 4000 × 10% = 400
@@ -123,8 +125,8 @@ class DistributionEndToEndTest extends TestCase
         $l1 = User::factory()->create(['balance' => 0]);
         $buyer = User::factory()->create(['pid' => $l1->id]);
 
-        $order = app(\App\Support\OrderService::class)->createOrder($product->id, null, 1, ['contact' => 'b@x.com', 'user_id' => $buyer->id]);
-        app(\App\Support\OrderService::class)->markPaid($order->order_no);
+        $order = app(OrderService::class)->createOrder($product->id, null, 1, ['contact' => 'b@x.com', 'user_id' => $buyer->id]);
+        app(OrderService::class)->markPaid($order->order_no);
 
         $this->assertEquals(0, Commission::where('order_id', $order->id)->count(), '分销关闭时不应有佣金');
         $this->assertSame(0, (int) $l1->fresh()->balance, '分销关闭时推广人余额不变');

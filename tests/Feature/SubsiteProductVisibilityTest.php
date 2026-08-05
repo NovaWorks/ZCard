@@ -2,17 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Api\ProductController;
 use App\Models\Category;
 use App\Models\Currency;
 use App\Models\Merchant;
 use App\Models\Product;
-use App\Models\SubsiteDomain;
 use App\Models\SubsiteProductSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 /**
@@ -31,16 +30,17 @@ class SubsiteProductVisibilityTest extends TestCase
 
     private function seedCurrency(): void
     {
-        Currency::create(['code' => 'CNY', 'name' => '人民币', 'symbol' => '¥', 'symbol_position' => 'before', 'decimal_places' => 2, 'exchange_rate' => '1', 'is_base' => true, 'is_enabled' => true, 'sort' => 0]);
+        Currency::firstOrCreate(['code' => 'CNY'], ['name' => '人民币', 'symbol' => '¥', 'symbol_position' => 'before', 'decimal_places' => 2, 'exchange_rate' => '1', 'is_base' => true, 'is_enabled' => true, 'sort' => 0]);
     }
 
     private function makeMainProduct(int $price): Product
     {
         $u = User::factory()->create();
         $m = Merchant::firstOrCreate(['slug' => 'default'], ['user_id' => $u->id, 'name' => '默认商户', 'status' => 1, 'commission_rate' => 0]);
-        $c = Category::create(['merchant_id' => $m->id, 'name' => 'C', 'slug' => 'c' . uniqid(), 'sort' => 0]);
+        $c = Category::create(['merchant_id' => $m->id, 'name' => 'C', 'slug' => 'c'.uniqid(), 'sort' => 0]);
+
         return Product::create([
-            'merchant_id' => $m->id, 'category_id' => $c->id, 'name' => 'P', 'slug' => 'p' . uniqid(),
+            'merchant_id' => $m->id, 'category_id' => $c->id, 'name' => 'P', 'slug' => 'p'.uniqid(),
             'price' => $price, 'stock_type' => 'card', 'delivery_mode' => 'status', 'status' => true, 'sort' => 0,
         ]);
     }
@@ -48,8 +48,9 @@ class SubsiteProductVisibilityTest extends TestCase
     private function makeSubsite(Merchant $main): Merchant
     {
         $owner = User::factory()->create();
+
         return Merchant::create([
-            'user_id' => $owner->id, 'name' => 'Sub', 'slug' => 'sub' . uniqid(),
+            'user_id' => $owner->id, 'name' => 'Sub', 'slug' => 'sub'.uniqid(),
             'status' => 1, 'commission_rate' => 0,
             'settings' => ['is_subsite' => true, 'default_markup_percent' => 0, 'max_markup_percent' => 50],
         ]);
@@ -95,7 +96,7 @@ class SubsiteProductVisibilityTest extends TestCase
         // 控制器用 request()->attributes,需把 request 注入容器当前实例
         app()->instance('request', $request);
 
-        $controller = app(\App\Http\Controllers\Api\ProductController::class);
+        $controller = app(ProductController::class);
         $resp = $controller->index($request);
         $items = collect(json_decode($resp->getContent(), true)['data'] ?? []);
 
@@ -118,7 +119,7 @@ class SubsiteProductVisibilityTest extends TestCase
         $request->attributes->set('subsite', $sub);
         app()->instance('request', $request);
 
-        $controller = app(\App\Http\Controllers\Api\ProductController::class);
+        $controller = app(ProductController::class);
         $resp = $controller->index($request);
         $item = collect(json_decode($resp->getContent(), true)['data'] ?? [])->firstWhere('id', $product->id);
 

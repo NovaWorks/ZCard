@@ -4,14 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\Card;
 use App\Models\Category;
-use App\Support\CardCipher;
 use App\Models\Currency;
 use App\Models\Merchant;
 use App\Models\Product;
 use App\Models\SubsiteDomain;
-use App\Models\SubsiteOrderSnapshot;
 use App\Models\SubsiteProductSetting;
 use App\Models\User;
+use App\Support\CardCipher;
+use App\Support\OrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
@@ -22,7 +22,7 @@ class SubsiteOrderTest extends TestCase
 
     private function setupSubsiteOrderContext(): array
     {
-        Currency::create(['code' => 'CNY', 'name' => '人民币', 'symbol' => '¥', 'symbol_position' => 'before', 'decimal_places' => 2, 'exchange_rate' => '1', 'is_base' => true, 'is_enabled' => true, 'sort' => 0]);
+        Currency::firstOrCreate(['code' => 'CNY'], ['name' => '人民币', 'symbol' => '¥', 'symbol_position' => 'before', 'decimal_places' => 2, 'exchange_rate' => '1', 'is_base' => true, 'is_enabled' => true, 'sort' => 0]);
         config(['zcard.features.sub_site' => true]);
         config(['zcard.features.distribution' => false]);
         Cache::flush();
@@ -39,7 +39,7 @@ class SubsiteOrderTest extends TestCase
             Card::create(array_merge([
                 'product_id' => $product->id,
                 'status' => Card::STATUS_UNUSED,
-            ], CardCipher::encryptWithHash('card-' . $i . uniqid())));
+            ], CardCipher::encryptWithHash('card-'.$i.uniqid())));
         }
 
         $owner = User::factory()->create();
@@ -58,7 +58,7 @@ class SubsiteOrderTest extends TestCase
         // 模拟分站上下文(直接设 request attribute,因测试 Host 不可靠)
         request()->attributes->set('subsite', $subsite);
 
-        $order = app(\App\Support\OrderService::class)->createOrder(
+        $order = app(OrderService::class)->createOrder(
             $product->id, null, 1,
             ['contact' => 'b@x.com', 'user_id' => $buyer->id]
         );
@@ -73,7 +73,7 @@ class SubsiteOrderTest extends TestCase
         [$product, $subsite, $owner] = $this->setupSubsiteOrderContext();
         request()->attributes->set('subsite', $subsite);
 
-        $order = app(\App\Support\OrderService::class)->createOrder(
+        $order = app(OrderService::class)->createOrder(
             $product->id, null, 1,
             ['contact' => $owner->email, 'user_id' => $owner->id] // 分站主自己买
         );
