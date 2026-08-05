@@ -114,6 +114,36 @@ const getErrorMessage = (status: number): string => {
 }
 
 /**
+ * Laravel 在生产环境(APP_DEBUG=false)对未捕获异常统一回 `{"message":"Server Error"}`
+ * (Foundation/Exceptions/Handler.php)。这类占位文案没有诊断价值,
+ * 展示它反而不如状态码对应的中文提示,故忽略。
+ */
+const GENERIC_SERVER_MESSAGES = new Set(['server error', 'not found', 'forbidden', 'unauthorized'])
+
+/**
+ * 从响应体里提取后端给出的可读错误信息。
+ *
+ * ZCard 后端有三种错误形状,都要认:
+ * - 货源/支付等接口:{ ok: false, error: '上游请求失败: HTTP 404 (可能是上游未配置伪静态...)' }
+ * - Laravel abort / 业务 4xx:{ message: '...' }
+ * - art-design-pro 原信封:{ msg: '...' }
+ *
+ * 拿不到(或只拿到框架占位文案)就返回空串,由调用方回退到状态码通用文案。
+ */
+const extractServerMessage = (data: unknown): string => {
+  if (!data || typeof data !== 'object') return ''
+  const body = data as Record<string, unknown>
+  for (const key of ['error', 'message', 'msg'] as const) {
+    const value = body[key]
+    if (typeof value !== 'string') continue
+    const trimmed = value.trim()
+    if (trimmed === '' || GENERIC_SERVER_MESSAGES.has(trimmed.toLowerCase())) continue
+    return trimmed
+  }
+  return ''
+}
+
+/**
  * 处理错误
  * @param error 错误对象
  * @returns 错误对象
@@ -126,7 +156,6 @@ export function handleError(error: AxiosError<ErrorResponse>): never {
   }
 
   const statusCode = error.response?.status
-  const errorMessage = error.response?.data?.msg || error.message
   const requestConfig = error.config
 
   // 处理网络错误
@@ -137,10 +166,13 @@ export function handleError(error: AxiosError<ErrorResponse>): never {
     })
   }
 
-  // 处理 HTTP 状态码错误
-  const message = statusCode
-    ? getErrorMessage(statusCode)
-    : errorMessage || $t('httpMsg.requestFailed')
+  // 处理 HTTP 状态码错误。
+  // 后端给了具体原因就优先展示 —— 上游对接类故障(伪静态未配、WAF 拦截、密钥错误)
+  // 全靠这条信息定位,若一律替换成「服务器内部错误」运维将无从排查。
+  const serverMessage = extractServerMessage(error.response.data)
+  const message =
+    serverMessage ||
+    (statusCode ? getErrorMessage(statusCode) : error.message || $t('httpMsg.requestFailed'))
   throw new HttpError(message, statusCode || ApiStatus.error, {
     data: error.response.data,
     url: requestConfig?.url,

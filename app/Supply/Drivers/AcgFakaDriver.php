@@ -118,6 +118,25 @@ class AcgFakaDriver implements SupplyDriver
         return (int) ($data['data']['stock'] ?? -1);
     }
 
+    /**
+     * acg-faka 把多张卡密用 PHP_EOL 拼成**一个** secret 字符串返回
+     * (Service/Bind/Order.php:1209 `$cardc .= $card->secret . PHP_EOL`)。
+     * 必须拆成数组,否则 UpstreamOrderService::writeCards 会把 N 张卡当成 1 张写。
+     *
+     * @return array<int, string>
+     */
+    private function splitSecret(?string $secret): array
+    {
+        if ($secret === null || trim($secret) === '') {
+            return [];
+        }
+
+        return array_values(array_filter(
+            array_map('trim', preg_split('/\r\n|\r|\n/', $secret) ?: []),
+            fn ($line) => $line !== ''
+        ));
+    }
+
     public function createOrder(array $params): UpstreamOrder
     {
         $data = $this->signedPost('/shared/commodity/trade', [
@@ -127,17 +146,40 @@ class AcgFakaDriver implements SupplyDriver
             'request_no' => $params['downstream_order_no'],
             'card_id' => 0,
         ]);
-        $secret = $data['data']['secret'] ?? null;
-        $fulfillment = $secret ? new UpstreamFulfillment(status: 'delivered', cards: [$secret]) : null;
-        return new UpstreamOrder(id: $params['downstream_order_no'], status: $fulfillment ? 'delivered' : 'pending', amount: 0, fulfillment: $fulfillment);
+        $d = $data['data'] ?? [];
+        $cards = $this->splitSecret($d['secret'] ?? null);
+        $fulfillment = $cards ? new UpstreamFulfillment(status: 'delivered', cards: $cards) : null;
+
+        return new UpstreamOrder(
+            // 必须存上游自己的 trade_no:查单接口是 where("trade_no", ...) 匹配的,
+            // 存我们的单号会导致重试时永远查不到(request_no 只是上游的防重键,不可查)。
+            id: (string) ($d['tradeNo'] ?? $params['downstream_order_no']),
+            status: $fulfillment ? 'delivered' : 'pending',
+            amount: isset($d['amount']) ? (int) round((float) $d['amount'] * 100) : 0, // 元→分
+            fulfillment: $fulfillment,
+        );
     }
 
     public function getOrder(string $upstreamOrderId): UpstreamOrder
     {
-        $data = $this->signedPost("/shared/commodity/query/{$upstreamOrderId}", []);
+        // acg-faka 的 Kernel 按 '/' 拆段:最后一段是方法名,之前的全部拼成类名。
+        // 所以 /shared/commodity/query/{no} 会被解析成不存在的类 Shared\Commodity\Query → 404。
+        // 正确形式是方法名结尾 + tradeNo 走 body(Collector 按参数名从 $_REQUEST 注入)。
+        $data = $this->signedPost('/shared/commodity/query', ['tradeNo' => $upstreamOrderId]);
         $d = $data['data'] ?? [];
-        $cards = ! empty($d['secret']) ? [$d['secret']] : [];
-        return new UpstreamOrder(id: $upstreamOrderId, status: $d['status'] ?? 'pending', amount: 0, fulfillment: $cards ? new UpstreamFulfillment(status: 'delivered', cards: $cards) : null);
+        $cards = $this->splitSecret($d['secret'] ?? null);
+
+        // acg-faka 订单 status 是 int:0=未完成,1=已支付(orderSuccess 时置 1)。
+        // 它没有"已取消"状态,故不映射 canceled。
+        // 必须 status=1 才认发货 —— 否则 UpstreamOrderService 会凭 fulfillment 就写卡。
+        $delivered = (int) ($d['status'] ?? 0) === 1 && $cards !== [];
+
+        return new UpstreamOrder(
+            id: $upstreamOrderId,
+            status: $delivered ? 'delivered' : 'pending',
+            amount: 0,
+            fulfillment: $delivered ? new UpstreamFulfillment(status: 'delivered', cards: $cards) : null,
+        );
     }
 
     public function cancelOrder(string $upstreamOrderId): bool { return false; }
@@ -155,6 +197,9 @@ class AcgFakaDriver implements SupplyDriver
             description: $p['introduce'] ?? ($p['description'] ?? null),
             cover: $p['cover'] ?? null,
             isActive: true,
+            // items 接口对「卡密自动发货」商品(delivery_way=0)会带 stock 字段,
+            // 手动发货商品不带 → 按无限(-1)处理。不读的话预览面板会把所有商品显示成无限库存。
+            stockQuantity: isset($p['stock']) ? (int) $p['stock'] : -1,
         );
     }
 }
