@@ -1,1 +1,0 @@
-import{b2 as a}from"./index-CIpW5f4S.js";const t=t=>{const e=new FormData;return e.append("file",t),a.post({url:"/admin/upload/image",data:e,headers:{"Content-Type":"multipart/form-data"}})};export{t as u};
