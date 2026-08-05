@@ -26,16 +26,25 @@ class SupplySyncService
     /**
      * 单个商品 upsert(供批量同步和测试调用)。
      */
-    public function upsertProduct(SupplySource $source, UpstreamProduct $dto): Product
+    /**
+     * upsert 上游商品到本地。
+     *
+     * @param  array|null  $pricing  显式定价策略(勾选导入时传入,覆盖货源默认):
+     *                               ['mode'=>percent|fixed|equal|pending,
+     *                                'markup_percent'=>int,
+     *                                'markup_amount'=>float(元)]
+     *                               为 null 时走货源 settings 默认定价。
+     */
+    public function upsertProduct(SupplySource $source, UpstreamProduct $dto, ?array $pricing = null): Product
     {
         $existing = Product::where('upstream_source_id', $source->id)
             ->where('upstream_product_code', $dto->code)
             ->first();
 
         if ($existing) {
-            // 已有:更新上游拥有字段,不动 price(售价保护)。
-            // 例外:price<=0 是导入定价失败的脏数据(上游 factory_price 为 0 时),
-            // 下次同步用上游售价重算,否则售价永远停留在 0。
+            // 已有:更新上游拥有字段,默认不动 price(售价保护)。
+            // 例外1:price<=0 是导入定价失败的脏数据,重算。
+            // 例外2:勾选导入显式传了 pricing → 按本次所选策略重新定价。
             $update = [
                 'name' => $dto->name,
                 'description' => $dto->description,
@@ -46,15 +55,20 @@ class SupplySyncService
                 'upstream_synced_at' => now(),
                 'hide' => ! $dto->isActive ? true : $existing->hide, // 上游下架→标隐藏,不删
             ];
-            if ((int) $existing->price <= 0) {
-                $update['price'] = $this->computeInitialPrice($source, $dto->factoryPrice, $dto->price) ?? 0;
+            if ($pricing !== null || (int) $existing->price <= 0) {
+                $newPrice = $this->computeInitialPrice($source, $dto->factoryPrice, $dto->price, $pricing);
+                $update['price'] = $newPrice ?? 0;
+                // pending 模式新导入/重定价 → 待审不上架
+                if ($newPrice === null) {
+                    $update['status'] = 0;
+                }
             }
             $existing->update($update);
             return $existing->fresh();
         }
 
         // 新建:按定价规则算初始 price
-        $price = $this->computeInitialPrice($source, $dto->factoryPrice, $dto->price);
+        $price = $this->computeInitialPrice($source, $dto->factoryPrice, $dto->price, $pricing);
 
         return Product::create([
             'merchant_id' => self::MAIN_MERCHANT_ID,
@@ -80,14 +94,22 @@ class SupplySyncService
      * 基础价优先取上游成本价 factoryPrice;上游未设成本(0)时回退到上游售价 price,
      * 否则(如 acg-faka)下游会把 0 成本加成后仍卖出 0 元。
      * 返回 null 表示待审(pending 模式)。
+     *
+     * @param  array|null  $pricing  显式定价策略(勾选导入时传入,覆盖货源默认):
+     *                               ['mode'=>percent|fixed|equal|pending,
+     *                                'markup_percent'=>int(百分比,如10),
+     *                                'markup_amount'=>float(元)]
      */
-    private function computeInitialPrice(SupplySource $source, int $factoryPrice, int $upstreamPrice): ?int
+    private function computeInitialPrice(SupplySource $source, int $factoryPrice, int $upstreamPrice, ?array $pricing = null): ?int
     {
         $base = $factoryPrice > 0 ? $factoryPrice : $upstreamPrice;
-        $mode = $source->settings['default_pricing_mode'] ?? 'percent';
+        $mode = $pricing['mode'] ?? $source->settings['default_pricing_mode'] ?? 'percent';
+        // markup_amount 单位:元 → 分(fixed 加价)
+        $amountFen = (int) round(((float) ($pricing['markup_amount'] ?? $source->settings['default_markup_amount'] ?? 0)) * 100);
+
         return match ($mode) {
-            'fixed' => $base + (int) ($source->settings['default_markup_amount'] ?? 0),
-            'percent' => (int) round($base * (1 + (int) ($source->settings['default_markup_percent'] ?? 10) / 100)),
+            'fixed' => $base + $amountFen,
+            'percent' => (int) round($base * (1 + (int) ($pricing['markup_percent'] ?? $source->settings['default_markup_percent'] ?? 10) / 100)),
             'equal' => $base,
             'pending' => null,
             default => (int) round($base * 1.1),

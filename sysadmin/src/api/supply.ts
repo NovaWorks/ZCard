@@ -121,8 +121,12 @@ export const previewSupplyProducts = (id: number) =>
   request.get<SupplyPreviewResult>({ url: `/admin/supply-sources/${id}/products/preview` })
 
 /** 勾选导入商品到本地 */
-export const importSupplyProducts = (id: number, codes: string[]) =>
+export const importSupplyProducts = (
+  id: number,
+  codes: string[],
+  options?: { pricing?: { mode?: string; markup_percent?: number; markup_amount?: number }; save_default?: boolean }
+) =>
   request.post<{ ok: boolean; imported: number; skipped: number; message: string; error?: string }>({
     url: `/admin/supply-sources/${id}/products/import`,
-    data: { codes }
+    data: { codes, ...options }
   })

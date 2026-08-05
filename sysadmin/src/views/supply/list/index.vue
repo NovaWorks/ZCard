@@ -204,6 +204,33 @@
               {{ t('zcard.supply.selectAll') }}
             </ElCheckbox>
           </div>
+
+          <!-- 定价策略:实时计算导入售价 -->
+          <div class="preview-pricing">
+            <span class="pricing-label">{{ t('zcard.supply.pricingStrategy') }}</span>
+            <ElRadioGroup v-model="pricingMode" class="pricing-modes">
+              <ElRadio value="percent">{{ t('zcard.supply.pricingPercent') }}</ElRadio>
+              <ElRadio value="fixed">{{ t('zcard.supply.pricingFixed') }}</ElRadio>
+              <ElRadio value="equal">{{ t('zcard.supply.pricingEqual') }}</ElRadio>
+              <ElRadio value="pending">{{ t('zcard.supply.pricingPending') }}</ElRadio>
+            </ElRadioGroup>
+            <template v-if="pricingMode === 'percent'">
+              <div class="input-with-unit pricing-param">
+                <ElInputNumber v-model="markupPercent" :min="0" :max="500" :precision="0" controls-position="right" size="small" style="width: 90px" />
+                <span class="unit">%</span>
+              </div>
+            </template>
+            <template v-if="pricingMode === 'fixed'">
+              <div class="input-with-unit pricing-param">
+                <ElInputNumber v-model="markupAmountYuan" :min="0" :precision="2" :step="0.5" controls-position="right" size="small" style="width: 110px" />
+                <span class="unit">{{ t('zcard.supplierAccount.yuan') }}</span>
+              </div>
+            </template>
+            <ElCheckbox v-model="saveDefaultPricing" class="pricing-save">
+              {{ t('zcard.supply.saveDefaultPricing') }}
+            </ElCheckbox>
+          </div>
+
           <div class="preview-list">
             <div v-for="cat in previewCategories" :key="cat.category_code ?? '_'" class="preview-cat">
               <div class="preview-cat-head" @click="toggleCategoryExpand(cat)">
@@ -230,13 +257,16 @@
               >
                 <div v-for="p in cat.products" :key="p.code" class="preview-product">
                   <ElCheckbox :value="p.code">
-                    <div class="pp-content">
-                      <span class="pp-name">{{ p.name }}</span>
-                      <span class="pp-meta">
-                        <span class="pp-price">¥{{ (p.factory_price / 100).toFixed(2) }}</span>
-                        <ElTag v-if="p.already_imported" size="small" type="success" effect="plain">{{ t('zcard.supply.imported') }}</ElTag>
-                      </span>
-                    </div>
+                      <div class="pp-content">
+                        <span class="pp-name">{{ p.name }}</span>
+                        <span class="pp-meta">
+                          <span class="pp-base">¥{{ (pricingBase(p) / 100).toFixed(2) }}</span>
+                          <span class="pp-arrow">→</span>
+                          <span v-if="calcPrice(p) !== null" class="pp-price">¥{{ ((calcPrice(p) ?? 0) / 100).toFixed(2) }}</span>
+                          <span v-else class="pp-price pending">{{ t('zcard.supply.pricingPendingTip') }}</span>
+                          <ElTag v-if="p.already_imported" size="small" type="success" effect="plain">{{ t('zcard.supply.imported') }}</ElTag>
+                        </span>
+                      </div>
                   </ElCheckbox>
                 </div>
               </ElCheckboxGroup>
@@ -564,6 +594,34 @@
     previewChecked.value = val ? [...allProductCodes.value] : []
   }
 
+  /** ===== 定价策略(勾选导入时实时预览售价) ===== */
+  const pricingMode = ref<'percent' | 'fixed' | 'equal' | 'pending'>('percent')
+  const markupPercent = ref(10)
+  const markupAmountYuan = ref(0)
+  const saveDefaultPricing = ref(false)
+
+  /** 定价基准:上游成本 factory_price,为 0 时回退上游售价 price(与后端一致) */
+  const pricingBase = (p: UpstreamCategory['products'][number]): number =>
+    (p.factory_price ?? 0) > 0 ? p.factory_price : p.price ?? 0
+
+  /** 按所选策略实时计算售价(分);pending 返回 null(待审) */
+  const calcPrice = (p: UpstreamCategory['products'][number]): number | null => {
+    const base = pricingBase(p)
+    if (pricingMode.value === 'percent') return Math.round(base * (1 + markupPercent.value / 100))
+    if (pricingMode.value === 'fixed') return base + Math.round(markupAmountYuan.value * 100)
+    if (pricingMode.value === 'equal') return base
+    return null
+  }
+
+  /** 打开弹窗时从货源设置预填定价策略 */
+  const initPricingFromSource = (row: SupplySource) => {
+    const s = row.settings || {}
+    pricingMode.value = (s.default_pricing_mode as typeof pricingMode.value) || 'percent'
+    markupPercent.value = s.default_markup_percent ?? 10
+    markupAmountYuan.value = Number(s.default_markup_amount) || 0
+    saveDefaultPricing.value = false
+  }
+
   /** ===== 分类折叠 + 分类全选 ===== */
   /** 展开中的分类 code 集合(自定义折叠,不用 el-collapse 避免 header 插槽 memo 不刷新) */
   const expandedCategories = ref<string[]>([])
@@ -611,6 +669,7 @@
     previewCategories.value = []
     previewChecked.value = []
     previewTotal.value = 0
+    initPricingFromSource(row)
     try {
       const res = await previewSupplyProducts(row.id)
       if (res.ok) {
@@ -629,12 +688,20 @@
     }
   }
 
-  /** 勾选导入 */
+  /** 勾选导入(按所选定价策略) */
   const handleImport = async () => {
     if (!previewSourceId.value || previewChecked.value.length === 0) return
     importing.value = true
     try {
-      const res = await importSupplyProducts(previewSourceId.value, [...previewChecked.value])
+      const pricing = {
+        mode: pricingMode.value,
+        markup_percent: markupPercent.value,
+        markup_amount: markupAmountYuan.value,
+      }
+      const res = await importSupplyProducts(previewSourceId.value, [...previewChecked.value], {
+        pricing,
+        save_default: saveDefaultPricing.value,
+      })
       if (res.ok) {
         ElMessage.success(res.message || t('zcard.supply.importSuccess'))
         previewVisible.value = false
@@ -732,6 +799,37 @@
     font-size: 13px;
     color: var(--el-text-color-secondary);
   }
+  /* 定价策略区 */
+  .preview-pricing {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    background: var(--el-fill-color-lighter);
+    border-radius: 6px;
+  }
+  .pricing-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+    flex-shrink: 0;
+  }
+  .pricing-modes {
+    display: flex;
+    align-items: center;
+  }
+  .pricing-modes :deep(.el-radio) {
+    margin-right: 14px;
+  }
+  .pricing-param {
+    margin-left: 4px;
+  }
+  .pricing-save {
+    margin-left: auto;
+    flex-shrink: 0;
+  }
   .preview-list {
     max-height: 55vh;
     overflow-y: auto;
@@ -823,10 +921,22 @@
     gap: 8px;
     flex-shrink: 0;
   }
+  .pp-base {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+    text-decoration: line-through;
+  }
+  .pp-arrow {
+    font-size: 12px;
+    color: var(--el-text-color-placeholder);
+  }
   .pp-price {
     font-size: 13px;
     color: var(--el-color-danger);
     font-weight: 600;
+  }
+  .pp-price.pending {
+    color: var(--el-color-warning);
   }
   .preview-empty {
     text-align: center;

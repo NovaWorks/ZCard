@@ -184,9 +184,33 @@ class SupplySourceController extends Controller
         $data = $request->validate([
             'codes' => 'required|array|min:1',
             'codes.*' => 'string',
+            'pricing' => 'nullable|array',
+            'pricing.mode' => 'sometimes|in:percent,fixed,equal,pending',
+            'pricing.markup_percent' => 'sometimes|numeric|min:0',
+            'pricing.markup_amount' => 'sometimes|numeric|min:0',
+            'save_default' => 'sometimes|boolean',
         ]);
 
         try {
+            // 显式定价策略(勾选导入时前端选择),null 则沿用货源默认
+            $pricing = $data['pricing'] ?? null;
+            if ($pricing !== null) {
+                $pricing = array_intersect_key($pricing, array_flip(['mode', 'markup_percent', 'markup_amount']));
+            }
+
+            // 保存为货源默认定价设置(下次打开弹窗预填/后续同步生效)
+            if (! empty($data['save_default']) && $pricing !== null) {
+                $settings = $supplySource->settings ?? [];
+                $settings['default_pricing_mode'] = $pricing['mode'] ?? $settings['default_pricing_mode'] ?? 'percent';
+                if (isset($pricing['markup_percent'])) {
+                    $settings['default_markup_percent'] = (int) $pricing['markup_percent'];
+                }
+                if (isset($pricing['markup_amount'])) {
+                    $settings['default_markup_amount'] = (float) $pricing['markup_amount'];
+                }
+                $supplySource->update(['settings' => $settings]);
+            }
+
             $driver = app(SupplyManager::class)->driver($supplySource);
             $sync = app(\App\Supply\SupplySyncService::class);
             $imported = 0;
@@ -202,7 +226,7 @@ class SupplySourceController extends Controller
                     $skipped++;
                     continue;
                 }
-                $sync->upsertProduct($supplySource, $dto);
+                $sync->upsertProduct($supplySource, $dto, $pricing);
                 $imported++;
             }
 
