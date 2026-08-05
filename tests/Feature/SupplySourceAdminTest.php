@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Support\StorefrontConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class SupplySourceAdminTest extends TestCase
@@ -18,7 +19,7 @@ class SupplySourceAdminTest extends TestCase
         parent::setUp();
         // RefreshDatabase 清空权限表,需重建角色(P0 RBAC 守卫要求 super_admin/merchant)
         foreach (['super_admin', 'merchant', 'user'] as $role) {
-            \Spatie\Permission\Models\Role::firstOrCreate(['name' => $role]);
+            Role::firstOrCreate(['name' => $role]);
         }
     }
 
@@ -26,6 +27,7 @@ class SupplySourceAdminTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole('super_admin');
+
         return $user->createToken('test')->plainTextToken;
     }
 
@@ -67,5 +69,24 @@ class SupplySourceAdminTest extends TestCase
         $fresh = $source->fresh();
         $this->assertSame('newkey', $fresh->credentials['api_key']);
         $this->assertSame('oldsecret', $fresh->credentials['api_secret']); // 保留旧值
+    }
+
+    public function test_preview_with_nonexistent_source_returns_friendly_404(): void
+    {
+        StorefrontConfig::setMany(['supply_enabled' => true]);
+        // 建一个货源,让"可用 id"列表非空
+        $source = SupplySource::create([
+            'name' => 'S', 'driver' => 'dujiao_next', 'base_url' => 'https://x.com',
+            'credentials' => ['api_key' => 'ak'], 'status' => 'active',
+        ]);
+        $missingId = $source->id + 999;
+
+        // 隐式路由绑定查不到记录 → 不再返回裸 "Not Found",而是带可用 id 的自诊断错误
+        $resp = $this->withToken($this->adminToken())
+            ->getJson("/api/admin/supply-sources/{$missingId}/products/preview");
+
+        $resp->assertStatus(404)
+            ->assertJsonPath('ok', false)
+            ->assertJsonPath('error', "货源不存在: id={$missingId}。可用货源 id: {$source->id}。请先 GET /api/admin/supply-sources 获取真实 id。");
     }
 }

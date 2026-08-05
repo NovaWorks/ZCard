@@ -1,9 +1,25 @@
 <?php
 
+use App\Http\Middleware\EnsureInstalled;
+use App\Http\Middleware\MaintenanceMiddleware;
+use App\Http\Middleware\NoCacheHtml;
+use App\Http\Middleware\RequireAdminRole;
+use App\Http\Middleware\RequireMainSite;
+use App\Http\Middleware\ResolveDisplayCurrency;
+use App\Http\Middleware\ResolveSubsite;
+use App\Http\Middleware\SetLocale;
+use App\Http\Middleware\SupplyAuth;
+use App\Http\Middleware\SupplyRateLimit;
+use App\Models\SupplySource;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Session\Middleware\StartSession;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\Routing\Exception\RouteNotFoundException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -15,27 +31,27 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // 未安装拦截:最先执行,检测到未安装时降级 driver 并跳转 /install
         // 必须在 StartSession 之前,否则 session(driver=database) 查表会崩
-        $middleware->prepend(\App\Http\Middleware\EnsureInstalled::class);
+        $middleware->prepend(EnsureInstalled::class);
 
         // SPA 入口 HTML 不缓存(防止更新后旧 index.html 引用已删除的 hash JS → 404 白屏)
-        $middleware->append(\App\Http\Middleware\NoCacheHtml::class);
+        $middleware->append(NoCacheHtml::class);
 
         // API 路由加入 Session 支持(mews/captcha 验证码需要 session 存储)
         $middleware->api(prepend: [
-            \Illuminate\Session\Middleware\StartSession::class,
-            \App\Http\Middleware\MaintenanceMiddleware::class,
-            \App\Http\Middleware\ResolveSubsite::class,
+            StartSession::class,
+            MaintenanceMiddleware::class,
+            ResolveSubsite::class,
         ]);
         // 确保 StatefulApi 域配置存在(Sanctum SPA 认证也需要)
         $middleware->statefulApi();
 
         $middleware->alias([
-            'display.currency' => \App\Http\Middleware\ResolveDisplayCurrency::class,
-            'set.locale' => \App\Http\Middleware\SetLocale::class,
-            'require.main.site' => \App\Http\Middleware\RequireMainSite::class,
-            'admin.role' => \App\Http\Middleware\RequireAdminRole::class,
-            'supply.auth' => \App\Http\Middleware\SupplyAuth::class,
-            'supply.rate' => \App\Http\Middleware\SupplyRateLimit::class,
+            'display.currency' => ResolveDisplayCurrency::class,
+            'set.locale' => SetLocale::class,
+            'require.main.site' => RequireMainSite::class,
+            'admin.role' => RequireAdminRole::class,
+            'supply.auth' => SupplyAuth::class,
+            'supply.rate' => SupplyRateLimit::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -46,14 +62,32 @@ return Application::configure(basePath: dirname(__DIR__))
         // API 请求未认证时返回 401 JSON,而非重定向到不存在的 login 路由(API-first)。
         // 认证异常的默认处理会尝试 redirect()->route('login'),因 API 无 login 路由会抛
         // RouteNotFoundException —— 同时捕获这两类异常,对 api/* 一律返回 401 JSON。
-        $exceptions->renderable(function (\Throwable $e, Request $request) {
+        $exceptions->renderable(function (Throwable $e, Request $request) {
             if (! $request->is('api/*')) {
                 return null;
             }
-            if ($e instanceof \Illuminate\Auth\AuthenticationException
-                || $e instanceof \Symfony\Component\Routing\Exception\RouteNotFoundException) {
+            if ($e instanceof AuthenticationException
+                || $e instanceof RouteNotFoundException) {
                 return response()->json(['message' => '未认证,请提供有效的 API token'], 401);
             }
+
+            // 隐式路由绑定找不到货源(如 /supply-sources/3/... 但 3 不存在):
+            // 返回自诊断 JSON,列出可用 id,避免调用方面对无从查起的裸 404。
+            // 注意:Handler 会先把 ModelNotFoundException 转成 NotFoundHttpException
+            // 再交给 renderable 回调,故从 getPrevious() 取原始异常判断模型。
+            if ($e instanceof NotFoundHttpException
+                && $e->getPrevious() instanceof ModelNotFoundException
+                && $e->getPrevious()->getModel() === SupplySource::class) {
+                $ids = SupplySource::query()->pluck('id')->all();
+
+                return response()->json([
+                    'ok' => false,
+                    'error' => '货源不存在: id='.($request->route('supplySource') ?? '?')
+                        .'。可用货源 id: '.(implode(', ', $ids) ?: '暂无')
+                        .'。请先 GET /api/admin/supply-sources 获取真实 id。',
+                ], 404);
+            }
+
             return null;
         });
     })->create();
