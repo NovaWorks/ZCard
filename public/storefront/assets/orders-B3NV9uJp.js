@@ -1,1 +1,0 @@
-import{n as e,t}from"./request-Bcg6USuH.js";var n=e({createOrder:()=>r,getMyOrders:()=>o,mockPay:()=>i,queryOrders:()=>a}),r=e=>t.post(`/orders`,e),i=e=>t.post(`/orders/${e}/mock-pay`),a=(e,n)=>t.get(`/orders/query`,{params:{keyword:e,password:n}}),o=()=>t.get(`/orders/mine`);export{a,n as i,o as n,i as r,r as t};

@@ -4,6 +4,7 @@ return [
     'guest_only' => 'Only members can checkout. Please log in first.',
     'captcha_error' => 'Invalid captcha.',
     'order_not_found' => 'No matching orders found.',
+    'items_required' => 'Please select at least one product.',
     'insufficient_stock' => 'Insufficient stock: :need needed, only :have left.',
 
     'auth.register_closed' => 'Registration is currently closed.',
@@ -39,6 +40,9 @@ return [
     'withdrawal.insufficient_balance' => 'Insufficient balance.',
 
     'payment.channel_disabled' => 'This payment channel is not enabled.',
+    'payment.order_ids_required' => 'Please select orders to pay.',
+    'payment.order_not_found' => 'Some orders are invalid.',
+    'payment.order_not_pending' => 'Some orders are already paid or closed.',
 
     // ===== Balance recharge =====
     'recharge.amount_invalid' => 'Recharge amount must be greater than 0',

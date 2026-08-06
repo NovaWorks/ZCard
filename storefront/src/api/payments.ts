@@ -24,3 +24,10 @@ export const createPayment = (orderNo: string, channelId: number) =>
     order_no: orderNo,
     channel_id: channelId,
   })
+
+/** 购物车聚合支付:一次支付多个订单 */
+export const createBatchPayment = (orderIds: number[], channelId: number) =>
+  request.post<unknown, PaymentResult>('/payments/batch-create', {
+    order_ids: orderIds,
+    channel_id: channelId,
+  })

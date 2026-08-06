@@ -4,6 +4,7 @@ return [
     'guest_only' => '当前仅限会员下单,请先登录',
     'captcha_error' => '验证码错误',
     'order_not_found' => '未找到相关订单',
+    'items_required' => '请选择至少一个商品',
     'insufficient_stock' => '库存不足,需要 :need 张,仅剩 :have 张',
 
     'auth.register_closed' => '注册功能已关闭',
@@ -39,6 +40,9 @@ return [
     'withdrawal.insufficient_balance' => '余额不足',
 
     'payment.channel_disabled' => '该支付通道未启用',
+    'payment.order_ids_required' => '请选择待支付的订单',
+    'payment.order_not_found' => '存在无效的订单',
+    'payment.order_not_pending' => '存在已支付或已关闭的订单',
 
     // ===== 余额充值 =====
     'recharge.amount_invalid' => '充值金额必须大于 0',

@@ -10,6 +10,7 @@
     "login": "Login",
     "register": "Register",
     "logout": "Logout",
+    "cart": "Cart",
     "brandBar": {
       "slogan": "🚀 Leading virtual goods auto-delivery platform · 24/7 instant dispatch",
       "securePay": "✓ Secure payment",
@@ -166,6 +167,7 @@
     "stock": "Stock",
     "sold": "Sold",
     "noImage": "No image",
+    "remove": "Remove",
     "loading": "Loading...",
     "confirm": "Confirm",
     "cancel": "Cancel",
@@ -258,7 +260,17 @@
       "submitFailed": "Order failed (may be out of stock)",
       "captchaGet": "Get",
       "captchaRefreshTitle": "Click to refresh",
-      "onlyUserSubmitError": "This product is for members only, please log in first"
+      "onlyUserSubmitError": "This product is for members only, please log in first",
+      "kinds": "items",
+      "unitPrice": "Unit Price",
+      "lineTotal": "Subtotal",
+      "contactTitle": "Contact Info",
+      "payMethod": "Payment Method",
+      "discount": "Discount",
+      "payable": "Total Due",
+      "cartEmpty": "Your cart is empty",
+      "continueShopping": "Keep Shopping",
+      "selectChannel": "Please select a payment method"
     },
     "myOrders": {
       "title": "My Orders",
@@ -320,6 +332,8 @@
       "stockPlenty": "In stock",
       "stockUnit": "{n} items",
       "buyNow": "Buy Now",
+      "addToCart": "Add to Cart",
+      "addedToCart": "Added ✓",
       "detailTitle": "Product Details",
       "reviewTitle": "Customer Reviews",
       "reviewAnonymous": "Anonymous",

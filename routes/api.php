@@ -277,12 +277,14 @@ Route::middleware('auth:sanctum')->get('/cards', [CardController::class, 'index'
 
 // 订单(游客,不需 auth)— API-first:前台和后台都调 OrderService
 Route::post('/orders', [OrderController::class, 'create'])->middleware(['display.currency', 'set.locale'])->name('api.orders.create');
+Route::post('/orders/batch', [OrderController::class, 'batch'])->middleware(['display.currency', 'set.locale'])->name('api.orders.batch');
 Route::post('/orders/{orderNo}/mock-pay', [OrderController::class, 'mockPay'])->middleware(['display.currency', 'set.locale'])->name('api.orders.mock-pay');
 Route::get('/orders/query', [OrderController::class, 'query'])->middleware(['display.currency', 'set.locale'])->name('api.orders.query');
 
 // 支付(游客 + 回调,不需 auth)
 Route::get('/payments/channels', [PaymentController::class, 'channels'])->name('api.payments.channels');
 Route::post('/payments/create', [PaymentController::class, 'create'])->name('api.payments.create');
+Route::post('/payments/batch-create', [PaymentController::class, 'batchCreate'])->name('api.payments.batch-create');
 Route::post('/payments/callback/{channel}', [PaymentController::class, 'callback'])->name('api.payments.callback');
 
 // 支付同步跳回(第三方支付完成后浏览器跳转,重定向到前台结果页)

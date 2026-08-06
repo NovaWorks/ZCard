@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Payment extends Model
 {
     protected $fillable = [
-        'order_id', 'recharge_id', 'channel', 'channel_order_no', 'amount', 'status', 'paid_at', 'raw',
+        'order_id', 'order_ids', 'recharge_id', 'channel', 'channel_order_no', 'amount', 'status', 'paid_at', 'raw',
         'charged_currency', 'charged_amount', 'channel_exchange_rate',
     ];
 
@@ -17,6 +17,7 @@ class Payment extends Model
         return [
             'paid_at' => 'datetime',
             'raw' => 'array',
+            'order_ids' => 'array',
             'channel_exchange_rate' => 'decimal:8',
         ];
     }

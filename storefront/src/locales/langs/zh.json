@@ -10,6 +10,7 @@
     "login": "登录",
     "register": "注册",
     "logout": "退出",
+    "cart": "购物车",
     "brandBar": {
       "slogan": "🚀 全球领先的虚拟商品自动发卡平台 · 7×24 小时极速发货",
       "securePay": "✓ 安全支付",
@@ -166,6 +167,7 @@
     "stock": "库存",
     "sold": "已售",
     "noImage": "暂无图片",
+    "remove": "移除",
     "loading": "加载中...",
     "confirm": "确认",
     "cancel": "取消",
@@ -258,7 +260,17 @@
       "submitFailed": "下单失败(可能库存不足)",
       "captchaGet": "获取",
       "captchaRefreshTitle": "点击刷新",
-      "onlyUserSubmitError": "该商品仅限会员购买，请先登录"
+      "onlyUserSubmitError": "该商品仅限会员购买，请先登录",
+      "kinds": "种商品",
+      "unitPrice": "单价",
+      "lineTotal": "小计",
+      "contactTitle": "联系方式",
+      "payMethod": "支付方式",
+      "discount": "优惠",
+      "payable": "应付总额",
+      "cartEmpty": "购物车还是空的",
+      "continueShopping": "去逛逛",
+      "selectChannel": "请选择支付方式"
     },
     "myOrders": {
       "title": "我的订单",
@@ -320,6 +332,8 @@
       "stockPlenty": "库存充足",
       "stockUnit": "{n} 件",
       "buyNow": "立即购买",
+      "addToCart": "加入购物车",
+      "addedToCart": "已加入 ✓",
       "detailTitle": "商品详情",
       "reviewTitle": "用户评价",
       "reviewAnonymous": "匿名用户",

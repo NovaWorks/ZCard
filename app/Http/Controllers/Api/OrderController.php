@@ -74,6 +74,67 @@ class OrderController extends Controller
         return 'other';
     }
 
+    /** 购物车批量下单:多个商品各创建一张订单(一个事务,任一失败整体回滚) */
+    public function batch(Request $request, OrderService $service): JsonResponse
+    {
+        $data = $request->validate([
+            'items' => 'required|array|min:1|max:20',
+            'items.*.product_id' => 'required|integer|exists:products,id',
+            'items.*.sku_id' => 'nullable|integer',
+            'items.*.qty' => 'required|integer|min:1|max:100',
+            'contact' => 'required|string|max:150',
+            'password' => 'nullable|string|max:50',
+            'captcha' => 'nullable|string',
+            'coupon_code' => 'nullable|string|max:32',
+            'extra' => 'nullable|array',
+            'display_currency' => 'nullable|string|size:3',
+        ]);
+
+        $guestCheckout = \App\Support\StorefrontConfig::get('guest_checkout') ?? true;
+        if (! $guestCheckout && ! $request->user()) {
+            return response()->json(['message' => __('messages.guest_only')], 403);
+        }
+
+        if (\App\Support\CaptchaService::isEnabled('trade')) {
+            if (! \App\Support\CaptchaService::verify('trade', $data['captcha'] ?? null)) {
+                return response()->json(['message' => __('messages.captcha_error')], 422);
+            }
+        }
+
+        try {
+            $orders = $service->batchCreate(
+                $data['items'],
+                [
+                    'contact' => $data['contact'],
+                    'password' => $data['password'] ?? null,
+                    'extra' => $data['extra'] ?? null,
+                    'coupon_code' => $data['coupon_code'] ?? null,
+                    'user_id' => $request->user()?->id,
+                    'create_ip' => $request->ip(),
+                    'create_device' => $this->detectDevice($request),
+                ],
+                $data['display_currency'] ?? null,
+            );
+
+            return response()->json([
+                'orders' => $orders->map(fn ($o) => [
+                    'id' => $o->id,
+                    'order_no' => $o->order_no,
+                    'product_id' => $o->product_id,
+                    'amount' => $o->amount,
+                    'discount_amount' => $o->discount_amount,
+                    'status' => $o->status,
+                ]),
+                'total_amount' => (int) $orders->sum('amount'),
+                'order_ids' => $orders->pluck('id')->all(),
+            ], 201);
+        } catch (\App\Exceptions\InsufficientStockException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
     public function mockPay(string $orderNo, OrderService $service): JsonResponse
     {
         // 安全:模拟支付仅限开发/测试环境,生产环境禁用(否则任何人可白嫖订单+触发佣金)

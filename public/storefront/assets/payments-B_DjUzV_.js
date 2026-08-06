@@ -1,1 +1,0 @@
-import{t as e}from"./request-Bcg6USuH.js";var t=()=>e.get(`/payments/channels`),n=(t,n)=>e.post(`/payments/create`,{order_no:t,channel_id:n});export{t as n,n as t};

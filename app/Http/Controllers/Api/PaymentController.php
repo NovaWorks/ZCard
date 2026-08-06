@@ -73,6 +73,25 @@ class PaymentController extends Controller
         }
     }
 
+    /**
+     * 购物车聚合支付:一次支付多个待支付订单(收银台场景)。
+     */
+    public function batchCreate(Request $request, PaymentService $service): JsonResponse
+    {
+        $data = $request->validate([
+            'order_ids' => 'required|array|min:1',
+            'order_ids.*' => 'integer',
+            'channel_id' => 'required|integer|exists:payment_channels,id',
+        ]);
+
+        try {
+            $result = $service->createBatchPayment($data['order_ids'], $data['channel_id']);
+            return response()->json($result);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 400);
+        }
+    }
+
     public function callback(string $channel, Request $request, PaymentService $service)
     {
         $result = $service->handleCallback($channel, $request);

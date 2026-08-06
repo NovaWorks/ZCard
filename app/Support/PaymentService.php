@@ -10,7 +10,6 @@ use App\Payment\Contracts\Payable;
 use App\Payment\Contracts\PaymentDriver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-
 class PaymentService
 {
     public function getEnabledChannels(): Collection
@@ -69,6 +68,84 @@ class PaymentService
             throw new \RuntimeException('不支持的 Payable 类型: ' . get_class($payable));
         }
         Payment::create($payload);
+
+        return $result->toArray();
+    }
+
+    /**
+     * 购物车聚合支付:多个订单一次付款。
+     *
+     * 用主订单(第一个)的订单号作为网关单号发起收款,金额为各订单之和;
+     * 支付流水通过 order_id=主订单 + order_ids=全部订单 关联,
+     * 回调时按主订单找到流水,再对 order_ids 内所有订单统一 markPaid。
+     *
+     * @return array 驱动 PaymentResult 的 toArray()
+     */
+    public function createBatchPayment(array $orderIds, int $channelId): array
+    {
+        $channel = PaymentChannel::findOrFail($channelId);
+        if (! $channel->enabled) {
+            throw new \RuntimeException(__('messages.payment.channel_disabled'));
+        }
+
+        $ids = array_values(array_unique(array_map('intval', $orderIds)));
+        if (empty($ids)) {
+            throw new \RuntimeException(__('messages.payment.order_ids_required'));
+        }
+
+        $orders = Order::whereIn('id', $ids)->get();
+        if ($orders->count() !== count($ids)) {
+            throw new \RuntimeException(__('messages.payment.order_not_found'));
+        }
+        if ($orders->contains(fn ($o) => $o->status !== 'pending')) {
+            throw new \RuntimeException(__('messages.payment.order_not_pending'));
+        }
+
+        $total = (int) $orders->sum('amount');
+        /** @var Order $main 主订单:网关单号 + 支付流水主关联 */
+        $main = $orders->first();
+
+        // 聚合 Payable:单号取主订单,金额取总和,驱动只关心这两项
+        $payable = new class($main, $total) implements Payable {
+            public function __construct(private Order $main, private int $total) {}
+
+            public function getPayableKey(): string
+            {
+                return $this->main->order_no;
+            }
+
+            public function getPayableAmount(): int
+            {
+                return $this->total;
+            }
+
+            public function getPayableType(): string
+            {
+                return 'order';
+            }
+        };
+
+        $driver = $this->resolveDriver($channel);
+        $config = $channel->config ?? [];
+        $supported = $driver->getSupportedCurrencies();
+        $targetCur = strtoupper($config['target_currency'] ?? ($supported[0] ?? 'CNY'));
+        $rate = (float) ($config['exchange_rate'] ?? 1);
+        if ($rate <= 0) {
+            $rate = 1.0;
+        }
+
+        $result = $driver->pay($payable, $config);
+
+        Payment::create([
+            'order_id' => $main->id,
+            'order_ids' => $orders->pluck('id')->all(),
+            'channel' => $channel->code,
+            'amount' => $total,
+            'status' => 'pending',
+            'charged_currency' => $result->currencySent ?? $targetCur,
+            'charged_amount' => $result->amountSent ?? $total,
+            'channel_exchange_rate' => $rate,
+        ]);
 
         return $result->toArray();
     }
@@ -132,15 +209,23 @@ class PaymentService
         Payment::where('order_id', $order->id)->where('channel', $channelCode)
             ->update(['status' => 'success', 'paid_at' => now(), 'raw' => $request->all()]);
 
+        // 聚合支付(order_ids 非空):主订单的支付流水关联了多个订单,统一 markPaid
+        $orderNos = Order::whereIn('id', ! empty($payment->order_ids) ? $payment->order_ids : [$order->id])
+            ->pluck('order_no')
+            ->all();
+
         // markPaid 内部有 lockForUpdate + 状态检查,并发时第二个会抛异常
         // 捕获后视为幂等(已被其他并发请求处理),返回 success 让第三方停止重试
-        try {
-            app(OrderService::class)->markPaid($order->order_no);
-        } catch (\RuntimeException $e) {
-            if ($order->fresh()->status === 'paid') {
-                return 'success';
+        foreach ($orderNos as $orderNo) {
+            try {
+                app(OrderService::class)->markPaid($orderNo);
+            } catch (\RuntimeException $e) {
+                $fresh = Order::where('order_no', $orderNo)->first();
+                if ($fresh && $fresh->status === 'paid') {
+                    continue;
+                }
+                throw $e;
             }
-            throw $e;
         }
 
         return 'success';

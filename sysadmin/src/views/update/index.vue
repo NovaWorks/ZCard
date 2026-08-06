@@ -14,7 +14,9 @@ import type { UpdateCheck, VersionInfo, UpdateResult } from '@/api/update'
 /** Markdown → HTML(marked 已对 XSS 做基本转义;release notes 来自自己的 GitHub) */
 const renderMd = (md?: string): string => {
   if (!md) return ''
-  return marked.parse(md, { async: false }) as string
+  // 兼容 GitHub Release body 中误存为字面量 "\n" 的换行(shell 创建 release 时未转义,常见问题)
+  const normalized = md.replace(/\\n/g, '\n')
+  return marked.parse(normalized, { async: false }) as string
 }
 
 defineOptions({ name: 'UpdateIndex' })

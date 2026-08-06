@@ -5,11 +5,13 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useSettingsStore } from '@/stores/settings'
 import { usePreferencesStore } from '@/stores/preferences'
+import { useCartStore } from '@/stores/cart'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const settings = useSettingsStore()
 const prefs = usePreferencesStore()
+const cart = useCartStore()
 const { t } = useI18n()
 // 确保配置已加载(直达子页时 config 可能为 null)
 onMounted(() => {
@@ -71,6 +73,14 @@ const mobileMenuOpen = ref(false)
       <nav class="hidden md:flex items-center gap-1 text-sm">
         <RouterLink to="/" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.home') }}</RouterLink>
         <RouterLink to="/orders/query" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.orders') }}</RouterLink>
+        <!-- 购物车入口(角标显示数量) -->
+        <RouterLink to="/checkout?cart=1" class="relative px-2 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">
+          🛒
+          <span
+            v-if="cart.totalQty > 0"
+            class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center"
+          >{{ cart.totalQty > 99 ? '99+' : cart.totalQty }}</span>
+        </RouterLink>
         <template v-if="authStore.isLoggedIn">
           <RouterLink to="/orders/mine" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.mine') }}</RouterLink>
           <RouterLink v-if="settings.config?.distribution_enabled" to="/distribution" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.distribution') }}</RouterLink>
@@ -114,6 +124,9 @@ const mobileMenuOpen = ref(false)
     <div v-if="mobileMenuOpen" class="md:hidden border-t border-border bg-white px-4 py-3 space-y-2">
       <RouterLink to="/" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">{{ t('nav.home') }}</RouterLink>
       <RouterLink to="/orders/query" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">{{ t('nav.orders') }}</RouterLink>
+      <RouterLink to="/checkout?cart=1" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">
+        🛒 {{ t('nav.cart') }}<span v-if="cart.totalQty > 0" class="text-danger font-bold"> ({{ cart.totalQty }})</span>
+      </RouterLink>
       <template v-if="authStore.isLoggedIn">
         <RouterLink to="/user" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink font-medium hover:bg-primary-light transition text-sm">👤 {{ authStore.user?.username }}</RouterLink>
         <RouterLink to="/orders/mine" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">{{ t('nav.mine') }}</RouterLink>

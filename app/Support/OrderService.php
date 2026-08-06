@@ -57,12 +57,12 @@ class OrderService
             }
         }
 
-        // 优惠券处理
+        // 优惠券处理(购物车批量下单支持任意数量;仅非分站订单可用)
         $couponCode = $customer['coupon_code'] ?? null;
         $discountAmount = 0;
         $coupon = null;
 
-        if ($couponCode && $qty === 1 && ! $subsite) {
+        if ($couponCode && ! $subsite) {
             $result = \App\Support\CouponService::validate($couponCode, $productId, $amount);
             $discountAmount = $result['discount'];
             $coupon = $result['coupon'];
@@ -167,6 +167,67 @@ class OrderService
 
             return $order;
         });
+    }
+
+    /**
+     * 购物车批量下单:一个事务内为多个商品各创建一张订单。
+     *
+     * @param array $items  [{product_id, sku_id?, qty}]
+     * @param array $customer [contact, password?, extra?, coupon_code?, user_id?, create_ip?, create_device?]
+     * @return \Illuminate\Support\Collection<int, Order> 订单集合(与 items 顺序一致)
+     * @throws InsufficientStockException 任一商品库存不足时整体回滚
+     */
+    public function batchCreate(array $items, array $customer, ?string $displayCurrency = null): \Illuminate\Support\Collection
+    {
+        if (empty($items)) {
+            throw new \InvalidArgumentException(__('messages.order.items_required'));
+        }
+
+        // 优惠券只作用于购物车中第一个适用商品(逐商品尝试验证)
+        $couponCode = $customer['coupon_code'] ?? null;
+        $couponUsed = false;
+
+        return DB::transaction(function () use ($items, $customer, $displayCurrency, $couponCode, &$couponUsed) {
+            $orders = [];
+            foreach ($items as $item) {
+                $productId = (int) ($item['product_id'] ?? 0);
+                $skuId = isset($item['sku_id']) ? (int) $item['sku_id'] : null;
+                $qty = max(1, (int) ($item['qty'] ?? 1));
+
+                $itemCustomer = $customer;
+                if ($couponCode && ! $couponUsed) {
+                    // 让 createOrder 对该商品应用优惠券;不适用则跳过该商品继续尝试下一个
+                    $itemCustomer['coupon_code'] = $couponCode;
+                } else {
+                    unset($itemCustomer['coupon_code']);
+                }
+
+                try {
+                    $orders[] = $this->createOrder($productId, $skuId, $qty, $itemCustomer, $displayCurrency);
+                    $couponUsed = true; // 创建成功即视为该商品适用(createOrder 内部已验证并核销)
+                } catch (\RuntimeException $e) {
+                    // 优惠券不适用当前商品:去掉券码重试(避免把非券错误吞掉)
+                    if ($couponCode && ! $couponUsed && $this->isCouponError($e)) {
+                        unset($itemCustomer['coupon_code']);
+                        $orders[] = $this->createOrder($productId, $skuId, $qty, $itemCustomer, $displayCurrency);
+                        continue;
+                    }
+                    throw $e;
+                }
+            }
+
+            return collect($orders);
+        });
+    }
+
+    /** 判断异常是否由优惠券校验引起(用于购物车批量下单时逐个商品尝试) */
+    private function isCouponError(\RuntimeException $e): bool
+    {
+        $msg = $e->getMessage();
+        return str_contains($msg, __('messages.coupon.not_for_product'))
+            || str_contains($msg, __('messages.coupon.not_for_category'))
+            || str_contains($msg, __('messages.coupon.below_min'))
+            || str_contains($msg, __('messages.coupon.exceeds_amount'));
     }
 
     /**

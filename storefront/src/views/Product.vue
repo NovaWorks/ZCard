@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getProduct, type Product } from '@/api/products'
 import { getProductReviews, type ReviewItem } from '@/api/reviews'
 import { useSettingsStore } from '@/stores/settings'
 import { formatMoney } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
+import { useCartStore } from '@/stores/cart'
 
 const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
 const settings = useSettingsStore()
 const prefs = usePreferencesStore()
+const cart = useCartStore()
 const product = ref<Product | null>(null)
 const err = ref('')
 const selectedSku = ref<number | null>(null)
@@ -92,8 +95,37 @@ const priceDisplay = computed(() => {
   return product.value.price_display ?? product.value.price
 })
 const fmtDate = (d: string | null) => d ? String(d).slice(0, 10) : ''
+/** 已加入购物车状态(按钮短暂反馈) */
+const addedFeedback = ref(false)
+let addedTimer: ReturnType<typeof setTimeout> | null = null
+function addToCart() {
+  if (!product.value) return
+  const sku = product.value.skus?.find(s => s.id === selectedSku.value)
+  cart.add({
+    product_id: product.value.id,
+    sku_id: selectedSku.value,
+    qty: qty.value,
+    slug: product.value.slug,
+    name: product.value.name,
+    cover: product.value.cover ?? null,
+    price: sku ? sku.price : product.value.price,
+    price_display: sku ? (sku.price_display ?? sku.price) : (product.value.price_display ?? product.value.price),
+    sku_name: sku?.name ?? null,
+  })
+  addedFeedback.value = true
+  if (addedTimer) clearTimeout(addedTimer)
+  addedTimer = setTimeout(() => { addedFeedback.value = false }, 2000)
+}
 function buy() {
-  alert(t('product.detail.buyAlert', { sku: selectedSku.value, qty: qty.value }))
+  if (!product.value) return
+  router.push({
+    path: '/checkout',
+    query: {
+      product: product.value.slug,
+      qty: String(qty.value),
+      ...(selectedSku.value ? { sku: String(selectedSku.value) } : {}),
+    },
+  })
 }
 </script>
 
@@ -206,8 +238,17 @@ function buy() {
           </div>
         </div>
 
-        <!-- 立即购买 -->
-        <button @click="buy" class="w-full mt-4 bg-gradient-to-r from-primary to-primary-hover text-white font-bold py-3 rounded-card shadow-md hover:shadow-pop transition">{{ t('product.detail.buyNow') }}</button>
+        <!-- 购买操作:加入购物车 + 立即购买 -->
+        <div class="flex gap-2 mt-4">
+          <button
+            @click="addToCart"
+            class="flex-1 bg-white border-2 border-primary text-primary font-bold py-3 rounded-card hover:bg-primary-light transition"
+          >{{ addedFeedback ? t('product.detail.addedToCart') : t('product.detail.addToCart') }}</button>
+          <button
+            @click="buy"
+            class="flex-1 bg-gradient-to-r from-primary to-primary-hover text-white font-bold py-3 rounded-card shadow-md hover:shadow-pop transition"
+          >{{ t('product.detail.buyNow') }}</button>
+        </div>
       </div>
     </div>
 

@@ -15,6 +15,17 @@ export const createOrder = (data: {
   contact: string; password?: string; extra?: Record<string, any>
 }) => request.post<unknown, CreatedOrder>('/orders', data)
 
+export interface BatchOrderResult {
+  orders: { id: number; order_no: string; product_id: number; amount: number; discount_amount: number; status: string }[]
+  total_amount: number
+  order_ids: number[]
+}
+export const createBatchOrders = (data: {
+  items: { product_id: number; sku_id?: number; qty: number }[]
+  contact: string; password?: string; captcha?: string
+  coupon_code?: string; extra?: Record<string, any>
+}) => request.post<unknown, BatchOrderResult>('/orders/batch', data)
+
 export const mockPay = (orderNo: string) =>
   request.post<unknown, { order_no: string; status: string; delivered: boolean }>(`/orders/${orderNo}/mock-pay`)
 
