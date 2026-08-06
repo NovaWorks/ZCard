@@ -140,7 +140,7 @@ class UpdateController extends Controller
             $this->ensureHttpsRemote();
             $this->preserveUserFiles();
             // fetch 远程 → reset --hard origin/main(工作区已被 preserveUserFiles 清理干净)
-            $output = $this->shell('cd ' . base_path() . ' && git fetch origin main 2>&1 && git reset --hard origin/main 2>&1');
+            $output = $this->shell('cd ' . base_path() . ' && ' . $this->gitCmd('fetch origin main') . ' 2>&1 && ' . $this->gitCmd('reset --hard origin/main') . ' 2>&1');
             $this->log($logFile, $output);
 
             // 检测致命错误(网络问题、文件权限等),必须在 restoreUserFiles 之前:
@@ -253,7 +253,7 @@ class UpdateController extends Controller
             $this->ensureGitSafeDirectory();
             $this->ensureHttpsRemote();
             $this->preserveUserFiles();
-            $output = $this->shell('cd ' . base_path() . ' && git reset --hard HEAD~1 2>&1');
+            $output = $this->shell('cd ' . base_path() . ' && ' . $this->gitCmd('reset --hard HEAD~1') . ' 2>&1');
             $this->log($logFile, $output);
 
             // reset 失败要在 restoreUserFiles 之前检测,避免恢复 .env 时的权限异常掩盖真正的失败原因
@@ -399,7 +399,7 @@ class UpdateController extends Controller
         // 2. 自动检测所有本地有改动的 git 跟踪文件,备份用户版本
         //    覆盖用户改过 config/app.php、config/cache.php 等任意配置的场景
         try {
-            $status = $this->shell('cd ' . base_path() . ' && git status --porcelain 2>/dev/null');
+            $status = $this->shell('cd ' . base_path() . ' && ' . $this->gitCmd('status --porcelain') . ' 2>/dev/null');
             $dirtyFiles = $this->parseDirtyFiles($status);
             foreach ($dirtyFiles as $relativePath) {
                 $fullPath = base_path($relativePath);
@@ -413,7 +413,7 @@ class UpdateController extends Controller
             }
             // 3. 强制清理工作区:reset 已跟踪改动 + clean 未跟踪文件
             //    确保工作区与 HEAD 完全一致,后续 fetch+reset 不被任何本地状态阻塞
-            $this->shell('cd ' . base_path() . ' && git reset --hard HEAD 2>/dev/null');
+            $this->shell('cd ' . base_path() . ' && ' . $this->gitCmd('reset --hard HEAD') . ' 2>/dev/null');
             $this->cleanUntracked();
         } catch (\Throwable) {
             // 无法检测本地改动(如 shell 被禁用),回退到仅保护固定清单
@@ -432,7 +432,7 @@ class UpdateController extends Controller
     {
         try {
             // -f 强制, -d 含目录; 不加 -x 以尊重 .gitignore
-            $this->shell('cd ' . base_path() . ' && git clean -fd 2>&1');
+            $this->shell('cd ' . base_path() . ' && ' . $this->gitCmd('clean -fd') . ' 2>&1');
         } catch (\Throwable) {
             // 清理失败不中断
         }
@@ -551,6 +551,18 @@ class UpdateController extends Controller
     }
 
     /**
+     * 构造带安全上下文的 git 命令:内联 -c safe.directory=。
+     *
+     * 比 `git config --global --add safe.directory` 更可靠:后者写入 $HOME/.gitconfig,
+     * 而 PHP-FPM 的 HOME 常不可写/未设置(宝塔环境),写入静默失败导致 git 操作
+     * 报 "dubious ownership" 被拒。内联配置每次调用即时生效,不依赖任何配置文件。
+     */
+    private function gitCmd(string $command): string
+    {
+        return 'git -c safe.directory=' . escapeshellarg(base_path()) . ' ' . $command;
+    }
+
+    /**
      * 解决 git "dubious ownership" 问题 + 修复 .git 目录权限。
      *
      * 两个层面的问题:
@@ -563,8 +575,8 @@ class UpdateController extends Controller
     {
         try {
             $base = base_path();
-            // 1. 加入 safe.directory(解决 dubious ownership)
-            $this->shell('git config --global --add safe.directory ' . $base . ' 2>/dev/null');
+            // 1. 加入 safe.directory(解决 dubious ownership;PHP-FPM HOME 不可写时静默失败,由内联 -c 兜底)
+            $this->shell('git config --global --add safe.directory ' . escapeshellarg($base) . ' 2>/dev/null');
 
             // 2. 修复 .git 目录权限(解决 insufficient permission)
             //    宝塔: .git 属主可能是 root, PHP-FPM 以 www 运行 → chmod 放开读写
@@ -591,11 +603,11 @@ class UpdateController extends Controller
     private function ensureHttpsRemote(): void
     {
         try {
-            $remote = trim($this->shell('git remote get-url origin 2>/dev/null'));
+            $remote = trim($this->shell($this->gitCmd('remote get-url origin') . ' 2>/dev/null'));
             // 如果是 SSH(git@github.com:owner/repo.git),转 HTTPS
             if (preg_match('#git@github\.com:(.+)/(.+)\.git#', $remote, $m)) {
                 $https = "https://github.com/{$m[1]}/{$m[2]}.git";
-                $this->shell("git remote set-url origin {$https}");
+                $this->shell($this->gitCmd('remote set-url origin ' . escapeshellarg($https)));
             }
         } catch (\Throwable $e) {
             // 函数被禁用时无法检测 remote,不中断(后续 git pull 会自行报错)
@@ -702,7 +714,7 @@ class UpdateController extends Controller
 
         try {
             // git checkout HEAD -- public/{dir}/ 强制恢复整个目录
-            $output = $this->shell('cd ' . base_path() . ' && git checkout HEAD -- public/' . escapeshellarg($dir) . '/ 2>&1');
+            $output = $this->shell('cd ' . base_path() . ' && ' . $this->gitCmd('checkout HEAD -- public/' . escapeshellarg($dir) . '/') . ' 2>&1');
             $this->log($logFile, "{$dir} git 同步完成: " . trim($output));
 
             // 再次校验
