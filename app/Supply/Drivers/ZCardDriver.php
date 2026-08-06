@@ -98,7 +98,13 @@ class ZCardDriver implements SupplyDriver
             stockQuantity: -1,
         ))->all();
 
-        return ['items' => $items, 'total' => $data['total'] ?? 0, 'page' => $page, 'has_more' => false];
+        // 分页:上游按 page_size(默认50)分页返回 total,必须推导 has_more,
+        // 否则 listAllProducts 只取第 1 页,第 2 页起商品丢失(导入/同步漏商品)。
+        $total = (int) ($data['total'] ?? 0);
+        $pageSize = (int) ($data['page_size'] ?? 50);
+        $hasMore = $pageSize > 0 && ($page * $pageSize) < $total;
+
+        return ['items' => $items, 'total' => $total, 'page' => $page, 'has_more' => $hasMore];
     }
 
     public function getProduct(string $code): ?UpstreamProduct

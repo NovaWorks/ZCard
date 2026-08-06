@@ -160,9 +160,13 @@ class SupplySourceController extends Controller
                 }
             }
 
-            // 已导入本地的商品 code 集合(判断 already_imported)
-            $importedCodes = Product::where('upstream_source_id', $supplySource->id)
-                ->pluck('upstream_product_code')->toArray();
+            // 已导入本地的商品 code 集合(判断 already_imported)。
+            // 用非严格比较:上游 code 可能是数字/字符串,本地存储也可能有类型差异,
+            // 严格 in_array 会漏判导致"已导入商品仍显示新货源"。
+            $importedCodes = collect(
+                Product::where('upstream_source_id', $supplySource->id)
+                    ->pluck('upstream_product_code')->toArray()
+            )->map(fn ($c) => (string) $c)->all();
 
             // 按上游分类聚合(没有分类的归到"未分类")
             $tree = [];
@@ -179,7 +183,7 @@ class SupplySourceController extends Controller
                     'factory_price' => $p->factoryPrice, // 分
                     'cover' => $p->cover,
                     'stock' => $p->stockQuantity,
-                    'already_imported' => in_array($p->code, $importedCodes, true),
+                    'already_imported' => in_array((string) $p->code, $importedCodes, true),
                 ];
             }
             foreach ($bucket as $catCode => $products) {
@@ -246,11 +250,21 @@ class SupplySourceController extends Controller
             $imported = 0;
             $skipped = 0;
 
-            // 拉取上游全部商品(循环分页,不能只取第 1 页),按 code 索引
+            // 拉取上游全部商品(循环分页,不能只取第 1 页),按 code 索引。
+            // 批量命中是主路径;个别 code 因上游分页/响应不一致未命中时,
+            // 逐个 getProduct 精确拉取兜底 —— 保证勾选的商品一定入库,
+            // 否则客户会看到"导入成功但重新拉取仍显示新货源"。
             $map = collect($this->listAllProducts($driver))->keyBy('code');
 
             foreach ($data['codes'] as $code) {
                 $dto = $map->get($code);
+                if (! $dto) {
+                    try {
+                        $dto = $driver->getProduct((string) $code);
+                    } catch (\Throwable $e) {
+                        $dto = null;
+                    }
+                }
                 if (! $dto) {
                     $skipped++;
 
