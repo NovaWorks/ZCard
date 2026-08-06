@@ -131,8 +131,7 @@ class SupplySourceController extends Controller
     {
         try {
             $driver = app(SupplyManager::class)->driver($supplySource);
-            $result = $driver->listProducts(null, 1);
-            $items = $result['items'] ?? [];
+            $items = $this->listAllProducts($driver);
 
             // 已导入本地的商品 code 集合(判断 already_imported)
             $importedCodes = \App\Models\Product::where('upstream_source_id', $supplySource->id)
@@ -218,9 +217,8 @@ class SupplySourceController extends Controller
             $imported = 0;
             $skipped = 0;
 
-            // 拉取上游全部商品,按 code 索引(只拉一次,避免逐个 getProduct 打多次请求)
-            $result = $driver->listProducts(null, 1);
-            $map = collect($result['items'] ?? [])->keyBy('code');
+            // 拉取上游全部商品(循环分页,不能只取第 1 页),按 code 索引
+            $map = collect($this->listAllProducts($driver))->keyBy('code');
 
             foreach ($data['codes'] as $code) {
                 $dto = $map->get($code);
@@ -312,5 +310,21 @@ class SupplySourceController extends Controller
         }
         $source->credentials = $creds;
         return $source;
+    }
+
+    /** 拉取上游全部商品(循环分页;上限 20 页防上游异常死循环) */
+    private function listAllProducts(mixed $driver): array
+    {
+        $all = [];
+        $page = 1;
+        do {
+            $result = $driver->listProducts(null, $page);
+            $items = $result['items'] ?? [];
+            $all = array_merge($all, $items);
+            $hasMore = ! empty($result['has_more']);
+            $page++;
+        } while ($hasMore && $page <= 20);
+
+        return $all;
     }
 }

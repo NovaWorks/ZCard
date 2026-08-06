@@ -374,20 +374,20 @@
 
         <!-- Tab: 货源对接 -->
         <ElTabPane :label="t('zcard.setting.tabSupply')" name="supply">
-          <ElForm :model="form" label-width="auto" class="setting-form">
-            <ElFormItem :label="t('zcard.setting.supplyEnabled')">
+          <ElForm :model="form" label-width="auto" class="setting-form supply-form">
+            <ElFormItem class="supply-form-item" :label="t('zcard.setting.supplyEnabled')">
               <ElSwitch v-model="form.supply_enabled" />
               <span class="form-tip">{{ t('zcard.setting.supplyEnabledTip') }}</span>
             </ElFormItem>
-            <ElFormItem :label="t('zcard.setting.supplyUpstreamEnabled')">
+            <ElFormItem class="supply-form-item" :label="t('zcard.setting.supplyUpstreamEnabled')">
               <ElSwitch v-model="form.supply_upstream_enabled" />
               <span class="form-tip">{{ t('zcard.setting.supplyUpstreamEnabledTip') }}</span>
             </ElFormItem>
-            <ElFormItem :label="t('zcard.setting.supplySupplierEnabled')">
+            <ElFormItem class="supply-form-item" :label="t('zcard.setting.supplySupplierEnabled')">
               <ElSwitch v-model="form.supply_supplier_enabled" />
               <span class="form-tip">{{ t('zcard.setting.supplySupplierEnabledTip') }}</span>
             </ElFormItem>
-            <ElFormItem :label="t('zcard.setting.supplyNonceStore')">
+            <ElFormItem class="supply-form-item" :label="t('zcard.setting.supplyNonceStore')">
               <ElSelect v-model="form.supply_nonce_store" style="width: 220px">
                 <ElOption label="Cache (默认)" value="cache" />
                 <ElOption label="Redis" value="redis" />
@@ -395,11 +395,11 @@
               </ElSelect>
               <span class="form-tip">{{ t('zcard.setting.supplyNonceStoreTip') }}</span>
             </ElFormItem>
-            <ElFormItem :label="t('zcard.setting.supplyRateLimit')">
+            <ElFormItem class="supply-form-item" :label="t('zcard.setting.supplyRateLimit')">
               <ElInputNumber v-model="form.supply_rate_limit" :min="1" :max="1000" />
               <span class="form-tip">{{ t('zcard.setting.supplyRateLimitTip') }}</span>
             </ElFormItem>
-            <ElFormItem :label="t('zcard.setting.supplyTimestampSkew')">
+            <ElFormItem class="supply-form-item" :label="t('zcard.setting.supplyTimestampSkew')">
               <ElInputNumber v-model="form.supply_timestamp_skew" :min="60" :max="3600" />
               <span class="form-tip">{{ t('zcard.setting.supplyTimestampSkewTip') }}</span>
             </ElFormItem>
@@ -854,6 +854,28 @@
   .setting-form {
     max-width: 640px;
     padding-top: 8px;
+  }
+
+  /* 货源对接表单:开关与说明文字留间距,说明换行,行距加大 */
+  .supply-form :deep(.el-form-item) {
+    margin-bottom: 22px;
+  }
+  .supply-form-item :deep(.el-form-item__content) {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .supply-form-item :deep(.el-form-item__content) > * {
+    flex-shrink: 0;
+  }
+  .supply-form-item .form-tip {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+    line-height: 1.7;
+    padding-top: 6px;
   }
 
   /* 常见问题(FAQ)编辑器 */

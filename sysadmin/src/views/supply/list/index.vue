@@ -330,7 +330,7 @@
                           {{ p.name }}
                         </span>
                         <span class="pp-meta">
-                          <span class="pp-base">¥{{ (pricingBase(p) / 100).toFixed(2) }}</span>
+                          <span class="pp-base">¥{{ (upstreamPrice(p) / 100).toFixed(2) }}</span>
                           <span class="pp-arrow">→</span>
                           <span v-if="calcPrice(p) !== null" class="pp-price">¥{{ ((calcPrice(p) ?? 0) / 100).toFixed(2) }}</span>
                           <span v-else class="pp-price pending">{{ t('zcard.supply.pricingPendingTip') }}</span>
@@ -675,13 +675,16 @@
   const markupAmountYuan = ref(0)
   const saveDefaultPricing = ref(false)
 
-  /** 定价基准:上游成本 factory_price,为 0 时回退上游售价 price(与后端一致) */
-  const pricingBase = (p: UpstreamCategory['products'][number]): number =>
+  /** 上游参考售价(分):预览展示,与上游页面价格一致 */
+  const upstreamPrice = (p: UpstreamCategory['products'][number]): number => p.price ?? 0
+
+  /** 加价基准 = 拿货成本(批发价),为 0 时回退上游售价(与后端一致) */
+  const costBase = (p: UpstreamCategory['products'][number]): number =>
     (p.factory_price ?? 0) > 0 ? p.factory_price : p.price ?? 0
 
   /** 按所选策略实时计算售价(分);pending 返回 null(待审) */
   const calcPrice = (p: UpstreamCategory['products'][number]): number | null => {
-    const base = pricingBase(p)
+    const base = costBase(p)
     if (pricingMode.value === 'percent') return Math.round(base * (1 + markupPercent.value / 100))
     if (pricingMode.value === 'fixed') return base + Math.round(markupAmountYuan.value * 100)
     if (pricingMode.value === 'equal') return base
