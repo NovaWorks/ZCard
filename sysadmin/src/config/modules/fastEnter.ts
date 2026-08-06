@@ -47,45 +47,8 @@ const fastEnterConfig: FastEnterConfig = {
       link: WEB_LINKS.RELEASE_NOTES
     }
   ],
-  // 快速链接
-  quickLinks: [
-    {
-      name: '登录',
-      enabled: true,
-      order: 1,
-      routeName: 'Login'
-    },
-    {
-      name: '注册',
-      enabled: true,
-      order: 2,
-      routeName: 'Register'
-    },
-    {
-      name: '忘记密码',
-      enabled: true,
-      order: 3,
-      routeName: 'ForgetPassword'
-    },
-    {
-      name: '定价',
-      enabled: true,
-      order: 4,
-      routeName: 'Pricing'
-    },
-    {
-      name: '个人中心',
-      enabled: true,
-      order: 5,
-      routeName: 'UserCenter'
-    },
-    {
-      name: '留言管理',
-      enabled: true,
-      order: 6,
-      routeName: 'ArticleComment'
-    }
-  ]
+  // 后台无前台页面路由,清空快速链接
+  quickLinks: []
 }
 
 export default Object.freeze(fastEnterConfig)

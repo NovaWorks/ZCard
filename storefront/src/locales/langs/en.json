@@ -353,7 +353,10 @@
       "heroAfterSales": "Worry-free after-sales",
       "featuredTitle": "🔥 Featured",
       "allProducts": "All Products",
-      "noProducts": "No products yet (please add products in the admin panel)"
+      "noProducts": "No products yet (please add products in the admin panel)",
+      "loadMore": "Load More",
+      "loadingMore": "Loading...",
+      "pageInfo": "Page {page} / {total}"
     }
   },
   "auth": {

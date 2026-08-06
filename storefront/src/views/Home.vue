@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
@@ -29,6 +29,9 @@ const keyword = ref('')
 const keywordInput = ref('')
 /** 移动端分类横向条(sidebar 模式在移动端隐藏,这里兜底) */
 const topCats = ref<Category[]>([])
+
+/** 是否还有下一页可加载 */
+const hasMore = computed(() => products.page < products.lastPage)
 
 async function load() {
   await settings.load()
@@ -199,6 +202,18 @@ function goProduct(p: Product) {
           <!-- 列表视图 -->
           <div v-else class="max-w-3xl mx-auto">
             <ProductCard v-for="p in products.list" :key="p.id" :product="p" />
+          </div>
+          <!-- 加载更多(分页) -->
+          <div v-if="hasMore" class="flex justify-center mt-6">
+            <button
+              type="button"
+              class="px-8 py-2.5 rounded-pill border border-primary text-primary text-sm font-medium hover:bg-primary-light hover:border-primary-hover transition disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="products.loading"
+              @click="products.fetchMore()"
+            >{{ products.loading ? t('product.home.loadingMore') : t('product.home.loadMore') }}</button>
+          </div>
+          <div v-if="!products.loading && products.list.length" class="text-center text-ink-muted text-xs mt-4">
+            {{ t('product.home.pageInfo', { page: products.page, total: products.lastPage }) }}
           </div>
         </div>
         <div v-if="!products.loading && !products.list.length" class="text-center text-ink-muted py-20">

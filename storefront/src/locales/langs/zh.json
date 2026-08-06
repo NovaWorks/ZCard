@@ -353,7 +353,10 @@
       "heroAfterSales": "售后无忧",
       "featuredTitle": "🔥 热门推荐",
       "allProducts": "全部商品",
-      "noProducts": "暂无商品(请先在后台添加商品)"
+      "noProducts": "暂无商品(请先在后台添加商品)",
+      "loadMore": "加载更多",
+      "loadingMore": "加载中...",
+      "pageInfo": "第 {page} / {total} 页"
     }
   },
   "auth": {

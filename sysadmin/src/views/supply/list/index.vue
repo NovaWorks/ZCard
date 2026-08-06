@@ -236,7 +236,6 @@
             <ElInputNumber
               v-model="formData.settings.default_markup_percent"
               :min="0"
-              :max="500"
               :precision="0"
               controls-position="right"
             />
@@ -328,7 +327,6 @@
                   <ElInputNumber
                     v-model="markupPercent"
                     :min="0"
-                    :max="500"
                     :precision="0"
                     controls-position="right"
                     size="small"
