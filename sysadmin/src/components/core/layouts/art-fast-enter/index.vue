@@ -44,7 +44,7 @@
         </div>
       </div>
 
-      <div class="border-l-d pl-6 pt-2">
+      <div v-if="enabledQuickLinks.length" class="border-l-d pl-6 pt-2">
         <h3 class="mb-2.5 text-base font-medium text-g-800">快速链接</h3>
         <ul>
           <li
