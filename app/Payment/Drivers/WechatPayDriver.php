@@ -16,8 +16,8 @@ class WechatPayDriver implements PaymentDriver
     protected function buildConfig(array $config): array
     {
         $mode = ($config['mode'] ?? 'normal') === 'sandbox'
-            ? \Yansongda\Pay\Pay::MODE_SANDBOX
-            : \Yansongda\Pay\Pay::MODE_NORMAL;
+            ? Pay::MODE_SANDBOX
+            : Pay::MODE_NORMAL;
 
         return [
             'wechat' => [
@@ -67,7 +67,7 @@ class WechatPayDriver implements PaymentDriver
         $tradeState = $data['trade_state'] ?? ($data['event_type'] ?? null);
         $success = in_array($tradeState, ['SUCCESS', 'TRANSACTION.SUCCESS'], true);
 
-        if (!$success) {
+        if (! $success) {
             return null;
         }
 
@@ -137,6 +137,11 @@ class WechatPayDriver implements PaymentDriver
             'name' => '微信支付',
             'icon' => '💚',
         ];
+    }
+
+    public function getPayTypes(array $config): array
+    {
+        return ['wechat'];
     }
 
     public function getSupportedCurrencies(): array

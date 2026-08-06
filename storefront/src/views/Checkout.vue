@@ -295,6 +295,34 @@ async function submit() {
 }
 
 const channelLabel = (ch: PaymentChannel) => ch.name
+
+/** 支付方式标识 → 展示信息(图标/名称)。参考 dujiao-next/acg-faka 收银台:显示具体支付方式而非通道名 */
+const PAY_TYPE_META: Record<string, { icon: string; label: string }> = {
+  alipay: { icon: '💰', label: '支付宝' },
+  wechat: { icon: '💚', label: '微信支付' },
+  wxpay: { icon: '💚', label: '微信支付' },
+  qqpay: { icon: '🐧', label: 'QQ 钱包' },
+  bank: { icon: '🏦', label: '云闪付 / 网银' },
+  jdpay: { icon: '🛒', label: '京东支付' },
+  paypal: { icon: '🅿️', label: 'PayPal' },
+  stripe: { icon: '💳', label: 'Stripe' },
+  usdt: { icon: '₮', label: 'USDT' },
+  tron: { icon: '₮', label: 'TRON' },
+  trx: { icon: '₮', label: 'TRX' },
+}
+
+/** 通道对应的支付方式列表(带图标与名称);无 pay_types 时回退到通道自身 */
+const channelPayTypes = (ch: PaymentChannel) => {
+  const types = (ch.pay_types || []).filter(Boolean)
+  if (types.length) {
+    return types.map((t) => ({
+      type: t,
+      icon: PAY_TYPE_META[t]?.icon || ch.icon || '💳',
+      label: PAY_TYPE_META[t]?.label || t,
+    }))
+  }
+  return [{ type: ch.code, icon: ch.icon || '💳', label: channelLabel(ch) }]
+}
 </script>
 
 <template>
@@ -417,18 +445,43 @@ const channelLabel = (ch: PaymentChannel) => ch.name
           <div class="bg-white rounded-card border border-border p-4">
             <h3 class="text-sm font-bold text-ink mb-3">{{ t('order.checkout.payMethod') }}</h3>
             <div v-if="channels.length" class="space-y-2">
-              <button v-for="ch in channels" :key="ch.id" type="button" @click="selectedChannelId = ch.id"
+              <button
+                v-for="ch in channels"
+                :key="ch.id"
+                type="button"
+                @click="selectedChannelId = ch.id"
                 :class="[
                   'w-full flex items-center gap-3 border rounded-card px-3 py-2.5 text-left transition',
-                  selectedChannelId === ch.id ? 'border-primary bg-primary-light ring-2 ring-primary/15' : 'border-border hover:border-primary/40 hover:bg-primary-light/30'
-                ]">
-                <span :class="['w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition', selectedChannelId === ch.id ? 'border-primary' : 'border-ink-muted/40']">
+                  selectedChannelId === ch.id
+                    ? 'border-primary bg-primary-light ring-2 ring-primary/15'
+                    : 'border-border hover:border-primary/40 hover:bg-primary-light/30'
+                ]"
+              >
+                <span
+                  :class="[
+                    'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition',
+                    selectedChannelId === ch.id ? 'border-primary' : 'border-ink-muted/40'
+                  ]"
+                >
                   <span v-if="selectedChannelId === ch.id" class="w-2 h-2 rounded-full bg-primary"></span>
                 </span>
-                <span class="text-xl leading-none shrink-0">{{ ch.icon || '💳' }}</span>
+                <!-- 支付方式(按 pay_types 展示图标+名称,非通道名) -->
+                <span class="flex items-center gap-2 shrink-0">
+                  <template v-for="pt in channelPayTypes(ch)" :key="pt.type">
+                    <span class="w-8 h-8 rounded-lg bg-surface-subtle flex items-center justify-center text-lg">
+                      {{ pt.icon }}
+                    </span>
+                  </template>
+                </span>
                 <span class="flex-1 min-w-0">
-                  <span class="block text-sm font-medium text-ink">{{ channelLabel(ch) }}</span>
-                  <span v-if="ch.target_currency" class="block text-[10px] text-ink-muted">{{ t('order.pay.receiveLabel', { symbol: '', code: ch.target_currency }) }}</span>
+                  <span class="block text-sm font-medium text-ink">
+                    {{ channelPayTypes(ch).map((p) => p.label).join(' / ') }}
+                  </span>
+                  <span
+                    v-if="ch.target_currency"
+                    class="block text-[10px] text-ink-muted"
+                    >{{ t('order.pay.receiveLabel', { symbol: '', code: ch.target_currency }) }}</span
+                  >
                 </span>
               </button>
             </div>

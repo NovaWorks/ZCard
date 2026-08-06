@@ -27,6 +27,7 @@ class EpuSdtDriver implements PaymentDriver
         if (app('router')->has($name)) {
             return route($name, $params, false);
         }
+
         return URL::current();
     }
 
@@ -46,7 +47,7 @@ class EpuSdtDriver implements PaymentDriver
 
         $pairs = [];
         foreach ($params as $k => $v) {
-            $pairs[] = $k . '=' . $v;
+            $pairs[] = $k.'='.$v;
         }
 
         return hash_hmac('sha256', implode('&', $pairs), $secretKey);
@@ -62,7 +63,7 @@ class EpuSdtDriver implements PaymentDriver
         $network = $config['network'] ?? 'TRC20';
 
         $notifyUrl = $this->namedUrl('payment.notify', ['channel' => 'epusdt']);
-        $redirectUrl = $this->namedUrl('payment.return', ['code' => 'epusdt']) . '?order_no=' . $order->getPayableKey();
+        $redirectUrl = $this->namedUrl('payment.return', ['code' => 'epusdt']).'?order_no='.$order->getPayableKey();
 
         $params = [
             'pid' => (string) $pid,
@@ -79,15 +80,15 @@ class EpuSdtDriver implements PaymentDriver
 
         $params['signature'] = $this->sign($params, $secretKey);
 
-        $response = Http::timeout(15)->post($apiUrl . '/payments/gmpay/v1/order/create-transaction', $params);
+        $response = Http::timeout(15)->post($apiUrl.'/payments/gmpay/v1/order/create-transaction', $params);
 
         if (! $response->ok()) {
-            throw new \RuntimeException('EpuSdt 下单失败: HTTP ' . $response->status());
+            throw new \RuntimeException('EpuSdt 下单失败: HTTP '.$response->status());
         }
 
         $data = $response->json();
         if (($data['status_code'] ?? 0) !== 200) {
-            throw new \RuntimeException('EpuSdt 下单失败: ' . ($data['message'] ?? '未知错误'));
+            throw new \RuntimeException('EpuSdt 下单失败: '.($data['message'] ?? '未知错误'));
         }
 
         $paymentUrl = $data['data']['payment_url'] ?? null;
@@ -194,6 +195,11 @@ class EpuSdtDriver implements PaymentDriver
             'name' => 'EpuSdt(USDT)',
             'icon' => '₮',
         ];
+    }
+
+    public function getPayTypes(array $config): array
+    {
+        return ['usdt'];
     }
 
     public function getSupportedCurrencies(): array

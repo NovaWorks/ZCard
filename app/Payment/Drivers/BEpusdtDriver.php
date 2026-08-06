@@ -33,6 +33,7 @@ class BEpusdtDriver implements PaymentDriver
         if (app('router')->has($name)) {
             return route($name, $params, false);
         }
+
         return URL::current();
     }
 
@@ -56,10 +57,10 @@ class BEpusdtDriver implements PaymentDriver
             if (is_bool($v)) {
                 $v = $v ? 'true' : 'false';
             }
-            $pairs[] = $k . '=' . $v;
+            $pairs[] = $k.'='.$v;
         }
 
-        return md5(implode('&', $pairs) . $apiToken);
+        return md5(implode('&', $pairs).$apiToken);
     }
 
     public function pay(Payable $order, array $config): PaymentResult
@@ -77,7 +78,7 @@ class BEpusdtDriver implements PaymentDriver
         $timeout = (int) ($config['timeout'] ?? 0);
 
         $notifyUrl = $this->namedUrl('payment.notify', ['channel' => 'bepusdt']);
-        $redirectUrl = $this->namedUrl('payment.return', ['code' => 'bepusdt']) . '?order_no=' . $order->getPayableKey();
+        $redirectUrl = $this->namedUrl('payment.return', ['code' => 'bepusdt']).'?order_no='.$order->getPayableKey();
 
         $params = [
             'order_id' => $order->getPayableKey(),
@@ -97,15 +98,15 @@ class BEpusdtDriver implements PaymentDriver
 
         $params['signature'] = $this->sign($params, $apiToken);
 
-        $response = Http::timeout(15)->post($apiUrl . '/api/v1/order/create-order', $params);
+        $response = Http::timeout(15)->post($apiUrl.'/api/v1/order/create-order', $params);
 
         if (! $response->ok()) {
-            throw new \RuntimeException('BEpusdt 下单失败: HTTP ' . $response->status());
+            throw new \RuntimeException('BEpusdt 下单失败: HTTP '.$response->status());
         }
 
         $data = $response->json();
         if (($data['status_code'] ?? 0) !== 200) {
-            throw new \RuntimeException('BEpusdt 下单失败: ' . ($data['message'] ?? '未知错误'));
+            throw new \RuntimeException('BEpusdt 下单失败: '.($data['message'] ?? '未知错误'));
         }
 
         $paymentUrl = $data['data']['payment_url'] ?? null;
@@ -217,6 +218,11 @@ class BEpusdtDriver implements PaymentDriver
             'name' => 'BEpusdt',
             'icon' => '🪙',
         ];
+    }
+
+    public function getPayTypes(array $config): array
+    {
+        return ['usdt'];
     }
 
     public function getSupportedCurrencies(): array

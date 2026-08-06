@@ -49,8 +49,8 @@ class EpayDriver implements PaymentDriver
      * MD5(V1):参数排序 → key=value& → 末尾追加商户 key → md5 小写
      * RSA(V2):参数排序 → key=value& → 商户私钥 SHA256 签名 → base64
      *
-     * @param array $params 待签名参数(含 sign/sign_type 会被剔除)
-     * @param string $secret 商户密钥(MD5)或 PKCS#8 私钥(RSA)
+     * @param  array  $params  待签名参数(含 sign/sign_type 会被剔除)
+     * @param  string  $secret  商户密钥(MD5)或 PKCS#8 私钥(RSA)
      */
     protected function sign(array $params, string $secret, string $signType = 'MD5'): string
     {
@@ -60,7 +60,7 @@ class EpayDriver implements PaymentDriver
 
         $parts = [];
         foreach ($params as $k => $v) {
-            $parts[] = $k . '=' . $v;
+            $parts[] = $k.'='.$v;
         }
         $query = implode('&', $parts);
 
@@ -69,7 +69,7 @@ class EpayDriver implements PaymentDriver
             return $this->rsaSign($query, $secret);
         }
 
-        return md5($query . $secret);
+        return md5($query.$secret);
     }
 
     /**
@@ -81,8 +81,8 @@ class EpayDriver implements PaymentDriver
         $pem = $privateKey;
         if (! str_contains($pem, '-----BEGIN')) {
             $pem = "-----BEGIN RSA PRIVATE KEY-----\n"
-                . wordwrap($privateKey, 64, "\n", true)
-                . "\n-----END RSA PRIVATE KEY-----";
+                .wordwrap($privateKey, 64, "\n", true)
+                ."\n-----END RSA PRIVATE KEY-----";
         }
 
         $key = openssl_pkey_get_private($pem);
@@ -91,6 +91,7 @@ class EpayDriver implements PaymentDriver
         }
 
         openssl_sign($data, $signature, $key, OPENSSL_ALGO_SHA256);
+
         return base64_encode($signature);
     }
 
@@ -103,8 +104,8 @@ class EpayDriver implements PaymentDriver
         $pem = $publicKey;
         if (! str_contains($pem, '-----BEGIN')) {
             $pem = "-----BEGIN PUBLIC KEY-----\n"
-                . wordwrap($publicKey, 64, "\n", true)
-                . "\n-----END PUBLIC KEY-----";
+                .wordwrap($publicKey, 64, "\n", true)
+                ."\n-----END PUBLIC KEY-----";
         }
 
         $key = openssl_pkey_get_public($pem);
@@ -113,6 +114,7 @@ class EpayDriver implements PaymentDriver
         }
 
         $result = openssl_verify($data, base64_decode($sign), $key, OPENSSL_ALGO_SHA256);
+
         return $result === 1;
     }
 
@@ -137,7 +139,7 @@ class EpayDriver implements PaymentDriver
             'pid' => $pid,
             'out_trade_no' => $order->getPayableKey(),
             'notify_url' => $this->namedUrl('payment.notify', ['channel' => 'epay']),
-            'return_url' => $this->namedUrl('payment.return', ['code' => 'epay']) . '?order_no=' . $order->getPayableKey(),
+            'return_url' => $this->namedUrl('payment.return', ['code' => 'epay']).'?order_no='.$order->getPayableKey(),
             'name' => $order->getPayableKey(),
             'money' => bcdiv((string) $order->getPayableAmount(), '100', 2), // 分→元
         ];
@@ -149,7 +151,7 @@ class EpayDriver implements PaymentDriver
         $params['sign'] = $this->sign($params, $key, $signType);
         $params['sign_type'] = $signType;
 
-        $url = $apiUrl . '/submit.php?' . http_build_query($params);
+        $url = $apiUrl.'/submit.php?'.http_build_query($params);
 
         return PaymentResult::redirect($url);
     }
@@ -177,7 +179,7 @@ class EpayDriver implements PaymentDriver
             // 重现签名原文(与 sign() 内部一致)
             $params = Arr::where($data, fn ($v, $k) => $k !== 'sign' && $k !== 'sign_type' && $v !== '' && $v !== null);
             ksort($params);
-            $query = implode('&', array_map(fn ($k, $v) => $k . '=' . $v, array_keys($params), $params));
+            $query = implode('&', array_map(fn ($k, $v) => $k.'='.$v, array_keys($params), $params));
             if (! $this->rsaVerify($query, $platformPublicKey, $provided)) {
                 return null;
             }
@@ -269,6 +271,17 @@ class EpayDriver implements PaymentDriver
             'name' => '易支付',
             'icon' => '🔗',
         ];
+    }
+
+    public function getPayTypes(array $config): array
+    {
+        // 聚合收银台:支持多种支付方式(后台 config.type 多选,默认 alipay+wxpay)
+        $types = $config['type'] ?? ['alipay', 'wxpay'];
+        if (is_string($types)) {
+            $types = array_filter(array_map('trim', explode(',', $types)));
+        }
+
+        return array_values(array_filter((array) $types, fn ($v) => $v !== ''));
     }
 
     public function getSupportedCurrencies(): array

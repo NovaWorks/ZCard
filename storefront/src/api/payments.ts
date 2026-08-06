@@ -5,6 +5,8 @@ export interface PaymentChannel {
   name: string
   code: string
   icon: string
+  /** 支持的支付方式标识(如 alipay/wechat/paypal/usdt) */
+  pay_types?: string[]
   supported_currencies?: string[]
   target_currency?: string | null
 }

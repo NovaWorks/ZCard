@@ -28,6 +28,34 @@ function currencySymbol(code?: string | null): string {
   return prefs.currencies.find((c) => c.code === code)?.symbol || ''
 }
 
+/** 支付方式标识 → 展示信息(图标/名称)。收银台显示具体支付方式而非通道名 */
+const PAY_TYPE_META: Record<string, { icon: string; label: string }> = {
+  alipay: { icon: '💰', label: '支付宝' },
+  wechat: { icon: '💚', label: '微信支付' },
+  wxpay: { icon: '💚', label: '微信支付' },
+  qqpay: { icon: '🐧', label: 'QQ 钱包' },
+  bank: { icon: '🏦', label: '云闪付 / 网银' },
+  jdpay: { icon: '🛒', label: '京东支付' },
+  paypal: { icon: '🅿️', label: 'PayPal' },
+  stripe: { icon: '💳', label: 'Stripe' },
+  usdt: { icon: '₮', label: 'USDT' },
+  tron: { icon: '₮', label: 'TRON' },
+  trx: { icon: '₮', label: 'TRX' },
+}
+
+/** 通道对应的支付方式列表;无 pay_types 时回退到通道自身 */
+const channelPayTypes = (ch: PaymentChannel) => {
+  const types = (ch.pay_types || []).filter(Boolean)
+  if (types.length) {
+    return types.map((t) => ({
+      type: t,
+      icon: PAY_TYPE_META[t]?.icon || ch.icon || '💳',
+      label: PAY_TYPE_META[t]?.label || t,
+    }))
+  }
+  return [{ type: ch.code, icon: ch.icon || '💳', label: ch.name }]
+}
+
 onMounted(async () => {
   // 偏好(含货币元信息)用于展示通道收款币种;失败不阻塞
   void prefs.load()
@@ -152,9 +180,21 @@ async function pay() {
           class="flex items-center gap-2 border border-border rounded-card px-3 py-3 text-left hover:border-primary hover:bg-primary-light transition disabled:opacity-50"
           :class="payingChannelId === ch.id ? 'border-primary ring-2 ring-primary/20' : ''"
         >
-          <span class="text-2xl leading-none shrink-0">{{ ch.icon || '💳' }}</span>
+          <span class="flex items-center gap-1.5 shrink-0">
+            <template v-for="pt in channelPayTypes(ch)" :key="pt.type">
+              <span class="w-7 h-7 rounded-md bg-surface-subtle flex items-center justify-center text-base">{{
+                pt.icon
+              }}</span>
+            </template>
+          </span>
           <span class="text-sm font-medium text-ink leading-tight">
-            <span class="block">{{ payingChannelId === ch.id ? t('order.pay.processing') : ch.name }}</span>
+            <span class="block">{{
+              payingChannelId === ch.id
+                ? t('order.pay.processing')
+                : channelPayTypes(ch)
+                    .map((p) => p.label)
+                    .join(' / ')
+            }}</span>
             <span v-if="ch.target_currency" class="block text-[10px] font-normal text-ink-muted">
               {{ t('order.pay.receiveLabel', { symbol: currencySymbol(ch.target_currency), code: ch.target_currency }) }}
             </span>

@@ -33,11 +33,11 @@ class CodePayDriver implements PaymentDriver
 
         $parts = [];
         foreach ($params as $k => $v) {
-            $parts[] = $k . '=' . $v;
+            $parts[] = $k.'='.$v;
         }
         $query = implode('&', $parts);
 
-        return md5($query . $key);
+        return md5($query.$key);
     }
 
     public function pay(Payable $order, array $config): PaymentResult
@@ -51,7 +51,7 @@ class CodePayDriver implements PaymentDriver
             'type' => $config['type'] ?? 'alipay',
             'out_trade_no' => $order->getPayableKey(),
             'notify_url' => $this->namedUrl('payment.notify', ['channel' => 'codepay']),
-            'return_url' => $this->namedUrl('payment.return', ['code' => 'codepay']) . '?order_no=' . $order->getPayableKey(),
+            'return_url' => $this->namedUrl('payment.return', ['code' => 'codepay']).'?order_no='.$order->getPayableKey(),
             'name' => $order->getPayableKey(),
             'money' => bcdiv((string) $order->getPayableAmount(), '100', 2), // 分→元
         ];
@@ -59,7 +59,7 @@ class CodePayDriver implements PaymentDriver
         $params['sign'] = $this->sign($params, $key);
         $params['sign_type'] = 'MD5';
 
-        $url = $apiUrl . '/submit.php?' . http_build_query($params);
+        $url = $apiUrl.'/submit.php?'.http_build_query($params);
 
         return PaymentResult::redirect($url);
     }
@@ -78,7 +78,7 @@ class CodePayDriver implements PaymentDriver
         $expected = $this->sign($data, $key);
         $provided = $data['sign'] ?? '';
 
-        if (!hash_equals($expected, (string) $provided)) {
+        if (! hash_equals($expected, (string) $provided)) {
             return null;
         }
 
@@ -137,6 +137,13 @@ class CodePayDriver implements PaymentDriver
             'name' => '码支付',
             'icon' => '📋',
         ];
+    }
+
+    public function getPayTypes(array $config): array
+    {
+        $type = $config['type'] ?? 'alipay';
+
+        return [$type];
     }
 
     public function getSupportedCurrencies(): array

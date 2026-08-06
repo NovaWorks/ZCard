@@ -155,6 +155,11 @@ class TokenPayDriver implements PaymentDriver
         return ['name' => 'TokenPay', 'icon' => '₮'];
     }
 
+    public function getPayTypes(array $config): array
+    {
+        return ['usdt'];
+    }
+
     public function getSupportedCurrencies(): array
     {
         return ['USDT'];

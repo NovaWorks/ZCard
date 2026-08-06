@@ -41,7 +41,7 @@ class PaypalDriver implements PaymentDriver
         $tokenRes = Http::withBasicAuth(
             $config['client_id'] ?? '',
             $config['client_secret'] ?? ''
-        )->asForm()->post($this->baseUrl($config) . '/v1/oauth2/token', [
+        )->asForm()->post($this->baseUrl($config).'/v1/oauth2/token', [
             'grant_type' => 'client_credentials',
         ]);
 
@@ -52,8 +52,8 @@ class PaypalDriver implements PaymentDriver
     {
         $token = $this->accessToken($config);
 
-        $returnUrl = $this->namedUrl('payment.return', ['code' => 'paypal']) . '?order_no=' . $order->getPayableKey();
-        $cancelUrl = $this->namedUrl('payment.cancel', ['code' => 'paypal']) . '?order_no=' . $order->getPayableKey();
+        $returnUrl = $this->namedUrl('payment.return', ['code' => 'paypal']).'?order_no='.$order->getPayableKey();
+        $cancelUrl = $this->namedUrl('payment.cancel', ['code' => 'paypal']).'?order_no='.$order->getPayableKey();
 
         $payload = [
             'intent' => 'CAPTURE',
@@ -73,7 +73,7 @@ class PaypalDriver implements PaymentDriver
         ];
 
         $res = Http::withToken($token)
-            ->post($this->baseUrl($config) . '/v2/checkout/orders', $payload);
+            ->post($this->baseUrl($config).'/v2/checkout/orders', $payload);
 
         $links = $res->json('links') ?? [];
         foreach ($links as $link) {
@@ -89,7 +89,7 @@ class PaypalDriver implements PaymentDriver
                 ? 'https://www.sandbox.paypal.com'
                 : 'https://www.paypal.com';
 
-            return PaymentResult::redirect($host . '/checkoutnow?token=' . $orderId);
+            return PaymentResult::redirect($host.'/checkoutnow?token='.$orderId);
         }
 
         return PaymentResult::redirect('');
@@ -100,14 +100,14 @@ class PaypalDriver implements PaymentDriver
         $token = $this->accessToken($config);
         $orderId = $request->input('token') ?: $request->input('orderID');
 
-        if (!$orderId) {
+        if (! $orderId) {
             return null;
         }
 
         $res = Http::withToken($token)
-            ->post($this->baseUrl($config) . '/v2/checkout/orders/' . $orderId . '/capture');
+            ->post($this->baseUrl($config).'/v2/checkout/orders/'.$orderId.'/capture');
 
-        if (!$res->successful()) {
+        if (! $res->successful()) {
             return null;
         }
 
@@ -169,6 +169,11 @@ class PaypalDriver implements PaymentDriver
             'name' => 'PayPal',
             'icon' => '🅿️',
         ];
+    }
+
+    public function getPayTypes(array $config): array
+    {
+        return ['paypal'];
     }
 
     public function getSupportedCurrencies(): array

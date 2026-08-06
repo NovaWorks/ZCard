@@ -16,8 +16,8 @@ class AlipayDriver implements PaymentDriver
     protected function buildConfig(array $config): array
     {
         $mode = ($config['mode'] ?? 'normal') === 'sandbox'
-            ? \Yansongda\Pay\Pay::MODE_SANDBOX
-            : \Yansongda\Pay\Pay::MODE_NORMAL;
+            ? Pay::MODE_SANDBOX
+            : Pay::MODE_NORMAL;
 
         return [
             'alipay' => [
@@ -61,7 +61,7 @@ class AlipayDriver implements PaymentDriver
         $data = method_exists($result, 'all') ? $result->all() : (array) $result;
 
         $tradeStatus = $data['trade_status'] ?? null;
-        if (!in_array($tradeStatus, ['TRADE_SUCCESS', 'TRADE_FINISHED'], true)) {
+        if (! in_array($tradeStatus, ['TRADE_SUCCESS', 'TRADE_FINISHED'], true)) {
             return null;
         }
 
@@ -119,6 +119,11 @@ class AlipayDriver implements PaymentDriver
             'name' => '支付宝',
             'icon' => '💰',
         ];
+    }
+
+    public function getPayTypes(array $config): array
+    {
+        return ['alipay'];
     }
 
     public function getSupportedCurrencies(): array

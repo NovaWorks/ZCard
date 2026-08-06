@@ -23,6 +23,7 @@ class PaymentController extends Controller
                 'name' => $ch->name,
                 'code' => $ch->code,
                 'icon' => $driver->getInfo()['icon'] ?? '💳',
+                'pay_types' => $driver->getPayTypes($config),
                 'supported_currencies' => $driver->getSupportedCurrencies(),
                 'target_currency' => $config['target_currency'] ?? ($driver->getSupportedCurrencies()[0] ?? null),
             ];
@@ -67,6 +68,7 @@ class PaymentController extends Controller
 
         try {
             $result = $service->createPayment($payable, $data['channel_id']);
+
             return response()->json($result);
         } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 500);
@@ -86,6 +88,7 @@ class PaymentController extends Controller
 
         try {
             $result = $service->createBatchPayment($data['order_ids'], $data['channel_id']);
+
             return response()->json($result);
         } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 400);
@@ -95,6 +98,7 @@ class PaymentController extends Controller
     public function callback(string $channel, Request $request, PaymentService $service)
     {
         $result = $service->handleCallback($channel, $request);
+
         return response($result === 'success' ? 'success' : $result);
     }
 }

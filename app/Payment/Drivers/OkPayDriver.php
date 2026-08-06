@@ -173,6 +173,11 @@ class OkPayDriver implements PaymentDriver
         return ['name' => 'OKPay', 'icon' => '₮'];
     }
 
+    public function getPayTypes(array $config): array
+    {
+        return ['usdt'];
+    }
+
     public function getSupportedCurrencies(): array
     {
         return ['USDT', 'TRX'];

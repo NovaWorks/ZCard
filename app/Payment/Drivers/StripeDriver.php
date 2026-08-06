@@ -43,8 +43,8 @@ class StripeDriver implements PaymentDriver
             ]],
             'mode' => 'payment',
             'client_reference_id' => $order->getPayableKey(),
-            'success_url' => $this->namedUrl('payment.return', ['code' => 'stripe']) . '?order_no=' . $order->getPayableKey() . '&session_id={CHECKOUT_SESSION_ID}',
-            'cancel_url' => $this->namedUrl('payment.cancel', ['code' => 'stripe']) . '?order_no=' . $order->getPayableKey(),
+            'success_url' => $this->namedUrl('payment.return', ['code' => 'stripe']).'?order_no='.$order->getPayableKey().'&session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url' => $this->namedUrl('payment.cancel', ['code' => 'stripe']).'?order_no='.$order->getPayableKey(),
         ]);
 
         return PaymentResult::redirect($session->url);
@@ -70,7 +70,7 @@ class StripeDriver implements PaymentDriver
         }
 
         $session = $event->data->object ?? null;
-        if (!$session) {
+        if (! $session) {
             return null;
         }
 
@@ -118,6 +118,11 @@ class StripeDriver implements PaymentDriver
             'name' => 'Stripe',
             'icon' => '💳',
         ];
+    }
+
+    public function getPayTypes(array $config): array
+    {
+        return ['stripe'];
     }
 
     public function getSupportedCurrencies(): array

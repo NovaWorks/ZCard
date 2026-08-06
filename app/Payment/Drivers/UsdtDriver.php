@@ -20,19 +20,20 @@ class UsdtDriver implements PaymentDriver
      * scheme 用于生成钱包 URI(钱包 App 靠它识别网络)。
      */
     public const CHAINS = [
-        'trx'   => ['tron',      'TRC20 (波场 / Tron)'],
-        'eth'   => ['ethereum',  'ERC20 (以太坊 / Ethereum)'],
-        'bsc'   => ['ethereum',  'BEP20 (币安链 / BSC)'],
-        'poly'  => ['ethereum',  'Polygon (Matic)'],
-        'arb'   => ['ethereum',  'Arbitrum One'],
-        'op'    => ['ethereum',  'Optimism'],
-        'tron'  => ['tron',      'TRC20 (波场,旧名)'],
+        'trx' => ['tron',      'TRC20 (波场 / Tron)'],
+        'eth' => ['ethereum',  'ERC20 (以太坊 / Ethereum)'],
+        'bsc' => ['ethereum',  'BEP20 (币安链 / BSC)'],
+        'poly' => ['ethereum',  'Polygon (Matic)'],
+        'arb' => ['ethereum',  'Arbitrum One'],
+        'op' => ['ethereum',  'Optimism'],
+        'tron' => ['tron',      'TRC20 (波场,旧名)'],
     ];
 
     /** 取链的钱包 URI scheme(默认 tron) */
     protected function chainScheme(array $config): string
     {
         $chain = strtolower((string) ($config['chain'] ?? 'trx'));
+
         return self::CHAINS[$chain][0] ?? 'tron';
     }
 
@@ -56,7 +57,7 @@ class UsdtDriver implements PaymentDriver
 
         // 钱包 URI:trc20→tron:Txxx...?amount=1.234567;erc20→ethereum:0x...?value=...
         // 各钱包 App 据此识别网络并自动填入地址与金额。
-        $content = $scheme . ':' . $wallet . '?amount=' . $usdt;
+        $content = $scheme.':'.$wallet.'?amount='.$usdt;
 
         return PaymentResult::qrcode($content);
     }
@@ -66,7 +67,7 @@ class UsdtDriver implements PaymentDriver
         $apiKey = $config['api_key'] ?? '';
         $provided = $request->header('X-API-Key') ?: $request->input('api_key');
 
-        if (!hash_equals((string) $apiKey, (string) $provided)) {
+        if (! hash_equals((string) $apiKey, (string) $provided)) {
             return null;
         }
 
@@ -156,9 +157,13 @@ class UsdtDriver implements PaymentDriver
         ];
     }
 
+    public function getPayTypes(array $config): array
+    {
+        return ['usdt'];
+    }
+
     public function getSupportedCurrencies(): array
     {
         return ['USDT'];
     }
 }
-
