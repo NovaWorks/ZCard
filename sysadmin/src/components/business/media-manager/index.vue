@@ -244,12 +244,12 @@
 
   // ===== 选择 =====
   const toggleSelect = (item: MediaItem) => {
-    if (!selecting.value) return
-    if (!multiple.value) {
-      // 单选:直接选中并返回
+    // 选择模式 + 单选:点击即选中并返回
+    if (selecting.value && !multiple.value) {
       emit('confirm', [{ url: item.url, id: item.id }])
       return
     }
+    // 管理模式 / 选择模式多选:切换选中(管理模式选中后顶部出现批量操作栏)
     const idx = selectedIds.value.indexOf(item.id)
     if (idx >= 0) {
       selectedIds.value.splice(idx, 1)
@@ -346,33 +346,33 @@
 
   // ===== 删除 =====
   const handleDelete = async (item: MediaItem) => {
-    await ElMessageBox.confirm(t('zcard.media.deleteConfirm'), t('zcard.common.warning'), {
-      confirmButtonText: t('zcard.media.delete'),
-      cancelButtonText: t('zcard.common.cancel'),
-      type: 'warning'
-    })
     try {
+      await ElMessageBox.confirm(t('zcard.media.deleteConfirm'), t('zcard.common.warning'), {
+        confirmButtonText: t('zcard.media.delete'),
+        cancelButtonText: t('zcard.common.cancel'),
+        type: 'warning'
+      })
       await deleteMediaFile(item.id)
       ElMessage.success(t('zcard.common.deleted'))
       await loadCategories()
       loadMedia()
     } catch {
-      // 统一错误提示
+      // 取消或失败统一静默
     }
   }
 
   const handleBatchDelete = async () => {
     if (!selectedIds.value.length) return
-    await ElMessageBox.confirm(
-      t('zcard.media.batchDeleteConfirm', { count: selectedIds.value.length }),
-      t('zcard.common.warning'),
-      {
-        confirmButtonText: t('zcard.media.delete'),
-        cancelButtonText: t('zcard.common.cancel'),
-        type: 'warning'
-      }
-    )
     try {
+      await ElMessageBox.confirm(
+        t('zcard.media.batchDeleteConfirm', { count: selectedIds.value.length }),
+        t('zcard.common.warning'),
+        {
+          confirmButtonText: t('zcard.media.delete'),
+          cancelButtonText: t('zcard.common.cancel'),
+          type: 'warning'
+        }
+      )
       await batchDeleteMedia(selectedIds.value)
       ElMessage.success(t('zcard.common.deleted'))
       selectedIds.value = []
@@ -380,7 +380,7 @@
       await loadCategories()
       loadMedia()
     } catch {
-      // 统一错误提示
+      // 取消或失败统一静默
     }
   }
 
@@ -556,12 +556,14 @@
             >
               <div class="card-thumb">
                 <img :src="item.url" :alt="item.original_name" loading="lazy" />
+                <!-- 管理模式:显示多选勾选标记;选择模式多选:同 -->
                 <span
-                  v-if="selecting && multiple"
+                  v-if="!selecting || multiple"
                   class="card-checkbox"
                   :class="{ checked: isSelected(item.id) }"
                   >✓</span
                 >
+                <!-- 选择模式单选:显示单选标记 -->
                 <span
                   v-if="selecting && !multiple"
                   class="card-radio"
