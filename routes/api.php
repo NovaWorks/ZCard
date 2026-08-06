@@ -100,6 +100,8 @@ use App\Http\Controllers\Api\Admin\SubsiteController as AdminSubsiteController;
 use App\Http\Controllers\Api\Admin\UploadController as AdminUploadController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\Admin\UserGroupController as AdminUserGroupController;
+use App\Http\Controllers\Api\Admin\MediaController as AdminMediaController;
+use App\Http\Controllers\Api\Admin\MediaCategoryController as AdminMediaCategoryController;
 
 Route::middleware(['auth:sanctum', 'admin.role'])->prefix('admin')->group(function () {
     // 仪表盘(概览/趋势/排行)
@@ -124,6 +126,22 @@ Route::middleware(['auth:sanctum', 'admin.role'])->prefix('admin')->group(functi
     Route::put('products/skus/{id}', [AdminProductSkuController::class, 'update']);
     Route::delete('products/skus/{id}', [AdminProductSkuController::class, 'destroy']);
     Route::post('upload/image', [AdminUploadController::class, 'image']);
+
+    // 素材管理(spec 2026-08-06)
+    // 注意:静态路由(batch-*)必须先于资源路由 media/{id} 注册,否则会被参数解析吃掉。
+    Route::get('media', [AdminMediaController::class, 'index']);
+    Route::post('media/upload', [AdminMediaController::class, 'upload']);
+    Route::post('media/batch-delete', [AdminMediaController::class, 'batchDelete']);
+    Route::post('media/batch-move', [AdminMediaController::class, 'batchMove']);
+    Route::delete('media/{id}', [AdminMediaController::class, 'destroy']);
+
+    // 素材分类
+    Route::get('media-categories', [AdminMediaCategoryController::class, 'index']);
+    Route::post('media-categories', [AdminMediaCategoryController::class, 'store']);
+    Route::put('media-categories/{id}', [AdminMediaCategoryController::class, 'update']);
+    Route::delete('media-categories/{id}', [AdminMediaCategoryController::class, 'destroy']);
+    Route::post('media-categories/{id}/move', [AdminMediaCategoryController::class, 'move']);
+
     Route::apiResource('categories', AdminCategoryController::class)->except(['show']);
     Route::get('categories/all', [AdminCategoryController::class, 'all']);
     Route::post('categories/sort', [AdminCategoryController::class, 'updateSort']);

@@ -24,10 +24,17 @@ const currentImg = ref(0)
 const lightboxOpen = ref(false)
 const lightboxScale = ref(1)
 const lightboxRotate = ref(0)
-function openLightbox() { lightboxOpen.value = true; document.body.style.overflow = 'hidden' }
+/** 当前预览图集(默认主图 gallery;描述内图片预览时切换为描述图集) */
+const lightboxImages = ref<string[]>([])
+function openLightbox() {
+  lightboxImages.value = galleryImages.value
+  currentImg.value = Math.min(currentImg.value, Math.max(galleryImages.value.length - 1, 0))
+  lightboxOpen.value = true
+  document.body.style.overflow = 'hidden'
+}
 function closeLightbox() { lightboxOpen.value = false; document.body.style.overflow = ''; lightboxScale.value = 1; lightboxRotate.value = 0 }
-function prevImg() { currentImg.value = (currentImg.value - 1 + galleryImages.value.length) % galleryImages.value.length; lightboxScale.value = 1; lightboxRotate.value = 0 }
-function nextImg() { currentImg.value = (currentImg.value + 1) % galleryImages.value.length; lightboxScale.value = 1; lightboxRotate.value = 0 }
+function prevImg() { currentImg.value = (currentImg.value - 1 + lightboxImages.value.length) % lightboxImages.value.length; lightboxScale.value = 1; lightboxRotate.value = 0 }
+function nextImg() { currentImg.value = (currentImg.value + 1) % lightboxImages.value.length; lightboxScale.value = 1; lightboxRotate.value = 0 }
 function zoomIn() { lightboxScale.value = Math.min(lightboxScale.value + 0.5, 4) }
 function zoomOut() { lightboxScale.value = Math.max(lightboxScale.value - 0.5, 0.5) }
 function rotateRight() { lightboxRotate.value = (lightboxRotate.value + 90) % 360 }
@@ -61,6 +68,30 @@ const sanitizedDescription = computed(() => {
     .replace(/<link[\s\S]*?>/gi, '')
     .replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
 })
+
+/** 描述富文本容器引用(用于事件委托收集图片) */
+const descriptionRef = ref<HTMLElement | null>(null)
+
+/**
+ * 描述内图片点击 → 收集该容器内全部 <img> 打开 lightbox 预览。
+ * 采集商品(acg-faka/dujiao 等)描述里常内嵌图片,此前点击无任何反应。
+ */
+function onDescriptionClick(e: MouseEvent) {
+  const target = e.target as HTMLElement
+  if (!(target instanceof HTMLImageElement)) return
+  e.preventDefault()
+  const container = descriptionRef.value
+  if (!container) return
+  const imgs = Array.from(container.querySelectorAll('img'))
+    .map((i) => i.getAttribute('src') || i.src)
+    .filter(Boolean)
+  if (!imgs.length) return
+  const idx = imgs.findIndex((s) => s === (target.getAttribute('src') || target.src))
+  lightboxImages.value = imgs
+  currentImg.value = idx >= 0 ? idx : 0
+  lightboxOpen.value = true
+  document.body.style.overflow = 'hidden'
+}
 
 // 真实 + 虚拟合并评价(由后端 getProductRating 合并)
 const reviewRating = ref(0)
@@ -151,7 +182,7 @@ function buy() {
 
       <!-- 图片放大预览(全屏遮罩,支持缩放/旋转,点击/ESC/左右键操作) -->
       <Teleport to="body">
-        <div v-if="lightboxOpen && galleryImages[currentImg]" class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center" @click.self="closeLightbox">
+        <div v-if="lightboxOpen && lightboxImages[currentImg]" class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center" @click.self="closeLightbox">
           <!-- 顶部工具条 -->
           <div class="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white/10 backdrop-blur rounded-full px-2 py-1.5 z-10">
             <button @click="zoomIn" class="w-8 h-8 rounded-full text-white text-sm hover:bg-white/20 transition" title="放大">＋</button>
@@ -161,18 +192,18 @@ function buy() {
           </div>
           <button @click="closeLightbox" class="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white text-xl hover:bg-white/25 transition flex items-center justify-center z-10" aria-label="关闭">✕</button>
           <button
-            v-if="galleryImages.length > 1"
+            v-if="lightboxImages.length > 1"
             @click="prevImg"
             class="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 text-white text-xl hover:bg-white/25 transition flex items-center justify-center z-10"
             aria-label="上一张">‹</button>
           <img
-            :src="galleryImages[currentImg]"
+            :src="lightboxImages[currentImg]"
             class="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl cursor-zoom-out select-none"
             :style="{ transform: `scale(${lightboxScale}) rotate(${lightboxRotate}deg)`, transition: 'transform .25s ease' }"
             @click="closeLightbox"
           />
           <button
-            v-if="galleryImages.length > 1"
+            v-if="lightboxImages.length > 1"
             @click="nextImg"
             class="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 text-white text-xl hover:bg-white/25 transition flex items-center justify-center z-10"
             aria-label="下一张">›</button>
@@ -257,8 +288,10 @@ function buy() {
       <h2 class="text-sm font-bold mb-3 border-l-2 border-primary pl-2">{{ t('product.detail.detailTitle') }}</h2>
       <div
         v-if="sanitizedDescription"
+        ref="descriptionRef"
         class="rich-content border border-border rounded-card p-4 bg-white"
         v-html="sanitizedDescription"
+        @click="onDescriptionClick"
       ></div>
       <div v-else class="text-xs text-ink-soft leading-relaxed border border-border rounded-card p-4 bg-white whitespace-pre-wrap">{{ t('product.detail.noDescription') }}</div>
     </div>
@@ -321,6 +354,11 @@ function buy() {
   max-width: 100%;
   height: auto;
   border-radius: 6px;
+  cursor: zoom-in;
+  transition: opacity 0.2s;
+}
+.rich-content :deep(img):hover {
+  opacity: 0.9;
 }
 .rich-content :deep(a) {
   color: #377dff;

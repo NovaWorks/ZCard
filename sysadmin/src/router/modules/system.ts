@@ -74,5 +74,15 @@ export const systemRoutes: AppRouteRecord = {
         keepAlive: false,
       },
     },
+    {
+      path: '/mediamgt/index',
+      name: 'MediaIndex',
+      component: '/media/index',
+      meta: {
+        title: 'menus.media.title',
+        icon: 'ri:image-2-line',
+        keepAlive: false,
+      },
+    },
   ],
 }

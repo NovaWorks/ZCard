@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Support\StorefrontConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -88,5 +89,43 @@ class SupplySourceAdminTest extends TestCase
         $resp->assertStatus(404)
             ->assertJsonPath('ok', false)
             ->assertJsonPath('error', "货源不存在: id={$missingId}。可用货源 id: {$source->id}。请先 GET /api/admin/supply-sources 获取真实 id。");
+    }
+
+    public function test_preview_products_uses_upstream_category_names(): void
+    {
+        StorefrontConfig::setMany(['supply_enabled' => true]);
+        $source = SupplySource::create([
+            'name' => 'S', 'driver' => 'dujiao_next', 'base_url' => 'https://x.com',
+            'credentials' => ['api_key' => 'ak', 'api_secret' => 'sk'], 'status' => 'active',
+        ]);
+
+        // 模拟 dujiao-next 上游:分类接口返回 id→name,商品接口返回带 category_id 的商品
+        Http::fake([
+            '*/api/v1/upstream/categories*' => Http::response([
+                'categories' => [
+                    ['id' => 4, 'name' => '游戏点卡'],
+                    ['id' => 7, 'name' => '视频会员'],
+                ],
+            ]),
+            '*/api/v1/upstream/products*' => Http::response([
+                'items' => [
+                    ['id' => 101, 'title' => '点卡A', 'price_amount' => '10.00', 'category_id' => 4],
+                    ['id' => 102, 'title' => '会员B', 'price_amount' => '20.00', 'category_id' => 7],
+                    ['id' => 103, 'title' => '无分类C', 'price_amount' => '5.00'],
+                ],
+                'total' => 3,
+            ]),
+        ]);
+
+        $resp = $this->withToken($this->adminToken())
+            ->getJson("/api/admin/supply-sources/{$source->id}/products/preview");
+
+        $resp->assertOk()->assertJsonPath('ok', true);
+        $cats = collect($resp->json('categories'));
+        // 分类名来自上游,而非"分类 #4"占位
+        $this->assertTrue($cats->contains('category_name', '游戏点卡'));
+        $this->assertTrue($cats->contains('category_name', '视频会员'));
+        $this->assertFalse($cats->contains('category_name', '分类 #4'));
+        $this->assertTrue($cats->contains(fn ($c) => $c['category_code'] === null && $c['category_name'] === '未分类'));
     }
 }

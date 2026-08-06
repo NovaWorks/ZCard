@@ -14,6 +14,7 @@ class UpstreamProduct
         public readonly int $price,              // 售价(分),驱动内部元→分转换后
         public readonly int $factoryPrice,       // 拿货价(分)
         public readonly ?string $categoryCode = null,
+        public readonly ?string $categoryName = null, // 上游分类名(驱动能拿到时填充,用于展示,避免"分类 #4")
         public readonly ?string $description = null,
         public readonly ?string $cover = null,
         public readonly array $images = [],

@@ -411,6 +411,9 @@
     },
     "supplierAccount": {
       "title": "Supplier Accounts"
+    },
+    "media": {
+      "title": "Media Library"
     }
   },
   "table": {
@@ -1516,6 +1519,53 @@
       "typeAdjust": "Adjust",
       "modified": "Modified",
       "deleteConfirm": "Delete supplier account \"{name}\"? It will no longer be able to dock into this site."
+    },
+    "media": {
+      "managerTitle": "Media Library",
+      "selectImage": "Select Image",
+      "upload": "Upload",
+      "refresh": "Refresh",
+      "categories": "Categories",
+      "all": "All",
+      "uncategorized": "Uncategorized",
+      "searchPlaceholder": "Search images...",
+      "sortCreatedAt": "Upload Time",
+      "sortFilename": "File Name",
+      "sortSize": "File Size",
+      "orderDesc": "Newest",
+      "orderAsc": "Oldest",
+      "addCategory": "New Category",
+      "categoryNamePlaceholder": "Enter category name",
+      "categoryNameRequired": "Please enter a category name",
+      "categoryNameMax": "Category name must not exceed 30 characters",
+      "categoryCreated": "Category created",
+      "categoryRenamed": "Category renamed",
+      "categoryDeleted": "Category deleted",
+      "categoryMoved": "Category moved",
+      "rename": "Rename",
+      "moveBeforeDelete": "Move images before deleting",
+      "moveBeforeDeleteTip": "This category contains images. Move them to another category before deleting.",
+      "moveToPlaceholder": "Select target category",
+      "confirmMove": "Move & Delete",
+      "moveTo": "Move",
+      "dragTip": "Drag images here, or click to upload",
+      "clickUpload": "Click to upload",
+      "uploadSuccess": "{count} images uploaded",
+      "preview": "Preview",
+      "copyLink": "Copy Link",
+      "linkCopied": "Link copied",
+      "linkCopyFailed": "Copy failed",
+      "download": "Download",
+      "deleteConfirm": "Delete this image? This cannot be undone.",
+      "batchDeleteConfirm": "Delete {count} selected images? This cannot be undone.",
+      "delete": "Delete",
+      "selected": "{count} selected",
+      "batchDelete": "Batch Delete",
+      "cancelSelect": "Clear",
+      "moved": "Moved",
+      "empty": "No images yet",
+      "singleSelectTip": "Click an image to select",
+      "multiSelectTip": "Click images to select multiple"
     }
   }
 }

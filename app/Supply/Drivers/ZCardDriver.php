@@ -44,8 +44,9 @@ class ZCardDriver implements SupplyDriver
     {
         $creds = $this->credentials();
         $ts = (string) time();
-        $nonce = 'zcard_' . uniqid();
+        $nonce = 'zcard_'.uniqid();
         $ss = HmacSigner::buildSignString($method, $path, $ts, $nonce, md5($rawBody));
+
         return [
             'X-Supply-Key' => $creds['api_key'],
             'X-Supply-Timestamp' => $ts,
@@ -59,14 +60,18 @@ class ZCardDriver implements SupplyDriver
         try {
             $path = '/api/supply/ping';
             $data = $this->postRaw($path, '', $this->signedHeaders('POST', $path));
+
             return ['connected' => $data['ok'] ?? false, 'name' => $data['name'] ?? null, 'balance' => $data['balance'] ?? null, 'currency' => $data['currency'] ?? 'CNY'];
-        } catch (\Throwable $e) { return ['connected' => false, 'error' => $e->getMessage()]; }
+        } catch (\Throwable $e) {
+            return ['connected' => false, 'error' => $e->getMessage()];
+        }
     }
 
     public function listCategories(): array
     {
         $path = '/api/supply/categories';
         $data = $this->postRaw($path, '', $this->signedHeaders('POST', $path));
+
         return collect($data['categories'] ?? [])->map(fn ($c) => new UpstreamCategory(code: (string) $c['id'], name: $c['name'], parentCode: isset($c['parent_id']) ? (string) $c['parent_id'] : null))->all();
     }
 
@@ -75,12 +80,24 @@ class ZCardDriver implements SupplyDriver
         $path = '/api/supply/products';
         $query = ['page' => $page];
         $data = $this->getJson($path, $query, $this->signedHeaders('GET', $path));
+        // 构建分类 code → name 映射,让商品预览/导入能显示上游真实分类名而非"分类 #id"
+        $catNames = [];
+        try {
+            foreach ($this->listCategories() as $cat) {
+                $catNames[$cat->code] = $cat->name;
+            }
+        } catch (\Throwable $e) {
+            // 分类接口失败不阻塞商品拉取
+        }
         $items = collect($data['items'] ?? [])->map(fn ($p) => new UpstreamProduct(
             code: (string) $p['id'], name: $p['name'], price: $p['price'] ?? 0, factoryPrice: $p['price'] ?? 0,
-            categoryCode: isset($p['category_id']) ? (string) $p['category_id'] : null, description: $p['description'] ?? null, cover: $p['cover'] ?? null,
+            categoryCode: isset($p['category_id']) ? (string) $p['category_id'] : null,
+            categoryName: isset($p['category_id']) ? ($catNames[(string) $p['category_id']] ?? null) : null,
+            description: $p['description'] ?? null, cover: $p['cover'] ?? null,
             // ZCard 供货 API 不返回库存数,默认无限(下游同步时 stock_cache 写 -1)
             stockQuantity: -1,
         ))->all();
+
         return ['items' => $items, 'total' => $data['total'] ?? 0, 'page' => $page, 'has_more' => false];
     }
 
@@ -89,6 +106,7 @@ class ZCardDriver implements SupplyDriver
         $path = "/api/supply/products/{$code}";
         $data = $this->getJson($path, [], $this->signedHeaders('GET', $path));
         $p = $data['product'] ?? null;
+
         return $p ? new UpstreamProduct(code: (string) $p['id'], name: $p['name'], price: $p['price'] ?? 0, factoryPrice: $p['price'] ?? 0) : null;
     }
 
@@ -96,6 +114,7 @@ class ZCardDriver implements SupplyDriver
     {
         $path = "/api/supply/products/{$code}/stock";
         $data = $this->getJson($path, [], $this->signedHeaders('GET', $path));
+
         return $data['stock'] ?? -1;
     }
 
@@ -106,6 +125,7 @@ class ZCardDriver implements SupplyDriver
         $bodyStr = $this->encodeBody(['product_id' => (int) $params['product_code'], 'quantity' => $params['quantity'], 'downstream_order_no' => $params['downstream_order_no']]);
         $data = $this->postRaw($path, $bodyStr, $this->signedHeaders('POST', $path, $bodyStr));
         $cards = $data['fulfillment']['cards'] ?? [];
+
         return new UpstreamOrder(id: (string) $data['supply_order_id'], status: $data['fulfillment']['status'] ?? 'pending', amount: $data['amount'] ?? 0, fulfillment: $cards ? new UpstreamFulfillment(status: 'delivered', cards: $cards) : null);
     }
 
@@ -114,6 +134,7 @@ class ZCardDriver implements SupplyDriver
         $path = "/api/supply/orders/{$upstreamOrderId}";
         $data = $this->getJson($path, [], $this->signedHeaders('GET', $path));
         $cards = $data['fulfillment']['cards'] ?? [];
+
         return new UpstreamOrder(id: $upstreamOrderId, status: $data['fulfillment']['status'] ?? 'pending', amount: $data['amount'] ?? 0, fulfillment: $cards ? new UpstreamFulfillment(status: 'delivered', cards: $cards) : null);
     }
 
@@ -121,6 +142,7 @@ class ZCardDriver implements SupplyDriver
     {
         $path = "/api/supply/orders/{$upstreamOrderId}/cancel";
         $data = $this->postRaw($path, '', $this->signedHeaders('POST', $path));
+
         return $data['ok'] ?? false;
     }
 
@@ -131,8 +153,11 @@ class ZCardDriver implements SupplyDriver
         $ts = $request->header('X-Supply-Timestamp');
         $nonce = $request->header('X-Supply-Nonce');
         $ss = HmacSigner::buildSignString('POST', $request->getPathInfo(), $ts, $nonce, md5($request->getContent() ?: ''));
-        if (! HmacSigner::verify($creds['api_secret'], $ss, $sig)) return null;
+        if (! HmacSigner::verify($creds['api_secret'], $ss, $sig)) {
+            return null;
+        }
         $data = $request->json()->all();
+
         return ['upstream_order_id' => (string) ($data['supply_order_id'] ?? ''), 'status' => $data['status'] ?? '', 'cards' => $data['fulfillment']['cards'] ?? [], 'downstream_order_no' => $data['downstream_order_no'] ?? null];
     }
 }

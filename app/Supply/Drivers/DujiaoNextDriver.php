@@ -46,6 +46,7 @@ class DujiaoNextDriver implements SupplyDriver
         $ts = (string) time();
         $signString = implode("\n", [$method, $path, $ts, md5($rawBody)]);
         $sig = hash_hmac('sha256', $signString, $creds['api_secret']);
+
         return [
             'Dujiao-Next-Api-Key' => $creds['api_key'],
             'Dujiao-Next-Timestamp' => $ts,
@@ -58,6 +59,7 @@ class DujiaoNextDriver implements SupplyDriver
         try {
             $path = '/api/v1/upstream/ping';
             $data = $this->postRaw($path, '', $this->signedHeaders('POST', $path));
+
             return [
                 'connected' => $data['ok'] ?? false,
                 'name' => $data['site_name'] ?? null, // 上游返回 site_name
@@ -73,6 +75,7 @@ class DujiaoNextDriver implements SupplyDriver
     {
         $path = '/api/v1/upstream/categories';
         $data = $this->getJson($path, [], $this->signedHeaders('GET', $path));
+
         return collect($data['categories'] ?? [])->map(fn ($c) => new UpstreamCategory(
             code: (string) $c['id'], name: $c['name'], parentCode: isset($c['parent_id']) ? (string) $c['parent_id'] : null,
             icon: $c['icon'] ?? null, sort: $c['sort_order'] ?? 0,
@@ -83,9 +86,21 @@ class DujiaoNextDriver implements SupplyDriver
     {
         $path = '/api/v1/upstream/products';
         $query = ['page' => $page, 'page_size' => 50];
-        if ($updatedAfter) $query['updated_after'] = $updatedAfter->toIso8601String();
+        if ($updatedAfter) {
+            $query['updated_after'] = $updatedAfter->toIso8601String();
+        }
         $data = $this->getJson($path, $query, $this->signedHeaders('GET', $path));
-        $items = collect($data['items'] ?? [])->map(fn ($p) => $this->mapProduct($p))->all();
+        // 构建分类 code → name 映射,让商品预览/导入能显示上游真实分类名而非"分类 #id"
+        $catNames = [];
+        try {
+            foreach ($this->listCategories() as $cat) {
+                $catNames[$cat->code] = $cat->name;
+            }
+        } catch (\Throwable $e) {
+            // 分类接口失败不阻塞商品拉取
+        }
+        $items = collect($data['items'] ?? [])->map(fn ($p) => $this->mapProduct($p, $catNames))->all();
+
         return ['items' => $items, 'total' => $data['total'] ?? 0, 'page' => $page, 'has_more' => ($page * 50) < ($data['total'] ?? 0)];
     }
 
@@ -93,12 +108,14 @@ class DujiaoNextDriver implements SupplyDriver
     {
         $path = "/api/v1/upstream/products/{$code}";
         $data = $this->getJson($path, [], $this->signedHeaders('GET', $path));
+
         return isset($data['product']) ? $this->mapProduct($data['product']) : null;
     }
 
     public function getStock(string $code, ?string $skuCode = null): int
     {
         $p = $this->getProduct($code);
+
         return $p?->stockQuantity ?? -1;
     }
 
@@ -122,6 +139,7 @@ class DujiaoNextDriver implements SupplyDriver
             'callback_url' => $params['callback_url'] ?? null,
         ]);
         $data = $this->postRaw($path, $bodyStr, $this->signedHeaders('POST', $path, $bodyStr));
+
         return new UpstreamOrder(
             id: (string) ($data['order_id'] ?? ''),
             status: $data['status'] ?? 'pending',
@@ -138,9 +156,12 @@ class DujiaoNextDriver implements SupplyDriver
         if (isset($data['fulfillment']) && ($data['fulfillment']['status'] ?? '') === 'delivered') {
             $cards = [];
             $payload = $data['fulfillment']['payload'] ?? null;
-            if ($payload) $cards[] = $payload;
+            if ($payload) {
+                $cards[] = $payload;
+            }
             $fulfillment = new UpstreamFulfillment(status: 'delivered', cards: $cards, deliveredAt: $data['fulfillment']['delivered_at'] ?? null);
         }
+
         return new UpstreamOrder(
             id: (string) ($data['order_id'] ?? $upstreamOrderId),
             status: $data['status'] ?? 'pending',
@@ -154,6 +175,7 @@ class DujiaoNextDriver implements SupplyDriver
     {
         $path = "/api/v1/upstream/orders/{$upstreamOrderId}/cancel";
         $data = $this->postRaw($path, '', $this->signedHeaders('POST', $path));
+
         return $data['ok'] ?? false;
     }
 
@@ -166,10 +188,15 @@ class DujiaoNextDriver implements SupplyDriver
         // 不是我们接收回调的实际路径,否则签名校验恒失败。
         $path = '/api/v1/upstream/callback';
         $expected = hash_hmac('sha256', implode("\n", ['POST', $path, $ts, md5($request->getContent())]), $creds['api_secret']);
-        if (! hash_equals($expected, $sig)) return null;
+        if (! hash_equals($expected, $sig)) {
+            return null;
+        }
         $data = $request->json()->all();
         $cards = [];
-        if (($data['fulfillment']['payload'] ?? null)) $cards[] = $data['fulfillment']['payload'];
+        if (($data['fulfillment']['payload'] ?? null)) {
+            $cards[] = $data['fulfillment']['payload'];
+        }
+
         return [
             'upstream_order_id' => (string) ($data['order_id'] ?? ''),
             'status' => $data['status'] ?? '',
@@ -178,7 +205,10 @@ class DujiaoNextDriver implements SupplyDriver
         ];
     }
 
-    private function mapProduct(array $p): UpstreamProduct
+    /**
+     * @param  array<string, string>  $catNames  分类 code → name 映射(用于填充 categoryName)
+     */
+    private function mapProduct(array $p, array $catNames = []): UpstreamProduct
     {
         // dujiao-next 库存/价格在 SKU 层,商品级 price_amount 为默认售价。
         // 填充 skus(取启用的 SKU),stockQuantity 取第一个启用 SKU。
@@ -196,6 +226,8 @@ class DujiaoNextDriver implements SupplyDriver
             ];
         }
 
+        $categoryCode = isset($p['category_id']) ? (string) $p['category_id'] : null;
+
         return new UpstreamProduct(
             code: (string) ($p['id'] ?? ''),
             name: $p['title'] ?? '',
@@ -204,7 +236,8 @@ class DujiaoNextDriver implements SupplyDriver
             factoryPrice: isset($p['wholesale_prices'][0]['unit_price'])
                 ? (int) round((float) $p['wholesale_prices'][0]['unit_price'] * 100)
                 : (isset($p['price_amount']) ? (int) round((float) $p['price_amount'] * 100) : 0),
-            categoryCode: isset($p['category_id']) ? (string) $p['category_id'] : null,
+            categoryCode: $categoryCode,
+            categoryName: $categoryCode !== null ? ($catNames[$categoryCode] ?? null) : null,
             description: $p['description'] ?? null,
             cover: $p['images'][0] ?? null,
             images: $p['images'] ?? [],

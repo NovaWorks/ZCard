@@ -411,6 +411,9 @@
     },
     "supplierAccount": {
       "title": "供货账号管理"
+    },
+    "media": {
+      "title": "素材管理"
     }
   },
   "table": {
@@ -1516,6 +1519,53 @@
       "typeAdjust": "手动调整",
       "modified": "修改成功",
       "deleteConfirm": "确认删除供货账号「{name}」?删除后该账号无法再对接本站拿货"
+    },
+    "media": {
+      "managerTitle": "素材管理",
+      "selectImage": "选择图片",
+      "upload": "上传图片",
+      "refresh": "刷新",
+      "categories": "分类管理",
+      "all": "全部",
+      "uncategorized": "未分类",
+      "searchPlaceholder": "搜索图片...",
+      "sortCreatedAt": "按上传时间",
+      "sortFilename": "按文件名称",
+      "sortSize": "按文件大小",
+      "orderDesc": "最新",
+      "orderAsc": "最早",
+      "addCategory": "新增分类",
+      "categoryNamePlaceholder": "请输入分类名称",
+      "categoryNameRequired": "请输入分类名称",
+      "categoryNameMax": "分类名称不能超过 30 个字",
+      "categoryCreated": "分类创建成功",
+      "categoryRenamed": "分类修改成功",
+      "categoryDeleted": "分类删除成功",
+      "categoryMoved": "分类迁移成功",
+      "rename": "修改",
+      "moveBeforeDelete": "迁移图片后删除分类",
+      "moveBeforeDeleteTip": "该分类下存在图片,请先将图片迁移到其它分类后才能删除。",
+      "moveToPlaceholder": "选择目标分类",
+      "confirmMove": "确认迁移",
+      "moveTo": "移动",
+      "dragTip": "拖拽图片到这里,或点击上传",
+      "clickUpload": "点击上传",
+      "uploadSuccess": "成功上传 {count} 张图片",
+      "preview": "预览",
+      "copyLink": "复制链接",
+      "linkCopied": "链接已复制",
+      "linkCopyFailed": "复制失败",
+      "download": "下载",
+      "deleteConfirm": "确认删除该图片?删除后无法恢复。",
+      "batchDeleteConfirm": "确认删除选中的 {count} 张图片?删除后无法恢复。",
+      "delete": "删除",
+      "selected": "已选 {count} 项",
+      "batchDelete": "批量删除",
+      "cancelSelect": "取消选择",
+      "moved": "移动成功",
+      "empty": "暂无图片",
+      "singleSelectTip": "点击图片即选中",
+      "multiSelectTip": "点击图片多选"
     }
   }
 }

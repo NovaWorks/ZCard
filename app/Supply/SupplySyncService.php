@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\SupplySource;
 use App\Supply\Dto\UpstreamProduct;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Str;
 
 /**
@@ -31,8 +32,8 @@ class SupplySyncService
      *
      * @param  array|null  $pricing  显式定价策略(勾选导入时传入,覆盖货源默认):
      *                               ['mode'=>percent|fixed|equal|pending,
-     *                                'markup_percent'=>int,
-     *                                'markup_amount'=>float(元)]
+     *                               'markup_percent'=>int,
+     *                               'markup_amount'=>float(元)]
      *                               为 null 时走货源 settings 默认定价。
      * @param  array|null  $categoryMap  上游分类 code → 本地分类 id 映射(勾选导入时)
      */
@@ -45,7 +46,7 @@ class SupplySyncService
             ->where('upstream_source_id', $source->id)
             ->where(function ($q) use ($dto) {
                 $q->where('upstream_product_code', $dto->code)
-                  ->orWhere('slug', Str::slug($dto->name) ?: ('p-' . $dto->code));
+                    ->orWhere('slug', Str::slug($dto->name) ?: ('p-'.$dto->code));
             })
             ->first();
 
@@ -60,7 +61,7 @@ class SupplySyncService
             // 例外2:勾选导入显式传了 pricing → 按本次所选策略重新定价。
             $update = [
                 'name' => $dto->name,
-                'description' => $dto->description,
+                'description' => $this->normalizeDescription($source, $dto->description),
                 'cover' => $this->normalizeCover($source, $dto->cover),
                 'images' => $this->normalizeImages($source, $dto->images, $dto->cover),
                 'factory_price' => $dto->factoryPrice,
@@ -78,6 +79,7 @@ class SupplySyncService
                 }
             }
             $existing->update($update);
+
             return $existing->fresh();
         }
 
@@ -88,7 +90,7 @@ class SupplySyncService
         // uniqueSlug 检查后仍撞库,捕获后换随机后缀重试一次,保证导入不中断。
         try {
             return $this->createProduct($source, $dto, $price, $pricing, $categoryMap);
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             if (! str_contains($e->getMessage(), 'Duplicate entry')) {
                 throw $e;
             }
@@ -103,7 +105,7 @@ class SupplySyncService
             'merchant_id' => self::MAIN_MERCHANT_ID,
             'name' => $dto->name,
             'slug' => $this->uniqueSlug($dto->name, $dto->code, $unique),
-            'description' => $dto->description,
+            'description' => $this->normalizeDescription($source, $dto->description),
             'cover' => $this->normalizeCover($source, $dto->cover),
             'images' => $this->normalizeImages($source, $dto->images, $dto->cover),
             'price' => $price ?? 0,
@@ -127,8 +129,8 @@ class SupplySyncService
      *
      * @param  array|null  $pricing  显式定价策略(勾选导入时传入,覆盖货源默认):
      *                               ['mode'=>percent|fixed|equal|pending,
-     *                                'markup_percent'=>int(百分比,如10),
-     *                                'markup_amount'=>float(元)]
+     *                               'markup_percent'=>int(百分比,如10),
+     *                               'markup_amount'=>float(元)]
      */
     private function computeInitialPrice(SupplySource $source, int $factoryPrice, int $upstreamPrice, ?array $pricing = null): ?int
     {
@@ -156,7 +158,7 @@ class SupplySyncService
             return $cover;
         }
 
-        return rtrim($source->base_url, '/') . '/' . ltrim($cover, '/');
+        return rtrim($source->base_url, '/').'/'.ltrim($cover, '/');
     }
 
     /**
@@ -178,6 +180,34 @@ class SupplySyncService
     }
 
     /**
+     * 描述 HTML 归一化:把其中相对路径的图片地址(如 /assets/a.png 或 assets/a.png)
+     * 拼上上游 base_url,否则在前台详情页会解析成本站域名 → 404。
+     * 绝对地址(https://)、协议相对(//cdn.xxx)、data:、锚点(#)保持不变。
+     */
+    private function normalizeDescription(SupplySource $source, ?string $description): ?string
+    {
+        if (! $description) {
+            return $description;
+        }
+        $base = rtrim($source->base_url, '/');
+
+        return preg_replace_callback(
+            '/(<img[^>]*\bsrc=["\'])([^"\']+)(["\'])/i',
+            function ($m) use ($base) {
+                $src = $m[2];
+                if ($src === '' || preg_match('/^(https?:|data:|#|\/\/)/i', $src)) {
+                    return $m[0];
+                }
+                // / 开头的站内绝对路径:直接拼 base_url;其余按相对路径拼
+                $url = $src[0] === '/' ? $base.$src : $base.'/'.$src;
+
+                return $m[1].$url.$m[3];
+            },
+            $description
+        );
+    }
+
+    /**
      * 解析商品应归入的本地分类 id。
      * 优先级:勾选导入时的显式映射(category_map) > 上游分类 code 匹配本地 slug > null。
      */
@@ -196,14 +226,15 @@ class SupplySyncService
 
     private function uniqueSlug(string $name, string $code, bool $forceUnique = false): string
     {
-        $base = Str::slug($name) ?: ('p-' . $code);
+        $base = Str::slug($name) ?: ('p-'.$code);
         $slug = $base;
         $i = 1;
         // 必须含软删除:软删商品仍占用唯一索引(merchant_id+slug),否则重新导入会 1062 冲突。
         // forceUnique=true 时额外追加随机后缀,彻底避免边缘冲突。
         while (Product::withTrashed()->where('slug', $slug)->exists() || ($forceUnique && $i === 1)) {
-            $slug = $base . '-' . ($forceUnique ? $i++ . '-' . Str::random(4) : $i++);
+            $slug = $base.'-'.($forceUnique ? $i++.'-'.Str::random(4) : $i++);
         }
+
         return $slug;
     }
 }

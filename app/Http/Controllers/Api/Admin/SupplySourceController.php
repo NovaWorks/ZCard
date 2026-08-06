@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\SyncSupplySourceProducts;
+use App\Models\Product;
 use App\Models\SupplySource;
 use App\Supply\SupplyManager;
+use App\Supply\SupplySyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
 
 /**
@@ -29,6 +32,7 @@ class SupplySourceController extends Controller
             ->orderByDesc('id')->paginate($request->integer('per_page', 20));
 
         $sources->getCollection()->transform(fn ($s) => $this->maskCredentials($s));
+
         return response()->json($sources);
     }
 
@@ -44,6 +48,7 @@ class SupplySourceController extends Controller
             'status' => $data['status'] ?? 'active',
             'settings' => $data['settings'] ?? null,
         ]);
+
         return response()->json($this->maskCredentials($source), 201);
     }
 
@@ -65,6 +70,7 @@ class SupplySourceController extends Controller
             $update['credentials'] = $merged;
         }
         $supplySource->update($update);
+
         return response()->json($this->maskCredentials($supplySource));
     }
 
@@ -72,6 +78,7 @@ class SupplySourceController extends Controller
     public function destroy(SupplySource $supplySource): JsonResponse
     {
         $supplySource->delete();
+
         return response()->json(null, 204);
     }
 
@@ -90,9 +97,11 @@ class SupplySourceController extends Controller
             } else {
                 $supplySource->update(['last_error' => $result['error'] ?? '连接失败']);
             }
+
             return response()->json($result);
         } catch (\Throwable $e) {
             $supplySource->update(['last_error' => $e->getMessage()]);
+
             return response()->json(['connected' => false, 'error' => $e->getMessage()]);
         }
     }
@@ -105,7 +114,8 @@ class SupplySourceController extends Controller
             // 同步执行(原为异步 dispatch,但生产环境常无 queue:worker 导致任务永不执行,
             // 用户点同步无反应。改为同步执行,立即返回结果)。
             $job = new SyncSupplySourceProducts($supplySource->id, $mode);
-            $job->handle(app(SupplyManager::class), app(\App\Supply\SupplySyncService::class));
+            $job->handle(app(SupplyManager::class), app(SupplySyncService::class));
+
             return response()->json(['ok' => true, 'message' => '同步完成', 'mode' => $mode]);
         } catch (\Throwable $e) {
             return response()->json(['ok' => false, 'message' => $e->getMessage(), 'mode' => $mode], 500);
@@ -133,8 +143,25 @@ class SupplySourceController extends Controller
             $driver = app(SupplyManager::class)->driver($supplySource);
             $items = $this->listAllProducts($driver);
 
+            // 上游分类名映射 code → name:
+            // 1) 驱动 listCategories() 返回的分类列表(dujiao-next / ZCard 供货 API)
+            // 2) 商品内嵌的 categoryName(acg-faka 的 items 里 cat.name)
+            $catNames = [];
+            try {
+                foreach ($driver->listCategories() as $cat) {
+                    $catNames[$cat->code] = $cat->name;
+                }
+            } catch (\Throwable $e) {
+                // 分类接口失败不阻塞商品预览,回退到"分类 #code"占位
+            }
+            foreach ($items as $p) {
+                if ($p->categoryCode !== null && $p->categoryName !== null) {
+                    $catNames[$p->categoryCode] = $p->categoryName;
+                }
+            }
+
             // 已导入本地的商品 code 集合(判断 already_imported)
-            $importedCodes = \App\Models\Product::where('upstream_source_id', $supplySource->id)
+            $importedCodes = Product::where('upstream_source_id', $supplySource->id)
                 ->pluck('upstream_product_code')->toArray();
 
             // 按上游分类聚合(没有分类的归到"未分类")
@@ -158,7 +185,9 @@ class SupplySourceController extends Controller
             foreach ($bucket as $catCode => $products) {
                 $tree[] = [
                     'category_code' => $catCode === '_uncategorized' ? null : $catCode,
-                    'category_name' => $catCode === '_uncategorized' ? '未分类' : ('分类 #' . $catCode),
+                    'category_name' => $catCode === '_uncategorized'
+                        ? '未分类'
+                        : ($catNames[$catCode] ?? ('分类 #'.$catCode)),
                     'products' => $products,
                 ];
             }
@@ -213,7 +242,7 @@ class SupplySourceController extends Controller
             }
 
             $driver = app(SupplyManager::class)->driver($supplySource);
-            $sync = app(\App\Supply\SupplySyncService::class);
+            $sync = app(SupplySyncService::class);
             $imported = 0;
             $skipped = 0;
 
@@ -224,6 +253,7 @@ class SupplySourceController extends Controller
                 $dto = $map->get($code);
                 if (! $dto) {
                     $skipped++;
+
                     continue;
                 }
                 $sync->upsertProduct($supplySource, $dto, $pricing, $data['category_map'] ?? null);
@@ -236,10 +266,11 @@ class SupplySourceController extends Controller
                 'ok' => true,
                 'imported' => $imported,
                 'skipped' => $skipped,
-                'message' => "成功导入 {$imported} 个商品" . ($skipped > 0 ? "(跳过 {$skipped} 个)" : ''),
+                'message' => "成功导入 {$imported} 个商品".($skipped > 0 ? "(跳过 {$skipped} 个)" : ''),
             ]);
         } catch (\Throwable $e) {
             $supplySource->update(['last_error' => $e->getMessage()]);
+
             return response()->json(['ok' => false, 'error' => $e->getMessage()], 500);
         }
     }
@@ -261,18 +292,18 @@ class SupplySourceController extends Controller
         unset($params['sign']);
         ksort($params);
         $params = array_filter($params, fn ($v) => $v !== '' && $v !== null);
-        $sign = md5(urldecode(http_build_query($params)) . '&key=' . $appKey);
+        $sign = md5(urldecode(http_build_query($params)).'&key='.$appKey);
         $params['sign'] = $sign;
 
-        $url = $baseUrl . '/shared/commodity/items';
-        $resp = \Illuminate\Support\Facades\Http::asForm()->timeout(30)->post($url, $params);
+        $url = $baseUrl.'/shared/commodity/items';
+        $resp = Http::asForm()->timeout(30)->post($url, $params);
 
         return response()->json([
             'request' => [
                 'url' => $url,
                 'method' => 'POST (application/x-www-form-urlencoded)',
                 'app_id' => $appId,
-                'app_key_masked' => $appKey ? ('••••' . substr($appKey, -4)) : '(空)',
+                'app_key_masked' => $appKey ? ('••••'.substr($appKey, -4)) : '(空)',
                 'sign' => $sign,
             ],
             'response' => [
@@ -282,8 +313,8 @@ class SupplySourceController extends Controller
                 'json' => $resp->json(),
             ],
             'hint' => '如果 http_status=404:上游未配置伪静态/URL重写。'
-                . '如果 json.code!=200:看 json.msg(如"密钥错误"=凭证问题,"商户ID不存在"=app_id 错)。'
-                . '如果 json.data 为空数组:商品未开启 API 上架(api_status=1)。',
+                .'如果 json.code!=200:看 json.msg(如"密钥错误"=凭证问题,"商户ID不存在"=app_id 错)。'
+                .'如果 json.data 为空数组:商品未开启 API 上架(api_status=1)。',
         ]);
     }
 
@@ -305,10 +336,11 @@ class SupplySourceController extends Controller
         $creds = $source->credentials ?? [];
         foreach ($creds as $key => $val) {
             if (is_string($val) && strlen($val) > 4 && (str_contains(strtolower($key), 'secret') || strtolower($key) === 'app_key')) {
-                $creds[$key] = '••••••••' . substr($val, -4);
+                $creds[$key] = '••••••••'.substr($val, -4);
             }
         }
         $source->credentials = $creds;
+
         return $source;
     }
 
