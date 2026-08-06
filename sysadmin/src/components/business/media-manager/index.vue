@@ -244,19 +244,22 @@
 
   // ===== 选择 =====
   const toggleSelect = (item: MediaItem) => {
-    // 选择模式 + 单选:点击即选中并返回
-    if (selecting.value && !multiple.value) {
-      emit('confirm', [{ url: item.url, id: item.id }])
-      return
-    }
-    // 管理模式 / 选择模式多选:切换选中(管理模式选中后顶部出现批量操作栏)
+    // 选择模式(单选/多选)与管理模式统一:点击切换选中,点底部「确定」返回。
+    // 单选模式点击即 emit confirm 会在事件处理中同步关闭弹窗并销毁本组件,
+    // 某些场景(组件卸载与事件冒泡竞态)会导致页面闪退,故改为点选后手动确定。
     const idx = selectedIds.value.indexOf(item.id)
     if (idx >= 0) {
       selectedIds.value.splice(idx, 1)
       selection.value = selection.value.filter((s) => s.id !== item.id)
     } else {
-      selectedIds.value.push(item.id)
-      selection.value.push({ url: item.url, id: item.id })
+      // 单选模式:切换时只保留当前选中
+      if (selecting.value && !multiple.value) {
+        selectedIds.value = [item.id]
+        selection.value = [{ url: item.url, id: item.id }]
+      } else {
+        selectedIds.value.push(item.id)
+        selection.value.push({ url: item.url, id: item.id })
+      }
     }
   }
 
@@ -969,7 +972,7 @@
         display: flex;
         justify-content: center;
         gap: 4px;
-        opacity: 0;
+        opacity: 0.85;
         transition: opacity 0.15s;
         :deep(.el-button) {
           width: 24px;
