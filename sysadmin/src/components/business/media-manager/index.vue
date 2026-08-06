@@ -573,8 +573,8 @@
                   :class="{ checked: isSelected(item.id) }"
                   >✓</span
                 >
-                <!-- Hover 操作条(管理模式:预览/复制) -->
-                <div v-if="!selecting" class="card-hover-actions" @click.stop>
+                <!-- Hover 操作条(预览/复制,所有模式) -->
+                <div class="card-hover-actions" @click.stop>
                   <ElButton
                     circle
                     size="small"
@@ -597,8 +597,8 @@
                   <span>{{ formatDate(item.created_at) }}</span>
                   <span>{{ formatSize(item.size) }}</span>
                 </div>
-                <!-- 管理模式:底部操作栏(常驻,删除入口明确) -->
-                <div v-if="!selecting" class="card-op-actions">
+                <!-- 底部操作栏(常驻,所有模式:复制/下载/移动/删除) -->
+                <div class="card-op-actions" @click.stop>
                   <ElButton text size="small" @click="copyLink(item.url)">🔗</ElButton>
                   <ElButton text size="small" @click="downloadFile(item)">⬇</ElButton>
                   <ElButton text size="small" @click="openMoveTarget([item.id])">📁</ElButton>
