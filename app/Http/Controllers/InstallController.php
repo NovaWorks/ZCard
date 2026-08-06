@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
+use App\Support\AppHelper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 
 /**
  * Web 安装向导(无需登录,安装前访问)。
@@ -95,7 +98,7 @@ class InstallController extends Controller
         } catch (\PDOException $e) {
             return response()->json([
                 'success' => false,
-                'message' => '连接失败: ' . $e->getMessage(),
+                'message' => '连接失败: '.$e->getMessage(),
             ], 422);
         }
     }
@@ -139,7 +142,7 @@ class InstallController extends Controller
 
             // Step 3: 卡密加密密钥
             if (empty(env('CARD_ENCRYPTION_KEY'))) {
-                $key = 'base64:' . base64_encode(random_bytes(32));
+                $key = 'base64:'.base64_encode(random_bytes(32));
                 $this->writeEnv('CARD_ENCRYPTION_KEY', $key);
             }
 
@@ -160,7 +163,14 @@ class InstallController extends Controller
 
             // Step 6: 角色
             foreach (['super_admin', 'merchant', 'user'] as $role) {
-                \Spatie\Permission\Models\Role::firstOrCreate(['name' => $role]);
+                Role::firstOrCreate(['name' => $role]);
+            }
+
+            // Step 6.5: storage 公开链接(素材/上传图片经 /storage/ 访问必需)
+            try {
+                Artisan::call('storage:link');
+            } catch (\Throwable $e) {
+                // 链接已存在或权限不足时忽略,不影响安装
             }
 
             // Step 7: 管理员账号
@@ -180,7 +190,7 @@ class InstallController extends Controller
                 DB::table('users')->where('id', $adminRow->id)->update([
                     'username' => 'admin',
                     'email' => $data['admin_email'],
-                    'password' => \Illuminate\Support\Facades\Hash::make($data['admin_password']),
+                    'password' => Hash::make($data['admin_password']),
                     'name' => 'Super Admin',
                     'status' => 1,
                     'deleted_at' => null,
@@ -192,7 +202,7 @@ class InstallController extends Controller
                 $adminId = DB::table('users')->insertGetId([
                     'username' => 'admin',
                     'email' => $data['admin_email'],
-                    'password' => \Illuminate\Support\Facades\Hash::make($data['admin_password']),
+                    'password' => Hash::make($data['admin_password']),
                     'name' => 'Super Admin',
                     'status' => 1,
                     'password_changed_at' => null,
@@ -201,7 +211,7 @@ class InstallController extends Controller
                 ]);
             }
             // 确保 super_admin 角色(用 Eloquent 实例绑定 Spatie 角色)
-            $admin = \App\Models\User::find($adminId);
+            $admin = User::find($adminId);
             if ($admin && ! $admin->hasRole('super_admin')) {
                 $admin->assignRole('super_admin');
             }
@@ -228,7 +238,7 @@ class InstallController extends Controller
 
             // Step 10: 安装锁(最后一步,确保全部成功后才写)
             file_put_contents(storage_path('app/installed'), json_encode([
-                'version' => \App\Support\AppHelper::version(),
+                'version' => AppHelper::version(),
                 'installed_at' => now()->toIso8601String(),
             ]));
 
@@ -241,7 +251,7 @@ class InstallController extends Controller
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => '安装失败: ' . $e->getMessage(),
+                'message' => '安装失败: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -288,10 +298,10 @@ class InstallController extends Controller
         }
         // 值含特殊字符时加双引号(符合 vlucas/phpdotenv 规范)
         if (preg_match('/[\s#=]/', $value) || $value === '') {
-            $value = '"' . str_replace('"', '\\"', $value) . '"';
+            $value = '"'.str_replace('"', '\\"', $value).'"';
         }
         $content = file_get_contents($path);
-        $pattern = '/^' . preg_quote($key, '/') . '=.*/m';
+        $pattern = '/^'.preg_quote($key, '/').'=.*/m';
         if (preg_match($pattern, $content)) {
             $content = preg_replace($pattern, "{$key}={$value}", $content);
         } else {

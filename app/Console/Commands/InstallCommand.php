@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Merchant;
 use App\Models\User;
+use App\Support\AppHelper;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
@@ -51,7 +52,7 @@ class InstallCommand extends Command
 
         // ─── Step 4: 卡密加密密钥 ───
         if (empty(config('zcard.card_encryption_key'))) {
-            $key = 'base64:' . base64_encode(random_bytes(32));
+            $key = 'base64:'.base64_encode(random_bytes(32));
             $this->writeEnv('CARD_ENCRYPTION_KEY', $key);
             $this->info(' ✔ 生成卡密加密密钥');
         }
@@ -63,8 +64,9 @@ class InstallCommand extends Command
             \DB::connection()->getPdo();
             $this->info(' ✔ 数据库连接成功');
         } catch (\Throwable $e) {
-            $this->error(' ✘ 数据库连接失败: ' . $e->getMessage());
+            $this->error(' ✘ 数据库连接失败: '.$e->getMessage());
             $this->warn('   请检查 .env 中的 DB_HOST / DB_DATABASE / DB_USERNAME / DB_PASSWORD');
+
             return self::FAILURE;
         }
 
@@ -79,6 +81,12 @@ class InstallCommand extends Command
         }
         $this->callSilently('shield:setup', ['--silent' => true]);
         $this->info(' ✔ 创建角色与权限');
+
+        // ─── Step 7.5: storage 公开链接 ───
+        // 素材管理/上传的图片存储在 storage/app/public,需 public/storage 软链接才能经
+        // /storage/... 访问。缺失时上传的图片会 403(被 Laravel 路由接管返回"访问被拒绝")。
+        $this->callSilently('storage:link');
+        $this->info(' ✔ 创建 storage 软链接(public/storage)');
 
         // ─── Step 8: 管理员账号 ───
         $email = $this->option('email');
@@ -123,7 +131,7 @@ class InstallCommand extends Command
 
         // ─── 安装锁 ───
         file_put_contents(storage_path('app/installed'), json_encode([
-            'version' => \App\Support\AppHelper::version(),
+            'version' => AppHelper::version(),
             'installed_at' => now()->toIso8601String(),
         ]));
 
@@ -142,8 +150,8 @@ class InstallCommand extends Command
         }
 
         $this->info('');
-        $this->info('  后台地址: ' . config('app.url') . '/admin');
-        $this->info('  前台地址: ' . config('app.url'));
+        $this->info('  后台地址: '.config('app.url').'/admin');
+        $this->info('  前台地址: '.config('app.url'));
         $this->info('');
 
         return self::SUCCESS;
@@ -213,7 +221,7 @@ class InstallCommand extends Command
         foreach ($checks as $name => $passed) {
             $ext = str_contains($name, '可选') ? '⚠' : '✘';
             $mark = $passed ? '✔' : $ext;
-            $this->line("   {$mark} {$name}" . ($passed ? '' : (str_contains($name, '可选') ? ' (跳过)' : ' (必需!)')));
+            $this->line("   {$mark} {$name}".($passed ? '' : (str_contains($name, '可选') ? ' (跳过)' : ' (必需!)')));
             if (! $passed && ! str_contains($name, '可选')) {
                 $allPass = false;
             }
@@ -222,8 +230,10 @@ class InstallCommand extends Command
         if (! $allPass) {
             $this->error('');
             $this->error('存在未满足的必需环境要求,请安装对应的 PHP 扩展后重试');
+
             return false;
         }
+
         return true;
     }
 
@@ -294,10 +304,10 @@ class InstallCommand extends Command
         }
         // 值含特殊字符时加双引号(符合 vlucas/phpdotenv 规范)
         if (preg_match('/[\s#=]/', $value) || $value === '') {
-            $value = '"' . str_replace('"', '\\"', $value) . '"';
+            $value = '"'.str_replace('"', '\\"', $value).'"';
         }
         $content = file_get_contents($path);
-        $pattern = '/^' . preg_quote($key, '/') . '=.*/m';
+        $pattern = '/^'.preg_quote($key, '/').'=.*/m';
         if (preg_match($pattern, $content)) {
             $content = preg_replace($pattern, "{$key}={$value}", $content);
         } else {
