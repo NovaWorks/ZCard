@@ -55,7 +55,7 @@ class OrderController extends Controller
                     'create_ip' => $request->ip(),
                     'create_device' => $this->detectDevice($request),
                 ],
-                $data['display_currency'] ?? null,
+                $data['display_currency'] ?? $request->attributes->get('currency'),
             );
 
             return response()->json([
@@ -128,7 +128,7 @@ class OrderController extends Controller
                     'create_ip' => $request->ip(),
                     'create_device' => $this->detectDevice($request),
                 ],
-                $data['display_currency'] ?? null,
+                $data['display_currency'] ?? $request->attributes->get('currency'),
             );
 
             return response()->json([

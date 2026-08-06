@@ -308,7 +308,7 @@ function buy() {
         <div class="mt-3 bg-gradient-to-br from-price-light to-white border border-orange-200 rounded-card p-4 relative">
           <span class="absolute top-0 right-0 bg-gradient-to-br from-price to-orange-400 text-white text-[9px] font-bold px-3 py-1 rounded-bl-lg">{{ t('product.detail.limitedTag') }}</span>
           <div class="flex items-baseline gap-2">
-            <span class="text-price font-extrabold text-3xl">{{ formatMoney(displayPrice, prefs.currentCurrency) }}</span>
+            <span class="text-price font-extrabold text-3xl">{{ formatMoney(displayPrice, prefs.currencyOf(product.display_currency)) }}</span>
             <span v-if="isPremium" class="text-xs text-ink-soft font-medium">{{ t('product.premium.fromPriceLabel') }}</span>
           </div>
         </div>
@@ -333,7 +333,7 @@ function buy() {
             <div v-for="s in product.skus" :key="s.id" @click="selectedSku = s.id"
               :class="['relative border-2 rounded-card px-3 py-2 cursor-pointer text-center min-w-[80px] transition', selectedSku === s.id ? 'border-primary bg-primary-light' : 'border-border hover:border-primary/40']">
               <div :class="['text-xs font-semibold', selectedSku === s.id ? 'text-primary' : 'text-ink-soft']">{{ s.name }}</div>
-              <div class="text-xs font-bold text-price">{{ formatMoney(s.price_display ?? s.price, prefs.currentCurrency) }}</div>
+              <div class="text-xs font-bold text-price">{{ formatMoney(s.price_display ?? s.price, prefs.currencyOf(product.display_currency)) }}</div>
             </div>
           </div>
         </div>
@@ -413,7 +413,7 @@ function buy() {
                 ]"
               >
                 <span class="text-sm font-semibold text-ink font-mono">{{ n.number }}</span>
-                <span class="text-price font-bold text-sm">{{ formatMoney(n.price_display ?? n.price, prefs.currentCurrency) }}</span>
+                <span class="text-price font-bold text-sm">{{ formatMoney(n.price_display ?? n.price, prefs.currencyOf(product.display_currency)) }}</span>
               </button>
               <!-- 加载更多 -->
               <button

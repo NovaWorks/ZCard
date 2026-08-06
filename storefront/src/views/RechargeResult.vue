@@ -78,7 +78,7 @@ onMounted(async () => {
         <div class="bg-surface-subtle rounded-field p-3 mb-5">
           <div class="flex justify-between text-xs">
             <span class="text-ink-muted">{{ t('recharge.colAmount') }}</span>
-            <span class="text-price font-bold">{{ formatMoney(amountFen, prefs.currentCurrency) }}</span>
+            <span class="text-price font-bold">{{ formatMoney(amountFen, prefs.baseCurrencyInfo) }}</span>
           </div>
         </div>
         <div class="flex gap-2">

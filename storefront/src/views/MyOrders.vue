@@ -76,7 +76,7 @@ onMounted(async () => {
           <div class="flex-1 min-w-0">
             <div class="text-sm font-semibold text-ink truncate">{{ o.product_name || t('common.productOffShelf') }}</div>
             <div class="text-xs text-ink-muted mt-0.5">× {{ o.quantity }}</div>
-            <div class="text-price font-bold mt-1">{{ formatMoney(o.amount_display ?? o.amount, prefs.currentCurrency) }}</div>
+            <div class="text-price font-bold mt-1">{{ formatMoney(o.amount_display ?? o.amount, prefs.currencyOf(o.display_currency)) }}</div>
           </div>
 
           <span class="text-xs font-bold px-2 py-0.5 rounded-pill shrink-0"

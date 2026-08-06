@@ -109,7 +109,7 @@ function goProduct(p: Product) {
             <div v-else class="w-full h-28 bg-gradient-to-br from-primary-soft to-primary-light flex items-center justify-center text-primary text-xs font-medium">{{ t('common.noImage') }}</div>
             <div class="p-2.5">
               <div class="text-xs font-medium text-ink line-clamp-1">{{ p.name }}</div>
-              <div class="text-price font-bold text-base mt-1">{{ formatMoney(p.price_display ?? p.price, prefs.currentCurrency) }}</div>
+              <div class="text-price font-bold text-base mt-1">{{ formatMoney(p.price_display ?? p.price, prefs.currencyOf(p.display_currency)) }}</div>
             </div>
           </div>
         </div>

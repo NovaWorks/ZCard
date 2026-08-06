@@ -81,7 +81,7 @@ onMounted(async () => {
           </div>
           <div class="flex justify-between text-xs">
             <span class="text-ink-muted">{{ t('order.payResult.amountLabel') }}</span>
-            <span class="text-price font-bold">{{ formatMoney(order.amount_display ?? order.amount, prefs.currentCurrency) }}</span>
+            <span class="text-price font-bold">{{ formatMoney(order.amount_display ?? order.amount, prefs.currencyOf(order.display_currency)) }}</span>
           </div>
         </div>
         <div v-if="order.cards.length" class="mb-5">

@@ -118,7 +118,7 @@ function stopPolling() {
     <div class="bg-white rounded-card border border-border p-6">
       <h2 class="text-lg font-bold text-ink mb-1">{{ t('recharge.payTitle') }}</h2>
       <div v-if="amountFen" class="text-2xl font-extrabold text-price mb-2">
-        {{ formatMoney(amountFen, prefs.currentCurrency) }}
+        {{ formatMoney(amountFen, prefs.baseCurrencyInfo) }}
       </div>
       <div class="text-xs text-ink-muted mb-4 font-mono break-all">{{ rechargeNo }}</div>
 

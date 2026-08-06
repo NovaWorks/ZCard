@@ -77,11 +77,11 @@ onMounted(async () => {
       <div class="grid grid-cols-2 gap-3 mb-4">
         <div class="bg-white rounded-card border border-border p-4">
           <div class="text-xs text-ink-muted">{{ t('distribution.totalCommission') }}</div>
-          <div class="text-price font-bold mt-1">{{ formatMoney(stats?.total_commission ?? 0, prefs.currentCurrency) }}</div>
+          <div class="text-price font-bold mt-1">{{ formatMoney(stats?.total_commission ?? 0, prefs.baseCurrencyInfo) }}</div>
         </div>
         <div class="bg-white rounded-card border border-border p-4">
           <div class="text-xs text-ink-muted">{{ t('distribution.availableCommission') }}</div>
-          <div class="text-price font-bold mt-1">{{ formatMoney(stats?.available_commission ?? 0, prefs.currentCurrency) }}</div>
+          <div class="text-price font-bold mt-1">{{ formatMoney(stats?.available_commission ?? 0, prefs.baseCurrencyInfo) }}</div>
           <button @click="goWithdraw"
             class="mt-2 px-3 py-1 rounded-field bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition">
             {{ t('nav.withdraw') }}
@@ -89,7 +89,7 @@ onMounted(async () => {
         </div>
         <div class="bg-white rounded-card border border-border p-4">
           <div class="text-xs text-ink-muted">{{ t('distribution.balance') }}</div>
-          <div class="text-price font-bold mt-1">{{ formatMoney(stats?.balance ?? 0, prefs.currentCurrency) }}</div>
+          <div class="text-price font-bold mt-1">{{ formatMoney(stats?.balance ?? 0, prefs.baseCurrencyInfo) }}</div>
         </div>
         <div class="bg-white rounded-card border border-border p-4">
           <div class="text-xs text-ink-muted">{{ t('distribution.referralCount') }}</div>
@@ -128,7 +128,7 @@ onMounted(async () => {
                 <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-pill bg-primary-light text-primary">T{{ c.tier }}</span>
                 <span class="text-ink-muted">{{ c.order?.order_no || '-' }}</span>
               </div>
-              <span class="text-price font-bold">{{ formatMoney(c.amount, prefs.currentCurrency) }}</span>
+              <span class="text-price font-bold">{{ formatMoney(c.amount, prefs.baseCurrencyInfo) }}</span>
             </div>
             <div class="flex items-center justify-between mt-1 text-[11px] text-ink-muted">
               <span>{{ c.buyer?.username || '-' }}</span>

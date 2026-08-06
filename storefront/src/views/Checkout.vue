@@ -41,6 +41,8 @@ interface LineItem {
 const isCartMode = computed(() => route.query.cart === '1' || cart.items.length > 0)
 /** 靓号自选:单品模式下隐藏 SKU/数量选择 */
 const singlePremium = computed(() => singleProduct.value?.pick_type === 'premium')
+/** 展示货币:优先跟随后端返回的 display_currency,避免符号与金额错乱 */
+const displayCur = computed(() => prefs.currencyOf(singleProduct.value?.display_currency))
 const items = ref<LineItem[]>([])
 const loading = ref(true)
 const err = ref('')
@@ -400,7 +402,7 @@ const channelPayTypes = (ch: PaymentChannel) => {
             <div v-if="it.sku_name" class="mt-1 inline-block px-2 py-0.5 rounded bg-surface-subtle text-[10px] text-ink-muted">{{ it.sku_name }}</div>
           </div>
           <div class="text-right shrink-0">
-            <div class="text-price font-bold">{{ formatMoney(it.price_display, prefs.currentCurrency) }}</div>
+            <div class="text-price font-bold">{{ formatMoney(it.price_display, displayCur) }}</div>
             <div class="text-[10px] text-ink-muted">{{ t('order.checkout.unitPrice') }}</div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
@@ -409,7 +411,7 @@ const channelPayTypes = (ch: PaymentChannel) => {
             <button @click="changeQty(idx, 1)" class="w-7 h-7 rounded-field border border-border text-ink-soft hover:bg-surface-subtle transition">+</button>
           </div>
           <div class="w-24 text-right shrink-0">
-            <div class="text-sm font-bold text-ink">{{ formatMoney(it.price_display * it.qty, prefs.currentCurrency) }}</div>
+            <div class="text-sm font-bold text-ink">{{ formatMoney(it.price_display * it.qty, displayCur) }}</div>
             <div class="text-[10px] text-ink-muted">{{ t('order.checkout.lineTotal') }}</div>
           </div>
           <button @click="removeItem(idx)" class="shrink-0 w-7 h-7 rounded-full text-ink-muted hover:text-danger hover:bg-red-50 transition" :title="t('common.remove')">✕</button>
@@ -422,7 +424,7 @@ const channelPayTypes = (ch: PaymentChannel) => {
             <button v-for="s in singleProduct.skus" :key="s.id" @click="selectedSku = s.id; onSkuChange()"
               :class="['border-2 rounded-card px-3 py-2 text-xs cursor-pointer transition', selectedSku === s.id ? 'border-primary bg-primary-light text-primary font-semibold' : 'border-border text-ink-soft hover:border-primary/40']">
               {{ s.name }}
-              <span class="block text-price font-bold mt-0.5">{{ formatMoney(s.price_display ?? s.price, prefs.currentCurrency) }}</span>
+              <span class="block text-price font-bold mt-0.5">{{ formatMoney(s.price_display ?? s.price, displayCur) }}</span>
             </button>
           </div>
         </div>
@@ -534,22 +536,22 @@ const channelPayTypes = (ch: PaymentChannel) => {
           <div class="bg-white rounded-card border border-border p-4">
             <div class="flex justify-between items-center text-sm mb-1">
               <span class="text-ink-soft">{{ t('order.checkout.subtotal') }} ({{ items.length }})</span>
-              <span class="text-ink font-semibold">{{ formatMoney(subtotal, prefs.currentCurrency) }}</span>
+              <span class="text-ink font-semibold">{{ formatMoney(subtotal, displayCur) }}</span>
             </div>
             <div v-if="couponDiscount > 0" class="flex justify-between items-center text-sm mb-1 text-success">
               <span>{{ t('order.checkout.discount') }}</span>
-              <span>-{{ formatMoney(couponDiscount * totalDisplayRatio, prefs.currentCurrency) }}</span>
+              <span>-{{ formatMoney(couponDiscount * totalDisplayRatio, displayCur) }}</span>
             </div>
             <div class="flex justify-between items-center py-2 mt-2 border-t border-border">
               <span class="text-sm font-semibold text-ink">{{ t('order.checkout.payable') }}</span>
-              <span class="text-2xl font-extrabold text-price">{{ formatMoney(totalDisplay, prefs.currentCurrency) }}</span>
+              <span class="text-2xl font-extrabold text-price">{{ formatMoney(totalDisplay, displayCur) }}</span>
             </div>
 
             <div v-if="err" class="text-danger text-xs mb-2">{{ err }}</div>
 
             <button @click="submit" :disabled="submitting || !items.length || !channels.length"
               class="w-full mt-2 bg-gradient-to-r from-primary to-primary-hover text-white font-bold py-3.5 rounded-card shadow-md hover:shadow-pop disabled:opacity-50 transition">
-              {{ submitting ? t('order.checkout.submitting') : t('order.checkout.submitOrder', { amount: formatMoney(totalDisplay, prefs.currentCurrency) }) }}
+              {{ submitting ? t('order.checkout.submitting') : t('order.checkout.submitOrder', { amount: formatMoney(totalDisplay, displayCur) }) }}
             </button>
           </div>
         </div>
@@ -573,7 +575,7 @@ const channelPayTypes = (ch: PaymentChannel) => {
                 <div class="text-sm font-semibold text-ink font-mono truncate">{{ line.sku_name }}</div>
                 <div class="text-[10px] text-ink-muted">{{ line.name }}</div>
               </div>
-              <span class="text-price font-bold text-sm shrink-0">{{ formatMoney(line.price_display, prefs.currentCurrency) }}</span>
+              <span class="text-price font-bold text-sm shrink-0">{{ formatMoney(line.price_display, displayCur) }}</span>
             </div>
           </div>
           <div class="flex gap-2 px-5 py-3.5 border-t border-border">

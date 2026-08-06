@@ -167,7 +167,7 @@ async function copyAll(cards: string[]) {
                 <div class="text-sm font-semibold text-ink truncate">{{ o.product_name || t('common.productOffShelf') }}</div>
                 <div class="text-xs text-ink-muted mt-0.5">× {{ o.quantity }}</div>
                 <div class="flex items-baseline gap-1 mt-1">
-                  <span class="text-price font-extrabold">{{ formatMoney(o.amount_display ?? o.amount, prefs.currentCurrency) }}</span>
+                  <span class="text-price font-extrabold">{{ formatMoney(o.amount_display ?? o.amount, prefs.currencyOf(o.display_currency)) }}</span>
                 </div>
               </div>
               <span class="text-xs font-semibold px-2.5 py-1 rounded-pill shrink-0" :class="statusClass(o.status)">

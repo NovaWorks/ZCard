@@ -16,10 +16,11 @@ const view = computed(() => settings.effectiveView)
 /** 靓号自选:显示最低价起 */
 const isPremium = computed(() => (props.product.pick_type ?? 'general') === 'premium')
 const priceText = computed(() => {
+  const cur = prefs.currencyOf(props.product.display_currency)
   const min = props.product.premium_min_price_display ?? props.product.premium_min_price
   return isPremium.value && min != null
-    ? t('product.premium.fromPrice', { price: formatMoney(min, prefs.currentCurrency) })
-    : formatMoney(props.product.price_display ?? props.product.price, prefs.currentCurrency)
+    ? t('product.premium.fromPrice', { price: formatMoney(min, cur) })
+    : formatMoney(props.product.price_display ?? props.product.price, cur)
 })
 function go() { router.push(`/product/${props.product.slug}`) }
 </script>

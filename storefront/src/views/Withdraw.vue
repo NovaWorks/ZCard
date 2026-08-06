@@ -219,7 +219,7 @@ onMounted(async () => {
         <tbody>
           <tr v-for="h in history" :key="h.id" class="border-b border-border/60">
             <td class="py-2 text-price font-semibold">
-              {{ formatMoney(h.amount, prefs.currentCurrency) }}
+              {{ formatMoney(h.amount, prefs.baseCurrencyInfo) }}
             </td>
             <td class="py-2 text-ink">
               {{ methods.find((m) => m.value === h.method)?.label || h.method }}

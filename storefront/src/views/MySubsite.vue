@@ -332,15 +332,15 @@ onMounted(async () => {
       <div class="grid grid-cols-3 gap-3 mb-4">
         <div class="bg-white rounded-card border border-border p-4">
           <div class="text-xs text-ink-muted">{{ t('subsite.totalProfit') }}</div>
-          <div class="text-price font-bold mt-1 text-sm">{{ formatMoney(finance?.total_profit ?? 0, prefs.currentCurrency) }}</div>
+          <div class="text-price font-bold mt-1 text-sm">{{ formatMoney(finance?.total_profit ?? 0, prefs.baseCurrencyInfo) }}</div>
         </div>
         <div class="bg-white rounded-card border border-border p-4">
           <div class="text-xs text-ink-muted">{{ t('subsite.available') }}</div>
-          <div class="text-price font-bold mt-1 text-sm">{{ formatMoney(finance?.available ?? 0, prefs.currentCurrency) }}</div>
+          <div class="text-price font-bold mt-1 text-sm">{{ formatMoney(finance?.available ?? 0, prefs.baseCurrencyInfo) }}</div>
         </div>
         <div class="bg-white rounded-card border border-border p-4">
           <div class="text-xs text-ink-muted">{{ t('subsite.pending') }}</div>
-          <div class="text-ink font-bold mt-1 text-sm">{{ formatMoney(finance?.pending ?? 0, prefs.currentCurrency) }}</div>
+          <div class="text-ink font-bold mt-1 text-sm">{{ formatMoney(finance?.pending ?? 0, prefs.baseCurrencyInfo) }}</div>
         </div>
       </div>
 
@@ -443,7 +443,7 @@ onMounted(async () => {
           <tbody>
             <tr v-for="l in ledger" :key="l.id" class="border-b border-border/60">
               <td class="py-2 text-ink">{{ l.type }}</td>
-              <td class="py-2 text-right text-price font-semibold">{{ formatMoney(l.amount, prefs.currentCurrency) }}</td>
+              <td class="py-2 text-right text-price font-semibold">{{ formatMoney(l.amount, prefs.baseCurrencyInfo) }}</td>
               <td class="py-2 text-ink-muted">{{ ledgerStatusText(l.status) }}</td>
               <td class="py-2 text-right text-ink-muted">{{ fmtDate(l.created_at) }}</td>
             </tr>
@@ -475,8 +475,8 @@ onMounted(async () => {
                 <td class="py-2 pr-3 text-ink">{{ o.product_name || '-' }}</td>
                 <td class="py-2 pr-3 text-ink">{{ o.buyer_name || '-' }}</td>
                 <td class="py-2 pr-3 text-right text-ink">{{ o.quantity }}</td>
-                <td class="py-2 pr-3 text-right text-price font-semibold">{{ formatMoney(o.amount, prefs.currentCurrency) }}</td>
-                <td class="py-2 pr-3 text-right text-price font-semibold">{{ formatMoney(o.profit, prefs.currentCurrency) }}</td>
+                <td class="py-2 pr-3 text-right text-price font-semibold">{{ formatMoney(o.amount, prefs.baseCurrencyInfo) }}</td>
+                <td class="py-2 pr-3 text-right text-price font-semibold">{{ formatMoney(o.profit, prefs.baseCurrencyInfo) }}</td>
                 <td class="py-2 pr-3 text-ink-muted">{{ orderStatusText(o.status) }}</td>
                 <td class="py-2 text-right text-ink-muted">{{ fmtDate(o.paid_at || o.created_at) }}</td>
               </tr>

@@ -105,7 +105,7 @@ onMounted(() => {
     <h1 class="text-xl font-bold text-ink mb-1">{{ t('recharge.title') }}</h1>
     <p class="text-xs text-ink-muted mb-4">
       {{ t('recharge.currentBalance') }}:
-      <span class="text-price font-bold">{{ formatMoney(balance, prefs.currentCurrency) }}</span>
+      <span class="text-price font-bold">{{ formatMoney(balance, prefs.baseCurrencyInfo) }}</span>
     </p>
 
     <!-- 充值卡 -->
@@ -183,7 +183,7 @@ onMounted(() => {
       <div class="mt-4 flex items-center justify-between border-t border-border pt-3">
         <span class="text-xs text-ink-muted">{{ t('recharge.willRecharge') }}</span>
         <span class="text-lg font-extrabold text-price">
-          {{ formatMoney(Math.round(effectiveAmount * 100), prefs.currentCurrency) }}
+          {{ formatMoney(Math.round(effectiveAmount * 100), prefs.baseCurrencyInfo) }}
         </span>
       </div>
 
@@ -217,7 +217,7 @@ onMounted(() => {
         <tbody>
           <tr v-for="h in history" :key="h.id" class="border-b border-border/60">
             <td class="py-2 text-price font-semibold">
-              {{ formatMoney(h.amount, prefs.currentCurrency) }}
+              {{ formatMoney(h.amount, prefs.baseCurrencyInfo) }}
             </td>
             <td class="py-2 text-ink-muted font-mono">{{ h.recharge_no }}</td>
             <td class="py-2">

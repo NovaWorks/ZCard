@@ -18,6 +18,19 @@ export const usePreferencesStore = defineStore('preferences', {
       return state.currencies.find((c) => c.code === state.currency)
         || state.currencies.find((c) => c.is_base)
     },
+    /** 基础货币元信息(账户类金额:余额/佣金/账单/提现,始终以基础货币记账展示) */
+    baseCurrencyInfo(state): CurrencyInfo | undefined {
+      return state.currencies.find((c) => c.code === state.baseCurrency)
+        || state.currencies.find((c) => c.is_base)
+    },
+    /** 按 code 取货币元信息(展示金额时优先用后端返回的 display_currency,保证符号与金额一致) */
+    currencyOf: (state) => (code: string | null | undefined): CurrencyInfo | undefined => {
+      if (code) {
+        const hit = state.currencies.find((c) => c.code === code)
+        if (hit) return hit
+      }
+      return state.currencies.find((c) => c.is_base)
+    },
   },
   actions: {
     async load() {

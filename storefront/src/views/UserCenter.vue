@@ -220,7 +220,7 @@ onMounted(loadData)
 
           <div class="mt-6 bg-white/15 rounded-field p-4 backdrop-blur-sm">
             <div class="text-white/80 text-xs">{{ t('userCenter.balance') }}</div>
-            <div class="text-3xl font-extrabold mt-1">{{ formatMoney(balance, prefs.currentCurrency) }}</div>
+            <div class="text-3xl font-extrabold mt-1">{{ formatMoney(balance, prefs.baseCurrencyInfo) }}</div>
             <div class="mt-3 flex gap-2">
               <button @click="go('recharge')"
                 class="bg-white/90 text-primary text-sm font-semibold px-4 py-1.5 rounded-pill hover:bg-white transition">
@@ -247,7 +247,7 @@ onMounted(loadData)
           <button @click="go('recharge')" class="bg-white rounded-field border border-border p-4 text-center hover:shadow-card-hover transition">
             <div class="text-2xl mb-1">💰</div>
             <div class="text-xs font-medium text-ink">{{ t('userCenter.recharge') }}</div>
-            <div class="text-[10px] text-ink-muted mt-0.5">{{ formatMoney(balance, prefs.currentCurrency) }}</div>
+            <div class="text-[10px] text-ink-muted mt-0.5">{{ formatMoney(balance, prefs.baseCurrencyInfo) }}</div>
           </button>
           <button @click="go('distribution')" class="bg-white rounded-field border border-border p-4 text-center hover:shadow-card-hover transition">
             <div class="text-2xl mb-1">🎁</div>
@@ -289,7 +289,7 @@ onMounted(loadData)
             <div class="flex items-center justify-between bg-surface-subtle rounded-field p-4">
               <div>
                 <div class="text-xs text-ink-muted">{{ t('supply.balance') }}</div>
-                <div class="text-2xl font-extrabold text-ink mt-0.5">{{ formatMoney(supplyAccount.balance, prefs.currentCurrency) }}</div>
+                <div class="text-2xl font-extrabold text-ink mt-0.5">{{ formatMoney(supplyAccount.balance, prefs.baseCurrencyInfo) }}</div>
               </div>
               <button
                 @click="goRechargeSupply"
@@ -369,7 +369,7 @@ onMounted(loadData)
                 <div class="text-xs text-ink-muted mt-0.5 font-mono">{{ o.order_no }}</div>
               </div>
               <div class="text-right shrink-0">
-                <div class="text-sm font-semibold text-price">{{ formatMoney(o.amount_display ?? o.amount, prefs.currentCurrency) }}</div>
+                <div class="text-sm font-semibold text-price">{{ formatMoney(o.amount_display ?? o.amount, prefs.currencyOf(o.display_currency)) }}</div>
                 <span class="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-pill mt-0.5" :class="statusClass(o.status)">
                   {{ statusText(o.status) }}
                 </span>
