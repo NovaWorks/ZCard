@@ -573,7 +573,7 @@
                   :class="{ checked: isSelected(item.id) }"
                   >✓</span
                 >
-                <!-- Hover 操作条(管理模式) -->
+                <!-- Hover 操作条(管理模式:预览/复制) -->
                 <div v-if="!selecting" class="card-hover-actions" @click.stop>
                   <ElButton
                     circle
@@ -589,28 +589,6 @@
                     @click="copyLink(item.url)"
                     >🔗</ElButton
                   >
-                  <ElButton
-                    circle
-                    size="small"
-                    :title="t('zcard.media.download')"
-                    @click="downloadFile(item)"
-                    >⬇</ElButton
-                  >
-                  <ElButton
-                    circle
-                    size="small"
-                    :title="t('zcard.media.moveTo')"
-                    @click="openMoveTarget([item.id])"
-                    >📁</ElButton
-                  >
-                  <ElButton
-                    circle
-                    size="small"
-                    type="danger"
-                    :title="t('zcard.common.delete')"
-                    @click="handleDelete(item)"
-                    >🗑</ElButton
-                  >
                 </div>
               </div>
               <div class="card-info">
@@ -618,6 +596,15 @@
                 <div class="card-meta">
                   <span>{{ formatDate(item.created_at) }}</span>
                   <span>{{ formatSize(item.size) }}</span>
+                </div>
+                <!-- 管理模式:底部操作栏(常驻,删除入口明确) -->
+                <div v-if="!selecting" class="card-op-actions">
+                  <ElButton text size="small" @click="copyLink(item.url)">🔗</ElButton>
+                  <ElButton text size="small" @click="downloadFile(item)">⬇</ElButton>
+                  <ElButton text size="small" @click="openMoveTarget([item.id])">📁</ElButton>
+                  <ElButton text type="danger" size="small" @click="handleDelete(item)">
+                    {{ t('zcard.media.delete') }}
+                  </ElButton>
                 </div>
               </div>
             </li>
@@ -1002,6 +989,19 @@
         font-size: 11px;
         color: var(--el-text-color-secondary);
         margin-top: 2px;
+      }
+      .card-op-actions {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        margin-top: 4px;
+        border-top: 1px solid var(--el-border-color-lighter);
+        padding-top: 4px;
+        :deep(.el-button) {
+          padding: 2px 6px;
+          font-size: 12px;
+          min-width: 0;
+        }
       }
     }
   }

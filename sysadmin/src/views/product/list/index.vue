@@ -325,9 +325,22 @@
                   <span>{{ t('zcard.product.coverUpload') }}</span>
                 </div>
               </ElUpload>
-              <ElButton v-if="formData.cover" link type="danger" class="ml-2" @click="formData.cover = ''">
-                {{ t('zcard.product.coverRemove') }}
-              </ElButton>
+              <div class="cover-actions">
+                <MediaPicker
+                  :button-text="t('zcard.media.selectImage')"
+                  size="small"
+                  @confirm="handleCoverMediaPick"
+                />
+                <ElButton
+                  v-if="formData.cover"
+                  link
+                  type="danger"
+                  class="ml-2"
+                  @click="formData.cover = ''"
+                >
+                  {{ t('zcard.product.coverRemove') }}
+                </ElButton>
+              </div>
             </ElFormItem>
 
             <ElFormItem :label="t('zcard.product.images')">
@@ -343,6 +356,14 @@
               >
                 <ElIcon class="upload-icon"><Plus /></ElIcon>
               </ElUpload>
+              <div class="gallery-actions">
+                <MediaPicker
+                  multiple
+                  :button-text="t('zcard.media.selectImages')"
+                  size="small"
+                  @confirm="handleGalleryMediaPick"
+                />
+              </div>
               <span class="form-hint">{{ t('zcard.product.galleryHint') }}</span>
             </ElFormItem>
           </ElTabPane>
@@ -811,6 +832,7 @@
   } from '@/api/products'
   import { getAllCategories, type Category } from '@/api/categories'
   import { uploadImage } from '@/api/upload'
+  import MediaPicker from '@/components/business/media-picker/index.vue'
   import { MdEditor } from 'md-editor-v3'
   import 'md-editor-v3/lib/style.css'
   import { marked } from 'marked'
@@ -1361,6 +1383,21 @@
   }
   /** 封面点击放大 */
   const handleCoverPreview = () => openViewer([formData.cover], 0)
+
+  /** 素材库选择封面(单选) */
+  const handleCoverMediaPick = (items: { url: string; id: number }[]) => {
+    if (items[0]) formData.cover = items[0].url
+  }
+
+  /** 素材库选择详情图(多选,追加到图集) */
+  const handleGalleryMediaPick = (items: { url: string; id: number }[]) => {
+    items.forEach((it) => {
+      if (!galleryUrls.value.includes(it.url)) {
+        galleryUrls.value.push(it.url)
+        galleryFileList.value.push({ name: it.url.split('/').pop() || 'image', url: it.url })
+      }
+    })
+  }
 
   /** SKU 列表编辑行 */
   interface SkuRow extends Sku {
@@ -1973,6 +2010,14 @@
 
   .cover-preview:hover .cover-mask {
     opacity: 1;
+  }
+
+  .cover-actions,
+  .gallery-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
   }
 
   .sku-empty {

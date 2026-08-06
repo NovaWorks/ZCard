@@ -1524,6 +1524,7 @@
     "media": {
       "managerTitle": "素材管理",
       "selectImage": "选择图片",
+      "selectImages": "从素材库选择",
       "upload": "上传图片",
       "refresh": "刷新",
       "categories": "分类管理",

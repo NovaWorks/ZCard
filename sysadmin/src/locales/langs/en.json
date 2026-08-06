@@ -1524,6 +1524,7 @@
     "media": {
       "managerTitle": "Media Library",
       "selectImage": "Select Image",
+      "selectImages": "Select from Library",
       "upload": "Upload",
       "refresh": "Refresh",
       "categories": "Categories",
