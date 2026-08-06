@@ -129,8 +129,59 @@ const fmtDate = (d: string | null) => d ? String(d).slice(0, 10) : ''
 /** 已加入购物车状态(按钮短暂反馈) */
 const addedFeedback = ref(false)
 let addedTimer: ReturnType<typeof setTimeout> | null = null
+
+/** 靓号自选:当前选中号码 + 弹窗控制 */
+const premiumVisible = ref(false)
+const premiumNumbers = ref<{ card_id: number; number: string; price: number; price_display: number; display_currency: string }[]>([])
+const selectedPremium = ref<{ card_id: number; number: string; price: number; price_display: number; display_currency: string } | null>(null)
+const pendingAction = ref<'cart' | 'buy' | null>(null)
+
+const isPremium = computed(() => (product.value?.pick_type ?? 'general') === 'premium')
+
+/** 打开靓号选择弹窗(记录待执行动作) */
+function openPremiumPick(action: 'cart' | 'buy') {
+  if (!product.value) return
+  premiumNumbers.value = product.value.premium_numbers || []
+  selectedPremium.value = null
+  pendingAction.value = action
+  premiumVisible.value = true
+}
+
+/** 确认选择:执行待办动作 */
+function confirmPremium() {
+  if (!selectedPremium.value) return
+  const sel = selectedPremium.value
+  if (pendingAction.value === 'buy') {
+    router.push({
+      path: '/checkout',
+      query: { product: product.value!.slug, card_id: String(sel.card_id) },
+    })
+  } else {
+    cart.add({
+      product_id: product.value!.id,
+      sku_id: null,
+      qty: 1,
+      slug: product.value!.slug,
+      name: product.value!.name,
+      cover: product.value!.cover ?? null,
+      price: sel.price,
+      price_display: sel.price_display ?? sel.price,
+      sku_name: sel.number,
+      card_id: sel.card_id,
+    })
+    addedFeedback.value = true
+    if (addedTimer) clearTimeout(addedTimer)
+    addedTimer = setTimeout(() => { addedFeedback.value = false }, 2000)
+  }
+  premiumVisible.value = false
+}
+
 function addToCart() {
   if (!product.value) return
+  if (isPremium.value) {
+    openPremiumPick('cart')
+    return
+  }
   const sku = product.value.skus?.find(s => s.id === selectedSku.value)
   cart.add({
     product_id: product.value.id,
@@ -149,6 +200,10 @@ function addToCart() {
 }
 function buy() {
   if (!product.value) return
+  if (isPremium.value) {
+    openPremiumPick('buy')
+    return
+  }
   router.push({
     path: '/checkout',
     query: {
@@ -282,6 +337,54 @@ function buy() {
         </div>
       </div>
     </div>
+
+    <!-- 靓号自选弹窗 -->
+    <Teleport to="body">
+      <div
+        v-if="premiumVisible"
+        class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+        @click.self="premiumVisible = false"
+      >
+        <div class="w-full max-w-lg bg-white rounded-card shadow-2xl overflow-hidden">
+          <div class="flex items-center justify-between px-5 py-3.5 border-b border-border">
+            <h3 class="text-base font-bold text-ink">{{ t('product.premium.pickTitle') }}</h3>
+            <button @click="premiumVisible = false" class="text-ink-muted hover:text-ink transition text-xl leading-none">✕</button>
+          </div>
+          <div class="px-5 py-4 max-h-[50vh] overflow-y-auto">
+            <p class="text-xs text-ink-muted mb-3">{{ t('product.premium.pickHint') }}</p>
+            <div v-if="premiumNumbers.length" class="space-y-2">
+              <button
+                v-for="n in premiumNumbers"
+                :key="n.card_id"
+                type="button"
+                @click="selectedPremium = n"
+                :class="[
+                  'w-full flex items-center justify-between gap-3 border rounded-card px-3 py-2.5 text-left transition',
+                  selectedPremium?.card_id === n.card_id
+                    ? 'border-primary bg-primary-light ring-2 ring-primary/15'
+                    : 'border-border hover:border-primary/40 hover:bg-primary-light/30'
+                ]"
+              >
+                <span class="text-sm font-semibold text-ink font-mono">{{ n.number }}</span>
+                <span class="text-price font-bold text-sm">{{ formatMoney(n.price_display ?? n.price, prefs.currentCurrency) }}</span>
+              </button>
+            </div>
+            <div v-else class="text-center text-ink-muted py-8 text-sm">{{ t('product.premium.noNumbers') }}</div>
+          </div>
+          <div class="flex gap-2 px-5 py-3.5 border-t border-border">
+            <button
+              @click="premiumVisible = false"
+              class="flex-1 border border-border text-ink-soft font-medium py-2.5 rounded-card hover:bg-surface-subtle transition text-sm"
+            >{{ t('common.cancel') }}</button>
+            <button
+              @click="confirmPremium"
+              :disabled="!selectedPremium"
+              class="flex-1 bg-gradient-to-r from-primary to-primary-hover text-white font-bold py-2.5 rounded-card shadow-md hover:shadow-pop transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >{{ t('common.confirm') }}</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- 商品描述 -->
     <div v-if="settings.config?.show_description !== false" class="mt-6 border-t-4 border-surface-subtle pt-4">

@@ -337,6 +337,7 @@
           <ElRadioGroup v-model="importForm.import_kind">
             <ElRadio value="general">{{ t('zcard.card.cardTypeGeneral') }}</ElRadio>
             <ElRadio value="account">{{ t('zcard.card.cardTypeAccount') }}</ElRadio>
+            <ElRadio value="premium">{{ t('zcard.card.cardTypePremium') }}</ElRadio>
           </ElRadioGroup>
         </ElFormItem>
         <ElFormItem :label="t('zcard.card.content')" prop="contents">
@@ -369,6 +370,10 @@
           <div v-if="importForm.import_kind === 'account'" class="form-help account-hint">
             <div>{{ t('zcard.card.accountFormatHint') }}</div>
             <div class="account-example">{{ t('zcard.card.accountFormatExample') }}</div>
+          </div>
+          <div v-else-if="importForm.import_kind === 'premium'" class="form-help account-hint">
+            <div>{{ t('zcard.card.premiumFormatHint') }}</div>
+            <div class="account-example">{{ t('zcard.card.premiumFormatExample') }}</div>
           </div>
           <div v-else class="form-help">{{ t('zcard.card.lineCount', { n: importLineCount }) }}</div>
         </ElFormItem>
@@ -886,7 +891,7 @@
     card_type: '',
     note: '',
     contents: '',
-    import_kind: 'general' as 'general' | 'account',
+    import_kind: 'general' as 'general' | 'account' | 'premium',
     dedup: false
   })
 
@@ -949,7 +954,12 @@
       const res = await importCards({
         product_id: importForm.product_id as number,
         contents: importForm.contents,
-        card_type: importForm.import_kind === 'account' ? 'account' : (importForm.card_type || undefined),
+        card_type:
+          importForm.import_kind === 'account'
+            ? 'account'
+            : importForm.import_kind === 'premium'
+              ? '靓号自选'
+              : (importForm.card_type || undefined),
         note: importForm.note || undefined,
         dedup: importForm.dedup
       })

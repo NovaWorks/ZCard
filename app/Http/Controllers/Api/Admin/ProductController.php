@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Card;
+use App\Models\Order;
 use App\Models\Product;
+use App\Models\UserGroup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -76,13 +79,14 @@ class ProductController extends Controller
             'hide' => 'boolean',
             'level_disable' => 'boolean',
             'dedup' => 'boolean',
+            'pick_type' => 'nullable|string|in:general,premium',
             'sort' => 'nullable|integer',
             'status' => 'boolean',
         ]);
 
         $data['merchant_id'] = 1;
         if (empty($data['slug'])) {
-            $data['slug'] = Str::slug($data['name']) . '-' . Str::random(6);
+            $data['slug'] = Str::slug($data['name']).'-'.Str::random(6);
         }
 
         $product = Product::create($data);
@@ -94,7 +98,7 @@ class ProductController extends Controller
     {
         $product = Product::with(['skus', 'category'])->findOrFail($id);
 
-        $userGroups = \App\Models\UserGroup::where('status', true)
+        $userGroups = UserGroup::where('status', true)
             ->orderBy('sort')
             ->get(['id', 'name']);
 
@@ -137,6 +141,7 @@ class ProductController extends Controller
             'hide' => 'boolean',
             'level_disable' => 'boolean',
             'dedup' => 'boolean',
+            'pick_type' => 'nullable|string|in:general,premium',
             'sort' => 'nullable|integer',
             'status' => 'boolean',
         ]);
@@ -161,9 +166,9 @@ class ProductController extends Controller
             'active' => Product::where('status', 1)->count(),
             'inactive' => Product::where('status', 0)->count(),
             'featured' => Product::where('is_featured', true)->count(),
-            'total_stock' => \App\Models\Card::where('status', 'unused')->count(),
-            'total_orders' => \App\Models\Order::count(),
-            'paid_orders' => \App\Models\Order::where('status', 'paid')->count(),
+            'total_stock' => Card::where('status', 'unused')->count(),
+            'total_orders' => Order::count(),
+            'paid_orders' => Order::where('status', 'paid')->count(),
         ]);
     }
 

@@ -10,6 +10,8 @@ export interface CartItem {
   price: number
   price_display: number
   sku_name: string | null
+  /** 靓号自选:选定的卡密 id */
+  card_id?: number | null
 }
 
 const STORAGE_KEY = 'zcard_cart'

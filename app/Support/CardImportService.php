@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Jobs\ImportCardsJob;
 use App\Models\Card;
 use App\Models\CardImport;
 use App\Models\Product;
@@ -24,7 +25,7 @@ class CardImportService
      * - delimiter: string|null
      * - source: string
      * - note: string|null     每条卡密统一打备注
-     * - card_type: string|null 每条卡密统一卡密类型(如月卡)
+     * - card_type: string|null 每条卡密统一卡密类型(如月卡);传「靓号自选」时按 --- 分隔解析价格
      */
     public function import(int $productId, int $operatorId, string $rawInput, array $options = []): CardImport
     {
@@ -43,6 +44,7 @@ class CardImportService
 
         if ($total === 0) {
             $import->update(['status' => 'completed']);
+
             return $import;
         }
 
@@ -50,7 +52,7 @@ class CardImportService
             $this->processSync($import, $cards, $options);
         } else {
             $tmpFile = $this->storeTempInput($rawInput, $import->id);
-            \App\Jobs\ImportCardsJob::dispatch($import->id, $tmpFile, $options);
+            ImportCardsJob::dispatch($import->id, $tmpFile, $options);
         }
 
         return $import;
@@ -59,6 +61,8 @@ class CardImportService
     /**
      * 解析:按 format 拆成卡密明文数组。
      * single/multi 都是整行入库(去空行/空白)。
+     * card_type=靓号自选 时,行内用 --- 分隔:第一段=靓号,第二段=价格(元),其余=其他信息。
+     * 价格解析不在此处(processChunk 中按卡密类型取),保持单行明文入库。
      */
     public function parse(string $rawInput, string $format = 'single', ?string $delimiter = null): array
     {
@@ -71,6 +75,7 @@ class CardImportService
             }
             $cards[] = $line;
         }
+
         return $cards;
     }
 
@@ -119,10 +124,12 @@ class CardImportService
         $failed = 0;
         $errors = [];
         $seenInChunk = []; // 本块内已见的 hash(防块内重复)
+        $isPremium = $cardType === '靓号自选' || $cardType === '靓号';
         foreach ($chunk as $i => $plain) {
             $hash = $hashes[$i];
             if ($dedup && ($existing->has($hash) || isset($seenInChunk[$hash]))) {
                 $skipped++;
+
                 continue;
             }
             if ($dedup) {
@@ -137,6 +144,8 @@ class CardImportService
                 'status' => Card::STATUS_UNUSED,
                 'note' => $note,
                 'card_type' => $cardType,
+                // 靓号自选:解析行内价格(第二段,元→分);非靓号卡不设
+                'price' => $isPremium ? $this->parsePremiumPrice($plain) : null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
@@ -182,8 +191,27 @@ class CardImportService
     /** 存原始输入到临时文件(队列 Job 用,避免序列化大数组) */
     private function storeTempInput(string $rawInput, int $importId): string
     {
-        $path = "card-imports/import-{$importId}-" . time() . '.txt';
+        $path = "card-imports/import-{$importId}-".time().'.txt';
         Storage::disk('local')->put($path, $rawInput);
+
         return $path;
+    }
+
+    /**
+     * 解析靓号自选行内价格:格式「靓号---价格(元)---其他信息」。
+     * 取第二段为单价,元转分;解析失败返回 null(不阻断导入,下单按商品价兜底)。
+     */
+    public function parsePremiumPrice(string $plain): ?int
+    {
+        $parts = explode('---', $plain);
+        if (count($parts) < 2) {
+            return null;
+        }
+        $amount = trim($parts[1]);
+        if ($amount === '' || ! is_numeric($amount)) {
+            return null;
+        }
+
+        return (int) round((float) $amount * 100);
     }
 }

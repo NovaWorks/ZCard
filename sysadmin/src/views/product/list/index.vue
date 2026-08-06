@@ -424,6 +424,16 @@
               </ElSelect>
             </ElFormItem>
 
+            <ElFormItem :label="t('zcard.product.pickType')">
+              <ElRadioGroup v-model="formData.pick_type">
+                <ElRadio value="general">{{ t('zcard.product.pickGeneral') }}</ElRadio>
+                <ElRadio value="premium">{{ t('zcard.product.pickPremium') }}</ElRadio>
+              </ElRadioGroup>
+              <div v-if="formData.pick_type === 'premium'" class="form-help">
+                {{ t('zcard.product.pickPremiumHint') }}
+              </div>
+            </ElFormItem>
+
             <ElFormItem :label="t('zcard.product.stockVisible')">
               <ElSwitch v-model="formData.stock_visible" />
               <span class="ml-2">{{ formData.stock_visible ? t('zcard.product.show') : t('zcard.product.hide') }}</span>
@@ -1183,6 +1193,7 @@
     hide: boolean
     level_disable: boolean
     dedup: boolean
+    pick_type: string
   }
 
   const createEmptyForm = (): ProductForm => ({
@@ -1203,6 +1214,7 @@
     max_order: 0,
     sort: 0,
     status: 1,
+    pick_type: 'general',
     contact_type: 'email',
     send_email: true,
     delivery_message: '',
@@ -1636,6 +1648,7 @@
         hide: !!detail.hide,
         level_disable: !!detail.level_disable,
         dedup: detail.dedup !== false,
+        pick_type: (detail.pick_type as string) || 'general',
         factoryPriceYuan: Number(((Number(detail.factory_price) || 0) / 100).toFixed(2)),
         draftPremiumYuan: Number(((Number(detail.draft_premium) || 0) / 100).toFixed(2))
       })
@@ -1718,6 +1731,7 @@
       hide: formData.hide,
       level_disable: formData.level_disable,
       dedup: formData.dedup,
+      pick_type: formData.pick_type,
       control_config: serializeControls()
     }
     if (memberPrice) payload.member_price = memberPrice

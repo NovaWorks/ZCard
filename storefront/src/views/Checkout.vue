@@ -34,9 +34,13 @@ interface LineItem {
   price: number
   price_display: number
   sku_name: string | null
+  /** 靓号自选:选定的卡密 id */
+  card_id?: number | null
 }
 
 const isCartMode = computed(() => route.query.cart === '1' || cart.items.length > 0)
+/** 靓号自选:单品模式下隐藏 SKU/数量选择 */
+const singlePremium = computed(() => singleProduct.value?.pick_type === 'premium')
 const items = ref<LineItem[]>([])
 const loading = ref(true)
 const err = ref('')
@@ -116,6 +120,10 @@ async function loadSingle(slug: string) {
     selectedSku.value = route.query.sku ? Number(route.query.sku) : (singleProduct.value.skus?.[0]?.id ?? null)
     const sku = singleProduct.value.skus?.find((s) => s.id === selectedSku.value)
     const qty = route.query.qty ? Number(route.query.qty) : 1
+    // 靓号自选:从 query.card_id 找到对应号码
+    const premiumPick = route.query.card_id
+      ? (singleProduct.value.premium_numbers || []).find((n) => String(n.card_id) === String(route.query.card_id))
+      : null
     items.value = [{
       product_id: singleProduct.value.id,
       sku_id: selectedSku.value,
@@ -123,9 +131,10 @@ async function loadSingle(slug: string) {
       slug: singleProduct.value.slug,
       name: singleProduct.value.name,
       cover: singleProduct.value.cover ?? null,
-      price: sku ? sku.price : singleProduct.value.price,
-      price_display: sku ? (sku.price_display ?? sku.price) : (singleProduct.value.price_display ?? singleProduct.value.price),
-      sku_name: sku?.name ?? null,
+      price: premiumPick ? premiumPick.price : (sku ? sku.price : singleProduct.value.price),
+      price_display: premiumPick ? (premiumPick.price_display ?? premiumPick.price) : (sku ? (sku.price_display ?? sku.price) : (singleProduct.value.price_display ?? singleProduct.value.price)),
+      sku_name: premiumPick ? premiumPick.number : (sku?.name ?? null),
+      card_id: premiumPick ? premiumPick.card_id : undefined,
     }]
   } catch {
     err.value = t('product.detail.notFound')
@@ -263,7 +272,12 @@ async function submit() {
   try {
     if (isCartMode.value) {
       const res = await createBatchOrders({
-        items: items.value.map((i) => ({ product_id: i.product_id, sku_id: i.sku_id ?? undefined, qty: i.qty })),
+        items: items.value.map((i) => ({
+          product_id: i.product_id,
+          sku_id: i.sku_id ?? undefined,
+          qty: i.qty,
+          card_id: i.card_id ?? undefined,
+        })),
         contact: contact.value,
         password: password.value || undefined,
         captcha: needCaptcha.value ? captcha.value : undefined,
@@ -279,6 +293,7 @@ async function submit() {
         product_id: it.product_id,
         sku_id: it.sku_id ?? undefined,
         qty: it.qty,
+        card_id: it.card_id ?? undefined,
         contact: contact.value,
         password: password.value || undefined,
         extra: { ...controlValues.value },
@@ -373,8 +388,8 @@ const channelPayTypes = (ch: PaymentChannel) => {
           <button @click="removeItem(idx)" class="shrink-0 w-7 h-7 rounded-full text-ink-muted hover:text-danger hover:bg-red-50 transition" :title="t('common.remove')">✕</button>
         </div>
 
-        <!-- 单品模式:SKU 选择(仅单商品) -->
-        <div v-if="!isCartMode && singleProduct?.skus?.length" class="bg-white rounded-card border border-border p-4">
+        <!-- 单品模式:SKU 选择(仅单商品;靓号自选无 SKU) -->
+        <div v-if="!isCartMode && !singlePremium && singleProduct?.skus?.length" class="bg-white rounded-card border border-border p-4">
           <div class="text-xs font-semibold text-ink-soft mb-2">{{ t('product.detail.skuTitle') }}</div>
           <div class="flex flex-wrap gap-2">
             <button v-for="s in singleProduct.skus" :key="s.id" @click="selectedSku = s.id; onSkuChange()"

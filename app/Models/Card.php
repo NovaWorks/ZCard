@@ -9,14 +9,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Card extends Model
 {
     const STATUS_UNUSED = 'unused';
+
     const STATUS_LOCKED = 'locked';
+
     const STATUS_USED = 'used';
+
     const STATUS_DISABLED = 'disabled';
 
     protected $fillable = [
         'product_id', 'import_id', 'content', 'content_hash',
         'status', 'order_id', 'locked_at', 'used_at',
         'note', 'card_type', 'owner_id', 'draft_premium', 'draft_cost',
+        'price', // 靓号自选:该靓号单价(分)
     ];
 
     protected function casts(): array
@@ -26,6 +30,7 @@ class Card extends Model
             'used_at' => 'datetime',
             'draft_premium' => 'integer',
             'draft_cost' => 'integer',
+            'price' => 'integer',
         ];
     }
 

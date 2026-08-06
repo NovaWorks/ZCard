@@ -317,6 +317,11 @@
     }
   },
   "product": {
+    "premium": {
+      "pickTitle": "Select Number",
+      "pickHint": "Select a number to purchase. Each number has its own price",
+      "noNumbers": "No numbers available"
+    },
     "detail": {
       "notFound": "Product not found",
       "loading": "Loading…",

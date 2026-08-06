@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\InsufficientStockException;
 use App\Http\Controllers\Controller;
+use App\Support\CaptchaService;
 use App\Support\OrderService;
+use App\Support\StorefrontConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,6 +18,7 @@ class OrderController extends Controller
             'product_id' => 'required|integer|exists:products,id',
             'sku_id' => 'nullable|integer',
             'qty' => 'required|integer|min:1|max:100',
+            'card_id' => 'nullable|integer', // 靓号自选:客户选定的具体卡密
             'contact' => 'required|string|max:150',
             'password' => 'nullable|string|max:50',
             'captcha' => 'nullable|string',
@@ -24,14 +28,14 @@ class OrderController extends Controller
         ]);
 
         // 游客下单限制
-        $guestCheckout = \App\Support\StorefrontConfig::get('guest_checkout') ?? true;
+        $guestCheckout = StorefrontConfig::get('guest_checkout') ?? true;
         if (! $guestCheckout && ! $request->user()) {
             return response()->json(['message' => __('messages.guest_only')], 403);
         }
 
         // 下单验证码校验
-        if (\App\Support\CaptchaService::isEnabled('trade')) {
-            if (! \App\Support\CaptchaService::verify('trade', $data['captcha'] ?? null)) {
+        if (CaptchaService::isEnabled('trade')) {
+            if (! CaptchaService::verify('trade', $data['captcha'] ?? null)) {
                 return response()->json(['message' => __('messages.captcha_error')], 422);
             }
         }
@@ -46,6 +50,7 @@ class OrderController extends Controller
                     'password' => $data['password'] ?? null,
                     'extra' => $data['extra'] ?? null,
                     'coupon_code' => $data['coupon_code'] ?? null,
+                    'card_id' => $data['card_id'] ?? null,
                     'user_id' => $request->user()?->id,
                     'create_ip' => $request->ip(),
                     'create_device' => $this->detectDevice($request),
@@ -58,7 +63,7 @@ class OrderController extends Controller
                 'amount' => $order->amount,
                 'status' => $order->status,
             ], 201);
-        } catch (\App\Exceptions\InsufficientStockException $e) {
+        } catch (InsufficientStockException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
     }
@@ -67,10 +72,19 @@ class OrderController extends Controller
     private function detectDevice(Request $request): string
     {
         $ua = strtolower($request->userAgent() ?: '');
-        if (str_contains($ua, 'windows')) return 'win';
-        if (str_contains($ua, 'mac') || str_contains($ua, 'macintosh')) return 'mac';
-        if (preg_match('/(iphone|ipad|ipod)/', $ua)) return 'ios';
-        if (str_contains($ua, 'android')) return 'android';
+        if (str_contains($ua, 'windows')) {
+            return 'win';
+        }
+        if (str_contains($ua, 'mac') || str_contains($ua, 'macintosh')) {
+            return 'mac';
+        }
+        if (preg_match('/(iphone|ipad|ipod)/', $ua)) {
+            return 'ios';
+        }
+        if (str_contains($ua, 'android')) {
+            return 'android';
+        }
+
         return 'other';
     }
 
@@ -82,6 +96,7 @@ class OrderController extends Controller
             'items.*.product_id' => 'required|integer|exists:products,id',
             'items.*.sku_id' => 'nullable|integer',
             'items.*.qty' => 'required|integer|min:1|max:100',
+            'items.*.card_id' => 'nullable|integer', // 靓号自选:该商品项选定的卡密
             'contact' => 'required|string|max:150',
             'password' => 'nullable|string|max:50',
             'captcha' => 'nullable|string',
@@ -90,13 +105,13 @@ class OrderController extends Controller
             'display_currency' => 'nullable|string|size:3',
         ]);
 
-        $guestCheckout = \App\Support\StorefrontConfig::get('guest_checkout') ?? true;
+        $guestCheckout = StorefrontConfig::get('guest_checkout') ?? true;
         if (! $guestCheckout && ! $request->user()) {
             return response()->json(['message' => __('messages.guest_only')], 403);
         }
 
-        if (\App\Support\CaptchaService::isEnabled('trade')) {
-            if (! \App\Support\CaptchaService::verify('trade', $data['captcha'] ?? null)) {
+        if (CaptchaService::isEnabled('trade')) {
+            if (! CaptchaService::verify('trade', $data['captcha'] ?? null)) {
                 return response()->json(['message' => __('messages.captcha_error')], 422);
             }
         }
@@ -128,7 +143,7 @@ class OrderController extends Controller
                 'total_amount' => (int) $orders->sum('amount'),
                 'order_ids' => $orders->pluck('id')->all(),
             ], 201);
-        } catch (\App\Exceptions\InsufficientStockException $e) {
+        } catch (InsufficientStockException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 422);

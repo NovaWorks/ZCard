@@ -6,6 +6,11 @@ use App\Events\OrderPaid;
 use App\Exceptions\InsufficientStockException;
 use App\Models\Card;
 use App\Models\Order;
+use App\Models\Payment;
+use App\Models\Product;
+use App\Models\SubsiteOrderSnapshot;
+use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -14,26 +19,50 @@ class OrderService
 {
     /**
      * 创建订单:锁卡 → 建 order(pending)。
-     * @param array $customer [contact, password?, extra?]
+     *
+     * @param  array  $customer  [contact, password?, extra?, card_id?]
+     *                           card_id: 靓号自选模式下客户选定的具体卡密(锁该卡,按卡价计算)
+     *
      * @throws InsufficientStockException
      */
     public function createOrder(int $productId, ?int $skuId, int $qty, array $customer, ?string $displayCurrency = null): Order
     {
-        $product = \App\Models\Product::with('skus')->findOrFail($productId);
-        $unitPrice = $skuId
-            ? ($product->skus->firstWhere('id', $skuId)?->price ?? $product->price)
-            : $product->price;
+        $product = Product::with('skus')->findOrFail($productId);
+        $premium = ($product->pick_type ?? 'general') === 'premium';
+        $cardId = $customer['card_id'] ?? null;
+
+        // 靓号自选:单价来自所选卡密(第二段价格),qty 强制 1
+        $unitPrice = null;
+        if ($premium) {
+            if (! $cardId) {
+                throw new \RuntimeException('靓号自选商品必须选择具体靓号');
+            }
+            $qty = 1;
+            $selectedCard = Card::where('product_id', $productId)
+                ->where('id', $cardId)
+                ->where('status', Card::STATUS_UNUSED)
+                ->first();
+            if (! $selectedCard) {
+                throw new \RuntimeException('所选靓号不可用或已被购买');
+            }
+            $unitPrice = $selectedCard->price ?? (int) $product->price;
+        } else {
+            $unitPrice = $skuId
+                ? ($product->skus->firstWhere('id', $skuId)?->price ?? $product->price)
+                : $product->price;
+        }
         $amount = $unitPrice * $qty;
 
-        // 分站定价(spec §5):读 subsite,按分站加价
+        // 分站定价(spec §5):读 subsite,按分站加价。
+        // 靓号自选:价格已由客户所选靓号决定,不再叠加分站加价。
         $subsite = request()->attributes->get('subsite');
         $subsiteId = null;
         $subsiteDomain = null;
         $baseUnitPrice = $unitPrice;
         $profitEligible = true;
         $profitBlockReason = null;
-        if ($subsite) {
-            $pricing = app(\App\Support\SubsitePricingService::class)
+        if ($subsite && ! $premium) {
+            $pricing = app(SubsitePricingService::class)
                 ->resolveUnitPrice($product, $skuId ? $product->skus->firstWhere('id', $skuId) : null, $subsite);
             $unitPrice = $pricing['price'];
             $amount = $unitPrice * $qty; // 重算金额(加价后)
@@ -45,9 +74,9 @@ class OrderService
                 $profitEligible = false;
                 $profitBlockReason = 'self_dealing_owner';
             } elseif ($buyerId) {
-                $upline = \App\Models\User::find($buyerId);
+                $upline = User::find($buyerId);
                 for ($i = 0; $i < 3 && $upline && $upline->pid; $i++) {
-                    $upline = \App\Models\User::find($upline->pid);
+                    $upline = User::find($upline->pid);
                     if ($upline && $upline->id == $subsite->user_id) {
                         $profitEligible = false;
                         $profitBlockReason = 'self_dealing_upline';
@@ -63,27 +92,40 @@ class OrderService
         $coupon = null;
 
         if ($couponCode && ! $subsite) {
-            $result = \App\Support\CouponService::validate($couponCode, $productId, $amount);
+            $result = CouponService::validate($couponCode, $productId, $amount);
             $discountAmount = $result['discount'];
             $coupon = $result['coupon'];
             $amount = max(0, $amount - $discountAmount);
         }
 
-        return DB::transaction(function () use ($productId, $skuId, $qty, $customer, $product, $amount, $discountAmount, $couponCode, $coupon, $displayCurrency, $subsite, $subsiteId, $subsiteDomain, $baseUnitPrice, $unitPrice, $profitEligible, $profitBlockReason) {
+        return DB::transaction(function () use ($productId, $skuId, $qty, $customer, $product, $amount, $discountAmount, $couponCode, $coupon, $displayCurrency, $subsite, $subsiteId, $subsiteDomain, $baseUnitPrice, $unitPrice, $profitEligible, $profitBlockReason, $premium, $cardId) {
             // 上游商品:跳过锁卡(无本地卡),付款后由 UpstreamOrderService 拿货
             $isUpstream = ! empty($product->upstream_source_id);
             $cards = collect();
 
             if (! $isUpstream) {
-                // 本地商品:锁卡(FOR UPDATE 防并发超卖)
-                $cards = Card::where('product_id', $productId)
-                    ->where('status', Card::STATUS_UNUSED)
-                    ->lockForUpdate()
-                    ->limit($qty)
-                    ->get();
+                if ($premium) {
+                    // 靓号自选:锁客户选定的那张卡(事务内再次校验未被占用)
+                    $cards = Card::where('product_id', $productId)
+                        ->where('id', $cardId)
+                        ->where('status', Card::STATUS_UNUSED)
+                        ->lockForUpdate()
+                        ->limit(1)
+                        ->get();
+                    if ($cards->count() < 1) {
+                        throw new \RuntimeException('所选靓号不可用或已被购买');
+                    }
+                } else {
+                    // 常规:锁任意未使用卡(FOR UPDATE 防并发超卖)
+                    $cards = Card::where('product_id', $productId)
+                        ->where('status', Card::STATUS_UNUSED)
+                        ->lockForUpdate()
+                        ->limit($qty)
+                        ->get();
 
-                if ($cards->count() < $qty) {
-                    throw new InsufficientStockException(__('messages.insufficient_stock', ['need' => $qty, 'have' => $cards->count()]));
+                    if ($cards->count() < $qty) {
+                        throw new InsufficientStockException(__('messages.insufficient_stock', ['need' => $qty, 'have' => $cards->count()]));
+                    }
                 }
             }
 
@@ -102,7 +144,7 @@ class OrderService
             $unitCost = (int) $product->factory_price;
 
             // 货币快照(spec §3.5):下单瞬间锁定显示汇率
-            $currencySvc = app(\App\Support\CurrencyService::class);
+            $currencySvc = app(CurrencyService::class);
             $baseCur = $currencySvc->getBaseCurrency();
             $dispCur = $displayCurrency ?: $baseCur;
             $conv = $currencySvc->convert((int) $amount, $dispCur);
@@ -135,12 +177,12 @@ class OrderService
 
             // 核销优惠券
             if ($coupon) {
-                \App\Support\CouponService::apply($coupon, $order->id, $customer['user_id'] ?? null);
+                CouponService::apply($coupon, $order->id, $customer['user_id'] ?? null);
             }
 
             // 分站订单定价快照(spec §5)
             if ($subsiteId) {
-                \App\Models\SubsiteOrderSnapshot::create([
+                SubsiteOrderSnapshot::create([
                     'order_id' => $order->id,
                     'merchant_id' => $subsiteId,
                     'domain' => $subsiteDomain,
@@ -172,12 +214,13 @@ class OrderService
     /**
      * 购物车批量下单:一个事务内为多个商品各创建一张订单。
      *
-     * @param array $items  [{product_id, sku_id?, qty}]
-     * @param array $customer [contact, password?, extra?, coupon_code?, user_id?, create_ip?, create_device?]
-     * @return \Illuminate\Support\Collection<int, Order> 订单集合(与 items 顺序一致)
+     * @param  array  $items  [{product_id, sku_id?, qty}]
+     * @param  array  $customer  [contact, password?, extra?, coupon_code?, user_id?, create_ip?, create_device?]
+     * @return Collection<int, Order> 订单集合(与 items 顺序一致)
+     *
      * @throws InsufficientStockException 任一商品库存不足时整体回滚
      */
-    public function batchCreate(array $items, array $customer, ?string $displayCurrency = null): \Illuminate\Support\Collection
+    public function batchCreate(array $items, array $customer, ?string $displayCurrency = null): Collection
     {
         if (empty($items)) {
             throw new \InvalidArgumentException(__('messages.order.items_required'));
@@ -195,6 +238,10 @@ class OrderService
                 $qty = max(1, (int) ($item['qty'] ?? 1));
 
                 $itemCustomer = $customer;
+                // 靓号自选:透传该商品项选定的卡密
+                if (! empty($item['card_id'])) {
+                    $itemCustomer['card_id'] = (int) $item['card_id'];
+                }
                 if ($couponCode && ! $couponUsed) {
                     // 让 createOrder 对该商品应用优惠券;不适用则跳过该商品继续尝试下一个
                     $itemCustomer['coupon_code'] = $couponCode;
@@ -210,6 +257,7 @@ class OrderService
                     if ($couponCode && ! $couponUsed && $this->isCouponError($e)) {
                         unset($itemCustomer['coupon_code']);
                         $orders[] = $this->createOrder($productId, $skuId, $qty, $itemCustomer, $displayCurrency);
+
                         continue;
                     }
                     throw $e;
@@ -224,6 +272,7 @@ class OrderService
     private function isCouponError(\RuntimeException $e): bool
     {
         $msg = $e->getMessage();
+
         return str_contains($msg, __('messages.coupon.not_for_product'))
             || str_contains($msg, __('messages.coupon.not_for_category'))
             || str_contains($msg, __('messages.coupon.below_min'))
@@ -244,7 +293,7 @@ class OrderService
                 throw new \RuntimeException("订单状态异常: {$order->status},无法支付");
             }
             // 快照支付渠道(从 payments 关联取成功的渠道码)
-            $paymentChannel = \App\Models\Payment::where('order_id', $order->id)
+            $paymentChannel = Payment::where('order_id', $order->id)
                 ->where('status', 'success')->value('channel');
             $order->update([
                 'status' => 'paid',
@@ -254,6 +303,7 @@ class OrderService
             // 事件在事务内派发,监听器(DeliveryService)同步执行,
             // 确保发卡与状态变更原子一致
             event(new OrderPaid($order));
+
             return $order;
         });
 
@@ -293,7 +343,7 @@ class OrderService
     {
         $order = Order::findOrFail($orderId);
         if ($order->status !== 'pending') {
-            throw new \RuntimeException("仅待支付订单可关闭");
+            throw new \RuntimeException('仅待支付订单可关闭');
         }
         DB::transaction(function () use ($order) {
             $order->update(['status' => 'closed', 'closed_at' => now()]);
@@ -301,6 +351,7 @@ class OrderService
                 ->where('status', Card::STATUS_LOCKED)
                 ->update(['status' => Card::STATUS_UNUSED, 'locked_at' => null, 'order_id' => null]);
         });
+
         return $order->fresh();
     }
 
@@ -353,6 +404,7 @@ class OrderService
                 if (! $storedHash) {
                     return true;
                 }
+
                 // 订单有密码 → 校验
                 return Hash::check($password ?? '', $storedHash);
             })->values();
@@ -404,7 +456,7 @@ class OrderService
     /** 我的订单(登录用户的历史订单) */
     public function myOrders(int $userId): array
     {
-        $orders = \App\Models\Order::where('user_id', $userId)
+        $orders = Order::where('user_id', $userId)
             ->with(['product:id,name,cover', 'orderDeliveries:id,order_id,card_content'])
             ->orderByDesc('id')
             ->limit(50)
@@ -428,6 +480,6 @@ class OrderService
 
     private function generateOrderNo(): string
     {
-        return 'ORD' . now()->format('YmdHis') . strtoupper(Str::random(6));
+        return 'ORD'.now()->format('YmdHis').strtoupper(Str::random(6));
     }
 }

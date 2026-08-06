@@ -8,6 +8,10 @@ export interface Product {
   description?: string; images?: string[]; category?: { id: number; name: string; slug: string }
   skus?: Sku[]; virtual_reviews?: { rating?: number; count?: number; list?: any[] }
   min_order?: number; max_order?: number; stock_type?: string; delivery_mode?: string
+  /** 购买选择方式: general=常规, premium=靓号自选 */
+  pick_type?: 'general' | 'premium'
+  /** 靓号自选:可选靓号列表(未使用卡密) */
+  premium_numbers?: { card_id: number; number: string; price: number; price_display: number; display_currency: string }[]
 }
 export interface Paginated {
   data: Product[]; current_page: number; last_page: number; total: number

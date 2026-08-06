@@ -24,6 +24,8 @@ class Product extends Model
         // 商品扩展字段
         'contact_type', 'send_email', 'delivery_message', 'leave_message',
         'only_user', 'purchase_limit', 'hide', 'level_disable', 'dedup',
+        // 购买选择方式(general 常规 / premium 靓号自选)
+        'pick_type',
     ];
 
     protected function casts(): array

@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\SubsiteProductSetting;
+use App\Support\CurrencyService;
 use App\Support\StorefrontConfig;
+use App\Support\SubsitePricingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -23,7 +26,7 @@ class ProductController extends Controller
         if ($keyword = $request->input('keyword')) {
             $query->where(function ($q) use ($keyword) {
                 $q->where('name', 'like', "%{$keyword}%")
-                  ->orWhere('description', 'like', "%{$keyword}%");
+                    ->orWhere('description', 'like', "%{$keyword}%");
             });
         }
 
@@ -34,7 +37,7 @@ class ProductController extends Controller
         // 分站可见性过滤:排除分站显式下架(is_listed=false)的商品(spec §4)。
         $subsite = $request->attributes->get('subsite');
         if ($subsite) {
-            $excludedIds = \App\Models\SubsiteProductSetting::where('merchant_id', $subsite->id)
+            $excludedIds = SubsiteProductSetting::where('merchant_id', $subsite->id)
                 ->where('is_listed', false)->pluck('product_id')->toArray();
             if ($excludedIds) {
                 $query->whereNotIn('id', $excludedIds);
@@ -65,7 +68,7 @@ class ProductController extends Controller
         // 分站可见性校验:分站下架的商品不允许直接访问(spec §4,G1 修复)
         $subsite = request()->attributes->get('subsite');
         if ($subsite) {
-            $hidden = \App\Models\SubsiteProductSetting::where('merchant_id', $subsite->id)
+            $hidden = SubsiteProductSetting::where('merchant_id', $subsite->id)
                 ->where('product_id', $product->id)
                 ->where('is_listed', false)
                 ->exists();
@@ -85,7 +88,7 @@ class ProductController extends Controller
         // 分站可见性过滤(与 index 一致)
         $subsite = $request->attributes->get('subsite');
         if ($subsite) {
-            $excludedIds = \App\Models\SubsiteProductSetting::where('merchant_id', $subsite->id)
+            $excludedIds = SubsiteProductSetting::where('merchant_id', $subsite->id)
                 ->where('is_listed', false)->pluck('product_id')->toArray();
             if ($excludedIds) {
                 $query->whereNotIn('id', $excludedIds);
@@ -103,13 +106,13 @@ class ProductController extends Controller
     private function transform(Product $p, bool $detail = false): array
     {
         // 解析当前显示货币(display.currency 中间件写入的 request attribute)
-        $svc = app(\App\Support\CurrencyService::class);
+        $svc = app(CurrencyService::class);
         $cur = request()->attributes->get('currency') ?? $svc->getBaseCurrency();
         // 分站定价:若请求来自分站(subsite request attribute),按分站定价引擎计算生效价(spec §4)。
         $subsite = request()->attributes->get('subsite');
         $effectivePrice = (int) $p->price;
         if ($subsite) {
-            $pricing = app(\App\Support\SubsitePricingService::class)->resolveUnitPrice($p, null, $subsite);
+            $pricing = app(SubsitePricingService::class)->resolveUnitPrice($p, null, $subsite);
             $effectivePrice = $pricing['price'];
         }
         $conv = $svc->convert($effectivePrice, $cur);
@@ -135,6 +138,7 @@ class ProductController extends Controller
                 'category' => $p->category?->only(['id', 'name', 'slug']),
                 'skus' => $p->skus->map(function ($s) use ($svc, $cur) {
                     $sconv = $svc->convert((int) $s->price, $cur);
+
                     return [
                         'id' => $s->id, 'name' => $s->name,
                         'price' => (int) $s->price,
@@ -158,8 +162,42 @@ class ProductController extends Controller
                 'send_email' => (bool) $p->send_email,
                 'leave_message' => $p->leave_message,
                 'purchase_limit' => $p->purchase_limit ?? 0,
+                'pick_type' => $p->pick_type ?? 'general',
             ]);
+            // 靓号自选:附带可选靓号列表(未使用卡密,按价格升序)
+            if (($p->pick_type ?? 'general') === 'premium') {
+                $data['premium_numbers'] = $this->premiumNumbers($p, $svc, $cur);
+            }
         }
+
         return $data;
+    }
+
+    /** 靓号自选:从商品下未使用卡密解析可选靓号(第一段)与价格 */
+    private function premiumNumbers(Product $p, $svc, string $cur): array
+    {
+        $cards = $p->cards()->where('status', 'unused')->get();
+        $list = [];
+        foreach ($cards as $card) {
+            $plain = $card->plainContent();
+            $parts = explode('---', $plain);
+            $number = trim($parts[0] ?? '');
+            if ($number === '') {
+                continue;
+            }
+            $priceFen = $card->price ?? (int) $p->price;
+            $conv = $svc->convert($priceFen, $cur);
+            $list[] = [
+                'card_id' => $card->id,
+                'number' => $number,
+                'price' => $priceFen,
+                'price_display' => $conv['amount'],
+                'display_currency' => $conv['currency'],
+            ];
+        }
+        // 按价格升序
+        usort($list, fn ($a, $b) => $a['price'] <=> $b['price']);
+
+        return $list;
     }
 }

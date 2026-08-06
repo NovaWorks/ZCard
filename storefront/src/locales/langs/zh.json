@@ -317,6 +317,11 @@
     }
   },
   "product": {
+    "premium": {
+      "pickTitle": "选择靓号",
+      "pickHint": "请选择一个靓号后下单,每个靓号价格不同",
+      "noNumbers": "暂无可选靓号"
+    },
     "detail": {
       "notFound": "商品不存在",
       "loading": "加载中…",
