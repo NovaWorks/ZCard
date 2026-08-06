@@ -320,7 +320,18 @@
     "premium": {
       "pickTitle": "Select Number",
       "pickHint": "Select a number to purchase. Each number has its own price",
-      "noNumbers": "No numbers available"
+      "noNumbers": "No numbers available",
+      "searchPlaceholder": "Search numbers...",
+      "searchNoResult": "No matching numbers",
+      "loadMore": "Load More",
+      "fromPrice": "From {price}",
+      "fromPriceLabel": "from",
+      "confirmPurchase": "Confirm Purchase",
+      "buyConfirmTitle": "Confirm Purchase",
+      "buyConfirmText": "You are about to buy number {number} for {price}. Continue to payment?",
+      "confirmBtn": "Pay Now",
+      "picked": "Selected",
+      "checkoutConfirm": "You will buy number {number} ({price}). Submit order?"
     },
     "detail": {
       "notFound": "Product not found",

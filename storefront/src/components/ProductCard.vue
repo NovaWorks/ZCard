@@ -13,6 +13,14 @@ const { t } = useI18n()
 const settings = useSettingsStore()
 const prefs = usePreferencesStore()
 const view = computed(() => settings.effectiveView)
+/** 靓号自选:显示最低价起 */
+const isPremium = computed(() => (props.product.pick_type ?? 'general') === 'premium')
+const priceText = computed(() => {
+  const min = props.product.premium_min_price_display ?? props.product.premium_min_price
+  return isPremium.value && min != null
+    ? t('product.premium.fromPrice', { price: formatMoney(min, prefs.currentCurrency) })
+    : formatMoney(props.product.price_display ?? props.product.price, prefs.currentCurrency)
+})
 function go() { router.push(`/product/${props.product.slug}`) }
 </script>
 
@@ -27,7 +35,7 @@ function go() { router.push(`/product/${props.product.slug}`) }
     <div class="p-2.5">
       <div class="text-xs font-medium text-ink line-clamp-2 min-h-[2rem] leading-snug">{{ product.name }}</div>
       <div v-if="settings.config?.show_price !== false" class="flex items-baseline gap-1 mt-1.5">
-        <span class="text-price font-extrabold text-base">{{ formatMoney(product.price_display ?? product.price, prefs.currentCurrency) }}</span>
+        <span class="text-price font-extrabold text-base">{{ priceText }}</span>
       </div>
       <div class="flex justify-between items-center mt-1 text-[10px] text-ink-muted">
         <span v-if="settings.config?.show_sales">{{ t('common.sold') }} {{ product.sales }}</span>
@@ -45,7 +53,7 @@ function go() { router.push(`/product/${props.product.slug}`) }
     <div class="flex-1 min-w-0">
       <div class="text-xs font-medium text-ink truncate">{{ product.name }}</div>
       <div class="flex items-center gap-2 mt-0.5">
-        <span v-if="settings.config?.show_price !== false" class="text-price font-bold text-sm">{{ formatMoney(product.price_display ?? product.price, prefs.currentCurrency) }}</span>
+        <span v-if="settings.config?.show_price !== false" class="text-price font-bold text-sm">{{ priceText }}</span>
         <span v-if="settings.config?.show_sales" class="text-[10px] text-ink-muted">{{ t('common.sold') }} {{ product.sales }}</span>
         <span v-if="settings.config?.show_stock" class="text-[10px] text-ink-muted">{{ t('common.stock') }} {{ product.stock }}</span>
       </div>

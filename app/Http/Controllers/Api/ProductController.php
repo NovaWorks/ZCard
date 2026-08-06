@@ -20,7 +20,8 @@ class ProductController extends Controller
 
         $query = Product::where('status', true)
             ->with(['skus' => fn ($q) => $q->where('status', true)->orderBy('sort')])
-            ->withCount(['cards as stock' => fn ($q) => $q->where('status', 'unused')]);
+            ->withCount(['cards as stock' => fn ($q) => $q->where('status', 'unused')])
+            ->withMin(['cards as premium_min' => fn ($q) => $q->where('status', 'unused')->whereNotNull('price')], 'price');
 
         // 关键词搜索(商品名/描述)
         if ($keyword = $request->input('keyword')) {
@@ -97,6 +98,7 @@ class ProductController extends Controller
 
         $products = $query->latest()->limit($count)
             ->withCount(['cards as stock' => fn ($q) => $q->where('status', 'unused')])
+            ->withMin(['cards as premium_min' => fn ($q) => $q->where('status', 'unused')->whereNotNull('price')], 'price')
             ->get()->map(fn ($p) => $this->transform($p));
 
         return response()->json($products);
@@ -130,6 +132,11 @@ class ProductController extends Controller
             'stock' => (int) $p->stock,
             'sales' => $p->displaySales(),
             'is_featured' => (bool) $p->is_featured,
+            // 靓号自选:列表最低价(未使用卡密 price 最小值,分;无则 null)
+            'premium_min_price' => $p->premium_min !== null ? (int) $p->premium_min : null,
+            'premium_min_price_display' => $p->premium_min !== null
+                ? $svc->convert((int) $p->premium_min, $cur)['amount']
+                : null,
         ];
         if ($detail) {
             $data = array_merge($data, [
@@ -173,16 +180,25 @@ class ProductController extends Controller
         return $data;
     }
 
-    /** 靓号自选:从商品下未使用卡密解析可选靓号(第一段)与价格 */
+    /** 靓号自选:解析可选靓号(第一段)与价格,支持 keyword 搜索/分页/card_id 精确命中(按价格升序) */
     private function premiumNumbers(Product $p, $svc, string $cur): array
     {
-        $cards = $p->cards()->where('status', 'unused')->get();
+        $keyword = trim((string) request()->input('keyword', ''));
+        $page = max(1, (int) request()->input('page', 1));
+        $perPage = min(50, max(1, (int) request()->input('per_page', 20)));
+        $cardId = request()->input('card_id');
+
+        $query = $p->cards()->where('status', 'unused');
+        if ($cardId !== null && $cardId !== '') {
+            $query->where('id', (int) $cardId);
+        }
+        $cards = $query->get();
         $list = [];
         foreach ($cards as $card) {
             $plain = $card->plainContent();
             $parts = explode('---', $plain);
             $number = trim($parts[0] ?? '');
-            if ($number === '') {
+            if ($number === '' || ($keyword !== '' && ! str_contains($number, $keyword))) {
                 continue;
             }
             $priceFen = $card->price ?? (int) $p->price;
@@ -198,6 +214,20 @@ class ProductController extends Controller
         // 按价格升序
         usort($list, fn ($a, $b) => $a['price'] <=> $b['price']);
 
-        return $list;
+        $total = count($list);
+        $min = $total > 0 ? $list[0]['price'] : null;
+        $minConv = $min !== null ? $svc->convert($min, $cur) : null;
+        $slice = array_slice($list, ($page - 1) * $perPage, $perPage);
+
+        return [
+            'list' => $slice,
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+            'has_more' => $page * $perPage < $total,
+            'min_price' => $min,
+            'min_price_display' => $minConv['amount'] ?? null,
+            'min_currency' => $minConv['currency'] ?? $cur,
+        ];
     }
 }

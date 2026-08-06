@@ -125,6 +125,7 @@ class CardImportService
         $errors = [];
         $seenInChunk = []; // 本块内已见的 hash(防块内重复)
         $isPremium = $cardType === '靓号自选' || $cardType === '靓号';
+
         foreach ($chunk as $i => $plain) {
             $hash = $hashes[$i];
             if ($dedup && ($existing->has($hash) || isset($seenInChunk[$hash]))) {
@@ -132,6 +133,35 @@ class CardImportService
 
                 continue;
             }
+
+            // 靓号自选:解析第一段为靓号,校验格式与全局唯一(跨商品)
+            $numberHash = null;
+            if ($isPremium) {
+                $number = $this->parsePremiumNumber($plain);
+                if ($number === null) {
+                    $failed++;
+                    $errors[] = "第 {$i} 行靓号格式错误(需用 --- 分隔): {$plain}";
+
+                    continue;
+                }
+                $numberHash = CardCipher::hash($number);
+                // 本块内已出现过的靓号也视为重复(同号不同价/不同附加信息)
+                if (isset($seenInChunk[$numberHash])) {
+                    $failed++;
+                    $errors[] = "第 {$i} 行靓号 {$number} 与本批导入重复";
+
+                    continue;
+                }
+                $seenInChunk[$numberHash] = true;
+                $dupProductId = $this->premiumExistsInDb($numberHash);
+                if ($dupProductId !== null) {
+                    $failed++;
+                    $errors[] = "第 {$i} 行靓号 {$number} 已存在(商品 #{$dupProductId}),不可重复上架";
+
+                    continue;
+                }
+            }
+
             if ($dedup) {
                 $seenInChunk[$hash] = true;
             }
@@ -146,6 +176,7 @@ class CardImportService
                 'card_type' => $cardType,
                 // 靓号自选:解析行内价格(第二段,元→分);非靓号卡不设
                 'price' => $isPremium ? $this->parsePremiumPrice($plain) : null,
+                'number_hash' => $numberHash,
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
@@ -213,5 +244,22 @@ class CardImportService
         }
 
         return (int) round((float) $amount * 100);
+    }
+
+    /** 解析靓号自选行第一段为靓号:取「---」前的部分,trim 后返回;为空返回 null */
+    public function parsePremiumNumber(string $plain): ?string
+    {
+        $parts = explode('---', $plain);
+        $number = trim($parts[0] ?? '');
+
+        return $number === '' ? null : $number;
+    }
+
+    /** 靓号(number_hash)是否已在库中存在(全局唯一,含同商品),返回占用该靓号的商品 id */
+    private function premiumExistsInDb(string $numberHash): ?int
+    {
+        return DB::table('cards')
+            ->where('number_hash', $numberHash)
+            ->value('product_id');
     }
 }

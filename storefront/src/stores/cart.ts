@@ -36,25 +36,32 @@ export const useCartStore = defineStore('cart', {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.items))
     },
     add(item: CartItem) {
-      const exist = this.items.find(
-        (i) => i.product_id === item.product_id && (i.sku_id ?? null) === (item.sku_id ?? null),
-      )
+      // 靓号自选:按 card_id 精确匹配,不同靓号不合并(同一商品多个靓号各自成行)
+      const exist = item.card_id
+        ? this.items.find((i) => i.product_id === item.product_id && i.card_id === item.card_id)
+        : this.items.find(
+            (i) => i.product_id === item.product_id && (i.sku_id ?? null) === (item.sku_id ?? null),
+          )
       if (exist) exist.qty += item.qty
       else this.items.push(item)
       this.persist()
     },
-    updateQty(productId: number, skuId: number | null, qty: number) {
+    updateQty(productId: number, skuId: number | null, qty: number, cardId?: number | null) {
       const it = this.items.find(
-        (i) => i.product_id === productId && (i.sku_id ?? null) === (skuId ?? null),
+        (i) => i.product_id === productId
+          && (i.sku_id ?? null) === (skuId ?? null)
+          && (i.card_id ?? null) === (cardId ?? null),
       )
       if (it) {
         it.qty = Math.max(1, qty)
         this.persist()
       }
     },
-    remove(productId: number, skuId: number | null) {
+    remove(productId: number, skuId: number | null, cardId?: number | null) {
       this.items = this.items.filter(
-        (i) => !(i.product_id === productId && (i.sku_id ?? null) === (skuId ?? null)),
+        (i) => !(i.product_id === productId
+          && (i.sku_id ?? null) === (skuId ?? null)
+          && (i.card_id ?? null) === (cardId ?? null)),
       )
       this.persist()
     },

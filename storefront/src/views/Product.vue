@@ -113,18 +113,6 @@ onMounted(async () => {
   } catch (e) { /* 评价加载失败不阻塞页面 */ }
 })
 
-const price = computed(() => {
-  if (!product.value) return 0
-  const sku = product.value.skus?.find(s => s.id === selectedSku.value)
-  return sku ? sku.price : product.value.price
-})
-/** 展示币种最小单位(优先用 _display 字段,缺失则回退基础金额) */
-const priceDisplay = computed(() => {
-  if (!product.value) return 0
-  const sku = product.value.skus?.find(s => s.id === selectedSku.value)
-  if (sku) return sku.price_display ?? sku.price
-  return product.value.price_display ?? product.value.price
-})
 const fmtDate = (d: string | null) => d ? String(d).slice(0, 10) : ''
 /** 已加入购物车状态(按钮短暂反馈) */
 const addedFeedback = ref(false)
@@ -132,19 +120,63 @@ let addedTimer: ReturnType<typeof setTimeout> | null = null
 
 /** 靓号自选:当前选中号码 + 弹窗控制 */
 const premiumVisible = ref(false)
-const premiumNumbers = ref<{ card_id: number; number: string; price: number; price_display: number; display_currency: string }[]>([])
+const premiumList = ref<{ card_id: number; number: string; price: number; price_display: number; display_currency: string }[]>([])
+const premiumTotal = ref(0)
+const premiumPage = ref(1)
+const premiumHasMore = ref(false)
+const premiumKeyword = ref('')
+const premiumLoading = ref(false)
 const selectedPremium = ref<{ card_id: number; number: string; price: number; price_display: number; display_currency: string } | null>(null)
 const pendingAction = ref<'cart' | 'buy' | null>(null)
 
 const isPremium = computed(() => (product.value?.pick_type ?? 'general') === 'premium')
+/** 详情页展示价:靓号自选用最低价(¥X起),其余用 SKU/商品价 */
+const displayPrice = computed(() => {
+  if (!product.value) return 0
+  if (isPremium.value) {
+    return product.value.premium_numbers?.min_price_display ?? product.value.premium_numbers?.min_price ?? product.value.price_display ?? product.value.price
+  }
+  const sku = product.value.skus?.find(s => s.id === selectedSku.value)
+  return sku ? (sku.price_display ?? sku.price) : (product.value.price_display ?? product.value.price)
+})
+
+/** 加载靓号列表(分页);page=1 时替换,否则追加 */
+async function loadPremiumNumbers(page = 1, keyword = '') {
+  if (!product.value) return
+  premiumLoading.value = true
+  try {
+    const data = await getProduct(product.value.slug, { keyword, page, per_page: 20 })
+    const pn = data.premium_numbers
+    if (!pn) return
+    if (page === 1) premiumList.value = pn.list
+    else premiumList.value = [...premiumList.value, ...pn.list]
+    premiumTotal.value = pn.total
+    premiumPage.value = pn.page
+    premiumHasMore.value = pn.has_more
+  } finally {
+    premiumLoading.value = false
+  }
+}
 
 /** 打开靓号选择弹窗(记录待执行动作) */
 function openPremiumPick(action: 'cart' | 'buy') {
   if (!product.value) return
-  premiumNumbers.value = product.value.premium_numbers || []
+  premiumKeyword.value = ''
   selectedPremium.value = null
   pendingAction.value = action
   premiumVisible.value = true
+  loadPremiumNumbers(1, '')
+}
+
+/** 搜索靓号(重置到第一页) */
+function searchPremium() {
+  loadPremiumNumbers(1, premiumKeyword.value.trim())
+}
+
+/** 加载更多靓号 */
+function loadMorePremium() {
+  if (!premiumHasMore.value || premiumLoading.value) return
+  loadPremiumNumbers(premiumPage.value + 1, premiumKeyword.value.trim())
 }
 
 /** 确认选择:执行待办动作 */
@@ -276,7 +308,8 @@ function buy() {
         <div class="mt-3 bg-gradient-to-br from-price-light to-white border border-orange-200 rounded-card p-4 relative">
           <span class="absolute top-0 right-0 bg-gradient-to-br from-price to-orange-400 text-white text-[9px] font-bold px-3 py-1 rounded-bl-lg">{{ t('product.detail.limitedTag') }}</span>
           <div class="flex items-baseline gap-2">
-            <span class="text-price font-extrabold text-3xl">{{ formatMoney(priceDisplay, prefs.currentCurrency) }}</span>
+            <span class="text-price font-extrabold text-3xl">{{ formatMoney(displayPrice, prefs.currentCurrency) }}</span>
+            <span v-if="isPremium" class="text-xs text-ink-soft font-medium">{{ t('product.premium.fromPriceLabel') }}</span>
           </div>
         </div>
 
@@ -293,8 +326,8 @@ function buy() {
           <span>{{ t('product.detail.guarantee.autoDelivery') }}</span><span>{{ t('product.detail.guarantee.instantAccount') }}</span><span>{{ t('product.detail.guarantee.genuineGuarantee') }}</span><span>{{ t('product.detail.guarantee.afterSales') }}</span>
         </div>
 
-        <!-- SKU -->
-        <div v-if="product.skus?.length" class="mt-4">
+        <!-- SKU(靓号自选模式不展示) -->
+        <div v-if="!isPremium && product.skus?.length" class="mt-4">
           <div class="text-xs font-semibold text-ink-soft mb-2">{{ t('product.detail.skuTitle') }} <span class="text-price">*</span></div>
           <div class="flex flex-wrap gap-2">
             <div v-for="s in product.skus" :key="s.id" @click="selectedSku = s.id"
@@ -305,8 +338,8 @@ function buy() {
           </div>
         </div>
 
-        <!-- 数量 -->
-        <div class="mt-4">
+        <!-- 数量(靓号自选模式固定 1 个,不展示) -->
+        <div v-if="!isPremium" class="mt-4">
           <div class="text-xs font-semibold text-ink-soft mb-2">{{ t('product.detail.qtyTitle') }}</div>
           <div class="inline-flex border border-border rounded-field overflow-hidden">
             <button @click="qty > 1 && qty--" class="w-9 h-9 text-ink-soft hover:bg-surface-subtle transition">−</button>
@@ -352,9 +385,23 @@ function buy() {
           </div>
           <div class="px-5 py-4 max-h-[50vh] overflow-y-auto">
             <p class="text-xs text-ink-muted mb-3">{{ t('product.premium.pickHint') }}</p>
-            <div v-if="premiumNumbers.length" class="space-y-2">
+            <!-- 搜索框 -->
+            <div class="flex gap-2 mb-3">
+              <input
+                v-model="premiumKeyword"
+                type="text"
+                :placeholder="t('product.premium.searchPlaceholder')"
+                class="flex-1 border border-border rounded-field px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none transition"
+                @keyup.enter="searchPremium"
+              />
               <button
-                v-for="n in premiumNumbers"
+                @click="searchPremium"
+                class="shrink-0 bg-primary text-white text-sm font-medium px-4 rounded-field hover:bg-primary-hover transition"
+              >{{ t('common.search') }}</button>
+            </div>
+            <div v-if="premiumList.length" class="space-y-2">
+              <button
+                v-for="n in premiumList"
                 :key="n.card_id"
                 type="button"
                 @click="selectedPremium = n"
@@ -368,8 +415,17 @@ function buy() {
                 <span class="text-sm font-semibold text-ink font-mono">{{ n.number }}</span>
                 <span class="text-price font-bold text-sm">{{ formatMoney(n.price_display ?? n.price, prefs.currentCurrency) }}</span>
               </button>
+              <!-- 加载更多 -->
+              <button
+                v-if="premiumHasMore"
+                @click="loadMorePremium"
+                :disabled="premiumLoading"
+                class="w-full border border-dashed border-border text-ink-muted text-xs font-medium py-2 rounded-card hover:border-primary/40 hover:text-primary transition disabled:opacity-50"
+              >{{ premiumLoading ? t('common.loading') : t('product.premium.loadMore') }} ({{ premiumList.length }}/{{ premiumTotal }})</button>
             </div>
-            <div v-else class="text-center text-ink-muted py-8 text-sm">{{ t('product.premium.noNumbers') }}</div>
+            <div v-else class="text-center text-ink-muted py-8 text-sm">
+              {{ premiumKeyword.trim() ? t('product.premium.searchNoResult') : t('product.premium.noNumbers') }}
+            </div>
           </div>
           <div class="flex gap-2 px-5 py-3.5 border-t border-border">
             <button

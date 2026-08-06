@@ -120,10 +120,15 @@ async function loadSingle(slug: string) {
     selectedSku.value = route.query.sku ? Number(route.query.sku) : (singleProduct.value.skus?.[0]?.id ?? null)
     const sku = singleProduct.value.skus?.find((s) => s.id === selectedSku.value)
     const qty = route.query.qty ? Number(route.query.qty) : 1
-    // 靓号自选:从 query.card_id 找到对应号码
-    const premiumPick = route.query.card_id
-      ? (singleProduct.value.premium_numbers || []).find((n) => String(n.card_id) === String(route.query.card_id))
+    // 靓号自选:从 query.card_id 找到对应号码(分页结构,可能不在第一页 → 用 card_id 精查)
+    let premiumPick = route.query.card_id
+      ? (singleProduct.value.premium_numbers?.list || []).find((n) => String(n.card_id) === String(route.query.card_id))
       : null
+    if (!premiumPick && route.query.card_id) {
+      const fresh = await getProduct(slug, { card_id: String(route.query.card_id) })
+      singleProduct.value = fresh
+      premiumPick = (fresh.premium_numbers?.list || []).find((n) => String(n.card_id) === String(route.query.card_id))
+    }
     items.value = [{
       product_id: singleProduct.value.id,
       sku_id: selectedSku.value,
@@ -197,20 +202,20 @@ async function validateCoupon() {
   }
 }
 
-/** 数量增减(购物车模式同步 store) */
+/** 数量增减(购物车模式同步 store;靓号行固定 1 个不允许增减) */
 function changeQty(idx: number, delta: number) {
   const it = items.value[idx]
-  if (!it) return
+  if (!it || it.card_id) return
   const next = it.qty + delta
   if (next < 1) return
   it.qty = next
-  if (isCartMode.value) cart.updateQty(it.product_id, it.sku_id, next)
+  if (isCartMode.value) cart.updateQty(it.product_id, it.sku_id, next, it.card_id)
 }
 function removeItem(idx: number) {
   const it = items.value[idx]
   if (!it) return
   if (isCartMode.value) {
-    cart.remove(it.product_id, it.sku_id)
+    cart.remove(it.product_id, it.sku_id, it.card_id)
     items.value = cart.items.map((i) => ({ ...i }))
   } else {
     items.value.splice(idx, 1)
@@ -267,6 +272,20 @@ async function submit() {
     }
   }
 
+  // 结算确认:含靓号自选时先弹确认框(展示所选号码+单价)
+  const premiumLines = items.value.filter((i) => i.card_id)
+  if (premiumLines.length) {
+    confirmItems.value = premiumLines
+    confirmVisible.value = true
+    return
+  }
+
+  await doSubmit()
+}
+
+async function doSubmit() {
+  if (!selectedChannelId.value) return
+  const channelId = selectedChannelId.value
   err.value = ''
   submitting.value = true
   try {
@@ -284,7 +303,7 @@ async function submit() {
         coupon_code: couponCode.value.trim() || undefined,
         extra: undefined,
       })
-      const result = await createBatchPayment(res.order_ids, selectedChannelId.value)
+      const result = await createBatchPayment(res.order_ids, channelId)
       cart.clear()
       handleResult(result)
     } else {
@@ -298,7 +317,7 @@ async function submit() {
         password: password.value || undefined,
         extra: { ...controlValues.value },
       } as any)
-      const result = await createPayment(res.order_no, selectedChannelId.value)
+      const result = await createPayment(res.order_no, channelId)
       handleResult(result)
     }
   } catch (e: any) {
@@ -310,6 +329,14 @@ async function submit() {
 }
 
 const channelLabel = (ch: PaymentChannel) => ch.name
+
+/** 结算确认弹窗(含靓号自选时提交前展示所选号码+单价) */
+const confirmVisible = ref(false)
+const confirmItems = ref<LineItem[]>([])
+function doSubmitConfirmed() {
+  confirmVisible.value = false
+  doSubmit()
+}
 
 /** 支付方式标识 → 展示信息(图标/名称)。参考 dujiao-next/acg-faka 收银台:显示具体支付方式而非通道名 */
 const PAY_TYPE_META: Record<string, { icon: string; label: string }> = {
@@ -528,5 +555,40 @@ const channelPayTypes = (ch: PaymentChannel) => {
         </div>
       </div>
     </div>
+
+    <!-- 结算确认弹窗:含靓号自选时提交前展示所选号码+单价 -->
+    <Teleport to="body">
+      <div
+        v-if="confirmVisible"
+        class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+        @click.self="confirmVisible = false"
+      >
+        <div class="w-full max-w-md bg-white rounded-card shadow-2xl overflow-hidden">
+          <div class="px-5 py-3.5 border-b border-border">
+            <h3 class="text-base font-bold text-ink">{{ t('product.premium.buyConfirmTitle') }}</h3>
+          </div>
+          <div class="px-5 py-4 max-h-[45vh] overflow-y-auto">
+            <div v-for="(line, idx) in confirmItems" :key="line.card_id ?? `c${idx}`" class="flex items-center justify-between gap-3 py-2 border-b border-border last:border-0">
+              <div class="min-w-0">
+                <div class="text-sm font-semibold text-ink font-mono truncate">{{ line.sku_name }}</div>
+                <div class="text-[10px] text-ink-muted">{{ line.name }}</div>
+              </div>
+              <span class="text-price font-bold text-sm shrink-0">{{ formatMoney(line.price_display, prefs.currentCurrency) }}</span>
+            </div>
+          </div>
+          <div class="flex gap-2 px-5 py-3.5 border-t border-border">
+            <button
+              @click="confirmVisible = false"
+              class="flex-1 border border-border text-ink-soft font-medium py-2.5 rounded-card hover:bg-surface-subtle transition text-sm"
+            >{{ t('common.cancel') }}</button>
+            <button
+              @click="doSubmitConfirmed"
+              :disabled="submitting"
+              class="flex-1 bg-gradient-to-r from-primary to-primary-hover text-white font-bold py-2.5 rounded-card shadow-md hover:shadow-pop transition text-sm disabled:opacity-50"
+            >{{ submitting ? t('order.checkout.submitting') : t('product.premium.confirmBtn') }}</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

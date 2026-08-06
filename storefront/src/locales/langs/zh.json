@@ -320,7 +320,18 @@
     "premium": {
       "pickTitle": "选择靓号",
       "pickHint": "请选择一个靓号后下单,每个靓号价格不同",
-      "noNumbers": "暂无可选靓号"
+      "noNumbers": "暂无可选靓号",
+      "searchPlaceholder": "搜索靓号...",
+      "searchNoResult": "未找到匹配的靓号",
+      "loadMore": "加载更多",
+      "fromPrice": "{price} 起",
+      "fromPriceLabel": "起",
+      "confirmPurchase": "确认购买",
+      "buyConfirmTitle": "确认购买该靓号",
+      "buyConfirmText": "即将购买靓号 {number},价格 {price},确认支付？",
+      "confirmBtn": "确认支付",
+      "picked": "已选",
+      "checkoutConfirm": "将购买靓号 {number}({price}),确认提交订单？"
     },
     "detail": {
       "notFound": "商品不存在",

@@ -20,7 +20,7 @@ class Card extends Model
         'product_id', 'import_id', 'content', 'content_hash',
         'status', 'order_id', 'locked_at', 'used_at',
         'note', 'card_type', 'owner_id', 'draft_premium', 'draft_cost',
-        'price', // 靓号自选:该靓号单价(分)
+        'price', 'number_hash', // 靓号自选:单价(分) / 靓号第一段 sha256(全局唯一)
     ];
 
     protected function casts(): array
