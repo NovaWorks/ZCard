@@ -4,26 +4,52 @@
     <ElCard ref="cardRef" class="art-table-card" shadow="never">
       <div class="toolbar">
         <div class="toolbar-left">
-          <ElSelect v-model="filterStatus" :placeholder="t('zcard.supply.filterStatus')" clearable style="width: 160px" @change="fetchData">
+          <ElSelect
+            v-model="filterStatus"
+            :placeholder="t('zcard.supply.filterStatus')"
+            clearable
+            style="width: 160px"
+            @change="fetchData"
+          >
             <ElOption :label="t('zcard.supply.statusActive')" value="active" />
             <ElOption :label="t('zcard.supply.statusDisabled')" value="disabled" />
           </ElSelect>
           <ElButton @click="fetchData">{{ t('zcard.common.reset') }}</ElButton>
         </div>
         <div class="toolbar-right">
-          <ElButton type="primary" :icon="Plus" @click="openAdd">{{ t('zcard.supply.add') }}</ElButton>
+          <ElButton type="primary" :icon="Plus" @click="openAdd">{{
+            t('zcard.supply.add')
+          }}</ElButton>
         </div>
       </div>
 
-      <ElTable ref="tableRef" v-loading="loading" :data="tableData" :height="tableHeight" row-key="id" border stripe>
+      <ElTable
+        ref="tableRef"
+        v-loading="loading"
+        :data="tableData"
+        :height="tableHeight"
+        row-key="id"
+        border
+        stripe
+      >
         <ElTableColumn :label="t('zcard.common.id')" prop="id" width="60" />
-        <ElTableColumn :label="t('zcard.supply.name')" prop="name" min-width="120" show-overflow-tooltip />
+        <ElTableColumn
+          :label="t('zcard.supply.name')"
+          prop="name"
+          min-width="120"
+          show-overflow-tooltip
+        />
         <ElTableColumn :label="t('zcard.supply.platform')" width="160">
           <template #default="{ row }">
             <ElTag :type="driverTagType(row.driver)">{{ driverLabel(row.driver) }}</ElTag>
           </template>
         </ElTableColumn>
-        <ElTableColumn :label="t('zcard.supply.baseUrl')" prop="base_url" min-width="200" show-overflow-tooltip />
+        <ElTableColumn
+          :label="t('zcard.supply.baseUrl')"
+          prop="base_url"
+          min-width="200"
+          show-overflow-tooltip
+        />
         <ElTableColumn :label="t('zcard.supply.balance')" width="120">
           <template #default="{ row }">
             <span v-if="row.balance_cache !== null">{{ formatFen(row.balance_cache) }}</span>
@@ -39,7 +65,11 @@
         <ElTableColumn :label="t('zcard.supply.status')" width="100">
           <template #default="{ row }">
             <ElTag :type="row.status === 'active' ? 'success' : 'info'">
-              {{ row.status === 'active' ? t('zcard.supply.statusActive') : t('zcard.supply.statusDisabled') }}
+              {{
+                row.status === 'active'
+                  ? t('zcard.supply.statusActive')
+                  : t('zcard.supply.statusDisabled')
+              }}
             </ElTag>
           </template>
         </ElTableColumn>
@@ -51,11 +81,20 @@
             <ElButton text type="primary" :loading="syncingId === row.id" @click="handleSync(row)">
               {{ t('zcard.supply.sync') }}
             </ElButton>
-            <ElButton text type="primary" :loading="previewingId === row.id" @click="openPreview(row)">
+            <ElButton
+              text
+              type="primary"
+              :loading="previewingId === row.id"
+              @click="openPreview(row)"
+            >
               {{ t('zcard.supply.pullProducts') }}
             </ElButton>
-            <ElButton text type="primary" @click="openEdit(row)">{{ t('zcard.common.edit') }}</ElButton>
-            <ElButton text type="danger" @click="handleDelete(row)">{{ t('zcard.common.delete') }}</ElButton>
+            <ElButton text type="primary" @click="openEdit(row)">{{
+              t('zcard.common.edit')
+            }}</ElButton>
+            <ElButton text type="danger" @click="handleDelete(row)">{{
+              t('zcard.common.delete')
+            }}</ElButton>
           </template>
         </ElTableColumn>
       </ElTable>
@@ -85,14 +124,30 @@
     </ElCard>
 
     <!-- 新建/编辑货源弹窗 -->
-    <ElDialog v-model="dialogVisible" :title="isEdit ? t('zcard.supply.editTitle') : t('zcard.supply.addTitle')" width="560px" destroy-on-close>
+    <ElDialog
+      v-model="dialogVisible"
+      :title="isEdit ? t('zcard.supply.editTitle') : t('zcard.supply.addTitle')"
+      width="560px"
+      destroy-on-close
+    >
       <ElForm ref="formRef" :model="formData" :rules="formRules" label-width="110px">
         <ElFormItem :label="t('zcard.supply.name')" prop="name">
           <ElInput v-model="formData.name" :placeholder="t('zcard.supply.namePlaceholder')" />
         </ElFormItem>
         <ElFormItem :label="t('zcard.supply.platform')" prop="driver">
-          <ElSelect v-model="formData.driver" :placeholder="t('zcard.supply.platformPlaceholder')" style="width: 100%" :disabled="isEdit" @change="onDriverChange">
-            <ElOption v-for="d in drivers" :key="d.driver" :label="`${d.icon || ''} ${d.name}`" :value="d.driver" />
+          <ElSelect
+            v-model="formData.driver"
+            :placeholder="t('zcard.supply.platformPlaceholder')"
+            style="width: 100%"
+            :disabled="isEdit"
+            @change="onDriverChange"
+          >
+            <ElOption
+              v-for="d in drivers"
+              :key="d.driver"
+              :label="`${d.icon || ''} ${d.name}`"
+              :value="d.driver"
+            />
           </ElSelect>
         </ElFormItem>
 
@@ -102,7 +157,9 @@
             v-for="field in currentSchemaFields"
             :key="field.key"
             :label="field.label"
-            :required="field.required && !(isSensitive(field.key) && isEdit && maskedSet.has(field.key))"
+            :required="
+              field.required && !(isSensitive(field.key) && isEdit && maskedSet.has(field.key))
+            "
             :prop="`credentials.${field.key}`"
           >
             <ElInputNumber
@@ -119,10 +176,15 @@
               :placeholder="credentialPlaceholder(field)"
             />
             <div v-if="field.help" class="field-help">{{ field.help }}</div>
-            <div v-else-if="isSensitive(field.key) && isEdit && maskedSet.has(field.key)" class="field-help">
+            <div
+              v-else-if="isSensitive(field.key) && isEdit && maskedSet.has(field.key)"
+              class="field-help"
+            >
               {{ t('zcard.supply.sensitiveKeepTip') }}
             </div>
-            <div v-else-if="isSensitive(field.key)" class="field-help">{{ t('zcard.supply.sensitiveTip') }}</div>
+            <div v-else-if="isSensitive(field.key)" class="field-help">{{
+              t('zcard.supply.sensitiveTip')
+            }}</div>
           </ElFormItem>
         </template>
 
@@ -140,7 +202,11 @@
             <ElOption :label="t('zcard.supply.stockModeSynced')" value="synced" />
             <ElOption :label="t('zcard.supply.stockModeRealtime')" value="realtime" />
           </ElSelect>
-          <div class="field-help">{{ formData.settings.stock_mode === 'realtime' ? t('zcard.supply.stockModeRealtimeTip') : t('zcard.supply.stockModeSyncedTip') }}</div>
+          <div class="field-help">{{
+            formData.settings.stock_mode === 'realtime'
+              ? t('zcard.supply.stockModeRealtimeTip')
+              : t('zcard.supply.stockModeSyncedTip')
+          }}</div>
         </ElFormItem>
         <ElFormItem :label="t('zcard.supply.fulfillmentMode')">
           <ElSelect v-model="formData.settings.fulfillment_mode" style="width: 100%">
@@ -162,15 +228,32 @@
             <ElOption :label="t('zcard.supply.pricingPending')" value="pending" />
           </ElSelect>
         </ElFormItem>
-        <ElFormItem v-if="formData.settings.default_pricing_mode === 'percent'" :label="t('zcard.supply.markupPercent')">
+        <ElFormItem
+          v-if="formData.settings.default_pricing_mode === 'percent'"
+          :label="t('zcard.supply.markupPercent')"
+        >
           <div class="input-with-unit">
-            <ElInputNumber v-model="formData.settings.default_markup_percent" :min="0" :max="500" :precision="0" controls-position="right" />
+            <ElInputNumber
+              v-model="formData.settings.default_markup_percent"
+              :min="0"
+              :max="500"
+              :precision="0"
+              controls-position="right"
+            />
             <span class="unit">%</span>
           </div>
         </ElFormItem>
-        <ElFormItem v-if="formData.settings.default_pricing_mode === 'fixed'" :label="t('zcard.supply.markupAmount')">
+        <ElFormItem
+          v-if="formData.settings.default_pricing_mode === 'fixed'"
+          :label="t('zcard.supply.markupAmount')"
+        >
           <div class="input-with-unit">
-            <ElInputNumber v-model="formData.settings.default_markup_amount" :min="0" :precision="2" controls-position="right" />
+            <ElInputNumber
+              v-model="formData.settings.default_markup_amount"
+              :min="0"
+              :precision="2"
+              controls-position="right"
+            />
             <span class="unit">{{ t('zcard.supplierAccount.yuan') }}</span>
           </div>
         </ElFormItem>
@@ -181,7 +264,9 @@
       </ElForm>
       <template #footer>
         <ElButton @click="dialogVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
-        <ElButton type="primary" :loading="saving" @click="handleSubmit">{{ t('zcard.common.ok') }}</ElButton>
+        <ElButton type="primary" :loading="saving" @click="handleSubmit">{{
+          t('zcard.common.ok')
+        }}</ElButton>
       </template>
     </ElDialog>
 
@@ -198,11 +283,22 @@
         <template v-else>
           <div class="preview-toolbar">
             <span class="preview-summary">
-              {{ t('zcard.supply.previewSummary', { total: previewTotal, selected: selectedCodes.size }) }}
-              <span class="summary-imported">{{ t('zcard.supply.previewImported', { n: importedCount }) }}</span>
+              {{
+                t('zcard.supply.previewSummary', {
+                  total: previewTotal,
+                  selected: selectedCodes.size
+                })
+              }}
+              <span class="summary-imported">{{
+                t('zcard.supply.previewImported', { n: importedCount })
+              }}</span>
             </span>
             <div class="toolbar-check">
-              <ElCheckbox v-model="checkAll" :indeterminate="isIndeterminate" @change="handleCheckAll">
+              <ElCheckbox
+                v-model="checkAll"
+                :indeterminate="isIndeterminate"
+                @change="handleCheckAll"
+              >
                 {{ t('zcard.supply.selectAll') }}
               </ElCheckbox>
               <ElButton
@@ -229,13 +325,29 @@
               </ElRadioGroup>
               <template v-if="pricingMode === 'percent'">
                 <div class="input-with-unit pricing-param">
-                  <ElInputNumber v-model="markupPercent" :min="0" :max="500" :precision="0" controls-position="right" size="small" style="width: 90px" />
+                  <ElInputNumber
+                    v-model="markupPercent"
+                    :min="0"
+                    :max="500"
+                    :precision="0"
+                    controls-position="right"
+                    size="small"
+                    style="width: 90px"
+                  />
                   <span class="unit">%</span>
                 </div>
               </template>
               <template v-if="pricingMode === 'fixed'">
                 <div class="input-with-unit pricing-param">
-                  <ElInputNumber v-model="markupAmountYuan" :min="0" :precision="2" :step="0.5" controls-position="right" size="small" style="width: 110px" />
+                  <ElInputNumber
+                    v-model="markupAmountYuan"
+                    :min="0"
+                    :precision="2"
+                    :step="0.5"
+                    controls-position="right"
+                    size="small"
+                    style="width: 110px"
+                  />
                   <span class="unit">{{ t('zcard.supplierAccount.yuan') }}</span>
                 </div>
               </template>
@@ -262,7 +374,11 @@
               </ElButton>
             </div>
             <div class="map-list">
-              <div v-for="cat in previewCategories" :key="'map-' + (cat.category_code ?? '_')" class="map-row">
+              <div
+                v-for="cat in previewCategories"
+                :key="'map-' + (cat.category_code ?? '_')"
+                class="map-row"
+              >
                 <span class="map-upstream">
                   {{ cat.category_name }}
                   <span class="map-count">({{ cat.products.length }})</span>
@@ -280,7 +396,12 @@
                     :placeholder="t('zcard.supply.categoryMapPlaceholder')"
                     class="map-select"
                   />
-                  <ElButton v-if="cat.category_code" link type="primary" @click="createCategoryForUpstream(cat)">
+                  <ElButton
+                    v-if="cat.category_code"
+                    link
+                    type="primary"
+                    @click="createCategoryForUpstream(cat)"
+                  >
                     {{ t('zcard.supply.categoryMapCreate') }}
                   </ElButton>
                   <ElTag
@@ -294,13 +415,19 @@
                   </ElTag>
                 </div>
               </div>
-              <div v-if="previewCategories.length === 0" class="map-empty">{{ t('zcard.supply.noProducts') }}</div>
+              <div v-if="previewCategories.length === 0" class="map-empty">{{
+                t('zcard.supply.noProducts')
+              }}</div>
             </div>
             <div class="map-tip">{{ t('zcard.supply.categoryMapTip') }}</div>
           </div>
 
           <div class="preview-list">
-            <div v-for="cat in previewCategories" :key="cat.category_code ?? '_'" class="preview-cat">
+            <div
+              v-for="cat in previewCategories"
+              :key="cat.category_code ?? '_'"
+              class="preview-cat"
+            >
               <div class="preview-cat-head" @click="toggleCategoryExpand(cat)">
                 <ElCheckbox
                   :model-value="isCategoryAllChecked(cat)"
@@ -312,7 +439,9 @@
                   <span class="cat-title">{{ cat.category_name }}</span>
                 </ElCheckbox>
                 <div class="cat-right">
-                  <span class="cat-count">{{ t('zcard.supply.catProductCount', { n: cat.products.length }) }}</span>
+                  <span class="cat-count">{{
+                    t('zcard.supply.catProductCount', { n: cat.products.length })
+                  }}</span>
                   <ElIcon class="cat-arrow" :class="{ expanded: isCategoryExpanded(cat) }">
                     <ArrowDown />
                   </ElIcon>
@@ -330,34 +459,59 @@
                   :class="{ 'is-imported': p.already_imported }"
                 >
                   <ElCheckbox :value="p.code">
-                      <div class="pp-content">
-                        <span class="pp-name">
-                          <ElTag v-if="p.already_imported" size="small" type="success" effect="light" round class="pp-status">
-                            {{ t('zcard.supply.imported') }}
-                          </ElTag>
-                          <ElTag v-else size="small" type="primary" effect="plain" round class="pp-status">
-                            {{ t('zcard.supply.notImported') }}
-                          </ElTag>
-                          {{ p.name }}
-                        </span>
-                        <span class="pp-meta">
-                          <span class="pp-base">¥{{ (upstreamPrice(p) / 100).toFixed(2) }}</span>
-                          <span class="pp-arrow">→</span>
-                          <span v-if="calcPrice(p) !== null" class="pp-price">¥{{ ((calcPrice(p) ?? 0) / 100).toFixed(2) }}</span>
-                          <span v-else class="pp-price pending">{{ t('zcard.supply.pricingPendingTip') }}</span>
-                        </span>
-                      </div>
+                    <div class="pp-content">
+                      <span class="pp-name">
+                        <ElTag
+                          v-if="p.already_imported"
+                          size="small"
+                          type="success"
+                          effect="light"
+                          round
+                          class="pp-status"
+                        >
+                          {{ t('zcard.supply.imported') }}
+                        </ElTag>
+                        <ElTag
+                          v-else
+                          size="small"
+                          type="primary"
+                          effect="plain"
+                          round
+                          class="pp-status"
+                        >
+                          {{ t('zcard.supply.notImported') }}
+                        </ElTag>
+                        {{ p.name }}
+                      </span>
+                      <span class="pp-meta">
+                        <span class="pp-base">¥{{ (upstreamPrice(p) / 100).toFixed(2) }}</span>
+                        <span class="pp-arrow">→</span>
+                        <span v-if="calcPrice(p) !== null" class="pp-price"
+                          >¥{{ ((calcPrice(p) ?? 0) / 100).toFixed(2) }}</span
+                        >
+                        <span v-else class="pp-price pending">{{
+                          t('zcard.supply.pricingPendingTip')
+                        }}</span>
+                      </span>
+                    </div>
                   </ElCheckbox>
                 </div>
               </ElCheckboxGroup>
             </div>
-            <div v-if="previewCategories.length === 0" class="preview-empty">{{ t('zcard.supply.noProducts') }}</div>
+            <div v-if="previewCategories.length === 0" class="preview-empty">{{
+              t('zcard.supply.noProducts')
+            }}</div>
           </div>
         </template>
       </div>
       <template #footer>
         <ElButton @click="previewVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
-        <ElButton type="primary" :loading="importing" :disabled="previewChecked.length === 0" @click="handleImport">
+        <ElButton
+          type="primary"
+          :loading="importing"
+          :disabled="previewChecked.length === 0"
+          @click="handleImport"
+        >
           {{ t('zcard.supply.importSelected', { n: previewChecked.length }) }}
         </ElButton>
       </template>
@@ -406,11 +560,11 @@
       const res = await getSupplySources({
         page: pagination.page,
         per_page: pagination.pageSize,
-        status: filterStatus.value || undefined,
+        status: filterStatus.value || undefined
       })
       tableData.value = res.data || []
       pagination.total = res.total || 0
-    } catch (e) {
+    } catch {
       tableData.value = []
     } finally {
       loading.value = false
@@ -424,7 +578,7 @@
     try {
       const res = await getSupplyDrivers()
       drivers.value = res.drivers || []
-    } catch (e) {
+    } catch {
       drivers.value = []
     }
   }
@@ -455,20 +609,20 @@
     default_pricing_mode: 'percent',
     default_markup_percent: 10,
     default_markup_amount: 0,
-    auto_list: true,
+    auto_list: true
   })
   const defaultForm = () => ({
     name: '',
     driver: '' as string,
     status: 'active' as 'active' | 'disabled',
     credentials: {} as Record<string, any>,
-    settings: defaultSettings(),
+    settings: defaultSettings()
   })
   const formData = reactive(defaultForm())
 
   const formRules = computed<FormRules>(() => ({
     name: [{ required: true, message: t('zcard.supply.nameRequired'), trigger: 'blur' }],
-    driver: [{ required: true, message: t('zcard.supply.platformRequired'), trigger: 'change' }],
+    driver: [{ required: true, message: t('zcard.supply.platformRequired'), trigger: 'change' }]
   }))
 
   /** 当前所选驱动的凭证字段(从 config_schema 规范化成数组) */
@@ -480,7 +634,7 @@
       label: def.label || key,
       type: (def.type || 'text') as 'text' | 'number' | 'url' | 'secret',
       required: def.required ?? false,
-      help: def.help,
+      help: def.help
     }))
   })
 
@@ -542,7 +696,7 @@
       default_pricing_mode: rs.default_pricing_mode || 'percent',
       default_markup_percent: rs.default_markup_percent ?? 10,
       default_markup_amount: rs.default_markup_amount ?? 0,
-      auto_list: rs.auto_list ?? true,
+      auto_list: rs.auto_list ?? true
     }
     dialogVisible.value = true
     nextTick(() => formRef.value?.clearValidate())
@@ -572,7 +726,7 @@
         base_url: creds.base_url || '',
         credentials: creds,
         status: formData.status,
-        settings: formData.settings,
+        settings: formData.settings
       }
       if (isEdit.value && editingId.value !== null) {
         await updateSupplySource(editingId.value, payload)
@@ -583,7 +737,7 @@
       }
       dialogVisible.value = false
       fetchData()
-    } catch (e: any) {
+    } catch {
       // 拦截器已提示
     } finally {
       saving.value = false
@@ -592,13 +746,17 @@
 
   /** 删除 */
   const handleDelete = (row: SupplySource) => {
-    ElMessageBox.confirm(t('zcard.supply.deleteConfirm', { name: row.name }), t('zcard.common.tips'), { type: 'warning' })
+    ElMessageBox.confirm(
+      t('zcard.supply.deleteConfirm', { name: row.name }),
+      t('zcard.common.tips'),
+      { type: 'warning' }
+    )
       .then(async () => {
         try {
           await deleteSupplySource(row.id)
           ElMessage.success(t('zcard.common.deleteSuccess'))
           fetchData()
-        } catch (e: any) {
+        } catch {
           // 拦截器已提示
         }
       })
@@ -614,14 +772,15 @@
       if (res.connected) {
         ElMessage.success(
           t('zcard.supply.testSuccess', {
-            balance: res.balance !== null && res.balance !== undefined ? formatFen(res.balance) : '—',
-          }),
+            balance:
+              res.balance !== null && res.balance !== undefined ? formatFen(res.balance) : '—'
+          })
         )
       } else {
         ElMessage.error(t('zcard.supply.testFailed', { error: res.error || '' }))
       }
       fetchData()
-    } catch (e: any) {
+    } catch {
       // 拦截器已提示
     } finally {
       testingId.value = null
@@ -636,7 +795,7 @@
       await syncSupplySource(row.id, 'incremental')
       ElMessage.success(t('zcard.supply.syncDispatched'))
       fetchData()
-    } catch (e: any) {
+    } catch {
       // 拦截器已提示
     } finally {
       syncingId.value = null
@@ -668,18 +827,24 @@
   )
   /** 已勾选 + 全部 → 计算全选/半选态 */
   const checkAll = computed({
-    get: () => allProductCodes.value.length > 0 && previewChecked.value.length === allProductCodes.value.length,
+    get: () =>
+      allProductCodes.value.length > 0 &&
+      previewChecked.value.length === allProductCodes.value.length,
     set: () => {} // 由 handleCheckAll 处理
   })
-  const isIndeterminate = computed(() =>
-    previewChecked.value.length > 0 && previewChecked.value.length < allProductCodes.value.length
+  const isIndeterminate = computed(
+    () =>
+      previewChecked.value.length > 0 && previewChecked.value.length < allProductCodes.value.length
   )
   /** selectedCodes 别名(模板用) */
   const selectedCodes = computed(() => new Set(previewChecked.value))
 
   /** 已对接(已导入本地)的商品数 */
   const importedCount = computed(() =>
-    previewCategories.value.reduce((n, c) => n + c.products.filter((p) => p.already_imported).length, 0)
+    previewCategories.value.reduce(
+      (n, c) => n + c.products.filter((p) => p.already_imported).length,
+      0
+    )
   )
 
   const handleCheckAll = (val: any) => {
@@ -702,7 +867,7 @@
 
   /** 加价基准 = 拿货成本(批发价),为 0 时回退上游售价(与后端一致) */
   const costBase = (p: UpstreamCategory['products'][number]): number =>
-    (p.factory_price ?? 0) > 0 ? p.factory_price : p.price ?? 0
+    (p.factory_price ?? 0) > 0 ? p.factory_price : (p.price ?? 0)
 
   /** 按所选策略实时计算售价(分);pending 返回 null(待审) */
   const calcPrice = (p: UpstreamCategory['products'][number]): number | null => {
@@ -741,7 +906,9 @@
   /** 未映射的上游分类(供一键创建 + 统计) */
   const unmappedCategories = computed(() =>
     previewCategories.value.filter(
-      (c) => (c.category_code ?? '_uncategorized') !== '_uncategorized' && ! categoryMapping.value[c.category_code as string]
+      (c) =>
+        (c.category_code ?? '_uncategorized') !== '_uncategorized' &&
+        !categoryMapping.value[c.category_code as string]
     )
   )
   const unmappedCount = computed(() => unmappedCategories.value.length)
@@ -778,13 +945,6 @@
     } finally {
       creatingMappings.value = false
     }
-  }
-
-  /** 映射变更 */
-  const setCategoryMapping = (cat: UpstreamCategory, val: number | null) => {
-    const key = cat.category_code as string
-    if (!key) return
-    categoryMapping.value = { ...categoryMapping.value, [key]: val }
   }
 
   /** 映射到的本地分类名(扁平化树查找) */
@@ -878,12 +1038,12 @@
       const pricing = {
         mode: pricingMode.value,
         markup_percent: markupPercent.value,
-        markup_amount: markupAmountYuan.value,
+        markup_amount: markupAmountYuan.value
       }
       const res = await importSupplyProducts(previewSourceId.value, [...previewChecked.value], {
         pricing,
         save_default: saveDefaultPricing.value,
-        category_map: categoryMapping.value,
+        category_map: categoryMapping.value
       })
       if (res.ok) {
         ElMessage.success(res.message || t('zcard.supply.importSuccess'))
@@ -898,7 +1058,6 @@
       importing.value = false
     }
   }
-
 
   /** 工具:分转元展示 */
   const formatFen = (fen: number | null | undefined) => {
