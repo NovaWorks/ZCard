@@ -39,15 +39,14 @@ class SupplySyncService
      */
     public function upsertProduct(SupplySource $source, UpstreamProduct $dto, ?array $pricing = null, ?array $categoryMap = null): Product
     {
-        // 含软删除查找:删除过的商品重新导入时恢复原记录(否则新建 slug 撞唯一索引 1062)。
-        // 匹配条件放宽:同货源下按 上游code 或 生成的slug 匹配 ——
-        // 上游商品 code/name 变化时也能命中原记录,避免走新建导致 slug 冲突。
+        // 含软删除查找:删除过的商品重新导入时恢复原记录。
+        // ⚠️ 只用 upstream_product_code 精确匹配 —— 不能再用 slug 兜底:
+        // 上游不同商品(如"美区Gemini"与"随机Gemini")的 Str::slug(name) 相同,
+        // slug 匹配会把新商品误绑到旧记录,导致新商品不入库、code 错乱,
+        // 表现即"导入成功但再次拉取仍显示新货源"。
         $existing = Product::withTrashed()
             ->where('upstream_source_id', $source->id)
-            ->where(function ($q) use ($dto) {
-                $q->where('upstream_product_code', $dto->code)
-                    ->orWhere('slug', Str::slug($dto->name) ?: ('p-'.$dto->code));
-            })
+            ->where('upstream_product_code', $dto->code)
             ->first();
 
         if ($existing) {

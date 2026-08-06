@@ -272,4 +272,68 @@ class ImportProductsFallbackTest extends TestCase
         $this->assertSame(16, $body['imported'], '批量缺失时应逐个 getProduct 兜底,保证全部导入');
         $this->assertSame(0, $body['skipped']);
     }
+
+    /**
+     * 客户真实 bug 复现:相似商品名但不同 code。
+     * 上游"随机地区Gemini"(code=A)已导入;导入"美区Gemini"(code=B)时,
+     * slug 兜底匹配曾把 B 误绑到 A 记录 → B 不入库、再次拉取仍显示新货源。
+     * 修复后应:精确按 code 匹配,B 新建独立记录。
+     */
+    public function test_similar_names_do_not_cross_match_codes(): void
+    {
+        $source = SupplySource::create([
+            'name' => 'S', 'driver' => 'acg_faka', 'base_url' => 'https://x.com',
+            'credentials' => ['app_id' => '1', 'app_key' => 'k'], 'status' => 'active',
+        ]);
+
+        // 预置已导入:随机地区Gemini(code=A)
+        Product::create([
+            'merchant_id' => 1,
+            'name' => '(随机22-24年账号)Gemini 3.1pro 12个月pixel成品号',
+            'slug' => '22-24gemini-31pro-12pixel', // slug 与即将导入的"美区Gemini"相同
+            'price' => 5200,
+            'factory_price' => 0,
+            'stock_type' => 'card',
+            'status' => 1,
+            'upstream_source_id' => $source->id,
+            'upstream_product_code' => '46F96C0223CB875A',
+        ]);
+
+        // 模拟上游 items 只返回这一个商品(美区Gemini,code=B,slug 相同)
+        Http::fake([
+            '*shared/commodity/items*' => Http::response([
+                'code' => 200, 'msg' => 'success',
+                'data' => [[
+                    'id' => 3, 'name' => 'gemini',
+                    'children' => [[
+                        'code' => '59B8227E22962629',
+                        'name' => '(美区22-24年账号)Gemini 3.1pro 12个月pixel成品号',
+                        'price' => '14.00',
+                    ]],
+                ]],
+            ]),
+        ]);
+
+        $resp = $this->withToken($this->adminToken())
+            ->postJson("/api/admin/supply-sources/{$source->id}/products/import", [
+                'codes' => ['59B8227E22962629'],
+                'pricing' => ['mode' => 'equal'],
+            ]);
+
+        $resp->assertOk();
+        $body = $resp->json();
+        fwrite(STDERR, "\n[cross-match] imported={$body['imported']} skipped={$body['skipped']} msg={$body['message']}\n");
+
+        // 美区Gemini 应新建独立记录,code 精确 = 59B8..., 不与随机Gemini(code=46F9...) 串号
+        $this->assertSame(1, $body['imported']);
+        $created = Product::where('upstream_source_id', $source->id)
+            ->where('upstream_product_code', '59B8227E22962629')->first();
+        $this->assertNotNull($created, '美区Gemini 应新建独立记录(精确 code 匹配),而不是误绑到随机Gemini');
+        $this->assertSame(2, Product::where('upstream_source_id', $source->id)->count(), '应存在 2 条独立记录');
+        // 随机Gemini 的 code 保持原值未被覆盖
+        $old = Product::where('upstream_source_id', $source->id)
+            ->where('upstream_product_code', '46F96C0223CB875A')->first();
+        $this->assertNotNull($old);
+        $this->assertStringContainsString('随机', $old->name, '随机Gemini 记录不应被美区Gemini 覆盖');
+    }
 }
