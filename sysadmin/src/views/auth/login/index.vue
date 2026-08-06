@@ -120,7 +120,7 @@
   const userStore = useUserStore()
   const router = useRouter()
   const route = useRoute()
-  const isPassing = ref(true) // ZCard: 跳过滑动验证（开发期）
+  const isPassing = ref(false) // 拖拽滑块验证(需滑动通过)
   const isClickPass = ref(false)
 
   const systemName = AppConfig.systemInfo.name
