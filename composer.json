@@ -43,7 +43,8 @@
         "laravel/sail": "^1.64",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
-        "phpunit/phpunit": "^12.5.12"
+        "phpunit/phpunit": "^12.5.12",
+        "symfony/yaml": "^7.4"
     },
     "autoload": {
         "psr-4": {
