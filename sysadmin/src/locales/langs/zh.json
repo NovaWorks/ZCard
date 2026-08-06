@@ -1467,6 +1467,7 @@
       "categoryCreated": "已创建分类: {name}",
       "categoryMapped": "已映射: {name}",
       "selectAll": "全选",
+      "selectNewOnly": "全选新货源({n})",
       "noProducts": "上游暂无可拉取的商品",
       "previewFailed": "拉取上游商品失败",
       "importSelected": "导入选中({n})",

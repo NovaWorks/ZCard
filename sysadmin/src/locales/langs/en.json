@@ -1467,6 +1467,7 @@
       "categoryCreated": "Category created: {name}",
       "categoryMapped": "Mapped: {name}",
       "selectAll": "Select All",
+      "selectNewOnly": "Select New Only ({n})",
       "noProducts": "No products available upstream",
       "previewFailed": "Failed to pull upstream products",
       "importSelected": "Import Selected ({n})",

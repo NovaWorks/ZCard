@@ -201,9 +201,20 @@
               {{ t('zcard.supply.previewSummary', { total: previewTotal, selected: selectedCodes.size }) }}
               <span class="summary-imported">{{ t('zcard.supply.previewImported', { n: importedCount }) }}</span>
             </span>
-            <ElCheckbox v-model="checkAll" :indeterminate="isIndeterminate" @change="handleCheckAll">
-              {{ t('zcard.supply.selectAll') }}
-            </ElCheckbox>
+            <div class="toolbar-check">
+              <ElCheckbox v-model="checkAll" :indeterminate="isIndeterminate" @change="handleCheckAll">
+                {{ t('zcard.supply.selectAll') }}
+              </ElCheckbox>
+              <ElButton
+                v-if="newProductCodes.length > 0"
+                type="primary"
+                link
+                :disabled="newProductCodes.length === 0"
+                @click="handleSelectNew"
+              >
+                {{ t('zcard.supply.selectNewOnly', { n: newProductCodes.length }) }}
+              </ElButton>
+            </div>
           </div>
 
           <!-- 定价策略:实时计算导入售价 -->
@@ -649,6 +660,12 @@
   const allProductCodes = computed(() =>
     previewCategories.value.flatMap((c) => c.products.map((p) => p.code))
   )
+  /** 新货源(未导入本地)的商品 code 集合 —— 二次导入时一键勾选 */
+  const newProductCodes = computed(() =>
+    previewCategories.value.flatMap((c) =>
+      c.products.filter((p) => !p.already_imported).map((p) => p.code)
+    )
+  )
   /** 已勾选 + 全部 → 计算全选/半选态 */
   const checkAll = computed({
     get: () => allProductCodes.value.length > 0 && previewChecked.value.length === allProductCodes.value.length,
@@ -667,6 +684,11 @@
 
   const handleCheckAll = (val: any) => {
     previewChecked.value = val ? [...allProductCodes.value] : []
+  }
+
+  /** 一键全选新货源(未导入商品),已导入的保持不勾选 */
+  const handleSelectNew = () => {
+    previewChecked.value = [...newProductCodes.value]
   }
 
   /** ===== 定价策略(勾选导入时实时预览售价) ===== */
@@ -964,6 +986,11 @@
     margin-left: 8px;
     color: var(--el-color-success);
     font-weight: 600;
+  }
+  .toolbar-check {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
   /* 定价策略区 */
   .preview-pricing {
