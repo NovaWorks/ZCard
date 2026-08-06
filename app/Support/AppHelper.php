@@ -14,13 +14,13 @@ use Illuminate\Support\Facades\Cache;
 class AppHelper
 {
     /**
-     * 当前应用版本。从 VERSION 文件读取,缓存 5 分钟。
+     * 当前应用版本。从 VERSION 文件读取,缓存 60 秒。
      * 缓存后端不可用时直接读文件(不抛异常,版本号是基础信息)。
      */
     public static function version(): string
     {
         try {
-            return Cache::remember('app:version', 300, function () {
+            return Cache::remember('app:version', 60, function () {
                 return self::resolveVersion();
             });
         } catch (\Throwable) {

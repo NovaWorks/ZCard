@@ -27,6 +27,9 @@ class UpdateController extends Controller
     public function check(): JsonResponse
     {
         $repo = config('zcard.update.repo', 'NovaWorks/ZCard');
+        // 顶栏版本徽章依赖此接口,必须返回最新版本号:先清缓存再读,
+        // 避免更新后 60 秒内仍显示旧版本(用户感知"更新了但版本号没变")。
+        \App\Support\AppHelper::clearVersionCache();
         $currentVersion = \App\Support\AppHelper::version();
 
         try {
