@@ -103,6 +103,8 @@
         "optimize-autoloader": true,
         "preferred-install": "dist",
         "sort-packages": true,
+        "home": "./.composer",
+        "cache-dir": "./.composer/cache",
         "platform": {
             "php": "8.3.0"
         },
