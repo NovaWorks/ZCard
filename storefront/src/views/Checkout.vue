@@ -63,7 +63,15 @@ const submitting = ref(false)
 // 下单验证码
 const needCaptcha = computed(() => !!settings.config?.trade_captcha)
 const captchaSrc = ref('')
-const refreshCaptcha = () => { captchaSrc.value = `/api/captcha/trade?${Date.now()}` }
+const refreshCaptcha = async () => {
+  try {
+    const res = await fetch(`/api/captcha/trade?${Date.now()}`)
+    const data = await res.json()
+    captchaSrc.value = data.src || ''
+  } catch {
+    captchaSrc.value = ''
+  }
+}
 
 const contactIsPhone = computed(() => {
   const globalType = settings.config?.contact_type

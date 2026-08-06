@@ -28,8 +28,14 @@ const needCaptcha = computed(() => !!settings.config?.captcha_register)
 const minLen = computed(() => settings.config?.username_min_length || 3)
 const captchaSrc = ref('')
 
-const refreshCaptcha = () => {
-  captchaSrc.value = `${request.defaults?.baseURL || '/api'}/captcha/register?${Date.now()}`
+const refreshCaptcha = async () => {
+  try {
+    const res = await fetch(`${request.defaults?.baseURL || '/api'}/captcha/register?${Date.now()}`)
+    const data = await res.json()
+    captchaSrc.value = data.src || ''
+  } catch {
+    captchaSrc.value = ''
+  }
 }
 
 onMounted(() => {

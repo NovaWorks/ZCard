@@ -22,8 +22,14 @@ const loading = ref(false)
 const needCaptcha = computed(() => !!settings.config?.captcha_login)
 const captchaSrc = ref('')
 
-const refreshCaptcha = () => {
-  captchaSrc.value = `${request.defaults?.baseURL || '/api'}/captcha/login?${Date.now()}`
+const refreshCaptcha = async () => {
+  try {
+    const res = await fetch(`${request.defaults?.baseURL || '/api'}/captcha/login?${Date.now()}`)
+    const data = await res.json()
+    captchaSrc.value = data.src || ''
+  } catch {
+    captchaSrc.value = ''
+  }
 }
 
 watch(needCaptcha, (v) => { if (v && !captchaSrc.value) refreshCaptcha() })
