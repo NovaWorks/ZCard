@@ -14,6 +14,22 @@ return [
         'expire' => 60,
         'encrypt' => false,
     ],
+    // 下单(trade)场景:与 default 同参数。此前缺失导致 mews 用类默认值
+    // (length=5/encrypt=true)生成,与校验逻辑不一致,验证码输入正确也报错。
+    // bgImage=false 去除背景纹理,提高可读性,降低用户误输概率。
+    'trade' => [
+        'length' => 4,
+        'width' => 120,
+        'height' => 36,
+        'quality' => 90,
+        'math' => false,
+        'expire' => 60,
+        'encrypt' => false,
+        'bgImage' => false,
+        'bgColor' => '#ffffff',
+        'lines' => 2,
+        'fontColors' => ['#2563eb', '#111827', '#dc2626', '#16a34a'],
+    ],
     'flat' => [
         'length' => 6,
         'fontColors' => ['#2c3e50', '#c0392b', '#16a085', '#c0392b', '#8e44ad', '#303f9f', '#f57c00', '#795548'],
