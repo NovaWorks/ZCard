@@ -28,6 +28,34 @@ function currencySymbol(code?: string | null): string {
   return prefs.currencies.find((c) => c.code === code)?.symbol || ''
 }
 
+/** 支付方式标识 → 展示信息(图标/名称)。与收银台 Checkout.vue 保持一致:显示具体支付方式而非通道名 */
+const PAY_TYPE_META: Record<string, { icon: string; label: string }> = {
+  alipay: { icon: '💰', label: '支付宝' },
+  wechat: { icon: '💚', label: '微信支付' },
+  wxpay: { icon: '💚', label: '微信支付' },
+  qqpay: { icon: '🐧', label: 'QQ 钱包' },
+  bank: { icon: '🏦', label: '云闪付 / 网银' },
+  jdpay: { icon: '🛒', label: '京东支付' },
+  paypal: { icon: '🅿️', label: 'PayPal' },
+  stripe: { icon: '💳', label: 'Stripe' },
+  usdt: { icon: '₮', label: 'USDT' },
+  tron: { icon: '₮', label: 'TRON' },
+  trx: { icon: '₮', label: 'TRX' },
+}
+
+/** 通道对应的支付方式列表(带图标与名称);无 pay_types 时回退到通道自身 */
+const channelPayTypes = (ch: PaymentChannel) => {
+  const types = (ch.pay_types || []).filter(Boolean)
+  if (types.length) {
+    return types.map((t) => ({
+      type: t,
+      icon: PAY_TYPE_META[t]?.icon || ch.icon || '💳',
+      label: PAY_TYPE_META[t]?.label || t,
+    }))
+  }
+  return [{ type: ch.code, icon: ch.icon || '💳', label: ch.name }]
+}
+
 onMounted(async () => {
   void prefs.load()
   // 拉一次充值单状态拿金额用于展示;同时加载通道
@@ -126,19 +154,28 @@ function stopPolling() {
 
       <div v-else-if="err" class="text-danger text-xs mb-3">{{ err }}</div>
 
-      <div v-if="!loading && channels.length" class="grid grid-cols-2 gap-2 mb-4">
+      <div v-if="!loading && channels.length" class="grid grid-cols-1 gap-2 mb-4">
         <button
           v-for="ch in channels"
           :key="ch.id"
           type="button"
           :disabled="payingChannelId !== null"
           @click="selectChannel(ch)"
-          class="flex items-center gap-2 border border-border rounded-card px-3 py-3 text-left hover:border-primary hover:bg-primary-light transition disabled:opacity-50"
+          class="flex items-center gap-3 border border-border rounded-card px-3 py-3 text-left hover:border-primary hover:bg-primary-light transition disabled:opacity-50"
           :class="payingChannelId === ch.id ? 'border-primary ring-2 ring-primary/20' : ''"
         >
-          <span class="text-2xl leading-none shrink-0">{{ ch.icon || '💳' }}</span>
-          <span class="text-sm font-medium text-ink leading-tight">
-            <span class="block">{{ payingChannelId === ch.id ? t('order.pay.processing') : ch.name }}</span>
+          <!-- 支付方式图标(按 pay_types 展开,与收银台一致) -->
+          <span class="flex items-center gap-1 shrink-0">
+            <template v-for="pt in channelPayTypes(ch).slice(0, 2)" :key="pt.type">
+              <span class="w-8 h-8 rounded-lg bg-surface-subtle flex items-center justify-center text-lg">
+                {{ pt.icon }}
+              </span>
+            </template>
+          </span>
+          <span class="flex-1 min-w-0">
+            <span class="block text-sm font-medium text-ink">
+              {{ payingChannelId === ch.id ? t('order.pay.processing') : channelPayTypes(ch).map((p) => p.label).join(' / ') }}
+            </span>
             <span v-if="ch.target_currency" class="block text-[10px] font-normal text-ink-muted">
               {{ t('order.pay.receiveLabel', { symbol: currencySymbol(ch.target_currency), code: ch.target_currency }) }}
             </span>
