@@ -13,6 +13,7 @@ onMounted(() => {
 const cfg = computed(() => settings.config)
 
 const siteName = computed(() => cfg.value?.site_name || 'ZCard')
+const siteLogo = computed(() => cfg.value?.site_logo || '')
 const about = computed(() => cfg.value?.footer_about || '')
 const links = computed(() => cfg.value?.footer_links || [])
 const contacts = computed(() => cfg.value?.footer_contact || [])
@@ -97,7 +98,9 @@ function isExternal(url: string) {
         <!-- 栏 1:品牌介绍(手机占整行) -->
         <div class="col-span-2 lg:col-span-1">
           <div class="flex items-center gap-2 mb-3">
-            <span class="w-8 h-8 bg-gradient-to-br from-primary to-primary-hover rounded-[8px] text-white font-extrabold flex items-center justify-center">Z</span>
+            <!-- Logo:优先显示自定义 logo 图片,否则用首字母方块 -->
+            <img v-if="siteLogo" :src="siteLogo" :alt="siteName" class="w-8 h-8 rounded-[8px] object-cover" />
+            <span v-else class="w-8 h-8 bg-gradient-to-br from-primary to-primary-hover rounded-[8px] text-white font-extrabold flex items-center justify-center">Z</span>
             <span class="text-lg font-extrabold text-ink">{{ siteName }}</span>
           </div>
           <p class="text-xs text-ink-soft leading-relaxed">{{ about }}</p>

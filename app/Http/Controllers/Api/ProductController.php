@@ -101,7 +101,8 @@ class ProductController extends Controller
             }
         }
 
-        $products = $query->latest()->limit($count)
+        // 推荐商品按后台设置的 sort 排序(大号在前),sort 相同按最新;支持推荐位自定义顺序
+        $products = $query->orderByDesc('sort')->latest()->limit($count)
             ->withCount(['cards as stock' => fn ($q) => $q->where('status', 'unused')])
             ->withMin(['cards as premium_min' => fn ($q) => $q->where('status', 'unused')->whereNotNull('price')], 'price')
             ->get()->map(fn ($p) => $this->transform($p));

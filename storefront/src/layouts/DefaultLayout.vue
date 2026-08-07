@@ -59,9 +59,12 @@ onMounted(async () => {
   <!-- 正常页面 -->
   <div v-else class="min-h-screen flex flex-col bg-surface">
     <AppHeader />
-    <!-- 店铺公告 -->
-    <div v-if="siteNotice" class="bg-primary text-white text-center text-xs py-1.5 px-4">
-      📢 {{ siteNotice }}
+    <!-- 店铺公告:醒目横幅(支持换行/多条) -->
+    <div v-if="siteNotice" class="bg-gradient-to-r from-primary via-primary-hover to-blue-600 text-white text-xs py-2 px-4">
+      <div class="max-w-6xl mx-auto flex items-start gap-2 leading-relaxed">
+        <span class="shrink-0 mt-0.5">📢</span>
+        <span class="whitespace-pre-line">{{ siteNotice }}</span>
+      </div>
     </div>
     <main class="flex-1">
       <RouterView />
