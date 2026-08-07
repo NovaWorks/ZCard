@@ -260,4 +260,41 @@ class DisplayCurrencyResponseTest extends TestCase
         $detail->assertOk();
         $this->assertSame(-1, $detail->json('stock'));
     }
+
+    public function test_parent_category_query_includes_subcategory_products(): void
+    {
+        // 商品挂在子分类下,按父分类筛选也应查到(谷歌邮箱→企业邮箱场景)
+        $merchant = $this->makeMerchant();
+        $parent = Category::create([
+            'merchant_id' => $merchant->id,
+            'name' => '父分类',
+            'slug' => 'parent-cat',
+            'sort' => 0,
+        ]);
+        $child = Category::create([
+            'merchant_id' => $merchant->id,
+            'parent_id' => $parent->id,
+            'name' => '子分类',
+            'slug' => 'child-cat',
+            'sort' => 0,
+        ]);
+        $p = Product::create([
+            'merchant_id' => $merchant->id,
+            'category_id' => $child->id,
+            'name' => '子分类商品',
+            'slug' => 'child-product',
+            'price' => 1000,
+            'stock_type' => 'card',
+            'delivery_mode' => 'status',
+            'status' => true,
+            'sort' => 0,
+        ]);
+        $this->seedCurrencies(enableUsd: true);
+
+        // 按父分类查询 → 应命中子分类商品
+        $resp = $this->getJson("/api/products?category={$parent->id}");
+        $resp->assertOk();
+        $this->assertSame(1, $resp->json('total'));
+        $this->assertSame('child-product', $resp->json('data.0.slug'));
+    }
 }

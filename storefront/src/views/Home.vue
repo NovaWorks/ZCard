@@ -29,6 +29,8 @@ const keyword = ref('')
 const keywordInput = ref('')
 /** 移动端分类横向条(sidebar 模式在移动端隐藏,这里兜底) */
 const topCats = ref<Category[]>([])
+/** 移动端已展开子分类的父分类 id(点击展开/收起) */
+const mobileExpandedCat = ref<number | null>(null)
 
 /** 是否还有下一页可加载 */
 const hasMore = computed(() => products.page < products.lastPage)
@@ -121,30 +123,57 @@ function goProduct(p: Product) {
       <HotTags v-if="settings.config?.show_hot_tags" :ids="settings.config?.hot_tag_categories || []" />
     </div>
 
-    <!-- 移动端分类条(sidebar 模式移动端隐藏左侧树,这里兜底显示一级分类) -->
+    <!-- 移动端分类条(sidebar 模式移动端隐藏左侧树,这里兜底显示一级分类 + 可展开子分类) -->
     <div
       v-if="settings.config?.category_nav_style === 'sidebar'"
-      class="md:hidden bg-white border-b border-border overflow-x-auto scrollbar-hide flex items-center gap-2 px-4 py-2.5"
+      class="md:hidden bg-white border-b border-border overflow-x-auto scrollbar-hide"
     >
-      <button
-        @click="category = null"
-        :class="[
-          'shrink-0 px-3.5 py-1.5 rounded-pill text-xs font-medium whitespace-nowrap transition',
-          category === null ? 'bg-primary text-white shadow-sm' : 'bg-surface-subtle text-ink-soft'
-        ]"
-      >{{ t('category.all') }}</button>
-      <button
-        v-for="c in topCats"
-        :key="c.id"
-        @click="category = c.id"
-        :class="[
-          'shrink-0 px-3.5 py-1.5 rounded-pill text-xs font-medium whitespace-nowrap transition inline-flex items-center gap-1',
-          category === c.id ? 'bg-primary text-white shadow-sm' : 'bg-surface-subtle text-ink-soft'
-        ]"
+      <div class="flex items-center gap-2 px-4 py-2.5">
+        <button
+          @click="category = null; mobileExpandedCat = null"
+          :class="[
+            'shrink-0 px-3.5 py-1.5 rounded-pill text-xs font-medium whitespace-nowrap transition',
+            category === null ? 'bg-primary text-white shadow-sm' : 'bg-surface-subtle text-ink-soft'
+          ]"
+        >{{ t('category.all') }}</button>
+        <button
+          v-for="c in topCats"
+          :key="c.id"
+          @click="mobileExpandedCat = mobileExpandedCat === c.id ? null : c.id"
+          :class="[
+            'shrink-0 px-3.5 py-1.5 rounded-pill text-xs font-medium whitespace-nowrap transition inline-flex items-center gap-1',
+            category === c.id ? 'bg-primary text-white shadow-sm' : 'bg-surface-subtle text-ink-soft'
+          ]"
+        >
+          <img v-if="c.icon && /^https?:\/\/|^\/storage\//.test(c.icon)" :src="c.icon" alt="" class="w-3.5 h-3.5 object-contain" />
+          <span v-else-if="c.icon">{{ c.icon }}</span>{{ c.name }}
+          <span v-if="c.children?.length" class="text-[8px] opacity-60">{{ mobileExpandedCat === c.id ? '▼' : '▶' }}</span>
+        </button>
+      </div>
+      <!-- 移动端子分类(选中父分类时展示,可横向滚动) -->
+      <div
+        v-if="mobileExpandedCat !== null"
+        class="flex items-center gap-2 px-4 pb-2.5 overflow-x-auto scrollbar-hide border-t border-border pt-2"
       >
-        <img v-if="c.icon && /^https?:\/\/|^\/storage\//.test(c.icon)" :src="c.icon" alt="" class="w-3.5 h-3.5 object-contain" />
-        <span v-else-if="c.icon">{{ c.icon }}</span>{{ c.name }}
-      </button>
+        <button
+          @click="category = mobileExpandedCat"
+          :class="[
+            'shrink-0 px-3 py-1.5 rounded-pill text-xs font-medium whitespace-nowrap transition',
+            category === mobileExpandedCat ? 'bg-primary text-white shadow-sm' : 'bg-surface-subtle text-ink-soft'
+          ]"
+        >{{ t('category.viewAll') }}</button>
+        <template v-for="c in topCats" :key="c.id">
+          <button
+            v-for="ch in (mobileExpandedCat === c.id ? (c.children || []) : [])"
+            :key="ch.id"
+            @click="category = ch.id"
+            :class="[
+              'shrink-0 px-3 py-1.5 rounded-pill text-xs font-medium whitespace-nowrap transition',
+              category === ch.id ? 'bg-primary text-white shadow-sm' : 'bg-surface-subtle text-ink-soft'
+            ]"
+          >{{ ch.name }}</button>
+        </template>
+      </div>
     </div>
 
     <!-- pills/combo:全宽顶行(flex 之外),分类在搜索框上方 -->

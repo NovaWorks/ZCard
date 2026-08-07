@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\SubsiteProductSetting;
 use App\Support\CurrencyService;
@@ -32,7 +33,11 @@ class ProductController extends Controller
         }
 
         if ($categoryId = $request->input('category')) {
-            $query->where('category_id', $categoryId);
+            // 父分类查询包含所有子分类的商品(谷歌邮箱下挂企业邮箱/个人邮箱的商品也要查到)
+            $ids = Category::where('id', $categoryId)
+                ->orWhere('parent_id', $categoryId)
+                ->pluck('id');
+            $query->whereIn('category_id', $ids);
         }
 
         // 分站可见性过滤:排除分站显式下架(is_listed=false)的商品(spec §4)。
