@@ -37,7 +37,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(NoCacheHtml::class);
 
         // API 路由加入 Session 支持(mews/captcha 验证码需要 session 存储)
+        // 注意:必须同时加 EncryptCookies —— 验证码图片走 web 组(有 EncryptCookies),
+        // 若 api 组不加,图片请求写入的加密 session cookie 在下单校验时无法解密,
+        // session 对不上 → 验证码恒定报错(主因 A:线上域名不在 SANCTUM_STATEFUL_DOMAINS 时的缺陷)。
         $middleware->api(prepend: [
+            \Illuminate\Cookie\Middleware\EncryptCookies::class,
             StartSession::class,
             MaintenanceMiddleware::class,
             ResolveSubsite::class,

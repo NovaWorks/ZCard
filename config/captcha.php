@@ -11,7 +11,10 @@ return [
         'height' => 36,
         'quality' => 90,
         'math' => false,
-        'expire' => 60,
+        // 有效期 10 分钟:验证码答案存 Cache,check() 先判缓存再比对。
+        // 60 秒太短,收银台填联系方式/密码/支付渠道/优惠券/靓号确认必然超时,
+        // 缓存一过期 check 直接返回 false(用户输入正确也报错)。
+        'expire' => 600,
         'encrypt' => false,
     ],
     // 下单(trade)场景:与 default 同参数。此前缺失导致 mews 用类默认值
@@ -23,7 +26,7 @@ return [
         'height' => 36,
         'quality' => 90,
         'math' => false,
-        'expire' => 60,
+        'expire' => 600,
         'encrypt' => false,
         'bgImage' => false,
         'bgColor' => '#ffffff',

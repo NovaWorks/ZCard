@@ -280,36 +280,7 @@ Route::get('/captcha/config', [CaptchaController::class, 'config'])->name('api.c
 // 优惠券验证(下单前预览折扣)
 Route::post('/coupons/validate', [CouponController::class, 'validateCode'])->name('api.coupons.validate');
 
-// 临时调试:读取当前 session 中验证码的明文答案(仅开发排障用,发布前必须删除)
-Route::get('/captcha/debug-read', function (Request $request) {
-    if (getenv('DEBUG_CAPTCHA') !== 'true' && ! (isset($_ENV['DEBUG_CAPTCHA']) && $_ENV['DEBUG_CAPTCHA'] === 'true')) {
-        abort(404);
-    }
-    $key = session('captcha.key');
-    if (! $key) {
-        return response()->json(['debug_answer' => null, 'reason' => 'no_captcha_in_session']);
-    }
-    $answer = \Illuminate\Support\Facades\Cache::get('captcha_' . md5((string) $key));
-    return response()->json([
-        'debug_answer' => is_array($answer) ? implode('', $answer) : $answer,
-    ]);
-})->name('api.captcha.debug-read');
 Route::get('/captcha/{scene?}', function (Request $request, $scene = 'default') {
-    // 临时调试:当 DEBUG_CAPTCHA=true 时,生成验证码并把明文答案随 src 一起返回(仅开发排障用,发布前必须删除)
-    if (getenv('DEBUG_CAPTCHA') === 'true' || (isset($_ENV['DEBUG_CAPTCHA']) && $_ENV['DEBUG_CAPTCHA'] === 'true')) {
-        $image = app('captcha')->create($scene); // 生成并写入 session + cache
-        $key = session('captcha.key');
-        $answer = \Illuminate\Support\Facades\Cache::get('captcha_' . md5((string) $key));
-        \Illuminate\Support\Facades\Log::debug('DEBUG_CAPTCHA', [
-            'scene' => $scene,
-            'key_present' => $key !== null,
-            'cache_answer' => $answer,
-        ]);
-        return response()->json([
-            'src' => captcha_src($scene),
-            'debug_answer' => is_array($answer) ? implode('', $answer) : $answer,
-        ]);
-    }
     return response()->json(['src' => captcha_src($scene)]);
 })->name('api.captcha.src');
 
