@@ -475,6 +475,10 @@
     "maintenanceTitle": "系统维护中",
     "maintenanceDefault": "系统维护中,请稍后再来访问。"
   },
+  "notice": {
+    "title": "站点公告",
+    "gotIt": "我知道了"
+  },
   "userCenter": {
     "title": "个人中心",
     "welcome": "欢迎回来",

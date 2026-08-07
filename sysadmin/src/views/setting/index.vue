@@ -234,7 +234,8 @@
               <ElInput v-model="form.maintenance_message" type="textarea" :rows="2" :placeholder="t('zcard.setting.maintenanceMessagePlaceholder')" />
             </ElFormItem>
             <ElFormItem :label="t('zcard.setting.siteNotice')">
-              <ElInput v-model="form.site_notice" type="textarea" :rows="2" :placeholder="t('zcard.setting.siteNoticePlaceholder')" />
+              <ArtWangEditor v-model="form.site_notice" mode="default" :placeholder="t('zcard.setting.siteNoticePlaceholder')" />
+              <span class="form-tip">{{ t('zcard.setting.siteNoticeHint') }}</span>
             </ElFormItem>
           </ElForm>
         </ElTabPane>

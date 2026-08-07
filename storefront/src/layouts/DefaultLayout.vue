@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
+import NoticeModal from '@/components/NoticeModal.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { getStorefrontSettings } from '@/api/settings'
 
@@ -10,8 +11,6 @@ const { t } = useI18n()
 const settings = useSettingsStore()
 const maintenanceMode = ref(false)
 const maintenanceMessage = ref('')
-
-const siteNotice = computed(() => settings.config?.site_notice || '')
 
 // SEO:动态设置标题和 meta description
 watchEffect(() => {
@@ -59,16 +58,11 @@ onMounted(async () => {
   <!-- 正常页面 -->
   <div v-else class="min-h-screen flex flex-col bg-surface">
     <AppHeader />
-    <!-- 店铺公告:醒目横幅(支持换行/多条) -->
-    <div v-if="siteNotice" class="bg-gradient-to-r from-primary via-primary-hover to-blue-600 text-white text-xs py-2 px-4">
-      <div class="max-w-6xl mx-auto flex items-start gap-2 leading-relaxed">
-        <span class="shrink-0 mt-0.5">📢</span>
-        <span class="whitespace-pre-line">{{ siteNotice }}</span>
-      </div>
-    </div>
     <main class="flex-1">
       <RouterView />
     </main>
     <AppFooter />
+    <!-- 公告弹窗:首次访问弹出(有公告内容时) -->
+    <NoticeModal />
   </div>
 </template>

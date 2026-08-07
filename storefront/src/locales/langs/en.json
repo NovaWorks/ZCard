@@ -475,6 +475,10 @@
     "maintenanceTitle": "System Maintenance",
     "maintenanceDefault": "The system is under maintenance, please come back later."
   },
+  "notice": {
+    "title": "Site Notice",
+    "gotIt": "Got it"
+  },
   "userCenter": {
     "title": "Account Center",
     "welcome": "Welcome back",
