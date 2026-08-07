@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
 
@@ -26,12 +26,13 @@ const sanitizedNotice = computed(() => {
     .replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
 })
 
-onMounted(() => {
-  // 有公告内容 + 本次会话未关闭过 → 弹出
-  if (noticeHtml.value.trim() && !localStorage.getItem(NOTICE_DISMISSED_KEY)) {
+// 监听公告内容:settings 异步加载完成后自动弹出(不能只靠 onMounted,
+// 此时 settings.config 可能尚未就绪导致不弹)
+watch(noticeHtml, (html) => {
+  if (html.trim() && !visible.value && !localStorage.getItem(NOTICE_DISMISSED_KEY)) {
     visible.value = true
   }
-})
+}, { immediate: true })
 
 function close() {
   visible.value = false
