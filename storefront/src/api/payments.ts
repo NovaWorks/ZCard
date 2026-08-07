@@ -9,6 +9,10 @@ export interface PaymentChannel {
   pay_types?: string[]
   supported_currencies?: string[]
   target_currency?: string | null
+  /** 手续费配置(客户承担时前端展示明细) */
+  fee?: number
+  fee_type?: string
+  fee_bearer?: string
 }
 
 export interface PaymentResult {

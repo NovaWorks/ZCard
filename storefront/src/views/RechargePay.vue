@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { getChannels, type PaymentChannel } from '@/api/payments'
 import { createRechargePayment, getRechargeStatus } from '@/api/recharge'
 import { formatMoney } from '@/utils/money'
+import { calcChannelFee } from '@/utils/fee'
 import { usePreferencesStore } from '@/stores/preferences'
 
 const route = useRoute()
@@ -19,6 +20,16 @@ const loading = ref(true)
 const err = ref('')
 const payingChannelId = ref<number | null>(null)
 const amountFen = ref(0)
+
+/** 手续费提示文案:原价 + 手续费 = 应付(供用户在付款前确认) */
+function feeTip(ch: PaymentChannel): string {
+  if (!amountFen.value) return ''
+  const { feeFen, payFen } = calcChannelFee(amountFen.value, ch)
+  if (feeFen <= 0) return ''
+  const orig = formatMoney(amountFen.value, prefs.baseCurrencyInfo)
+  const pay = formatMoney(payFen, prefs.baseCurrencyInfo)
+  return t('recharge.feeTip', { orig, fee: formatMoney(feeFen, prefs.baseCurrencyInfo), pay })
+}
 
 const qrcodeContent = ref('')
 const formContainerId = 'recharge-form-mount'
@@ -178,6 +189,10 @@ function stopPolling() {
             </span>
             <span v-if="ch.target_currency" class="block text-[10px] font-normal text-ink-muted">
               {{ t('order.pay.receiveLabel', { symbol: currencySymbol(ch.target_currency), code: ch.target_currency }) }}
+            </span>
+            <!-- 客户承担手续费提示:点击前告知用户需另付手续费 -->
+            <span v-if="ch.fee_bearer === 'customer' && Number(ch.fee ?? 0) > 0" class="block text-[10px] font-normal text-price">
+              {{ feeTip(ch) }}
             </span>
           </span>
         </button>

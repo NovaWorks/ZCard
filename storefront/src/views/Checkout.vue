@@ -8,6 +8,7 @@ import { getChannels, createPayment, createBatchPayment, type PaymentChannel, ty
 import { useSettingsStore } from '@/stores/settings'
 import { useAuthStore } from '@/stores/auth'
 import { formatMoney } from '@/utils/money'
+import { calcChannelFee } from '@/utils/fee'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useCartStore, type CartItem } from '@/stores/cart'
 
@@ -175,6 +176,27 @@ const totalDisplayRatio = computed(() => {
   const dispTotal = items.value.reduce((n, i) => n + i.price_display * i.qty, 0)
   return skuTotal ? dispTotal / skuTotal : 1
 })
+
+/** 当前选中渠道(用于计算手续费) */
+const selectedChannel = computed<PaymentChannel | null>(
+  () => channels.value.find((c) => c.id === selectedChannelId.value) ?? null,
+)
+
+/** 手续费(展示货币分):仅客户承担时展示并计入应付 */
+const channelFee = computed(() => {
+  // 应付总额(展示货币,含优惠券折扣)作为手续费计算基数
+  const base = Math.max(0, totalDisplay.value)
+  return calcChannelFee(base, selectedChannel.value)
+})
+
+/** 含手续费的最终应付(展示货币分):客户承担时=应付+手续费 */
+const finalPayDisplay = computed(() => {
+  const fee = calcChannelFee(totalDisplay.value, selectedChannel.value)
+  return fee.payFen
+})
+
+/** 是否需展示手续费明细(客户承担且手续费>0) */
+const showFeeDetail = computed(() => channelFee.value.feeFen > 0 && selectedChannel.value?.fee_bearer === 'customer')
 
 // 优惠券验证
 async function validateCoupon() {
@@ -546,16 +568,21 @@ const channelPayTypes = (ch: PaymentChannel) => {
               <span>{{ t('order.checkout.discount') }}</span>
               <span>-{{ formatMoney(couponDiscount * totalDisplayRatio, displayCur) }}</span>
             </div>
+            <!-- 手续费明细:仅客户承担时展示 -->
+            <div v-if="showFeeDetail" class="flex justify-between items-center text-sm mb-1 text-ink-muted">
+              <span>{{ t('order.checkout.feeLabel') }}</span>
+              <span>+{{ formatMoney(channelFee.feeFen, displayCur) }}</span>
+            </div>
             <div class="flex justify-between items-center py-2 mt-2 border-t border-border">
               <span class="text-sm font-semibold text-ink">{{ t('order.checkout.payable') }}</span>
-              <span class="text-2xl font-extrabold text-price">{{ formatMoney(totalDisplay, displayCur) }}</span>
+              <span class="text-2xl font-extrabold text-price">{{ formatMoney(finalPayDisplay, displayCur) }}</span>
             </div>
 
             <div v-if="err" class="text-danger text-xs mb-2">{{ err }}</div>
 
             <button @click="submit" :disabled="submitting || !items.length || !channels.length"
               class="w-full mt-2 bg-gradient-to-r from-primary to-primary-hover text-white font-bold py-3.5 rounded-card shadow-md hover:shadow-pop disabled:opacity-50 transition">
-              {{ submitting ? t('order.checkout.submitting') : t('order.checkout.submitOrder', { amount: formatMoney(totalDisplay, displayCur) }) }}
+              {{ submitting ? t('order.checkout.submitting') : t('order.checkout.submitOrder', { amount: formatMoney(finalPayDisplay, displayCur) }) }}
             </button>
           </div>
         </div>

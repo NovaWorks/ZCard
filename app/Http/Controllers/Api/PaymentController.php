@@ -26,6 +26,10 @@ class PaymentController extends Controller
                 'pay_types' => $driver->getPayTypes($config),
                 'supported_currencies' => $driver->getSupportedCurrencies(),
                 'target_currency' => $config['target_currency'] ?? ($driver->getSupportedCurrencies()[0] ?? null),
+                // 手续费配置(供前端展示明细:客户承担时原价+手续费=应付)
+                'fee' => (float) ($ch->fee ?? 0),
+                'fee_type' => $ch->fee_type ?? 'percent',
+                'fee_bearer' => $ch->fee_bearer ?? 'merchant',
             ];
         });
 

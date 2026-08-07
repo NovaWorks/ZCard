@@ -1,0 +1,1 @@
+function e(e,t){let n=Number(t?.fee??0);if(!t||n<=0)return{feeFen:0,payFen:e};let r=(t.fee_type||`percent`)===`percent`?Math.round(e*n/100):Math.round(n*100);return{feeFen:r,payFen:(t.fee_bearer||`merchant`)===`customer`?e+r:e}}export{e as t};
