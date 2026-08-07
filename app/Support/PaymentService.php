@@ -27,7 +27,7 @@ class PaymentService
      *
      * 返回 [手续费(分), 应付金额(分)]:
      * - fee <= 0 → 无手续费,[0, 原金额]
-     * - fee_type = fixed → 手续费 = fee × 100(分);percent → 手续费 = 原金额 × fee
+     * - fee_type = fixed → 手续费 = fee × 100(分);percent → 手续费 = 原金额 × fee ÷ 100(fee=5 表示 5%)
      * - fee_bearer = customer → 应付金额 = 原金额 + 手续费(加到用户付款额)
      * - fee_bearer = merchant → 应付金额不变(手续费从商户实收扣,仅记录)
      *
@@ -42,7 +42,7 @@ class PaymentService
 
         $feeFen = $channel->fee_type === 'fixed'
             ? (int) round($fee * 100) // 固定金额:元 → 分
-            : (int) round($amountFen * $fee); // 百分比:0.05 = 5%
+            : (int) round($amountFen * $fee / 100); // 百分比:fee=5 表示 5%(与后台 UI 提示一致)
 
         $payAmount = ($channel->fee_bearer ?? 'merchant') === 'customer'
             ? $amountFen + $feeFen
