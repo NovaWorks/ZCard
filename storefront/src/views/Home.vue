@@ -145,8 +145,8 @@ function goProduct(p: Product) {
             category === c.id ? 'bg-primary text-white shadow-sm' : 'bg-surface-subtle text-ink-soft'
           ]"
         >
-          <img v-if="c.icon && /^https?:\/\/|^\/storage\//.test(c.icon)" :src="c.icon" alt="" class="w-3.5 h-3.5 object-contain" />
-          <span v-else-if="c.icon">{{ c.icon }}</span>{{ c.name }}
+          <img v-if="c.icon && /^https?:\/\/|^\/storage\//.test(c.icon)" :src="c.icon" alt="" class="w-3.5 h-3.5 object-contain inline-block align-middle" />
+          <span v-else-if="c.icon" class="mr-0.5">{{ c.icon }}</span>{{ c.name }}
           <span v-if="c.children?.length" class="text-[8px] opacity-60">{{ mobileExpandedCat === c.id ? '▼' : '▶' }}</span>
         </button>
       </div>

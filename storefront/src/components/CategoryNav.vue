@@ -35,25 +35,60 @@ function onCatHover(c: Category) { dropdownCat.value = c }
 </script>
 
 <template>
-  <!-- pills: 顶部横排(大厂风格:横向滚动 + 胶囊) -->
+  <!-- pills: 顶部横排(大厂风格:横向滚动 + 胶囊)。有子分类的一级分类点击后展开子分类面板 -->
   <div v-if="style === 'pills'" class="bg-white border-b border-border">
-    <div class="max-w-6xl mx-auto px-4">
+    <div class="max-w-6xl mx-auto px-4 relative">
       <div class="flex items-center gap-2 py-3 overflow-x-auto scrollbar-hide">
-        <button @click="select(null)" :class="[
+        <button @click="select(null); dropdownCat = null" :class="[
           'shrink-0 px-4 py-1.5 rounded-pill text-sm font-medium transition-all whitespace-nowrap',
           modelValue === null
             ? 'bg-primary text-white shadow-sm'
             : 'bg-surface-subtle text-ink-soft hover:bg-primary-light hover:text-primary'
         ]">{{ t('category.all') }}</button>
-        <button v-for="c in cats" :key="c.id" @click="select(c.id)" :class="[
-          'shrink-0 px-4 py-1.5 rounded-pill text-sm font-medium transition-all whitespace-nowrap',
-          modelValue === c.id
-            ? 'bg-primary text-white shadow-sm'
-            : 'bg-surface-subtle text-ink-soft hover:bg-primary-light hover:text-primary'
-        ]">
-          <img v-if="isImgIcon(c.icon)" :src="c.icon" alt="" class="cat-icon-img" />
-          <span v-else-if="c.icon" class="mr-1">{{ c.icon }}</span>{{ c.name }}
-        </button>
+        <div v-for="c in cats" :key="c.id" class="shrink-0"
+          @mouseenter="onCatHover(c)">
+          <button @click="onCatClick(c)" :class="[
+            'shrink-0 px-4 py-1.5 rounded-pill text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1',
+            modelValue === c.id
+              ? 'bg-primary text-white shadow-sm'
+              : 'bg-surface-subtle text-ink-soft hover:bg-primary-light hover:text-primary'
+          ]">
+            <img v-if="isImgIcon(c.icon)" :src="c.icon" alt="" class="cat-icon-img" />
+            <span v-else-if="c.icon" class="mr-0.5">{{ c.icon }}</span>{{ c.name }}
+            <span v-if="hasChildren(c)" class="text-[8px] opacity-60">▼</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 子分类面板:absolute 挂外层(无 overflow),完整展示不被裁剪 -->
+      <div
+        v-if="dropdownCat && hasChildren(dropdownCat)"
+        class="absolute left-4 right-4 top-full z-30 bg-white border border-border rounded-card shadow-pop p-4"
+        @mouseleave="dropdownCat = null"
+      >
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-sm font-bold text-ink flex items-center gap-1">
+            <img v-if="isImgIcon(dropdownCat.icon)" :src="dropdownCat.icon" alt="" class="cat-icon-img" />
+            <span v-else-if="dropdownCat.icon">{{ dropdownCat.icon }}</span>{{ dropdownCat.name }}
+          </span>
+          <button
+            @click="select(dropdownCat.id); dropdownCat = null"
+            class="text-xs text-primary hover:text-primary-hover transition shrink-0 ml-2"
+          >{{ t('category.viewAll') }} →</button>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="ch in dropdownCat.children"
+            :key="ch.id"
+            @click="select(ch.id); dropdownCat = null"
+            :class="[
+              'px-3 py-1.5 rounded-field text-xs border transition',
+              modelValue === ch.id
+                ? 'border-primary bg-primary-light text-primary font-medium'
+                : 'border-border text-ink-soft hover:border-primary/40 hover:text-primary'
+            ]"
+          >{{ ch.name }}</button>
+        </div>
       </div>
     </div>
   </div>
@@ -188,6 +223,7 @@ function onCatHover(c: Category) { dropdownCat.value = c }
   object-fit: contain;
   border-radius: 4px;
   margin-right: 2px;
+  display: inline-block;
   vertical-align: -3px;
 }
 </style>

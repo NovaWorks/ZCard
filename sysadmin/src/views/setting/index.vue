@@ -104,6 +104,10 @@
             </ElFormItem>
             <ElFormItem :label="t('zcard.setting.hotTags')">
               <ElInput v-model="form.hotTagCategoriesJson" type="textarea" :rows="4" :placeholder="t('zcard.setting.hotTagsPlaceholder')" />
+              <div class="text-xs text-ink-soft mt-1 leading-relaxed">
+                <div>{{ t('zcard.setting.hotTagsFormatTip') }}</div>
+                <div class="mt-0.5">{{ t('zcard.setting.hotTagsFormatExample') }}</div>
+              </div>
             </ElFormItem>
           </ElForm>
         </ElTabPane>
@@ -653,12 +657,25 @@
   }
 
   const parseArr = (text: string): any[] | null => {
+    // 1. 标准 JSON 数组
     try {
       const v = JSON.parse(text)
       return Array.isArray(v) ? v : null
     } catch {
-      return null
+      /* 继续尝试逗号分隔 */
     }
+    // 2. 兼容「逗号分隔的分类 ID/名称」(老用户习惯,如: 1,3,5)
+    const trimmed = text.trim()
+    if (trimmed && !trimmed.startsWith('[')) {
+      const parts = trimmed.split(/[,，\s]+/).filter(Boolean)
+      if (parts.length) {
+        return parts.map((p) => {
+          const n = Number(p)
+          return Number.isNaN(n) ? p : n
+        })
+      }
+    }
+    return null
   }
 
   const coerceArray = (value: any, fallback: string[]): string[] => {

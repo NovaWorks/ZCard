@@ -317,6 +317,8 @@ async function doSubmit() {
         card_id: it.card_id ?? undefined,
         contact: contact.value,
         password: password.value || undefined,
+        captcha: needCaptcha.value ? captcha.value : undefined,
+        coupon_code: couponCode.value.trim() || undefined,
         extra: { ...controlValues.value },
       } as any)
       const result = await createPayment(res.order_no, channelId)

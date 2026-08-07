@@ -12,7 +12,8 @@ export interface OrderDetail {
 }
 export const createOrder = (data: {
   product_id: number; sku_id?: number; qty: number; card_id?: number
-  contact: string; password?: string; extra?: Record<string, any>
+  contact: string; password?: string; captcha?: string
+  coupon_code?: string; extra?: Record<string, any>
 }) => request.post<unknown, CreatedOrder>('/orders', data)
 
 export interface BatchOrderResult {
