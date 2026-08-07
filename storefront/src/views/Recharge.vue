@@ -157,13 +157,12 @@ onMounted(() => {
         </button>
       </div>
 
-      <!-- 自定义金额(容器用 div:input 不能嵌套在 button 内,移动端点击会被外层按钮吞掉导致无法输入) -->
-      <div
-        class="w-full border rounded-card px-3 py-2 text-left text-sm transition flex items-center justify-between cursor-pointer"
+      <!-- 自定义金额(文字描述在前,编辑框在后;整行点击聚焦输入框) -->
+      <label
+        class="w-full border rounded-card px-3 py-2 text-left text-sm transition flex items-center gap-2 cursor-text"
         :class="isCustom ? 'border-primary ring-2 ring-primary/20 bg-primary-light' : 'border-border hover:border-primary'"
-        @click="selectCustom"
       >
-        <span class="text-ink-muted">{{ t('recharge.customAmount') }}</span>
+        <span class="text-ink-muted shrink-0">{{ t('recharge.customAmount') }}</span>
         <input
           v-model="customAmount"
           type="number"
@@ -171,10 +170,9 @@ onMounted(() => {
           min="0.01"
           :placeholder="t('recharge.customPlaceholder')"
           @focus="selectCustom"
-          @click.stop
-          class="w-32 text-right bg-transparent outline-none text-ink font-semibold"
+          class="flex-1 min-w-0 bg-transparent outline-none text-ink font-semibold text-right"
         />
-      </div>
+      </label>
 
       <!-- 错误 -->
       <div v-if="err" class="mt-3 text-xs text-danger">{{ err }}</div>

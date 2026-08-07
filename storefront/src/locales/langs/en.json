@@ -384,8 +384,10 @@
       "registerNow": "Register now",
       "logining": "Signing in...",
       "login": "Login",
-      "fillEmailPassword": "Please enter email and password",
-      "loginFailed": "Login failed, please check your email and password"
+      "emailOrUsername": "Email / Username",
+      "emailOrUsernamePlaceholder": "Enter email or username",
+      "fillEmailPassword": "Please enter email or username and password",
+      "loginFailed": "Login failed, please check your account and password"
     },
     "register": {
       "closedTitle": "Registration Closed",

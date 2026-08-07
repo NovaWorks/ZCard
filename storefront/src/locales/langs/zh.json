@@ -384,8 +384,10 @@
       "registerNow": "立即注册",
       "logining": "登录中...",
       "login": "登录",
-      "fillEmailPassword": "请填写邮箱和密码",
-      "loginFailed": "登录失败,请检查邮箱和密码"
+      "emailOrUsername": "邮箱 / 用户名",
+      "emailOrUsernamePlaceholder": "请输入邮箱或用户名",
+      "fillEmailPassword": "请填写邮箱或用户名和密码",
+      "loginFailed": "登录失败,请检查账号和密码"
     },
     "register": {
       "closedTitle": "注册已关闭",

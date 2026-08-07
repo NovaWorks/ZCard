@@ -82,7 +82,8 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'email' => 'required|email',
+            // 支持邮箱或用户名登录(注册时有 username 字段;register_type 可配 email/username)
+            'email' => 'required|string|max:255',
             'password' => 'required|string',
             'captcha' => 'nullable|string',
         ]);
@@ -96,7 +97,11 @@ class AuthController extends Controller
             }
         }
 
-        $user = User::where('email', $data['email'])->first();
+        // 邮箱或用户名匹配(field 参数兼容前端传 email/username/account)
+        $identifier = trim((string) ($data['email'] ?? $data['account'] ?? ''));
+        $user = User::query()
+            ->where(fn ($q) => $q->where('email', $identifier)->orWhere('username', $identifier))
+            ->first();
 
         if (! $user || ! Hash::check($data['password'], $user->password)) {
             throw ValidationException::withMessages([

@@ -78,8 +78,8 @@ async function submit() {
 
       <form @submit.prevent="submit" class="space-y-4">
         <div>
-          <label class="block text-xs font-semibold text-ink-soft mb-1">{{ t('common.email') }}</label>
-          <input v-model="email" type="email" :placeholder="t('auth.register.emailPlaceholder')"
+          <label class="block text-xs font-semibold text-ink-soft mb-1">{{ t('auth.login.emailOrUsername') }}</label>
+          <input v-model="email" type="text" :placeholder="t('auth.login.emailOrUsernamePlaceholder')"
             class="w-full px-3 py-2 border border-border rounded-field text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition" />
         </div>
         <div>

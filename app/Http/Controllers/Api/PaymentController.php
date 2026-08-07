@@ -48,7 +48,9 @@ class PaymentController extends Controller
         // 按单号前缀解析业务对象(订单 / 充值单)
         if (str_starts_with($bizNo, 'RCH')) {
             // 充值单强归属:必须登录,且只能为本人充值单发起支付(防越权)
-            $userId = $request->user()?->id;
+            // 注意:本路由不在 auth:sanctum 组内,$request->user() 默认走 web guard(session),
+            // 无法解析 Bearer token → 恒为 null。必须显式用 sanctum guard 解析。
+            $userId = $request->user('sanctum')?->id;
             if (! $userId) {
                 return response()->json(['message' => __('messages.recharge.login_required')], 401);
             }
