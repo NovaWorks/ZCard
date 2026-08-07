@@ -1,1 +1,0 @@
-import{t as e}from"./request-Bcg6USuH.js";var t=(t={})=>e.get(`/products`,{params:t}),n=(t,n={})=>e.get(`/products/${t}`,{params:n}),r=t=>e.get(`/products/featured`,{params:t?{limit:t}:{}});export{n,t as r,r as t};

@@ -21,6 +21,13 @@ request.interceptors.response.use(
   (res) => res.data,
   (err) => {
     console.error('[API]', err?.response?.status, err?.message)
+    // 401 = token 无效/过期:清理登录态并引导重新登录(保留原路径,登录后跳回)。
+    // 仅对登录用户的接口生效;公开接口(商品/验证码等)不会返回 401。
+    if (err?.response?.status === 401 && !window.location.pathname.startsWith('/login')) {
+      localStorage.removeItem('zcard_token')
+      const redirect = encodeURIComponent(window.location.pathname + window.location.search)
+      window.location.href = `/login?redirect=${redirect}`
+    }
     return Promise.reject(err)
   },
 )

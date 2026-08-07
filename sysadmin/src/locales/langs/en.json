@@ -1,6 +1,6 @@
 {
   "httpMsg": {
-    "unauthorized": "Unauthorized access, please login again",
+    "unauthorized": "Login expired, please sign in again",
     "forbidden": "Access to this resource is forbidden",
     "notFound": "The requested resource does not exist",
     "methodNotAllowed": "Request method not allowed",

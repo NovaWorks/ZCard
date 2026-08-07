@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { login } from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
@@ -8,6 +8,7 @@ import { useSettingsStore } from '@/stores/settings'
 import request from '@/api/request'
 
 const router = useRouter()
+const route = useRoute()
 const { t } = useI18n()
 const authStore = useAuthStore()
 const settings = useSettingsStore()
@@ -52,7 +53,8 @@ async function submit() {
       captcha: needCaptcha.value ? captcha.value : undefined,
     } as any)
     authStore.setAuth(res.token, res.user)
-    router.push('/')
+    const redirect = typeof route.query.redirect === 'string' && route.query.redirect ? route.query.redirect : '/'
+    router.push(redirect)
   } catch (e: any) {
     err.value = e?.response?.data?.message || t('auth.login.loginFailed')
     if (e?.response?.data?.errors?.captcha) {
