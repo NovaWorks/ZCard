@@ -129,7 +129,7 @@ class ProductController extends Controller
             'price_display' => $conv['amount'],
             'display_currency' => $conv['currency'],
             'exchange_rate' => $conv['rate'],
-            'stock' => (int) $p->stock,
+            'stock' => $p->availableStock(),
             'sales' => $p->displaySales(),
             'is_featured' => (bool) $p->is_featured,
             // 靓号自选:列表最低价(未使用卡密 price 最小值,分;无则 null)
@@ -153,7 +153,7 @@ class ProductController extends Controller
                         'price_display' => $sconv['amount'],
                         'display_currency' => $sconv['currency'],
                         'exchange_rate' => $sconv['rate'],
-                        'stock' => (int) $p->stock,
+                        'stock' => $p->availableStock(),
                     ];
                 }),
                 'virtual_reviews' => $p->virtual_reviews,

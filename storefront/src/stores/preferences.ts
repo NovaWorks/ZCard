@@ -35,11 +35,12 @@ export const usePreferencesStore = defineStore('preferences', {
   actions: {
     async load() {
       if (this.loaded) return
+      // 记录用户是否已保存货币选择:load 末尾统一写回,保证后续请求带正确 X-Currency
+      const savedCurrency = this.currency
       try {
         const data: CurrencyListResponse = await getCurrencies()
         this.baseCurrency = data.base_currency
         this.currencies = data.currencies
-        if (!this.currency) this.currency = data.base_currency
       } catch {
         // /currencies 失败不阻塞渲染
       }
@@ -52,8 +53,6 @@ export const usePreferencesStore = defineStore('preferences', {
           this.languages = Array.isArray(cfg.enabled_languages) && cfg.enabled_languages.length
             ? cfg.enabled_languages
             : ['zh', 'en']
-          // 默认展示货币:仅在用户未保存选择时应用
-          if (!this.currency) this.currency = cfg.default_display_currency || this.baseCurrency
           // 默认语言:仅在用户未保存选择时应用
           if (!this.language) {
             const dl = cfg.default_language || 'zh'
@@ -65,6 +64,17 @@ export const usePreferencesStore = defineStore('preferences', {
       } catch {
         // 设置加载失败不阻塞渲染
       }
+      // 货币优先级:用户已保存选择 > 后台默认显示货币 > 基础货币。
+      // 必须先判断「是否已保存」再决定用哪个,否则 base 会先占位导致默认货币永远不生效。
+      if (this.currencies.length && this.currencies.some((c) => c.code === savedCurrency)) {
+        this.currency = savedCurrency
+      } else {
+        const cfg = useSettingsStore().config
+        this.currency = cfg?.default_display_currency || this.baseCurrency
+      }
+      // 写回 localStorage:保证后续 API 请求带正确的 X-Currency 头(此前只改 store 状态,
+      // request.ts 读 localStorage 拿不到默认货币 → 后端回退基础货币,手机首访显示 CNY)
+      localStorage.setItem('zcard_currency', this.currency)
       this.loaded = true
     },
     setCurrency(code: string) {

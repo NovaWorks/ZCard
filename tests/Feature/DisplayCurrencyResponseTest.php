@@ -214,4 +214,50 @@ class DisplayCurrencyResponseTest extends TestCase
         $this->assertSame(175, (int) $order->amount_display);
         $this->assertSame('0.14000000', $order->exchange_rate);
     }
+
+    public function test_upstream_product_stock_uses_stock_cache(): void
+    {
+        // 上游商品无本地卡,库存应读 stock_cache(-1=无限或具体数值),而非 withCount(cards)=0
+        $merchant = $this->makeMerchant();
+        $source = \App\Models\SupplySource::create([
+            'name' => '上游货源',
+            'driver' => 'zcard',
+            'base_url' => 'https://example.com',
+            'credentials' => [],
+        ]);
+        $cat = Category::create([
+            'merchant_id' => $merchant->id,
+            'name' => 'Cat',
+            'slug' => 'cat-upstream',
+            'sort' => 0,
+        ]);
+        $p = Product::create([
+            'merchant_id' => $merchant->id,
+            'category_id' => $cat->id,
+            'name' => '上游商品',
+            'slug' => 'upstream-stock',
+            'price' => 1000,
+            'stock_type' => 'card',
+            'delivery_mode' => 'status',
+            'status' => true,
+            'sort' => 0,
+            'upstream_source_id' => $source->id,
+            'upstream_product_code' => 'UP-001',
+            'stock_cache' => 42,
+        ]);
+        $this->seedCurrencies(enableUsd: true);
+
+        $resp = $this->getJson('/api/products');
+
+        $resp->assertOk();
+        $item = collect($resp->json('data'))->firstWhere('id', $p->id);
+        $this->assertNotNull($item);
+        $this->assertSame(42, $item['stock']);
+
+        // 无限库存场景
+        $p->update(['stock_cache' => -1]);
+        $detail = $this->getJson("/api/products/{$p->slug}");
+        $detail->assertOk();
+        $this->assertSame(-1, $detail->json('stock'));
+    }
 }
