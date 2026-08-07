@@ -14,6 +14,12 @@ export interface PaymentChannel {
   enabled: boolean
   /** 渠道配置（键值对） */
   config?: Record<string, any>
+  /** 手续费值:percent 时为百分比(0.05=5%),fixed 时为固定金额(元) */
+  fee?: number
+  /** 手续费类型:percent=百分比 / fixed=固定金额 */
+  fee_type?: string
+  /** 手续费承担方:merchant=商户承担 / customer=客户承担 */
+  fee_bearer?: string
   sort?: number
   created_at?: string
   updated_at?: string

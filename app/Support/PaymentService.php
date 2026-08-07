@@ -23,6 +23,35 @@ class PaymentService
     }
 
     /**
+     * 按通道配置计算手续费。
+     *
+     * 返回 [手续费(分), 应付金额(分)]:
+     * - fee <= 0 → 无手续费,[0, 原金额]
+     * - fee_type = fixed → 手续费 = fee × 100(分);percent → 手续费 = 原金额 × fee
+     * - fee_bearer = customer → 应付金额 = 原金额 + 手续费(加到用户付款额)
+     * - fee_bearer = merchant → 应付金额不变(手续费从商户实收扣,仅记录)
+     *
+     * @return array{0: int, 1: int} [feeFen, payAmountFen]
+     */
+    public function calcFee(PaymentChannel $channel, int $amountFen): array
+    {
+        $fee = (float) ($channel->fee ?? 0);
+        if ($fee <= 0) {
+            return [0, $amountFen];
+        }
+
+        $feeFen = $channel->fee_type === 'fixed'
+            ? (int) round($fee * 100) // 固定金额:元 → 分
+            : (int) round($amountFen * $fee); // 百分比:0.05 = 5%
+
+        $payAmount = ($channel->fee_bearer ?? 'merchant') === 'customer'
+            ? $amountFen + $feeFen
+            : $amountFen;
+
+        return [$feeFen, $payAmount];
+    }
+
+    /**
      * 向网关发起收款。
      *
      * 同时服务于发卡订单(Order)与充值单(Recharge):两者均实现 Payable,
@@ -49,23 +78,40 @@ class PaymentService
             $rate = 1.0;
         }
 
+        // 通道手续费:按配置计算。商户承担 → 应付金额不变,仅记录 fee;
+        // 客户承担 → 应付金额 = 原金额 + 手续费(驱动以含手续费金额发起收款)。
+        $original = $payable;
+        [$feeFen, $payAmountFen] = $this->calcFee($channel, (int) $payable->getPayableAmount());
+        if ($payAmountFen !== (int) $payable->getPayableAmount()) {
+            $payable = new class($payable, $payAmountFen) implements Payable {
+                public function __construct(private Payable $inner, private int $amount) {}
+
+                public function getPayableKey(): string { return $this->inner->getPayableKey(); }
+
+                public function getPayableAmount(): int { return $this->amount; }
+
+                public function getPayableType(): string { return $this->inner->getPayableType(); }
+            };
+        }
+
         $result = $driver->pay($payable, $config);
 
         // 写支付流水:按 Payable 类型填 order_id 或 recharge_id,另一个留空。
         $payload = [
             'channel' => $channel->code,
-            'amount' => $payable->getPayableAmount(),
+            'amount' => (int) $payable->getPayableAmount(),
             'status' => 'pending',
+            'fee' => $feeFen,
             'charged_currency' => $result->currencySent ?? $targetCur,
             'charged_amount' => $result->amountSent ?? (int) $payable->getPayableAmount(),
             'channel_exchange_rate' => $rate,
         ];
-        if ($payable instanceof Recharge) {
-            $payload['recharge_id'] = $payable->id;
-        } elseif ($payable instanceof Order) {
-            $payload['order_id'] = $payable->id;
+        if ($original instanceof Recharge) {
+            $payload['recharge_id'] = $original->id;
+        } elseif ($original instanceof Order) {
+            $payload['order_id'] = $original->id;
         } else {
-            throw new \RuntimeException('不支持的 Payable 类型: ' . get_class($payable));
+            throw new \RuntimeException('不支持的 Payable 类型: ' . get_class($original));
         }
         Payment::create($payload);
 
@@ -105,8 +151,11 @@ class PaymentService
         /** @var Order $main 主订单:网关单号 + 支付流水主关联 */
         $main = $orders->first();
 
-        // 聚合 Payable:单号取主订单,金额取总和,驱动只关心这两项
-        $payable = new class($main, $total) implements Payable {
+        // 聚合手续费:基于订单总额计算(与 createPayment 同逻辑)
+        [$feeFen, $payTotal] = $this->calcFee($channel, $total);
+
+        // 聚合 Payable:单号取主订单,金额取总和(含客户承担手续费),驱动只关心这两项
+        $payable = new class($main, $payTotal) implements Payable {
             public function __construct(private Order $main, private int $total) {}
 
             public function getPayableKey(): string
@@ -140,10 +189,11 @@ class PaymentService
             'order_id' => $main->id,
             'order_ids' => $orders->pluck('id')->all(),
             'channel' => $channel->code,
-            'amount' => $total,
+            'amount' => $payTotal,
+            'fee' => $feeFen,
             'status' => 'pending',
             'charged_currency' => $result->currencySent ?? $targetCur,
-            'charged_amount' => $result->amountSent ?? $total,
+            'charged_amount' => $result->amountSent ?? $payTotal,
             'channel_exchange_rate' => $rate,
         ]);
 

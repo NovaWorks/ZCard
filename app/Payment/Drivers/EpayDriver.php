@@ -148,9 +148,13 @@ class EpayDriver extends AbstractPaymentDriver
     public function verifyCallback(Request $request, array $config): ?array
     {
         $key = $config['key'] ?? '';
-        $signType = strtoupper($config['sign_type'] ?? 'MD5');
         // 易支付回调可能走 GET query 或 POST body,合并读取
         $data = array_merge($request->query(), $request->post());
+
+        // 验签算法:优先用回调自带的 sign_type 字段(易支付 889 等平台回调默认 RSA),
+        // 其次回退到通道配置。若只按配置判断,回调 sign_type 与配置不一致时会用错算法 → 验签恒失败。
+        $callbackSignType = strtoupper((string) ($data['sign_type'] ?? ''));
+        $signType = $callbackSignType !== '' ? $callbackSignType : strtoupper($config['sign_type'] ?? 'MD5');
 
         $tradeStatus = $data['trade_status'] ?? '';
         if ($tradeStatus !== 'TRADE_SUCCESS') {
@@ -194,12 +198,12 @@ class EpayDriver extends AbstractPaymentDriver
                 'label' => '签名方式',
                 'type' => 'select',
                 'options' => [
-                    'MD5' => 'MD5(V1 接口,传统易支付通用)',
-                    'RSA' => 'RSA / SHA256WithRSA(V2 接口,新版易支付)',
+                    'MD5' => 'MD5(V1 接口,传统易支付)',
+                    'RSA' => 'RSA / SHA256WithRSA(V2 接口,889 等新版易支付默认)',
                 ],
                 'required' => true,
                 'default' => 'MD5',
-                'help' => 'V1 易支付用 MD5(填商户密钥);V2 新版易支付用 RSA(填商户私钥)。不确定选 MD5。',
+                'help' => '按易支付平台要求选择。889 平台默认 RSA;传统易支付用 MD5。RSA 需在「商户密钥/私钥」填商户私钥,并在「平台公钥」填平台公钥。',
             ],
             'pid' => [
                 'label' => '商户 ID(PID)',
@@ -210,13 +214,13 @@ class EpayDriver extends AbstractPaymentDriver
                 'label' => '商户密钥 / 私钥',
                 'type' => 'textarea',
                 'required' => true,
-                'help' => 'MD5 方式:填商户密钥(KEY);RSA 方式:填 PKCS#8 商户私钥(不含 PEM 头尾的纯字符串亦可),用于下单签名。',
+                'help' => 'MD5 方式:填商户密钥(KEY)。RSA 方式:填商户私钥(PKCS#8,可含 -----BEGIN PRIVATE KEY----- 头尾),用于下单签名。',
             ],
             'platform_public_key' => [
                 'label' => '平台公钥(仅 RSA)',
                 'type' => 'textarea',
                 'required' => false,
-                'help' => 'RSA 方式必填:易支付平台公钥,用于校验回调签名。MD5 方式留空。',
+                'help' => '仅 RSA 方式必填:易支付平台公钥,用于校验回调签名(平台用其私钥签名)。MD5 方式留空。',
             ],
             'url' => [
                 'label' => '易支付网关地址',
@@ -244,7 +248,7 @@ class EpayDriver extends AbstractPaymentDriver
                 'type' => 'text',
                 'required' => false,
                 'placeholder' => '如 https://kmigo.com',
-                'help' => '易支付平台会校验 notify_url 必须是完整 URL。留空时用站点 APP_URL;若站点域名与支付回调入口不一致(如走 CDN/独立公网入口),请在此填写回调入口域名(不带末尾斜杠)。参考 acg-faka 的「自定义支付回调域名」。',
+                'help' => '回调地址默认用当前运行域名自动生成(部署到哪个域名就用哪个)。仅当回调入口与站点域名不一致(如走 CDN/独立公网入口)时才需填写。',
             ],
             'target_currency' => [
                 'label' => '收款货币',

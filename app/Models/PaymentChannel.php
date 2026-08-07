@@ -8,7 +8,7 @@ class PaymentChannel extends Model
 {
     protected $fillable = [
         'merchant_id', 'name', 'code', 'driver', 'config',
-        'fee', 'fee_type', 'sort', 'enabled',
+        'fee', 'fee_type', 'fee_bearer', 'sort', 'enabled',
     ];
 
     protected function casts(): array

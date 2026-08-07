@@ -304,7 +304,9 @@ Route::get('/orders/query', [OrderController::class, 'query'])->middleware(['dis
 Route::get('/payments/channels', [PaymentController::class, 'channels'])->name('api.payments.channels');
 Route::post('/payments/create', [PaymentController::class, 'create'])->name('api.payments.create');
 Route::post('/payments/batch-create', [PaymentController::class, 'batchCreate'])->name('api.payments.batch-create');
-Route::post('/payments/callback/{channel}', [PaymentController::class, 'callback'])->name('api.payments.callback');
+// 支付回调:易支付(889 等)文档明确异步通知走 GET,部分平台走 POST,统一用 any 兼容。
+// 驱动 verifyCallback 内部已 array_merge(query, post) 兼容两种传参方式。
+Route::any('/payments/callback/{channel}', [PaymentController::class, 'callback'])->name('api.payments.callback');
 
 // 支付同步跳回(第三方支付完成后浏览器跳转,重定向到前台结果页)
 // 驱动用 payment.return / payment.cancel / payment.notify 命名路由拼接跳回地址
@@ -336,8 +338,9 @@ Route::get('/payments/cancel/{code}', function (Request $request, string $code) 
     return redirect('/pay/result?status=cancel&' . $query);
 })->name('payment.cancel');
 
-// payment.notify = 异步通知,与 callback 同义(部分第三方用 notify_url 命名)
-Route::post('/payments/notify/{channel}', [PaymentController::class, 'callback'])->name('payment.notify');
+// payment.notify = 异步通知,与 callback 同义(部分第三方用 notify_url 命名)。
+// 易支付(889)异步通知走 GET,其他平台可能 POST,统一 any 兼容。
+Route::any('/payments/notify/{channel}', [PaymentController::class, 'callback'])->name('payment.notify');
 
 Route::get('/user', function (Request $request) {
     return $request->user();

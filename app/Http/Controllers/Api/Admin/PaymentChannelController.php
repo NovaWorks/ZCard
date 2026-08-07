@@ -113,6 +113,7 @@ class PaymentChannelController extends Controller
             'name'    => 'sometimes|string|max:100',
             'fee'     => 'sometimes|numeric|min:0',
             'fee_type' => 'sometimes|string',
+            'fee_bearer' => 'sometimes|string|in:merchant,customer',
             'sort'    => 'sometimes|integer',
         ]);
 

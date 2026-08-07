@@ -81,6 +81,35 @@
           <ElSwitch v-model="configForm.enabled" :active-text="t('zcard.payment.enable')" :inactive-text="t('zcard.payment.disable')" />
         </ElFormItem>
 
+        <!-- 手续费配置:承担方 + 比例类型 + 金额 -->
+        <el-divider content-position="left">{{ t('zcard.payment.feeTitle') }}</el-divider>
+        <ElFormItem :label="t('zcard.payment.feeBearer')">
+          <ElRadioGroup v-model="configForm.fee_bearer">
+            <ElRadio value="merchant">{{ t('zcard.payment.feeBearerMerchant') }}</ElRadio>
+            <ElRadio value="customer">{{ t('zcard.payment.feeBearerCustomer') }}</ElRadio>
+          </ElRadioGroup>
+          <div class="field-help">{{ t('zcard.payment.feeBearerTip') }}</div>
+        </ElFormItem>
+        <ElFormItem :label="t('zcard.payment.feeType')">
+          <ElRadioGroup v-model="configForm.fee_type">
+            <ElRadio value="percent">{{ t('zcard.payment.feeTypePercent') }}</ElRadio>
+            <ElRadio value="fixed">{{ t('zcard.payment.feeTypeFixed') }}</ElRadio>
+          </ElRadioGroup>
+        </ElFormItem>
+        <ElFormItem :label="t('zcard.payment.feeAmount')">
+          <ElInputNumber
+            v-model="configForm.fee"
+            :min="0"
+            :max="100"
+            :step="configForm.fee_type === 'percent' ? 0.1 : 0.01"
+            :precision="configForm.fee_type === 'percent' ? 2 : 2"
+            controls-position="right"
+            style="width: 200px"
+          />
+          <span class="ml-2 text-xs text-ink-soft">{{ configForm.fee_type === 'percent' ? '%' : t('zcard.payment.feeFixedUnit') }}</span>
+          <div class="field-help">{{ configForm.fee_type === 'percent' ? t('zcard.payment.feePercentTip') : t('zcard.payment.feeFixedTip') }}</div>
+        </ElFormItem>
+
         <!-- 回调地址提示 -->
         <el-alert
           v-if="callbackUrl"
@@ -301,8 +330,11 @@
   /** 该通道的异步回调地址 */
   const callbackUrl = ref('')
 
-  const configForm = reactive<{ enabled: boolean; values: Record<string, any> }>({
+  const configForm = reactive<{ enabled: boolean; fee: number; fee_type: string; fee_bearer: string; values: Record<string, any> }>({
     enabled: false,
+    fee: 0,
+    fee_type: 'percent',
+    fee_bearer: 'merchant',
     values: {}
   })
 
@@ -314,6 +346,9 @@
   const openConfig = async (channel: PaymentChannel) => {
     currentChannel.value = channel
     configForm.enabled = !!channel.enabled
+    configForm.fee = Number(channel.fee ?? 0)
+    configForm.fee_type = channel.fee_type || 'percent'
+    configForm.fee_bearer = channel.fee_bearer || 'merchant'
     configFields.value = []
     callbackUrl.value = ''
     configVisible.value = true
@@ -376,6 +411,9 @@
     try {
       await updateChannel(currentChannel.value.id, {
         enabled: configForm.enabled,
+        fee: configForm.fee,
+        fee_type: configForm.fee_type,
+        fee_bearer: configForm.fee_bearer,
         config: values
       })
       ElMessage.success(t('zcard.payment.saved'))
