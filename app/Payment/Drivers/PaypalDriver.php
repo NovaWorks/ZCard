@@ -3,13 +3,12 @@
 namespace App\Payment\Drivers;
 
 use App\Payment\Contracts\Payable;
-use App\Payment\Contracts\PaymentDriver;
+use App\Payment\AbstractPaymentDriver;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\URL;
 
-class PaypalDriver implements PaymentDriver
+class PaypalDriver extends AbstractPaymentDriver
 {
     /**
      * 根据 mode 选择 PayPal 的 base URL。
@@ -21,19 +20,7 @@ class PaypalDriver implements PaymentDriver
             : 'https://api-m.paypal.com';
     }
 
-    /**
-     * 安全构建命名路由 URL；若路由尚未定义则回退到当前请求 URL。
-     */
-    protected function namedUrl(string $name, array $params = []): string
-    {
-        if (app('router')->has($name)) {
-            return route($name, $params, false);
-        }
-
-        return URL::current();
-    }
-
-    /**
+        /**
      * 获取 PayPal access token (client credentials)。
      */
     protected function accessToken(array $config): string

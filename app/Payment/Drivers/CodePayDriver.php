@@ -2,27 +2,15 @@
 
 namespace App\Payment\Drivers;
 
+use App\Payment\AbstractPaymentDriver;
 use App\Payment\Contracts\Payable;
-use App\Payment\Contracts\PaymentDriver;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\URL;
 
-class CodePayDriver implements PaymentDriver
+class CodePayDriver extends AbstractPaymentDriver
 {
-    /**
-     * 安全构建命名路由 URL；若路由尚未定义则回退到当前请求 URL。
-     */
-    protected function namedUrl(string $name, array $params = []): string
-    {
-        if (app('router')->has($name)) {
-            return route($name, $params, false);
-        }
-
-        return URL::current();
-    }
-
     /**
      * 对参与签名的参数做字典序升序拼接后做 MD5。
      */
@@ -50,8 +38,8 @@ class CodePayDriver implements PaymentDriver
             'pid' => $pid,
             'type' => $config['type'] ?? 'alipay',
             'out_trade_no' => $order->getPayableKey(),
-            'notify_url' => $this->namedUrl('payment.notify', ['channel' => 'codepay']),
-            'return_url' => $this->namedUrl('payment.return', ['code' => 'codepay']).'?order_no='.$order->getPayableKey(),
+            'notify_url' => $this->namedUrl('payment.notify', ['channel' => 'codepay'], $config),
+            'return_url' => $this->namedUrl('payment.return', ['code' => 'codepay'], $config).'?order_no='.$order->getPayableKey(),
             'name' => $order->getPayableKey(),
             'money' => bcdiv((string) $order->getPayableAmount(), '100', 2), // 分→元
         ];
@@ -115,6 +103,13 @@ class CodePayDriver implements PaymentDriver
                 'options' => ['alipay' => '支付宝', 'wxpay' => '微信支付', 'qqpay' => 'QQ钱包'],
                 'required' => true,
                 'default' => 'alipay',
+            ],
+            'notify_domain' => [
+                'label' => '回调域名(可选)',
+                'type' => 'text',
+                'required' => false,
+                'placeholder' => '如 https://kmigo.com',
+                'help' => '码支付平台校验 notify_url 必须为完整 URL。留空用站点 APP_URL;若回调入口与站点域名不一致请在此填写(不带末尾斜杠)。',
             ],
             'target_currency' => [
                 'label' => '收款货币',

@@ -2,8 +2,8 @@
 
 namespace App\Payment\Drivers;
 
+use App\Payment\AbstractPaymentDriver;
 use App\Payment\Contracts\Payable;
-use App\Payment\Contracts\PaymentDriver;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -29,19 +29,8 @@ use Illuminate\Support\Facades\URL;
  *
  * 回调:GET query 或 POST 传参,trade_status==TRADE_SUCCESS 为成功,返回 "success"。
  */
-class EpayDriver implements PaymentDriver
+class EpayDriver extends AbstractPaymentDriver
 {
-    /**
-     * 安全构建命名路由 URL；若路由尚未定义则回退到当前请求 URL。
-     */
-    protected function namedUrl(string $name, array $params = []): string
-    {
-        if (app('router')->has($name)) {
-            return route($name, $params, false);
-        }
-
-        return URL::current();
-    }
 
     /**
      * 签名:按 sign_type 分流 MD5 / RSA。
@@ -138,8 +127,8 @@ class EpayDriver implements PaymentDriver
         $params = [
             'pid' => $pid,
             'out_trade_no' => $order->getPayableKey(),
-            'notify_url' => $this->namedUrl('payment.notify', ['channel' => 'epay']),
-            'return_url' => $this->namedUrl('payment.return', ['code' => 'epay']).'?order_no='.$order->getPayableKey(),
+            'notify_url' => $this->namedUrl('payment.notify', ['channel' => 'epay'], $config),
+            'return_url' => $this->namedUrl('payment.return', ['code' => 'epay'], $config).'?order_no='.$order->getPayableKey(),
             'name' => $order->getPayableKey(),
             'money' => bcdiv((string) $order->getPayableAmount(), '100', 2), // 分→元
         ];
@@ -249,6 +238,13 @@ class EpayDriver implements PaymentDriver
                 'required' => false,
                 'default' => ['alipay', 'wxpay'],
                 'help' => '勾选要支持的支付方式(可多选)。勾选多个时,用户在易支付收银台自选;只勾选一个则直接进入该支付通道。具体可用方式以易支付商户后台开通为准。',
+            ],
+            'notify_domain' => [
+                'label' => '回调域名(可选)',
+                'type' => 'text',
+                'required' => false,
+                'placeholder' => '如 https://kmigo.com',
+                'help' => '易支付平台会校验 notify_url 必须是完整 URL。留空时用站点 APP_URL;若站点域名与支付回调入口不一致(如走 CDN/独立公网入口),请在此填写回调入口域名(不带末尾斜杠)。参考 acg-faka 的「自定义支付回调域名」。',
             ],
             'target_currency' => [
                 'label' => '收款货币',

@@ -3,29 +3,16 @@
 namespace App\Payment\Drivers;
 
 use App\Payment\Contracts\Payable;
-use App\Payment\Contracts\PaymentDriver;
+use App\Payment\AbstractPaymentDriver;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\URL;
 use Stripe\Checkout\Session;
 use Stripe\Stripe;
 use Stripe\Webhook;
 
-class StripeDriver implements PaymentDriver
+class StripeDriver extends AbstractPaymentDriver
 {
-    /**
-     * 安全构建命名路由 URL；若路由尚未定义则回退到当前请求 URL。
-     */
-    protected function namedUrl(string $name, array $params = []): string
-    {
-        if (app('router')->has($name)) {
-            return route($name, $params, false);
-        }
-
-        return URL::current();
-    }
-
-    public function pay(Payable $order, array $config): PaymentResult
+        public function pay(Payable $order, array $config): PaymentResult
     {
         Stripe::setApiKey($config['secret_key'] ?? '');
 

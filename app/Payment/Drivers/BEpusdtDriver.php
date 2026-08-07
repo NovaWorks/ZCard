@@ -3,11 +3,10 @@
 namespace App\Payment\Drivers;
 
 use App\Payment\Contracts\Payable;
-use App\Payment\Contracts\PaymentDriver;
+use App\Payment\AbstractPaymentDriver;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\URL;
 
 /**
  * BEpusdt(USDT/USDC 等加密货币支付网关)驱动。
@@ -23,21 +22,9 @@ use Illuminate\Support\Facades\URL;
  * 与 EpuSdt 的差异:端点/api 版本/认证方式(无 pid)/签名拼接(无 &)均不同,
  * 故单独实现本驱动。
  */
-class BEpusdtDriver implements PaymentDriver
+class BEpusdtDriver extends AbstractPaymentDriver
 {
-    /**
-     * 安全构建命名路由 URL;若路由尚未定义则回退到当前请求 URL。
-     */
-    protected function namedUrl(string $name, array $params = []): string
-    {
-        if (app('router')->has($name)) {
-            return route($name, $params, false);
-        }
-
-        return URL::current();
-    }
-
-    /**
+        /**
      * BEpusdt MD5 签名(与 EpuSdt 不同,本驱动末尾直接追加 token,中间无 &):
      * 1. 剔除 signature 字段及空值(null / "")
      * 2. 参数名按 ASCII 字典序排序

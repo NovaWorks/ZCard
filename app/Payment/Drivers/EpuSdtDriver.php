@@ -3,11 +3,10 @@
 namespace App\Payment\Drivers;
 
 use App\Payment\Contracts\Payable;
-use App\Payment\Contracts\PaymentDriver;
+use App\Payment\AbstractPaymentDriver;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\URL;
 
 /**
  * EpuSdt(USDT 加密货币支付网关)驱动。
@@ -17,21 +16,9 @@ use Illuminate\Support\Facades\URL;
  * - 回调:epusdt 主动 POST notify_url,JSON 格式,HMAC-SHA256 验签
  * - 金额:法币(元),epusdt 内部转换为 USDT
  */
-class EpuSdtDriver implements PaymentDriver
+class EpuSdtDriver extends AbstractPaymentDriver
 {
-    /**
-     * 安全构建命名路由 URL；若路由尚未定义则回退到当前请求 URL。
-     */
-    protected function namedUrl(string $name, array $params = []): string
-    {
-        if (app('router')->has($name)) {
-            return route($name, $params, false);
-        }
-
-        return URL::current();
-    }
-
-    /**
+        /**
      * GMPay HMAC-SHA256 签名:
      * 1. 排除 signature 字段
      * 2. 非空参数按 key ASCII 字典序排序
