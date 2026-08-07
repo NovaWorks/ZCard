@@ -162,6 +162,8 @@ function onSkuChange() {
 /** 金额合计(基础货币分) */
 const subtotal = computed(() => items.value.reduce((n, i) => n + i.price * i.qty, 0))
 const total = computed(() => Math.max(0, subtotal.value - couponDiscount.value))
+/** 展示货币小计(无券时=应付总额;与商品行单价同口径) */
+const subtotalDisplay = computed(() => items.value.reduce((n, i) => n + i.price_display * i.qty, 0))
 /** 展示货币合计(折扣按展示币种比例折算) */
 const totalDisplay = computed(() => {
   const base = items.value.reduce((n, i) => n + i.price_display * i.qty, 0)
@@ -538,7 +540,7 @@ const channelPayTypes = (ch: PaymentChannel) => {
           <div class="bg-white rounded-card border border-border p-4">
             <div class="flex justify-between items-center text-sm mb-1">
               <span class="text-ink-soft">{{ t('order.checkout.subtotal') }} ({{ items.length }})</span>
-              <span class="text-ink font-semibold">{{ formatMoney(subtotal, displayCur) }}</span>
+              <span class="text-ink font-semibold">{{ formatMoney(subtotalDisplay, displayCur) }}</span>
             </div>
             <div v-if="couponDiscount > 0" class="flex justify-between items-center text-sm mb-1 text-success">
               <span>{{ t('order.checkout.discount') }}</span>
