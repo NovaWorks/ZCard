@@ -89,9 +89,10 @@ class StorefrontConfig
                 ['name' => 'Discord', 'icon' => '🎮', 'url' => ''],
             ],
             // 帮助中心(页脚栏4):后台可配置的链接/文本列表
+            // title 为默认语言标题;title_en 为英文标题(前台英文界面时显示,缺省回退 title)
             'footer_help_links' => [
-                ['title' => '常见问题', 'url' => '/orders/query'],
-                ['title' => '购买须知', 'url' => ''],
+                ['title' => '常见问题', 'title_en' => 'FAQ', 'url' => '/orders/query'],
+                ['title' => '购买须知', 'title_en' => 'Purchase Guide', 'url' => ''],
             ],
             'footer_copyright' => '© 2026 ZCard · 现代化插件制自动发卡系统',
             // 第三方统计代码(百度统计/Google Analytics 等,原样注入到页面底部)

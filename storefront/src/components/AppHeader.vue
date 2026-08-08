@@ -60,10 +60,6 @@ const mobileMenuOpen = ref(false)
     <div class="max-w-6xl mx-auto px-4 h-8 flex items-center justify-between overflow-hidden">
       <span class="opacity-90 truncate flex items-center gap-2 min-w-0">
         <span class="truncate">{{ t('nav.brandBar.slogan') }}</span>
-        <!-- 公告入口:有公告时显示,点击重新弹出公告弹窗 -->
-        <button v-if="hasNotice" @click="openNotice" class="shrink-0 inline-flex items-center gap-1 hover:opacity-80 transition cursor-pointer">
-          📢 <span class="underline underline-offset-2">{{ t('nav.brandBar.notice') }}</span>
-        </button>
       </span>
       <div class="hidden sm:flex items-center gap-3 opacity-90 shrink-0">
         <span>{{ t('nav.brandBar.securePay') }}</span>
@@ -96,6 +92,10 @@ const mobileMenuOpen = ref(false)
         <template v-if="authStore.isLoggedIn">
           <RouterLink to="/orders/mine" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.mine') }}</RouterLink>
           <RouterLink v-if="settings.config?.distribution_enabled" to="/distribution" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.distribution') }}</RouterLink>
+          <!-- 公告入口:有公告时显示,点击重新弹出公告弹窗(放在推广中心后面) -->
+          <button v-if="hasNotice" @click="openNotice" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition inline-flex items-center gap-1 cursor-pointer">
+            📢 <span class="underline underline-offset-2">{{ t('nav.brandBar.notice') }}</span>
+          </button>
           <RouterLink v-if="settings.config?.subsite_enabled" to="/my-subsite" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.mySubsite') }}</RouterLink>
           <span class="px-2 text-ink-muted">|</span>
           <RouterLink to="/user" class="px-3 py-1.5 rounded-field text-ink font-medium hover:text-primary hover:bg-primary-light transition">
@@ -143,6 +143,7 @@ const mobileMenuOpen = ref(false)
         <RouterLink to="/user" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink font-medium hover:bg-primary-light transition text-sm">👤 {{ authStore.user?.username }}</RouterLink>
         <RouterLink to="/orders/mine" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">{{ t('nav.mine') }}</RouterLink>
         <RouterLink v-if="settings.config?.distribution_enabled" to="/distribution" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">{{ t('nav.distribution') }}</RouterLink>
+        <button v-if="hasNotice" @click="openNotice(); mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">📢 {{ t('nav.brandBar.notice') }}</button>
         <RouterLink v-if="settings.config?.subsite_enabled" to="/my-subsite" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">{{ t('nav.mySubsite') }}</RouterLink>
         <button @click="logout(); mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-field text-ink-soft hover:text-danger hover:bg-red-50 transition text-sm">{{ t('nav.logout') }}</button>
       </template>

@@ -40,6 +40,12 @@
             <ElFormItem :label="t('zcard.setting.footerHelpLinks')">
               <ElInput v-model="form.footerHelpLinksJson" type="textarea" :rows="4" placeholder="JSON" />
               <span class="form-tip">{{ t('zcard.setting.footerHelpLinksTip') }}</span>
+              <div class="mt-2 flex items-center gap-2">
+                <ElButton size="small" type="primary" plain @click="form.footerHelpLinksJson = DEMO_HELP_LINKS_JSON">
+                  {{ t('zcard.setting.footerHelpLinksFillDemo') }}
+                </ElButton>
+                <span class="form-tip">{{ t('zcard.setting.footerHelpLinksDemoTitle') }}</span>
+              </div>
             </ElFormItem>
             <ElFormItem :label="t('zcard.setting.footerAnalytics')">
               <ElInput v-model="form.footer_analytics" type="textarea" :rows="5" :placeholder="t('zcard.setting.footerAnalyticsPlaceholder')" />
@@ -434,6 +440,16 @@
   defineOptions({ name: 'SettingIndex' })
 
   const { t } = useI18n()
+
+  /**
+   * 帮助中心演示示例:含中英双语 title_en(前台英文界面时显示,缺省回退 title)。
+   * 「填入示例」按钮点击后填充到 footerHelpLinksJson 输入框。
+   */
+  const DEMO_HELP_LINKS_JSON = JSON.stringify([
+    { title: '常见问题', title_en: 'FAQ', url: '/orders/query' },
+    { title: '购买须知', title_en: 'Purchase Guide', url: '' },
+    { title: '售后服务', title_en: 'After-Sales', url: '' },
+  ], null, 2)
 
   const activeTab = ref<'site' | 'footer' | 'display' | 'featured' | 'trade' | 'security' | 'system' | 'mail' | 'sms' | 'cash' | 'locale' | 'distribution' | 'supply'>('site')
 

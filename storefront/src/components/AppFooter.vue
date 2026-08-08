@@ -3,7 +3,7 @@ import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const settings = useSettingsStore()
 // 确保配置已加载(页脚为全局组件,兜底加载避免直达子页时 config 为 null)
 onMounted(() => {
@@ -19,6 +19,12 @@ const links = computed(() => cfg.value?.footer_links || [])
 const helpLinks = computed(() => cfg.value?.footer_help_links || [])
 const contacts = computed(() => cfg.value?.footer_contact || [])
 const copyright = computed(() => cfg.value?.footer_copyright || `© ${new Date().getFullYear()} ${siteName.value}`)
+
+/** 帮助中心链接标题多语言:英文界面优先 title_en,缺省回退 title(兼容旧数据) */
+const helpTitle = (h: { title?: string; title_en?: string }) => {
+  if (!h) return ''
+  return locale.value === 'en' ? (h.title_en || h.title || '') : (h.title || '')
+}
 
 /** 底部固定入口:GitHub 仓库 + 群组(新窗口打开) */
 const GITHUB_URL = 'https://github.com/NovaWorks/ZCard'
@@ -151,8 +157,8 @@ function isExternal(url: string) {
               <router-link to="/orders/query" class="text-xs text-ink-soft hover:text-primary transition">{{ t('nav.orders') }}</router-link>
             </li>
             <li v-for="h in helpLinks" :key="h.title">
-              <router-link v-if="h.url" :to="h.url" class="text-xs text-ink-soft hover:text-primary transition">{{ h.title }}</router-link>
-              <span v-else class="text-xs text-ink-soft">{{ h.title }}</span>
+              <router-link v-if="h.url" :to="h.url" class="text-xs text-ink-soft hover:text-primary transition">{{ helpTitle(h) }}</router-link>
+              <span v-else class="text-xs text-ink-soft">{{ helpTitle(h) }}</span>
             </li>
           </ul>
         </div>
