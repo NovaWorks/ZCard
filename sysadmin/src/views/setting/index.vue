@@ -46,6 +46,16 @@
                 </ElButton>
                 <span class="form-tip">{{ t('zcard.setting.footerHelpLinksDemoTitle') }}</span>
               </div>
+              <!-- 中英文双语预览:实时解析当前 JSON,展示两种语言下的页脚效果 -->
+              <div v-if="helpLinksPreview.length" class="mt-2 help-links-preview">
+                <div class="preview-title">{{ t('zcard.setting.footerHelpLinksPreview') }}</div>
+                <div v-for="(h, idx) in helpLinksPreview" :key="idx" class="preview-row">
+                  <span class="preview-lang">{{ t('zcard.setting.langZh') }}</span>
+                  <span class="preview-item">{{ h.title || '-' }}</span>
+                  <span class="preview-lang">{{ t('zcard.setting.langEn') }}</span>
+                  <span class="preview-item">{{ h.title_en || h.title || '-' }}</span>
+                </div>
+              </div>
             </ElFormItem>
             <ElFormItem :label="t('zcard.setting.footerAnalytics')">
               <ElInput v-model="form.footer_analytics" type="textarea" :rows="5" :placeholder="t('zcard.setting.footerAnalyticsPlaceholder')" />
@@ -679,6 +689,15 @@
     return '[]'
   }
 
+  /** 帮助中心双语预览:解析当前 JSON,返回 [{title, title_en}] 列表(无效 JSON 返回空) */
+  const helpLinksPreview = computed(() => {
+    const arr = parseArr(form.footerHelpLinksJson)
+    if (!Array.isArray(arr)) return []
+    return arr
+      .filter((h) => h && typeof h === 'object')
+      .map((h) => ({ title: h.title || '', title_en: h.title_en || '' }))
+  })
+
   const parseArr = (text: string): any[] | null => {
     // 1. 标准 JSON 数组
     try {
@@ -892,6 +911,41 @@
       max-height: calc(100vh - 280px);
       overflow-y: auto;
       padding-right: 4px;
+    }
+  }
+
+  /* 帮助中心双语预览 */
+  .help-links-preview {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: 1px dashed var(--el-border-color);
+    border-radius: 6px;
+    background: var(--el-fill-color-lighter);
+
+    .preview-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+      margin-bottom: 6px;
+    }
+
+    .preview-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 2px 0;
+      font-size: 12px;
+
+      .preview-lang {
+        flex-shrink: 0;
+        color: var(--el-color-primary);
+        font-weight: 500;
+        width: 52px;
+      }
+
+      .preview-item {
+        color: var(--el-text-color-regular);
+      }
     }
   }
 
