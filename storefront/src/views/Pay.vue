@@ -135,9 +135,17 @@ function startPolling() {
   if (pollTimer) return
   pollTimer = setInterval(async () => {
     try {
-      const { queryOrders } = await import('@/api/orders')
-      const list = await queryOrders(orderNo)
-      const found = Array.isArray(list) ? list.find(o => o.order_no === orderNo) : null
+      // 登录用户优先走 /orders/mine(不受「查询密码」过滤,否则设了密码的订单永远查不到)
+      const { queryOrders, getMyOrders } = await import('@/api/orders')
+      let found: { order_no: string; status: string } | null = null
+      if (localStorage.getItem('zcard_token')) {
+        const mine = await getMyOrders()
+        found = Array.isArray(mine) ? mine.find(o => o.order_no === orderNo) ?? null : null
+      }
+      if (!found) {
+        const list = await queryOrders(orderNo)
+        found = Array.isArray(list) ? list.find(o => o.order_no === orderNo) ?? null : null
+      }
       if (found?.status === 'paid') {
         stopPolling()
         router.push('/pay/result?order_no=' + orderNo)

@@ -312,7 +312,7 @@
       "amountLabel": "金额",
       "cardsTitle": "您的卡密({n})",
       "processingWithNo": "订单 {no} 正在确认，",
-      "processingWithNoNext": "请稍后在订单查询页查看结果",
+      "processingWithNoNext": "请稍后在订单查询页查看结果(若设置了查询密码,请在订单查询页输入密码查询)",
       "processingNoNo": "请稍后在订单查询页查看支付结果",
       "viewOrderDetail": "查看订单详情",
       "orderQuery": "订单查询",

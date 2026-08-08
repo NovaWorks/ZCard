@@ -312,7 +312,7 @@
       "amountLabel": "Amount",
       "cardsTitle": "Your cards ({n})",
       "processingWithNo": "Order {no} is being confirmed,",
-      "processingWithNoNext": "please check the result on the order tracking page later",
+      "processingWithNoNext": "please check the order tracking page later (enter your query password if set)",
       "processingNoNo": "Please check the payment result on the order tracking page later",
       "viewOrderDetail": "View order details",
       "orderQuery": "Track Order",

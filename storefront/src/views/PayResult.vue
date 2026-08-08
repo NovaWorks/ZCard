@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { queryOrders, type OrderDetail } from '@/api/orders'
+import { queryOrders, getMyOrders, type OrderDetail } from '@/api/orders'
 import { formatMoney } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
 import AppIcon from '@/components/AppIcon.vue'
@@ -18,6 +18,29 @@ const loading = ref(true)
 const order = ref<OrderDetail | null>(null)
 const paid = ref(false)
 
+/**
+ * 查询订单状态。
+ * 登录用户优先走 /orders/mine(按 user_id 查,不受「查询密码」过滤——
+ * 开启 order_query_password 时,queryOrders 不带密码查不到有密码的订单,
+ * 支付成功回跳页就会永远停在"处理中")。
+ * 游客回退订单查询(无密码订单可查)。
+ */
+async function fetchOrderStatus(no: string): Promise<OrderDetail | null> {
+  if (localStorage.getItem('zcard_token')) {
+    try {
+      const mine = await getMyOrders()
+      const found = Array.isArray(mine) ? mine.find(o => o.order_no === no) : null
+      if (found) return found
+    } catch { /* 回退订单查询 */ }
+  }
+  try {
+    const list = await queryOrders(no)
+    return Array.isArray(list) ? list.find(o => o.order_no === no) ?? null : null
+  } catch {
+    return null
+  }
+}
+
 onMounted(async () => {
   // 取消支付,无需查询
   if (isCancel.value) {
@@ -29,21 +52,17 @@ onMounted(async () => {
     loading.value = false
     return
   }
-  // 轮询订单状态(异步回调可能有延迟,最多查 5 次)
-  for (let i = 0; i < 5; i++) {
-    try {
-      const list = await queryOrders(orderNo.value)
-      const found = Array.isArray(list) ? list.find(o => o.order_no === orderNo.value) : null
-      if (found) {
-        order.value = found
-        if (found.status === 'paid') {
-          paid.value = true
-          break
-        }
+  // 持续轮询订单状态(第三方异步回调可能延迟,最多 20 次 × 2s ≈ 40 秒)
+  for (let i = 0; i < 20; i++) {
+    const found = await fetchOrderStatus(orderNo.value)
+    if (found) {
+      order.value = found
+      if (found.status === 'paid') {
+        paid.value = true
+        break
       }
-    } catch { /* 忽略,继续轮询 */ }
-    // 未支付,等 1.5s 再查
-    if (i < 4) await new Promise(r => setTimeout(r, 1500))
+    }
+    if (i < 19) await new Promise(r => setTimeout(r, 2000))
   }
   loading.value = false
 })
