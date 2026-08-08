@@ -487,7 +487,7 @@
                 size="small"
                 :title="t('zcard.media.rename')"
                 @click="openRenameCategory(cat.id, cat.name)"
-                >✏</ElButton
+                ><ArtSvgIcon icon="ri:edit-line" /></ElButton
               >
               <ElButton
                 text
@@ -495,7 +495,7 @@
                 size="small"
                 :title="t('zcard.common.delete')"
                 @click="handleDeleteCategory(cat.id)"
-                >🗑</ElButton
+                ><ArtSvgIcon icon="ri:delete-bin-5-line" /></ElButton
               >
             </span>
           </li>
@@ -514,12 +514,12 @@
             @clear="handleSearch"
             @keyup.enter="handleSearch"
           >
-            <template #prefix>🔍</template>
+            <template #prefix><ArtSvgIcon icon="ri:search-line" /></template>
           </ElInput>
           <ElButton type="primary" @click="openFilePicker"
-            >📤 {{ t('zcard.media.upload') }}</ElButton
+            ><ArtSvgIcon icon="ri:export-line" /> {{ t('zcard.media.upload') }}</ElButton
           >
-          <ElButton @click="refresh">🔄 {{ t('zcard.media.refresh') }}</ElButton>
+          <ElButton @click="refresh"><ArtSvgIcon icon="ri:refresh-line" /> {{ t('zcard.media.refresh') }}</ElButton>
           <ElSelect v-model="sortField" class="sort-select" @change="handleSortChange">
             <ElOption :label="t('zcard.media.sortCreatedAt')" value="created_at" />
             <ElOption :label="t('zcard.media.sortFilename')" value="filename" />
@@ -580,14 +580,14 @@
                     size="small"
                     :title="t('zcard.media.preview')"
                     @click="openPreview(index)"
-                    >👁</ElButton
+                    ><ArtSvgIcon icon="ri:eye-line" /></ElButton
                   >
                   <ElButton
                     circle
                     size="small"
                     :title="t('zcard.media.copyLink')"
                     @click="copyLink(item.url)"
-                    >🔗</ElButton
+                    ><ArtSvgIcon icon="ri:link" /></ElButton
                   >
                 </div>
               </div>
@@ -599,9 +599,9 @@
                 </div>
                 <!-- 底部操作栏(常驻,所有模式:复制/下载/移动/删除) -->
                 <div class="card-op-actions" @click.stop>
-                  <ElButton text size="small" @click="copyLink(item.url)">🔗</ElButton>
-                  <ElButton text size="small" @click="downloadFile(item)">⬇</ElButton>
-                  <ElButton text size="small" @click="openMoveTarget([item.id])">📁</ElButton>
+                  <ElButton text size="small" @click="copyLink(item.url)"><ArtSvgIcon icon="ri:link" /></ElButton>
+                  <ElButton text size="small" @click="downloadFile(item)"><ArtSvgIcon icon="ri:download-line" /></ElButton>
+                  <ElButton text size="small" @click="openMoveTarget([item.id])"><ArtSvgIcon icon="ri:folder-2-line" /></ElButton>
                   <ElButton text type="danger" size="small" @click="handleDelete(item)">
                     {{ t('zcard.media.delete') }}
                   </ElButton>
@@ -710,7 +710,7 @@
           :limit="20"
         >
           <div class="upload-inner">
-            <div class="upload-icon">📤</div>
+            <div class="upload-icon"><ArtSvgIcon icon="ri:export-line" /></div>
             <div class="upload-text">{{ t('zcard.media.dragTip') }}</div>
             <div class="upload-sub">{{ t('zcard.media.clickUpload') }}</div>
             <div class="upload-formats">JPG / PNG / WEBP / GIF / SVG</div>

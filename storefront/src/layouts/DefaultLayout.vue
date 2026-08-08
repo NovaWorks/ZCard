@@ -7,6 +7,7 @@ import NoticeModal from '@/components/NoticeModal.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { getStorefrontSettings } from '@/api/settings'
 import { on as onEvent } from '@/utils/eventBus'
+import AppIcon from '@/components/AppIcon.vue'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -58,7 +59,7 @@ onMounted(async () => {
   <!-- 维护模式 -->
   <div v-if="maintenanceMode" class="min-h-screen flex items-center justify-center bg-surface-subtle">
     <div class="bg-white rounded-card border border-border p-10 shadow-card text-center max-w-md">
-      <div class="text-6xl mb-4">🔧</div>
+      <div class="text-6xl mb-4 inline-flex"><AppIcon name="ri:tools-line" class="w-16 h-16" /></div>
       <h1 class="text-xl font-bold text-ink mb-2">{{ t('layout.maintenanceTitle') }}</h1>
       <p class="text-sm text-ink-muted">{{ maintenanceMessage }}</p>
     </div>

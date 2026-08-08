@@ -11,6 +11,7 @@ import { formatMoney } from '@/utils/money'
 import { calcChannelFee } from '@/utils/fee'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useCartStore, type CartItem } from '@/stores/cart'
+import AppIcon from '@/components/AppIcon.vue'
 
 interface ControlField {
   type: string; label: string; name: string; required: boolean; options?: string[]
@@ -368,17 +369,17 @@ function doSubmitConfirmed() {
 
 /** 支付方式标识 → 展示信息(图标/名称)。参考 dujiao-next/acg-faka 收银台:显示具体支付方式而非通道名 */
 const PAY_TYPE_META: Record<string, { icon: string; label: string }> = {
-  alipay: { icon: '💰', label: '支付宝' },
-  wechat: { icon: '💚', label: '微信支付' },
-  wxpay: { icon: '💚', label: '微信支付' },
-  qqpay: { icon: '🐧', label: 'QQ 钱包' },
-  bank: { icon: '🏦', label: '云闪付 / 网银' },
-  jdpay: { icon: '🛒', label: '京东支付' },
-  paypal: { icon: '🅿️', label: 'PayPal' },
-  stripe: { icon: '💳', label: 'Stripe' },
-  usdt: { icon: '₮', label: 'USDT' },
-  tron: { icon: '₮', label: 'TRON' },
-  trx: { icon: '₮', label: 'TRX' },
+  alipay: { icon: 'ri:alipay-line', label: '支付宝' },
+  wechat: { icon: 'ri:wechat-line', label: '微信支付' },
+  wxpay: { icon: 'ri:wechat-line', label: '微信支付' },
+  qqpay: { icon: 'ri:qq-line', label: 'QQ 钱包' },
+  bank: { icon: 'ri:bank-line', label: '云闪付 / 网银' },
+  jdpay: { icon: 'ri:shopping-bag-line', label: '京东支付' },
+  paypal: { icon: 'ri:paypal-line', label: 'PayPal' },
+  stripe: { icon: 'ri:bank-card-2-line', label: 'Stripe' },
+  usdt: { icon: 'ri:coins-line', label: 'USDT' },
+  tron: { icon: 'ri:coins-line', label: 'TRON' },
+  trx: { icon: 'ri:coins-line', label: 'TRX' },
 }
 
 /** 通道对应的支付方式列表(带图标与名称);无 pay_types 时回退到通道自身 */
@@ -387,11 +388,11 @@ const channelPayTypes = (ch: PaymentChannel) => {
   if (types.length) {
     return types.map((t) => ({
       type: t,
-      icon: PAY_TYPE_META[t]?.icon || ch.icon || '💳',
+      icon: PAY_TYPE_META[t]?.icon || ch.icon || 'ri:bank-card-2-line',
       label: PAY_TYPE_META[t]?.label || t,
     }))
   }
-  return [{ type: ch.code, icon: ch.icon || '💳', label: channelLabel(ch) }]
+  return [{ type: ch.code, icon: ch.icon || 'ri:bank-card-2-line', label: channelLabel(ch) }]
 }
 </script>
 
@@ -411,7 +412,7 @@ const channelPayTypes = (ch: PaymentChannel) => {
       <div class="lg:col-span-2 space-y-3">
         <!-- 空购物车 -->
         <div v-if="!items.length" class="bg-white rounded-card border border-border p-16 text-center">
-          <div class="text-5xl mb-3 opacity-40">🛒</div>
+          <div class="text-5xl mb-3 opacity-40"><AppIcon name="ri:shopping-cart-2-line" class="w-12 h-12" /></div>
           <p class="text-sm text-ink-muted mb-4">{{ t('order.checkout.cartEmpty') }}</p>
           <router-link to="/" class="inline-block px-5 py-2 rounded-field bg-primary text-white text-sm font-medium hover:bg-primary-hover transition">{{ t('order.checkout.continueShopping') }}</router-link>
         </div>
@@ -440,7 +441,7 @@ const channelPayTypes = (ch: PaymentChannel) => {
             <div class="text-sm font-bold text-ink">{{ formatMoney(it.price_display * it.qty, displayCur) }}</div>
             <div class="text-[10px] text-ink-muted">{{ t('order.checkout.lineTotal') }}</div>
           </div>
-          <button @click="removeItem(idx)" class="shrink-0 w-7 h-7 rounded-full text-ink-muted hover:text-danger hover:bg-red-50 transition" :title="t('common.remove')">✕</button>
+          <button @click="removeItem(idx)" class="shrink-0 w-7 h-7 rounded-full text-ink-muted hover:text-danger hover:bg-red-50 transition inline-flex items-center justify-center" :title="t('common.remove')"><AppIcon name="ri:close-line" class="w-4 h-4" /></button>
         </div>
 
         <!-- 单品模式:SKU 选择(仅单商品;靓号自选无 SKU) -->
@@ -539,7 +540,7 @@ const channelPayTypes = (ch: PaymentChannel) => {
                 <span class="flex items-center gap-2 shrink-0">
                   <template v-for="pt in channelPayTypes(ch)" :key="pt.type">
                     <span class="w-8 h-8 rounded-lg bg-surface-subtle flex items-center justify-center text-lg">
-                      {{ pt.icon }}
+                      <AppIcon :name="pt.icon" class="w-4.5 h-4.5" />
                     </span>
                   </template>
                 </span>

@@ -214,7 +214,7 @@
                 <span v-else class="encrypt-hint">{{ t('zcard.setting.cardEncryptionOffTip') }}</span>
               </div>
               <div v-if="encryptionRiskCards > 0" class="encrypt-risk">
-                ⚠️ {{ t('zcard.setting.cardEncryptionRisk', { n: encryptionRiskCards }) }}
+                <ArtSvgIcon icon="ri:alert-line" /> {{ t('zcard.setting.cardEncryptionRisk', { n: encryptionRiskCards }) }}
               </div>
             </ElFormItem>
             <ElFormItem v-if="form.card_encryption_enabled" :label="t('zcard.setting.cardEncryptionKey')">

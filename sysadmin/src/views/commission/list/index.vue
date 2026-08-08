@@ -30,9 +30,9 @@ const stats = ref<CommissionStats>({
 })
 
 const statCards = computed(() => [
-  { label: t('zcard.commission.statTotal'), value: stats.value.total_amount, icon: '💰', color: '#67c23a', isAmount: true },
-  { label: t('zcard.commission.statCount'), value: stats.value.total_count, icon: '📦', color: '#909399', isAmount: false },
-  { label: t('zcard.commission.statAvailable'), value: stats.value.available_amount, icon: '🏦', color: '#409eff', isAmount: true },
+  { label: t('zcard.commission.statTotal'), value: stats.value.total_amount, icon: 'ri:money-cny-circle-line', color: '#67c23a', isAmount: true },
+  { label: t('zcard.commission.statCount'), value: stats.value.total_count, icon: 'ri:archive-line', color: '#909399', isAmount: false },
+  { label: t('zcard.commission.statAvailable'), value: stats.value.available_amount, icon: 'ri:bank-line', color: '#409eff', isAmount: true },
 ])
 
 const formatAmount = (fen: number) => (Number(fen || 0) / 100).toFixed(2)
@@ -95,7 +95,7 @@ onMounted(fetchData)
     <!-- 统计卡片 -->
     <div class="stats-grid">
       <div v-for="card in statCards" :key="card.label" class="stat-card" :style="{ '--accent': card.color }">
-        <div class="stat-icon">{{ card.icon }}</div>
+        <div class="stat-icon"><ArtSvgIcon :icon="card.icon" /></div>
         <div class="stat-body">
           <div class="stat-label">{{ card.label }}</div>
           <div class="stat-value">{{ card.isAmount ? '¥' + formatAmount(card.value) : formatCount(card.value) }}</div>

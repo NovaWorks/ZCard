@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { usePreferencesStore } from '@/stores/preferences'
+import AppIcon from '@/components/AppIcon.vue'
 import { formatMoney } from '@/utils/money'
 import { createRecharge, getRechargeHistory, type RechargeRecord } from '@/api/recharge'
 
@@ -121,7 +122,7 @@ onMounted(() => {
             ? 'border-primary ring-2 ring-primary/20 bg-primary-light'
             : 'border-border hover:border-primary'"
         >
-          <div class="text-2xl">💳</div>
+          <div class="text-2xl"><AppIcon name="ri:bank-card-line" class="w-7 h-7" /></div>
           <div class="text-sm font-semibold text-ink mt-1">{{ t('recharge.targetBalance') }}</div>
           <div class="text-[11px] text-ink-muted mt-0.5">{{ t('recharge.targetBalanceTip') }}</div>
         </button>
@@ -133,7 +134,7 @@ onMounted(() => {
             ? 'border-primary ring-2 ring-primary/20 bg-primary-light'
             : 'border-border hover:border-primary'"
         >
-          <div class="text-2xl">🔗</div>
+          <div class="text-2xl"><AppIcon name="ri:link" class="w-7 h-7" /></div>
           <div class="text-sm font-semibold text-ink mt-1">{{ t('recharge.targetSupply') }}</div>
           <div class="text-[11px] text-ink-muted mt-0.5">{{ t('recharge.targetSupplyTip') }}</div>
         </button>

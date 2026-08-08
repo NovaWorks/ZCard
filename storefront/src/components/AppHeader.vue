@@ -7,6 +7,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useCartStore } from '@/stores/cart'
 import { emit } from '@/utils/eventBus'
+import AppIcon from '@/components/AppIcon.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -83,7 +84,7 @@ const mobileMenuOpen = ref(false)
         <RouterLink to="/orders/query" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.orders') }}</RouterLink>
         <!-- 购物车入口(角标显示数量) -->
         <RouterLink to="/checkout?cart=1" class="relative px-2 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">
-          🛒
+          <AppIcon name="ri:shopping-cart-2-line" class="w-5 h-5" />
           <span
             v-if="cart.totalQty > 0"
             class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center"
@@ -94,12 +95,12 @@ const mobileMenuOpen = ref(false)
           <RouterLink v-if="settings.config?.distribution_enabled" to="/distribution" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.distribution') }}</RouterLink>
           <!-- 公告入口:有公告时显示,点击重新弹出公告弹窗(放在推广中心后面) -->
           <button v-if="hasNotice" @click="openNotice" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition inline-flex items-center gap-1 cursor-pointer">
-            📢 <span class="underline underline-offset-2">{{ t('nav.brandBar.notice') }}</span>
+            <AppIcon name="ri:megaphone-line" class="w-4 h-4" /> <span class="underline underline-offset-2">{{ t('nav.brandBar.notice') }}</span>
           </button>
           <RouterLink v-if="settings.config?.subsite_enabled" to="/my-subsite" class="px-3 py-1.5 rounded-field text-ink-soft hover:text-primary hover:bg-primary-light transition">{{ t('nav.mySubsite') }}</RouterLink>
           <span class="px-2 text-ink-muted">|</span>
-          <RouterLink to="/user" class="px-3 py-1.5 rounded-field text-ink font-medium hover:text-primary hover:bg-primary-light transition">
-            👤 {{ authStore.user?.username }}
+          <RouterLink to="/user" class="px-3 py-1.5 rounded-field text-ink font-medium hover:text-primary hover:bg-primary-light transition inline-flex items-center gap-1">
+            <AppIcon name="ri:user-3-line" class="w-4 h-4" /> {{ authStore.user?.username }}
           </RouterLink>
           <button @click="logout" class="ml-1 px-3 py-1.5 rounded-field text-ink-soft hover:text-danger hover:bg-red-50 transition">{{ t('nav.logout') }}</button>
         </template>
@@ -136,14 +137,14 @@ const mobileMenuOpen = ref(false)
     <div v-if="mobileMenuOpen" class="md:hidden border-t border-border bg-white px-4 py-3 space-y-2">
       <RouterLink to="/" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">{{ t('nav.home') }}</RouterLink>
       <RouterLink to="/orders/query" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">{{ t('nav.orders') }}</RouterLink>
-      <RouterLink to="/checkout?cart=1" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">
-        🛒 {{ t('nav.cart') }}<span v-if="cart.totalQty > 0" class="text-danger font-bold"> ({{ cart.totalQty }})</span>
+      <RouterLink to="/checkout?cart=1" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm inline-flex items-center gap-1.5">
+        <AppIcon name="ri:shopping-cart-2-line" class="w-4 h-4" /> {{ t('nav.cart') }}<span v-if="cart.totalQty > 0" class="text-danger font-bold"> ({{ cart.totalQty }})</span>
       </RouterLink>
       <template v-if="authStore.isLoggedIn">
-        <RouterLink to="/user" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink font-medium hover:bg-primary-light transition text-sm">👤 {{ authStore.user?.username }}</RouterLink>
+        <RouterLink to="/user" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink font-medium hover:bg-primary-light transition text-sm inline-flex items-center gap-1.5"><AppIcon name="ri:user-3-line" class="w-4 h-4" /> {{ authStore.user?.username }}</RouterLink>
         <RouterLink to="/orders/mine" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">{{ t('nav.mine') }}</RouterLink>
         <RouterLink v-if="settings.config?.distribution_enabled" to="/distribution" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">{{ t('nav.distribution') }}</RouterLink>
-        <button v-if="hasNotice" @click="openNotice(); mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">📢 {{ t('nav.brandBar.notice') }}</button>
+        <button v-if="hasNotice" @click="openNotice(); mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm inline-flex items-center gap-1.5"><AppIcon name="ri:megaphone-line" class="w-4 h-4" /> {{ t('nav.brandBar.notice') }}</button>
         <RouterLink v-if="settings.config?.subsite_enabled" to="/my-subsite" @click="mobileMenuOpen = false" class="block px-3 py-2 rounded-field text-ink-soft hover:bg-primary-light transition text-sm">{{ t('nav.mySubsite') }}</RouterLink>
         <button @click="logout(); mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-field text-ink-soft hover:text-danger hover:bg-red-50 transition text-sm">{{ t('nav.logout') }}</button>
       </template>

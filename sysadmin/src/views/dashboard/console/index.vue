@@ -26,7 +26,7 @@
         class="kpi-card"
         :style="{ '--accent': card.color }"
       >
-        <div class="kpi-icon">{{ card.icon }}</div>
+        <div class="kpi-icon"><ArtSvgIcon :icon="card.icon" /></div>
         <div class="kpi-body">
           <div class="kpi-label">{{ t(card.label) }}</div>
           <div class="kpi-value">{{ formatValue(card) }}</div>
@@ -123,7 +123,7 @@
         </template>
         <div class="alert-list">
           <div class="alert-item alert-warn" @click="goProducts">
-            <div class="alert-icon">📦</div>
+            <div class="alert-icon"><ArtSvgIcon icon="ri:archive-line" /></div>
             <div class="alert-body">
               <div class="alert-title">
                 {{ t('zcard.dashboard.statLowStock') }}：
@@ -136,7 +136,7 @@
           </div>
 
           <div class="alert-item alert-danger" @click="goWithdrawals">
-            <div class="alert-icon">💸</div>
+            <div class="alert-icon"><ArtSvgIcon icon="ri:money-dollar-circle-line" /></div>
             <div class="alert-body">
               <div class="alert-title">
                 {{ t('zcard.dashboard.statPendingWithdrawals') }}：
@@ -149,7 +149,7 @@
           </div>
 
           <div class="alert-item alert-pending">
-            <div class="alert-icon">⏳</div>
+            <div class="alert-icon"><ArtSvgIcon icon="ri:time-line" /></div>
             <div class="alert-body">
               <div class="alert-title">
                 {{ t('zcard.dashboard.statPendingAmount') }}：
@@ -234,7 +234,7 @@ const statCards = computed<StatCard[]>(() => {
       label: 'zcard.dashboard.statPaidOrders',
       value: o?.paid_orders,
       sub: subOrders,
-      icon: '🧾',
+      icon: 'ri:bill-line',
       color: '#409eff',
     },
     {
@@ -242,7 +242,7 @@ const statCards = computed<StatCard[]>(() => {
       label: 'zcard.dashboard.statPaidAmount',
       value: o?.paid_amount,
       sub: subProfit,
-      icon: '💰',
+      icon: 'ri:money-cny-circle-line',
       color: '#67c23a',
       isAmount: true,
     },
@@ -251,7 +251,7 @@ const statCards = computed<StatCard[]>(() => {
       label: 'zcard.dashboard.statProfitMargin',
       value: o?.profit_margin,
       sub: subCost,
-      icon: '📈',
+      icon: 'ri:line-chart-line',
       color: '#16a34a',
       isPercent: true,
       decimals: 1,
@@ -261,7 +261,7 @@ const statCards = computed<StatCard[]>(() => {
       label: 'zcard.dashboard.statPaymentRate',
       value: o?.payment_rate,
       sub: subPayRate,
-      icon: '✅',
+      icon: 'ri:checkbox-circle-line',
       color: '#0ea5e9',
       isPercent: true,
       decimals: 1,
@@ -271,7 +271,7 @@ const statCards = computed<StatCard[]>(() => {
       label: 'zcard.dashboard.statPendingAmount',
       value: o?.pending_amount,
       sub: subPending,
-      icon: '⏳',
+      icon: 'ri:time-line',
       color: '#e6a23c',
       isAmount: true,
     },
@@ -280,7 +280,7 @@ const statCards = computed<StatCard[]>(() => {
       label: 'zcard.dashboard.statNewUsers',
       value: o?.new_users,
       sub: subNewUser,
-      icon: '👤',
+      icon: 'ri:user-3-line',
       color: '#9254de',
     },
     {
@@ -288,7 +288,7 @@ const statCards = computed<StatCard[]>(() => {
       label: 'zcard.dashboard.statStock',
       value: o?.total_stock,
       sub: subStock,
-      icon: '📦',
+      icon: 'ri:archive-line',
       color: '#14b8a6',
     },
     {
@@ -296,7 +296,7 @@ const statCards = computed<StatCard[]>(() => {
       label: 'zcard.dashboard.statPendingWithdrawals',
       value: o?.pending_withdrawals,
       sub: t('zcard.dashboard.pendingWithdrawalsTip'),
-      icon: '💸',
+      icon: 'ri:money-dollar-circle-line',
       color: '#f56c6c',
     },
   ]

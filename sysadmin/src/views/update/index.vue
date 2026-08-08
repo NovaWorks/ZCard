@@ -92,10 +92,10 @@ const handleCheck = async () => {
         </div>
       `
       ElMessageBox({
-        title: `🚀 ${t('zcard.update.hasUpdate')}`,
+        title: ` ${t('zcard.update.hasUpdate')}`,
         message: msgHtml,
         dangerouslyUseHTMLString: true,
-        confirmButtonText: `⬆️ ${t('zcard.update.runUpdate')}`,
+        confirmButtonText: ` ${t('zcard.update.runUpdate')}`,
         cancelButtonText: t('zcard.common.cancel'),
         confirmButtonClass: 'el-button--success',
         type: 'success',
@@ -188,14 +188,14 @@ onMounted(() => {
   <div class="update-page art-full-height">
     <!-- ========== Section 1: 当前版本状态卡 ========== -->
     <div class="status-hero" v-loading="checking">
-      <div class="hero-bg-icon">📦</div>
+      <div class="hero-bg-icon"><ArtSvgIcon icon="ri:archive-line" /></div>
       <div class="hero-content">
         <div class="hero-version-row">
           <div class="hero-version-box">
             <div class="hero-version-label">{{ t('zcard.update.currentVersion') }}</div>
             <div class="hero-version-num current">v{{ checkResult?.current_version || '...' }}</div>
             <ElButton text type="primary" size="small" round class="hero-view-notes" @click="openCurrentVersion">
-              📄 {{ t('zcard.update.viewCurrentNotes') }}
+              <ArtSvgIcon icon="ri:file-text-line" /> {{ t('zcard.update.viewCurrentNotes') }}
             </ElButton>
           </div>
           <div class="hero-arrow" v-if="checkResult?.has_update">→</div>
@@ -207,20 +207,20 @@ onMounted(() => {
 
         <div class="hero-actions">
           <ElTag v-if="checkResult && !checkResult.has_update" type="success" size="large" effect="dark" round>
-            ✅ {{ t('zcard.update.noUpdate') }}
+            <ArtSvgIcon icon="ri:checkbox-circle-line" /> {{ t('zcard.update.noUpdate') }}
           </ElTag>
           <ElTag v-if="checkResult?.has_update" type="warning" size="large" effect="dark" round>
-            🆕 {{ t('zcard.update.hasUpdate') }}
+            <ArtSvgIcon icon="ri:sparkling-line" /> {{ t('zcard.update.hasUpdate') }}
           </ElTag>
 
           <ElButton type="primary" plain :loading="checking" @click="handleCheck" round>
-            🔄 {{ t('zcard.update.checkUpdate') }}
+            <ArtSvgIcon icon="ri:refresh-line" /> {{ t('zcard.update.checkUpdate') }}
           </ElButton>
           <ElButton v-if="checkResult?.has_update" type="success" :loading="updating" @click="performUpdate" round>
-            ⬆️ {{ t('zcard.update.runUpdate') }}
+            <ArtSvgIcon icon="ri:arrow-up-line" /> {{ t('zcard.update.runUpdate') }}
           </ElButton>
           <ElButton v-if="checkResult?.release_url" tag="a" :href="checkResult.release_url" target="_blank" round>
-            🔗 GitHub
+            <ArtSvgIcon icon="ri:link" /> GitHub
           </ElButton>
         </div>
 
@@ -234,9 +234,9 @@ onMounted(() => {
     <ElCard class="art-table-card" shadow="never">
       <template #header>
         <div class="card-header">
-          <span class="header-title">📜 {{ t('zcard.update.versionHistory') }}</span>
+          <span class="header-title"><ArtSvgIcon icon="ri:file-history-line" /> {{ t('zcard.update.versionHistory') }}</span>
           <ElButton text type="primary" :loading="versionsLoading" @click="loadVersions">
-            🔄 {{ t('zcard.update.refreshHistory') }}
+            <ArtSvgIcon icon="ri:refresh-line" /> {{ t('zcard.update.refreshHistory') }}
           </ElButton>
         </div>
       </template>
@@ -281,7 +281,7 @@ onMounted(() => {
           <ElTag v-if="versionDetailData.prerelease" type="warning" effect="plain">Pre-release</ElTag>
           <span class="detail-date">{{ formatDate(versionDetailData.published_at) }}</span>
           <ElButton v-if="versionDetailData.url" tag="a" :href="versionDetailData.url" target="_blank" size="small" round>
-            🔗 GitHub
+            <ArtSvgIcon icon="ri:link" /> GitHub
           </ElButton>
         </div>
         <div v-if="versionDetailData.notes" class="markdown-body detail-notes-full" v-html="renderMd(versionDetailData.notes)"></div>
@@ -320,12 +320,12 @@ onMounted(() => {
         </div>
         <div v-if="successResult?.message" class="result-message">{{ successResult.message }}</div>
         <details v-if="successResult?.log" class="log-details">
-          <summary>📋 {{ t('zcard.update.viewLog') }}</summary>
+          <summary><ArtSvgIcon icon="ri:clipboard-line" /> {{ t('zcard.update.viewLog') }}</summary>
           <pre class="log-content">{{ successResult.log }}</pre>
         </details>
       </div>
       <template #footer>
-        <ElButton type="primary" @click="handleRefresh" round>🔄 {{ t('zcard.update.refresh') }}</ElButton>
+        <ElButton type="primary" @click="handleRefresh" round><ArtSvgIcon icon="ri:refresh-line" /> {{ t('zcard.update.refresh') }}</ElButton>
       </template>
     </ElDialog>
 
@@ -336,14 +336,14 @@ onMounted(() => {
         <div v-if="failedResult?.message" class="result-message failed-msg">{{ failedResult.message }}</div>
         <ElAlert :title="t('zcard.update.rollbackHint')" type="warning" :closable="false" show-icon />
         <details v-if="failedResult?.log" class="log-details" open>
-          <summary>📋 {{ t('zcard.update.viewLog') }}</summary>
+          <summary><ArtSvgIcon icon="ri:clipboard-line" /> {{ t('zcard.update.viewLog') }}</summary>
           <pre class="log-content">{{ failedResult.log }}</pre>
         </details>
       </div>
       <template #footer>
         <ElButton @click="failedVisible = false" round>{{ t('zcard.common.cancel') }}</ElButton>
-        <ElButton type="warning" @click="handleRollback" :loading="rollingBack" round>⏪ {{ t('zcard.update.rollback') }}</ElButton>
-        <ElButton type="primary" @click="handleRetry" round>🔄 {{ t('zcard.update.checkUpdate') }}</ElButton>
+        <ElButton type="warning" @click="handleRollback" :loading="rollingBack" round><ArtSvgIcon icon="ri:arrow-go-back-line" /> {{ t('zcard.update.rollback') }}</ElButton>
+        <ElButton type="primary" @click="handleRetry" round><ArtSvgIcon icon="ri:refresh-line" /> {{ t('zcard.update.checkUpdate') }}</ElButton>
       </template>
     </ElDialog>
   </div>

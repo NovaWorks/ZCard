@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { getRechargeStatus } from '@/api/recharge'
 import { formatMoney } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
+import AppIcon from '@/components/AppIcon.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -54,14 +55,14 @@ onMounted(async () => {
     <div class="bg-white rounded-card border border-border p-8 shadow-card text-center">
       <!-- 加载中 -->
       <template v-if="loading">
-        <div class="w-16 h-16 mx-auto bg-primary-light rounded-full flex items-center justify-center text-3xl mb-4 animate-pulse">⏳</div>
+        <div class="w-16 h-16 mx-auto bg-primary-light rounded-full flex items-center justify-center mb-4 animate-pulse"><AppIcon name="ri:time-line" class="w-8 h-8" /></div>
         <h2 class="text-lg font-bold text-ink mb-1">{{ t('recharge.resultConfirming') }}</h2>
         <p class="text-xs text-ink-muted">{{ t('recharge.resultConfirmingHint') }}</p>
       </template>
 
       <!-- 取消 -->
       <template v-else-if="isCancel">
-        <div class="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center text-3xl mb-4">😕</div>
+        <div class="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4"><AppIcon name="ri:emotion-sad-line" class="w-8 h-8" /></div>
         <h2 class="text-lg font-bold text-ink mb-1">{{ t('recharge.resultCancelTitle') }}</h2>
         <p class="text-xs text-ink-muted mb-5">{{ t('recharge.resultCancelHint') }}</p>
         <div class="flex gap-2 justify-center">
@@ -72,7 +73,7 @@ onMounted(async () => {
 
       <!-- 成功 -->
       <template v-else-if="paid">
-        <div class="w-16 h-16 mx-auto bg-green-50 rounded-full flex items-center justify-center text-3xl mb-4">✅</div>
+        <div class="w-16 h-16 mx-auto bg-green-50 rounded-full flex items-center justify-center mb-4"><AppIcon name="ri:checkbox-circle-line" class="w-8 h-8" /></div>
         <h2 class="text-lg font-bold text-ink mb-1">{{ t('recharge.resultSuccessTitle') }}</h2>
         <p class="text-xs text-ink-muted mb-2 font-mono break-all">{{ rechargeNo }}</p>
         <div class="bg-surface-subtle rounded-field p-3 mb-5">
@@ -88,7 +89,7 @@ onMounted(async () => {
 
       <!-- 处理中 -->
       <template v-else>
-        <div class="w-16 h-16 mx-auto bg-amber-50 rounded-full flex items-center justify-center text-3xl mb-4">⏰</div>
+        <div class="w-16 h-16 mx-auto bg-amber-50 rounded-full flex items-center justify-center mb-4"><AppIcon name="ri:time-line" class="w-8 h-8" /></div>
         <h2 class="text-lg font-bold text-ink mb-1">{{ t('recharge.resultProcessingTitle') }}</h2>
         <p class="text-xs text-ink-muted mb-5">{{ t('recharge.resultProcessingHint') }}</p>
         <div class="flex gap-2 justify-center">

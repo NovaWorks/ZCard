@@ -4,7 +4,7 @@
     <!-- 统计卡片 -->
     <div class="stats-grid">
       <div v-for="card in statCards" :key="card.key" class="stat-card" :style="{ '--accent': card.color }">
-        <div class="stat-icon">{{ card.icon }}</div>
+        <div class="stat-icon"><ArtSvgIcon :icon="card.icon" /></div>
         <div class="stat-body">
           <div class="stat-label">{{ t(card.label) }}</div>
           <div class="stat-value">{{ card.isAmount ? '¥' + formatAmount(card.value) : formatCount(card.value) }}</div>
@@ -17,10 +17,10 @@
       <div class="toolbar">
         <div class="toolbar-left">
           <ElButton @click="handleClear" :loading="clearing">
-            <template #icon>🧹</template>{{ t('zcard.order.clearOrders') }}
+            <template #icon><ArtSvgIcon icon="ri:eraser-line" /></template>{{ t('zcard.order.clearOrders') }}
           </ElButton>
           <ElButton type="success" plain @click="handleExport" :loading="exporting">
-            <template #icon>📥</template>{{ t('zcard.order.exportOrders') }}
+            <template #icon><ArtSvgIcon icon="ri:download-line" /></template>{{ t('zcard.order.exportOrders') }}
           </ElButton>
         </div>
         <div class="toolbar-right">
@@ -259,12 +259,12 @@
   })
 
   const statCards = computed(() => [
-    { key: 'count', label: 'zcard.order.statCount', value: stats.value.total_count, icon: '📦', color: '#409eff', isAmount: false },
-    { key: 'pending', label: 'zcard.order.statPending', value: stats.value.pending_amount, icon: '⏳', color: '#e6a23c', isAmount: true },
-    { key: 'total', label: 'zcard.order.statTotal', value: stats.value.total_amount, icon: '💰', color: '#67c23a', isAmount: true },
-    { key: 'paid', label: 'zcard.order.statPaid', value: stats.value.paid_amount, icon: '✅', color: '#67c23a', isAmount: true },
-    { key: 'refunded', label: 'zcard.order.statRefunded', value: stats.value.refunded_amount, icon: '↩️', color: '#f56c6c', isAmount: true },
-    { key: 'cost', label: 'zcard.order.statCost', value: stats.value.total_cost, icon: '📊', color: '#909399', isAmount: true },
+    { key: 'count', label: 'zcard.order.statCount', value: stats.value.total_count, icon: 'ri:archive-line', color: '#409eff', isAmount: false },
+    { key: 'pending', label: 'zcard.order.statPending', value: stats.value.pending_amount, icon: 'ri:time-line', color: '#e6a23c', isAmount: true },
+    { key: 'total', label: 'zcard.order.statTotal', value: stats.value.total_amount, icon: 'ri:money-cny-circle-line', color: '#67c23a', isAmount: true },
+    { key: 'paid', label: 'zcard.order.statPaid', value: stats.value.paid_amount, icon: 'ri:checkbox-circle-line', color: '#67c23a', isAmount: true },
+    { key: 'refunded', label: 'zcard.order.statRefunded', value: stats.value.refunded_amount, icon: 'ri:refund-2-line', color: '#f56c6c', isAmount: true },
+    { key: 'cost', label: 'zcard.order.statCost', value: stats.value.total_cost, icon: 'ri:bar-chart-2-line', color: '#909399', isAmount: true },
   ])
 
   /** 分(整数)→元(2位小数字符串) */

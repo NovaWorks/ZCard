@@ -7,6 +7,7 @@ import { getProductReviews, type ReviewItem } from '@/api/reviews'
 import { useSettingsStore } from '@/stores/settings'
 import { formatMoney } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
+import AppIcon from '@/components/AppIcon.vue'
 import { useCartStore } from '@/stores/cart'
 
 const route = useRoute()
@@ -277,7 +278,7 @@ function buy() {
             <button @click="rotateRight" class="w-8 h-8 rounded-full text-white text-sm hover:bg-white/20 transition" title="旋转 90°">↻</button>
             <button @click="resetTransform" class="w-8 h-8 rounded-full text-white text-xs hover:bg-white/20 transition" title="还原">⟲</button>
           </div>
-          <button @click="closeLightbox" class="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white text-xl hover:bg-white/25 transition flex items-center justify-center z-10" aria-label="关闭">✕</button>
+          <button @click="closeLightbox" class="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white hover:bg-white/25 transition flex items-center justify-center z-10" aria-label="关闭"><AppIcon name="ri:close-line" class="w-5 h-5" /></button>
           <button
             v-if="lightboxImages.length > 1"
             @click="prevImg"
@@ -381,7 +382,7 @@ function buy() {
         <div class="w-full max-w-lg bg-white rounded-card shadow-2xl overflow-hidden">
           <div class="flex items-center justify-between px-5 py-3.5 border-b border-border">
             <h3 class="text-base font-bold text-ink">{{ t('product.premium.pickTitle') }}</h3>
-            <button @click="premiumVisible = false" class="text-ink-muted hover:text-ink transition text-xl leading-none">✕</button>
+            <button @click="premiumVisible = false" class="text-ink-muted hover:text-ink transition inline-flex items-center justify-center"><AppIcon name="ri:close-line" class="w-5 h-5" /></button>
           </div>
           <div class="px-5 py-4 max-h-[50vh] overflow-y-auto">
             <p class="text-xs text-ink-muted mb-3">{{ t('product.premium.pickHint') }}</p>

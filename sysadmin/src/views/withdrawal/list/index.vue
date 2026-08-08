@@ -23,12 +23,12 @@ const { cardRef, tableRef, paginationRef, tableHeight } = useListTableHeight()
 const stats = ref<WithdrawalStats>({ pending_count: 0, approved_count: 0, rejected_count: 0, pending_amount: 0, approved_amount: 0, total_count: 0 })
 
 const statCards = computed(() => [
-  { label: t('zcard.withdrawal.statPending'), value: stats.value.pending_count, icon: '⏳', color: '#e6a23c', isAmount: false },
-  { label: t('zcard.withdrawal.statPendingAmount'), value: stats.value.pending_amount, icon: '💰', color: '#e6a23c', isAmount: true },
-  { label: t('zcard.withdrawal.statApproved'), value: stats.value.approved_count, icon: '✅', color: '#67c23a', isAmount: false },
-  { label: t('zcard.withdrawal.statApprovedAmount'), value: stats.value.approved_amount, icon: '💸', color: '#67c23a', isAmount: true },
-  { label: t('zcard.withdrawal.statRejected'), value: stats.value.rejected_count, icon: '❌', color: '#f56c6c', isAmount: false },
-  { label: t('zcard.withdrawal.statTotal'), value: stats.value.total_count, icon: '📦', color: '#909399', isAmount: false },
+  { label: t('zcard.withdrawal.statPending'), value: stats.value.pending_count, icon: 'ri:time-line', color: '#e6a23c', isAmount: false },
+  { label: t('zcard.withdrawal.statPendingAmount'), value: stats.value.pending_amount, icon: 'ri:money-cny-circle-line', color: '#e6a23c', isAmount: true },
+  { label: t('zcard.withdrawal.statApproved'), value: stats.value.approved_count, icon: 'ri:checkbox-circle-line', color: '#67c23a', isAmount: false },
+  { label: t('zcard.withdrawal.statApprovedAmount'), value: stats.value.approved_amount, icon: 'ri:money-dollar-circle-line', color: '#67c23a', isAmount: true },
+  { label: t('zcard.withdrawal.statRejected'), value: stats.value.rejected_count, icon: 'ri:close-circle-line', color: '#f56c6c', isAmount: false },
+  { label: t('zcard.withdrawal.statTotal'), value: stats.value.total_count, icon: 'ri:archive-line', color: '#909399', isAmount: false },
 ])
 
 const formatAmount = (fen: number) => (Number(fen || 0) / 100).toFixed(2)
@@ -89,7 +89,7 @@ onActivated(fetchData)
   <div class="withdrawal-page art-full-height">
     <div class="stats-grid">
       <div v-for="card in statCards" :key="card.label" class="stat-card" :style="{ '--accent': card.color }">
-        <div class="stat-icon">{{ card.icon }}</div>
+        <div class="stat-icon"><ArtSvgIcon :icon="card.icon" /></div>
         <div class="stat-body">
           <div class="stat-label">{{ card.label }}</div>
           <div class="stat-value">{{ card.isAmount ? '¥' + formatAmount(card.value) : formatCount(card.value) }}</div>

@@ -12,6 +12,7 @@ import ViewSwitcher from '@/components/ViewSwitcher.vue'
 import ProductCard from '@/components/ProductCard.vue'
 import HotTags from '@/components/HotTags.vue'
 import { getCategories, type Category } from '@/api/categories'
+import AppIcon from '@/components/AppIcon.vue'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -91,7 +92,7 @@ function goProduct(p: Product) {
             <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 bg-green-300 rounded-full"></span> {{ t('product.home.heroAfterSales') }}</span>
           </div>
         </div>
-        <div class="hidden md:block text-7xl opacity-30">🛒</div>
+        <div class="hidden md:block text-7xl opacity-30"><AppIcon name="ri:shopping-cart-2-line" class="w-20 h-20" /></div>
       </div>
     </section>
 
@@ -246,7 +247,7 @@ function goProduct(p: Product) {
           </div>
         </div>
         <div v-if="!products.loading && !products.list.length" class="text-center text-ink-muted py-20">
-          <div class="text-5xl mb-3 opacity-40">📦</div>
+          <div class="text-5xl mb-3 opacity-40"><AppIcon name="ri:archive-line" class="w-12 h-12" /></div>
           <div>{{ t('product.home.noProducts') }}</div>
         </div>
       </div>

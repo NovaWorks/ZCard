@@ -20,10 +20,10 @@ const { cardRef, tableRef, paginationRef, tableHeight } = useListTableHeight()
 const stats = ref<CouponStats>({ active_count: 0, used_count: 0, disabled_count: 0, total_count: 0 })
 
 const statCards = computed(() => [
-  { label: t('zcard.coupon.statActive'), value: stats.value.active_count, icon: '🎫', color: '#67c23a' },
-  { label: t('zcard.coupon.statUsed'), value: stats.value.used_count, icon: '✅', color: '#909399' },
-  { label: t('zcard.coupon.statDisabled'), value: stats.value.disabled_count, icon: '🚫', color: '#f56c6c' },
-  { label: t('zcard.coupon.statTotal'), value: stats.value.total_count, icon: '📦', color: '#409eff' },
+  { label: t('zcard.coupon.statActive'), value: stats.value.active_count, icon: 'ri:ticket-2-line', color: '#67c23a' },
+  { label: t('zcard.coupon.statUsed'), value: stats.value.used_count, icon: 'ri:checkbox-circle-line', color: '#909399' },
+  { label: t('zcard.coupon.statDisabled'), value: stats.value.disabled_count, icon: 'ri:forbid-2-line', color: '#f56c6c' },
+  { label: t('zcard.coupon.statTotal'), value: stats.value.total_count, icon: 'ri:archive-line', color: '#409eff' },
 ])
 
 const formatAmount = (fen: number) => (Number(fen || 0) / 100).toFixed(2)
@@ -160,7 +160,7 @@ onActivated(fetchData)
   <div class="coupon-page art-full-height">
     <div class="stats-grid">
       <div v-for="card in statCards" :key="card.label" class="stat-card" :style="{ '--accent': card.color }">
-        <div class="stat-icon">{{ card.icon }}</div>
+        <div class="stat-icon"><ArtSvgIcon :icon="card.icon" /></div>
         <div class="stat-body">
           <div class="stat-label">{{ card.label }}</div>
           <div class="stat-value">{{ card.value }}</div>
@@ -193,9 +193,9 @@ onActivated(fetchData)
             plain
             :disabled="!selectedRows.length"
             @click="handleBatchDelete"
-          >🗑 {{ t('zcard.coupon.batchDelete') }} ({{ selectedRows.length }})</ElButton>
-          <ElButton :loading="exporting" @click="handleExport">📥 {{ t('zcard.coupon.exportFiltered') }}</ElButton>
-          <ElButton type="primary" @click="openGen">🎫 {{ t('zcard.coupon.generate') }}</ElButton>
+          ><ArtSvgIcon icon="ri:delete-bin-5-line" /> {{ t('zcard.coupon.batchDelete') }} ({{ selectedRows.length }})</ElButton>
+          <ElButton :loading="exporting" @click="handleExport"><ArtSvgIcon icon="ri:download-line" /> {{ t('zcard.coupon.exportFiltered') }}</ElButton>
+          <ElButton type="primary" @click="openGen"><ArtSvgIcon icon="ri:ticket-2-line" /> {{ t('zcard.coupon.generate') }}</ElButton>
         </div>
       </div>
 
@@ -205,7 +205,7 @@ onActivated(fetchData)
           <template #default="{ row }">
             <div class="code-cell">
               <span class="code-text">{{ row.code }}</span>
-              <ElButton text size="small" @click="copyText(row.code)">📋</ElButton>
+              <ElButton text size="small" @click="copyText(row.code)"><ArtSvgIcon icon="ri:clipboard-line" /></ElButton>
             </div>
           </template>
         </ElTableColumn>

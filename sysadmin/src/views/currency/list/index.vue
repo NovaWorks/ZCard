@@ -236,7 +236,7 @@ onMounted(loadData)
           />
         </div>
         <div class="toolbar-right">
-          <ElButton type="primary" @click="handleAdd()">➕ {{ t('zcard.currency.add') }}</ElButton>
+          <ElButton type="primary" @click="handleAdd()"><ArtSvgIcon icon="ri:add-line" /> {{ t('zcard.currency.add') }}</ElButton>
         </div>
       </div>
 

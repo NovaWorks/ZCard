@@ -5,6 +5,7 @@ import { queryOrders, type OrderDetail } from '@/api/orders'
 import { useSettingsStore } from '@/stores/settings'
 import { formatMoney } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
+import AppIcon from '@/components/AppIcon.vue'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -95,7 +96,7 @@ async function copyAll(cards: string[]) {
         <!-- 搜索框 -->
         <form @submit.prevent="search" class="mt-6">
           <div class="bg-white rounded-2xl shadow-pop p-2 flex items-center gap-2">
-            <span class="pl-3 text-ink-muted text-xl shrink-0">🔍</span>
+            <span class="pl-3 text-ink-muted shrink-0"><AppIcon name="ri:search-line" class="w-5 h-5" /></span>
             <input
               v-model="keyword"
               type="text"
@@ -125,8 +126,8 @@ async function copyAll(cards: string[]) {
         </form>
 
         <!-- 错误提示(浮于 Hero 底部) -->
-        <div v-if="err" class="mt-2 inline-block bg-red-500/90 text-white text-xs px-4 py-1.5 rounded-full">
-          ⚠ {{ err }}
+        <div v-if="err" class="mt-2 inline-block bg-red-500/90 text-white text-xs px-4 py-1.5 rounded-full inline-flex items-center gap-1">
+          <AppIcon name="ri:alert-line" class="w-3.5 h-3.5" /> {{ err }}
         </div>
       </div>
     </section>
@@ -146,7 +147,7 @@ async function copyAll(cards: string[]) {
 
         <!-- 空状态 -->
         <div v-if="hasSearched && !loading && !results.length" class="text-center py-14">
-          <div class="text-6xl mb-4 opacity-30">🔍</div>
+          <div class="text-6xl mb-4 opacity-30"><AppIcon name="ri:search-line" class="w-16 h-16" /></div>
           <div class="text-ink-soft text-sm">{{ t('order.query.notFound') }}</div>
           <div class="text-ink-muted text-xs mt-1">{{ t('order.query.checkInput') }}</div>
         </div>
@@ -210,7 +211,7 @@ async function copyAll(cards: string[]) {
 
             <!-- 待支付提示 -->
             <div v-else-if="o.status === 'pending'" class="px-4 py-3 text-xs text-amber-600 flex items-center gap-1.5">
-              <span>⏳</span> {{ t('order.query.pendingHint') }}
+              <AppIcon name="ri:time-line" class="w-3.5 h-3.5" /> {{ t('order.query.pendingHint') }}
             </div>
           </div>
         </div>
@@ -237,7 +238,7 @@ async function copyAll(cards: string[]) {
             <!-- 下:常见问题(手风琴:标题默认可见,点击展开答案) -->
             <div class="border-t border-border">
               <div class="px-4 py-2 text-xs font-semibold text-ink flex items-center gap-2 bg-surface-subtle/50">
-                <span>💡</span>{{ t('order.query.faqTitle') }}
+                <AppIcon name="ri:lightbulb-line" class="w-3.5 h-3.5" />{{ t('order.query.faqTitle') }}
               </div>
               <div class="divide-y divide-border">
                 <div v-for="(item, idx) in faqList" :key="idx">

@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getCategories, type Category } from '@/api/categories'
+import AppIcon from '@/components/AppIcon.vue'
 
 const props = defineProps<{ modelValue: number | null; style: 'pills' | 'sidebar' | 'combo' }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: number | null): void }>()
@@ -25,6 +26,8 @@ function toggle(id: number) {
 function hasChildren(c: Category) { return c.children && c.children.length > 0 }
 /** icon 是图片 URL(http/https 或 /storage/ 开头)则用 img 渲染,否则是 emoji 直接显示 */
 function isImgIcon(v?: string) { return !!v && /^https?:\/\/|^\/storage\//.test(v) }
+/** icon 以 "ri:" 开头 → 用 Iconify/Remix 渲染(后台分类图标选择器可选) */
+function isRiIcon(v?: string) { return !!v && v.startsWith('ri:') }
 /** combo:点击一级分类时选中并切换子分类面板(移动端无 hover,点击也能展开) */
 function onCatClick(c: Category) {
   select(c.id)
@@ -54,6 +57,7 @@ function onCatHover(c: Category) { dropdownCat.value = c }
               : 'bg-surface-subtle text-ink-soft hover:bg-primary-light hover:text-primary'
           ]">
             <img v-if="isImgIcon(c.icon)" :src="c.icon" alt="" class="cat-icon-img" />
+            <AppIcon v-else-if="isRiIcon(c.icon)" :name="c.icon" class="w-3.5 h-3.5" />
             <span v-else-if="c.icon" class="mr-0.5">{{ c.icon }}</span>{{ c.name }}
             <span v-if="hasChildren(c)" class="text-[8px] opacity-60">▼</span>
           </button>
@@ -69,6 +73,7 @@ function onCatHover(c: Category) { dropdownCat.value = c }
         <div class="flex items-center justify-between mb-3">
           <span class="text-sm font-bold text-ink flex items-center gap-1">
             <img v-if="isImgIcon(dropdownCat.icon)" :src="dropdownCat.icon" alt="" class="cat-icon-img" />
+            <AppIcon v-else-if="isRiIcon(dropdownCat.icon)" :name="dropdownCat.icon" class="w-3.5 h-3.5" />
             <span v-else-if="dropdownCat.icon">{{ dropdownCat.icon }}</span>{{ dropdownCat.name }}
           </span>
           <button
@@ -98,7 +103,7 @@ function onCatHover(c: Category) { dropdownCat.value = c }
     <div class="bg-white rounded-card border border-border overflow-hidden sticky top-4">
       <!-- 标题 -->
       <div class="flex items-center gap-2 px-4 py-3 border-b border-border bg-surface-subtle">
-        <span class="text-sm">📂</span>
+        <AppIcon name="ri:folder-2-line" class="w-4 h-4" />
         <span class="text-sm font-bold text-ink">{{ t('category.title') }}</span>
       </div>
       <!-- 全部 -->
@@ -109,7 +114,7 @@ function onCatHover(c: Category) { dropdownCat.value = c }
             ? 'bg-primary text-white shadow-sm'
             : 'text-ink-soft hover:bg-primary-light hover:text-primary'
         ]">
-          <span class="text-xs">🏠</span>{{ t('category.allProducts') }}
+          <AppIcon name="ri:home-4-line" class="w-4 h-4" />{{ t('category.allProducts') }}
         </button>
       </div>
       <!-- 分类列表 -->
@@ -123,8 +128,9 @@ function onCatHover(c: Category) { dropdownCat.value = c }
               : 'text-ink-soft hover:bg-primary-light hover:text-primary'
           ]">
             <img v-if="isImgIcon(c.icon)" :src="c.icon" alt="" class="cat-icon-img" />
+            <AppIcon v-else-if="isRiIcon(c.icon)" :name="c.icon" class="w-4 h-4" />
             <span v-else-if="c.icon" class="text-xs">{{ c.icon }}</span>
-            <span v-else class="text-xs opacity-50">📄</span>
+            <AppIcon v-else name="ri:file-text-line" class="w-4 h-4 opacity-50" />
             <span class="flex-1 text-left truncate">{{ c.name }}</span>
             <!-- 子分类展开按钮 -->
             <span v-if="hasChildren(c)" @click.stop="toggle(c.id)" class="text-[10px] opacity-60 group-hover:opacity-100 transition">
@@ -168,6 +174,7 @@ function onCatHover(c: Category) { dropdownCat.value = c }
               : 'bg-surface-subtle text-ink-soft hover:bg-primary-light hover:text-primary'
           ]">
             <img v-if="isImgIcon(c.icon)" :src="c.icon" alt="" class="cat-icon-img" />
+            <AppIcon v-else-if="isRiIcon(c.icon)" :name="c.icon" class="w-3.5 h-3.5" />
             <span v-else-if="c.icon" class="mr-0.5">{{ c.icon }}</span>{{ c.name }}
             <span v-if="hasChildren(c)" class="text-[8px] opacity-60">▼</span>
           </button>
@@ -183,6 +190,7 @@ function onCatHover(c: Category) { dropdownCat.value = c }
         <div class="flex items-center justify-between mb-3">
           <span class="text-sm font-bold text-ink flex items-center gap-1">
             <img v-if="isImgIcon(dropdownCat.icon)" :src="dropdownCat.icon" alt="" class="cat-icon-img" />
+            <AppIcon v-else-if="isRiIcon(dropdownCat.icon)" :name="dropdownCat.icon" class="w-3.5 h-3.5" />
             <span v-else-if="dropdownCat.icon">{{ dropdownCat.icon }}</span>{{ dropdownCat.name }}
           </span>
           <button

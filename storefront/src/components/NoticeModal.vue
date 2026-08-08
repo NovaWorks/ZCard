@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
+import AppIcon from '@/components/AppIcon.vue'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -58,7 +59,7 @@ defineExpose({ open, close })
       <div class="bg-white rounded-card shadow-pop max-w-lg w-full overflow-hidden animate-[fadeInUp_.2s_ease]">
         <!-- 标题栏 -->
         <div class="flex items-center justify-between px-5 py-3 border-b border-border bg-surface-subtle">
-          <span class="text-sm font-bold text-ink">📢 {{ t('notice.title') }}</span>
+          <span class="text-sm font-bold text-ink inline-flex items-center gap-1.5"><AppIcon name="ri:megaphone-line" class="w-4 h-4" /> {{ t('notice.title') }}</span>
           <button @click="close" class="w-7 h-7 rounded-full flex items-center justify-center text-ink-muted hover:bg-border hover:text-ink transition text-lg leading-none">
             ×
           </button>

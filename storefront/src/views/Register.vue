@@ -95,7 +95,7 @@ async function submit() {
   <div class="max-w-md mx-auto px-4 py-12">
     <!-- 注册关闭提示 -->
     <div v-if="!registerOpen" class="bg-white rounded-card border border-border p-8 shadow-card text-center">
-      <div class="text-5xl mb-4 opacity-40">🔒</div>
+      <div class="text-5xl mb-4 opacity-40"><AppIcon name="ri:lock-line" class="w-12 h-12" /></div>
       <h1 class="text-lg font-bold text-ink mb-2">{{ t('auth.register.closedTitle') }}</h1>
       <p class="text-xs text-ink-muted mb-5">{{ t('auth.register.closedHint') }}</p>
       <button @click="router.push('/login')" class="px-4 py-2 text-xs bg-primary text-white rounded-field hover:bg-primary-hover transition">{{ t('auth.register.backToLogin') }}</button>

@@ -20,10 +20,10 @@ const { cardRef, tableRef, paginationRef, tableHeight } = useListTableHeight()
 const stats = ref<BillStats>({ total_income: 0, total_expense: 0, net_amount: 0, total_count: 0 })
 
 const statCards = computed(() => [
-  { label: t('zcard.bill.statIncome'), value: stats.value.total_income, icon: '💰', color: '#67c23a', isAmount: true },
-  { label: t('zcard.bill.statExpense'), value: stats.value.total_expense, icon: '📤', color: '#f56c6c', isAmount: true },
-  { label: t('zcard.bill.statNet'), value: stats.value.net_amount, icon: '📊', color: '#409eff', isAmount: true },
-  { label: t('zcard.bill.statCount'), value: stats.value.total_count, icon: '📦', color: '#909399', isAmount: false },
+  { label: t('zcard.bill.statIncome'), value: stats.value.total_income, icon: 'ri:money-cny-circle-line', color: '#67c23a', isAmount: true },
+  { label: t('zcard.bill.statExpense'), value: stats.value.total_expense, icon: 'ri:export-line', color: '#f56c6c', isAmount: true },
+  { label: t('zcard.bill.statNet'), value: stats.value.net_amount, icon: 'ri:bar-chart-2-line', color: '#409eff', isAmount: true },
+  { label: t('zcard.bill.statCount'), value: stats.value.total_count, icon: 'ri:archive-line', color: '#909399', isAmount: false },
 ])
 
 const formatAmount = (fen: number) => (Number(fen || 0) / 100).toFixed(2)
@@ -97,7 +97,7 @@ onActivated(fetchData)
     <!-- 统计卡片 -->
     <div class="stats-grid">
       <div v-for="card in statCards" :key="card.label" class="stat-card" :style="{ '--accent': card.color }">
-        <div class="stat-icon">{{ card.icon }}</div>
+        <div class="stat-icon"><ArtSvgIcon :icon="card.icon" /></div>
         <div class="stat-body">
           <div class="stat-label">{{ card.label }}</div>
           <div class="stat-value">{{ card.isAmount ? '¥' + formatAmount(card.value) : formatCount(card.value) }}</div>
@@ -119,7 +119,7 @@ onActivated(fetchData)
           <ElButton type="primary" @click="handleSearch">{{ t('zcard.common.search') }}</ElButton>
           <ElButton @click="resetSearch">{{ t('zcard.common.reset') }}</ElButton>
         </div>
-        <ElButton type="warning" plain @click="openAdjust">✏️ {{ t('zcard.bill.adjust') }}</ElButton>
+        <ElButton type="warning" plain @click="openAdjust"><ArtSvgIcon icon="ri:edit-line" /> {{ t('zcard.bill.adjust') }}</ElButton>
       </div>
 
       <!-- 表格 -->

@@ -7,7 +7,7 @@
       class="fixed top-0 left-0 z-[999999] flex-cc w-full h-full text-white bg-gradient-to-br from-[#1e1e1e] to-black animate-fade-in"
     >
       <div class="p-5 text-center select-none">
-        <div class="mb-7.5 text-5xl">🔒</div>
+        <div class="mb-7.5 text-5xl"><ArtSvgIcon icon="ri:lock-line" /></div>
         <h1 class="m-0 mb-5 text-3xl font-semibold text-danger">系统已锁定</h1>
         <p class="max-w-125 m-0 text-lg leading-relaxed text-white">
           检测到开发者工具已打开<br />

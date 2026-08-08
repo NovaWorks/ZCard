@@ -7,6 +7,7 @@ import { createRechargePayment, getRechargeStatus } from '@/api/recharge'
 import { formatMoney } from '@/utils/money'
 import { calcChannelFee } from '@/utils/fee'
 import { usePreferencesStore } from '@/stores/preferences'
+import AppIcon from '@/components/AppIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -41,17 +42,17 @@ function currencySymbol(code?: string | null): string {
 
 /** 支付方式标识 → 展示信息(图标/名称)。与收银台 Checkout.vue 保持一致:显示具体支付方式而非通道名 */
 const PAY_TYPE_META: Record<string, { icon: string; label: string }> = {
-  alipay: { icon: '💰', label: '支付宝' },
-  wechat: { icon: '💚', label: '微信支付' },
-  wxpay: { icon: '💚', label: '微信支付' },
-  qqpay: { icon: '🐧', label: 'QQ 钱包' },
-  bank: { icon: '🏦', label: '云闪付 / 网银' },
-  jdpay: { icon: '🛒', label: '京东支付' },
-  paypal: { icon: '🅿️', label: 'PayPal' },
-  stripe: { icon: '💳', label: 'Stripe' },
-  usdt: { icon: '₮', label: 'USDT' },
-  tron: { icon: '₮', label: 'TRON' },
-  trx: { icon: '₮', label: 'TRX' },
+  alipay: { icon: 'ri:alipay-line', label: '支付宝' },
+  wechat: { icon: 'ri:wechat-line', label: '微信支付' },
+  wxpay: { icon: 'ri:wechat-line', label: '微信支付' },
+  qqpay: { icon: 'ri:qq-line', label: 'QQ 钱包' },
+  bank: { icon: 'ri:bank-line', label: '云闪付 / 网银' },
+  jdpay: { icon: 'ri:shopping-bag-line', label: '京东支付' },
+  paypal: { icon: 'ri:paypal-line', label: 'PayPal' },
+  stripe: { icon: 'ri:bank-card-2-line', label: 'Stripe' },
+  usdt: { icon: 'ri:coins-line', label: 'USDT' },
+  tron: { icon: 'ri:coins-line', label: 'TRON' },
+  trx: { icon: 'ri:coins-line', label: 'TRX' },
 }
 
 /** 通道对应的支付方式列表(带图标与名称);无 pay_types 时回退到通道自身 */
@@ -60,11 +61,11 @@ const channelPayTypes = (ch: PaymentChannel) => {
   if (types.length) {
     return types.map((t) => ({
       type: t,
-      icon: PAY_TYPE_META[t]?.icon || ch.icon || '💳',
+      icon: PAY_TYPE_META[t]?.icon || ch.icon || 'ri:bank-card-2-line',
       label: PAY_TYPE_META[t]?.label || t,
     }))
   }
-  return [{ type: ch.code, icon: ch.icon || '💳', label: ch.name }]
+  return [{ type: ch.code, icon: ch.icon || 'ri:bank-card-2-line', label: ch.name }]
 }
 
 onMounted(async () => {
@@ -179,7 +180,7 @@ function stopPolling() {
           <span class="flex items-center gap-1 shrink-0">
             <template v-for="pt in channelPayTypes(ch).slice(0, 2)" :key="pt.type">
               <span class="w-8 h-8 rounded-lg bg-surface-subtle flex items-center justify-center text-lg">
-                {{ pt.icon }}
+                <AppIcon :name="pt.icon" class="w-4.5 h-4.5" />
               </span>
             </template>
           </span>

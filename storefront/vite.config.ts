@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
+import Icons from 'unplugin-icons/vite'
 
 export default defineConfig(({ mode }) => {
   // 读取环境变量:生产用 VITE_BASE_URL=/storefront/,开发默认 /
@@ -9,7 +10,7 @@ export default defineConfig(({ mode }) => {
   const base = env.VITE_BASE_URL ?? (mode === 'production' ? '/storefront/' : '/')
 
   return {
-    plugins: [vue(), tailwindcss()],
+    plugins: [vue(), tailwindcss(), Icons({ compiler: 'vue3', autoInstall: false })],
     // 资源 URL 前缀:必须与 outDir 一致,否则 index.html 引用 /assets/...
     // 而物理产物在 public/storefront/assets/...,差一层 → 404 / 白屏
     base,

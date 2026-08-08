@@ -246,7 +246,7 @@ onActivated(loadData)
           <ElButton v-if="selectedIds.length" type="warning" plain size="small" @click="handleBatch('status', 0)">{{ t('zcard.category.batchDisable') }}</ElButton>
           <ElButton v-if="selectedIds.length" type="info" plain size="small" @click="handleBatch('hide', 1)">{{ t('zcard.category.batchHide') }}</ElButton>
           <ElButton v-if="selectedIds.length" size="small" @click="handleBatch('hide', 0)">{{ t('zcard.category.batchShow') }}</ElButton>
-          <ElButton type="primary" @click="handleAdd()">➕ {{ t('zcard.category.add') }}</ElButton>
+          <ElButton type="primary" @click="handleAdd()"><ArtSvgIcon icon="ri:add-line" /> {{ t('zcard.category.add') }}</ElButton>
         </div>
       </div>
 
@@ -263,7 +263,7 @@ onActivated(loadData)
                 <img v-if="/^https?:\/\/|^\/storage\//.test(row.icon)" :src="row.icon" class="cat-icon-img" />
                 <span v-else class="cat-icon">{{ row.icon }}</span>
               </template>
-              <span v-else class="cat-icon-placeholder">📁</span>
+              <span v-else class="cat-icon-placeholder"><ArtSvgIcon icon="ri:folder-2-line" /></span>
               <span class="cat-name">{{ row.name }}</span>
               <ElTag v-if="row.description" size="small" type="info" class="cat-desc-tag">{{ row.description }}</ElTag>
             </div>

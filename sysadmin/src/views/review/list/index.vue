@@ -23,10 +23,10 @@ const { cardRef, tableRef, paginationRef, tableHeight } = useListTableHeight()
 const stats = ref<ReviewStats>({ total: 0, pending: 0, approved: 0, rejected: 0 })
 
 const statCards = computed(() => [
-  { label: t('zcard.review.statTotal'), value: stats.value.total, icon: '📝', color: '#909399' },
-  { label: t('zcard.review.statPending'), value: stats.value.pending, icon: '⏳', color: '#e6a23c' },
-  { label: t('zcard.review.statApproved'), value: stats.value.approved, icon: '✅', color: '#67c23a' },
-  { label: t('zcard.review.statRejected'), value: stats.value.rejected, icon: '🚫', color: '#f56c6c' },
+  { label: t('zcard.review.statTotal'), value: stats.value.total, icon: 'ri:edit-box-line', color: '#909399' },
+  { label: t('zcard.review.statPending'), value: stats.value.pending, icon: 'ri:time-line', color: '#e6a23c' },
+  { label: t('zcard.review.statApproved'), value: stats.value.approved, icon: 'ri:checkbox-circle-line', color: '#67c23a' },
+  { label: t('zcard.review.statRejected'), value: stats.value.rejected, icon: 'ri:forbid-2-line', color: '#f56c6c' },
 ])
 
 const formatCount = (n: number) => Number(n || 0).toLocaleString()
@@ -102,7 +102,7 @@ onMounted(fetchData)
     <!-- 统计卡片 -->
     <div class="stats-grid">
       <div v-for="card in statCards" :key="card.label" class="stat-card" :style="{ '--accent': card.color }">
-        <div class="stat-icon">{{ card.icon }}</div>
+        <div class="stat-icon"><ArtSvgIcon :icon="card.icon" /></div>
         <div class="stat-body">
           <div class="stat-label">{{ card.label }}</div>
           <div class="stat-value">{{ formatCount(card.value) }}</div>

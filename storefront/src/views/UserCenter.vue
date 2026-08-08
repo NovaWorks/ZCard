@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { usePreferencesStore } from '@/stores/preferences'
+import AppIcon from '@/components/AppIcon.vue'
 import { formatMoney } from '@/utils/money'
 import { getMyOrders, type OrderDetail } from '@/api/orders'
 import { updatePassword, updateProfile } from '@/api/auth'
@@ -196,7 +197,7 @@ onMounted(loadData)
   <div class="mx-auto w-full max-w-4xl px-4 sm:px-6 py-6 space-y-6">
     <!-- 未登录提示 -->
     <div v-if="!auth.isLoggedIn" class="text-center py-20">
-      <div class="text-5xl mb-4 opacity-30">🔒</div>
+      <div class="text-5xl mb-4 opacity-30"><AppIcon name="ri:lock-line" class="w-12 h-12" /></div>
       <p class="text-ink-soft mb-4">{{ t('userCenter.loginRequired') }}</p>
       <button @click="go('login')" class="bg-primary text-white px-6 py-2 rounded-field text-sm font-medium">
         {{ t('nav.login') }}
@@ -240,21 +241,21 @@ onMounted(loadData)
         <h2 class="text-sm font-semibold text-ink-soft mb-3">{{ t('userCenter.quickEntry') }}</h2>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <button @click="go('my-orders')" class="bg-white rounded-field border border-border p-4 text-center hover:shadow-card-hover transition">
-            <div class="text-2xl mb-1">📦</div>
+            <div class="text-2xl mb-1"><AppIcon name="ri:archive-line" class="w-6 h-6" /></div>
             <div class="text-xs font-medium text-ink">{{ t('userCenter.myOrders') }}</div>
             <div class="text-[10px] text-ink-muted mt-0.5">{{ orders.length }} {{ t('userCenter.orderCount') }}</div>
           </button>
           <button @click="go('recharge')" class="bg-white rounded-field border border-border p-4 text-center hover:shadow-card-hover transition">
-            <div class="text-2xl mb-1">💰</div>
+            <div class="text-2xl mb-1"><AppIcon name="ri:money-cny-circle-line" class="w-6 h-6" /></div>
             <div class="text-xs font-medium text-ink">{{ t('userCenter.recharge') }}</div>
             <div class="text-[10px] text-ink-muted mt-0.5">{{ formatMoney(balance, prefs.baseCurrencyInfo) }}</div>
           </button>
           <button @click="go('distribution')" class="bg-white rounded-field border border-border p-4 text-center hover:shadow-card-hover transition">
-            <div class="text-2xl mb-1">🎁</div>
+            <div class="text-2xl mb-1"><AppIcon name="ri:gift-2-line" class="w-6 h-6" /></div>
             <div class="text-xs font-medium text-ink">{{ t('userCenter.distribution') }}</div>
           </button>
           <button @click="go('my-subsite')" class="bg-white rounded-field border border-border p-4 text-center hover:shadow-card-hover transition">
-            <div class="text-2xl mb-1">🏪</div>
+            <div class="text-2xl mb-1"><AppIcon name="ri:store-3-line" class="w-6 h-6" /></div>
             <div class="text-xs font-medium text-ink">{{ t('userCenter.mySubsite') }}</div>
           </button>
         </div>
@@ -263,7 +264,7 @@ onMounted(loadData)
       <!-- API 对接(自助供货) -->
       <section class="bg-white rounded-card border border-border overflow-hidden">
         <div class="px-5 py-3 border-b border-border flex items-center justify-between">
-          <h2 class="text-sm font-semibold text-ink flex items-center gap-1.5">🔗 {{ t('supply.title') }}</h2>
+          <h2 class="text-sm font-semibold text-ink flex items-center gap-1.5"><AppIcon name="ri:link" class="w-4 h-4" /> {{ t('supply.title') }}</h2>
           <span v-if="supplyAccount" class="text-[11px] text-ink-muted">{{ t('supply.subtitle') }}</span>
         </div>
         <div class="p-5">
@@ -272,7 +273,7 @@ onMounted(loadData)
 
           <!-- 未开通凭证 -->
           <div v-if="!supplyAccount" class="text-center py-6">
-            <div class="text-5xl mb-3 opacity-30">🔗</div>
+            <div class="text-5xl mb-3 opacity-30"><AppIcon name="ri:link" class="w-12 h-12" /></div>
             <p class="text-ink-soft text-sm mb-4">{{ t('supply.notOpened') }}</p>
             <button
               @click="createSupply"
@@ -339,7 +340,7 @@ onMounted(loadData)
                 @click="supplyDocOpen = !supplyDocOpen"
                 class="w-full px-4 py-2.5 flex items-center justify-between text-left text-xs font-medium text-ink-soft hover:bg-surface-subtle/50 transition"
               >
-                <span>📖 {{ t('supply.docTitle') }}</span>
+                <span class="inline-flex items-center gap-1"><AppIcon name="ri:book-open-line" class="w-4 h-4" /> {{ t('supply.docTitle') }}</span>
                 <span class="transition-transform" :class="supplyDocOpen ? 'rotate-180' : ''">▾</span>
               </button>
               <div v-show="supplyDocOpen" class="px-4 pb-3 text-[11px] text-ink-muted leading-relaxed space-y-1.5">
@@ -387,7 +388,7 @@ onMounted(loadData)
         <div class="px-5 py-4">
           <!-- 提示 -->
           <div v-if="okMsg" class="mb-3 text-xs text-green-600 bg-green-50 rounded-field px-3 py-2">✓ {{ okMsg }}</div>
-          <div v-if="errMsg" class="mb-3 text-xs text-red-600 bg-red-50 rounded-field px-3 py-2">⚠ {{ errMsg }}</div>
+          <div v-if="errMsg" class="mb-3 text-xs text-red-600 bg-red-50 rounded-field px-3 py-2 inline-flex items-center gap-1"><AppIcon name="ri:alert-line" class="w-3.5 h-3.5" /> {{ errMsg }}</div>
 
           <h3 class="text-xs font-semibold text-ink-soft mb-2">{{ t('userCenter.profile') }}</h3>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">

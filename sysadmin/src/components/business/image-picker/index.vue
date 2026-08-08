@@ -61,7 +61,7 @@
     <!-- 上传按钮 -->
     <ElUpload :show-file-list="false" :before-upload="handleUpload" accept="image/*">
       <ElButton :loading="uploading" size="default">
-        {{ uploading ? '...' : '📷' }}
+        {{ uploading ? '...' : '<ArtSvgIcon icon="ri:camera-line" />' }}
       </ElButton>
     </ElUpload>
 

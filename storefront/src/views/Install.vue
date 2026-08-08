@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { getInstallStatus, testDbConnection, runInstall } from '@/api/install'
 import type { InstallStatus } from '@/api/install'
+import AppIcon from '@/components/AppIcon.vue'
 
 const router = useRouter()
 
@@ -129,7 +130,7 @@ onMounted(() => {
 
       <!-- 已安装 -->
       <div v-if="installed" class="bg-white rounded-card border border-border p-8 text-center shadow-sm">
-        <div class="text-5xl mb-4">✅</div>
+        <div class="text-5xl mb-4"><AppIcon name="ri:checkbox-circle-line" class="w-12 h-12 text-green-500" /></div>
         <h2 class="text-lg font-bold text-ink mb-2">系统已安装</h2>
         <p class="text-sm text-ink-muted mb-6">如需重新安装,请删除 <code class="bg-surface-subtle px-2 py-1 rounded text-xs">storage/app/installed</code> 文件</p>
         <div class="flex gap-3 justify-center">
@@ -158,13 +159,13 @@ onMounted(() => {
         <div class="p-6 sm:p-8">
           <!-- 错误提示 -->
           <div v-if="error" class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-field text-sm text-danger">
-            ⚠ {{ error }}
+            <span class="inline-flex items-center gap-1"><AppIcon name="ri:alert-line" class="w-4 h-4" /> {{ error }}</span>
           </div>
 
           <!-- Step 0: 环境检查 -->
           <div v-if="step === 0" v-loading="loading">
             <div class="space-y-2 mb-6">
-              <div class="text-sm font-medium text-ink mb-3">📋 PHP 环境检查</div>
+              <div class="text-sm font-medium text-ink mb-3 inline-flex items-center gap-1"><AppIcon name="ri:clipboard-line" class="w-4 h-4" /> PHP 环境检查</div>
               <div v-for="check in status?.checks" :key="check.name"
                 class="flex items-center justify-between py-2 px-3 rounded-field"
                 :class="check.passed ? 'bg-green-50' : (check.optional ? 'bg-yellow-50' : 'bg-red-50')">
@@ -176,7 +177,7 @@ onMounted(() => {
             </div>
 
             <div class="space-y-2 mb-6">
-              <div class="text-sm font-medium text-ink mb-3">📁 目录权限</div>
+              <div class="text-sm font-medium text-ink mb-3 inline-flex items-center gap-1"><AppIcon name="ri:folder-open-line" class="w-4 h-4" /> 目录权限</div>
               <div v-for="w in status?.writable" :key="w.name"
                 class="flex items-center justify-between py-2 px-3 rounded-field"
                 :class="w.passed ? 'bg-green-50' : 'bg-red-50'">
@@ -236,8 +237,9 @@ onMounted(() => {
             <div class="flex gap-3">
               <button @click="step = 0" class="px-4 py-2.5 border border-border rounded-field text-sm text-ink-soft hover:bg-surface-subtle transition">← 返回</button>
               <button @click="handleTestDb" :disabled="dbTesting"
-                class="flex-1 py-2.5 border border-primary text-primary rounded-field text-sm font-medium hover:bg-primary-light transition disabled:opacity-50">
-                {{ dbTesting ? '测试中...' : '🔌 测试连接' }}
+                class="flex-1 py-2.5 border border-primary text-primary rounded-field text-sm font-medium hover:bg-primary-light transition disabled:opacity-50 inline-flex items-center justify-center gap-1.5">
+                <AppIcon v-if="!dbTesting" name="ri:plug-line" class="w-4 h-4" />
+                {{ dbTesting ? '测试中...' : '测试连接' }}
               </button>
               <button @click="step = 2" :disabled="!dbTestResult?.success"
                 class="flex-1 py-2.5 bg-primary text-white rounded-field text-sm font-medium hover:bg-primary-hover transition disabled:opacity-50 disabled:cursor-not-allowed">
@@ -270,7 +272,7 @@ onMounted(() => {
               <button @click="step = 1" class="px-4 py-2.5 border border-border rounded-field text-sm text-ink-soft hover:bg-surface-subtle transition">← 返回</button>
               <button @click="handleInstall"
                 class="flex-1 py-2.5 bg-success text-white rounded-field text-sm font-medium hover:opacity-90 transition">
-                🚀 开始安装
+                <span class="inline-flex items-center gap-1.5"><AppIcon name="ri:rocket-line" class="w-4 h-4" /> 开始安装</span>
               </button>
             </div>
           </div>
@@ -284,7 +286,7 @@ onMounted(() => {
 
           <!-- Step 4: 完成 -->
           <div v-else-if="step === 4" class="py-8 text-center">
-            <div class="text-5xl mb-4">🎉</div>
+            <div class="text-5xl mb-4"><AppIcon name="ri:emotion-happy-line" class="w-12 h-12 text-primary" /></div>
             <h2 class="text-lg font-bold text-ink mb-2">安装完成!</h2>
             <p class="text-sm text-ink-muted mb-6">ZCard 已成功安装,请使用刚才创建的管理员账号登录后台</p>
             <div class="flex gap-3 justify-center">

@@ -2,6 +2,7 @@
 import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
+import AppIcon from '@/components/AppIcon.vue'
 
 const { t, locale } = useI18n()
 const settings = useSettingsStore()
@@ -69,28 +70,28 @@ function isExternal(url: string) {
     <div class="border-b border-border">
       <div class="max-w-6xl mx-auto px-4 py-6 grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="flex items-center gap-2 sm:gap-3">
-          <span class="w-9 h-9 sm:w-11 sm:h-11 bg-primary-light text-primary rounded-card flex items-center justify-center text-lg sm:text-xl shrink-0">🚀</span>
+          <span class="w-9 h-9 sm:w-11 sm:h-11 bg-primary-light text-primary rounded-card flex items-center justify-center text-lg sm:text-xl shrink-0"><AppIcon name="ri:rocket-line" class="w-5 h-5 sm:w-6 sm:h-6" /></span>
           <div class="min-w-0">
             <div class="text-xs font-semibold text-ink">{{ t('footer.badge.fastTitle') }}</div>
             <div class="text-[10px] text-ink-muted mt-0.5 truncate">{{ t('footer.badge.fastHint') }}</div>
           </div>
         </div>
         <div class="flex items-center gap-2 sm:gap-3">
-          <span class="w-9 h-9 sm:w-11 sm:h-11 bg-green-50 text-success rounded-card flex items-center justify-center text-lg sm:text-xl shrink-0">🔒</span>
+          <span class="w-9 h-9 sm:w-11 sm:h-11 bg-green-50 text-success rounded-card flex items-center justify-center text-lg sm:text-xl shrink-0"><AppIcon name="ri:shield-check-line" class="w-5 h-5 sm:w-6 sm:h-6" /></span>
           <div class="min-w-0">
             <div class="text-xs font-semibold text-ink">{{ t('footer.badge.secureTitle') }}</div>
             <div class="text-[10px] text-ink-muted mt-0.5 truncate">{{ t('footer.badge.secureHint') }}</div>
           </div>
         </div>
         <div class="flex items-center gap-2 sm:gap-3">
-          <span class="w-9 h-9 sm:w-11 sm:h-11 bg-orange-50 text-warning rounded-card flex items-center justify-center text-lg sm:text-xl shrink-0">⏰</span>
+          <span class="w-9 h-9 sm:w-11 sm:h-11 bg-orange-50 text-warning rounded-card flex items-center justify-center text-lg sm:text-xl shrink-0"><AppIcon name="ri:time-line" class="w-5 h-5 sm:w-6 sm:h-6" /></span>
           <div class="min-w-0">
             <div class="text-xs font-semibold text-ink">{{ t('footer.badge.onlineTitle') }}</div>
             <div class="text-[10px] text-ink-muted mt-0.5 truncate">{{ t('footer.badge.onlineHint') }}</div>
           </div>
         </div>
         <div class="flex items-center gap-2 sm:gap-3">
-          <span class="w-9 h-9 sm:w-11 sm:h-11 bg-blue-50 text-primary rounded-card flex items-center justify-center text-lg sm:text-xl shrink-0">💬</span>
+          <span class="w-9 h-9 sm:w-11 sm:h-11 bg-blue-50 text-primary rounded-card flex items-center justify-center text-lg sm:text-xl shrink-0"><AppIcon name="ri:customer-service-2-line" class="w-5 h-5 sm:w-6 sm:h-6" /></span>
           <div class="min-w-0">
             <div class="text-xs font-semibold text-ink">{{ t('footer.badge.supportTitle') }}</div>
             <div class="text-[10px] text-ink-muted mt-0.5">{{ t('footer.badge.supportHint') }}</div>

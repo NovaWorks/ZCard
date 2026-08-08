@@ -262,7 +262,7 @@ onMounted(loadData)
           <ElButton @click="loadData">{{ t('zcard.common.search') }}</ElButton>
         </div>
         <div class="toolbar-right">
-          <ElButton type="primary" @click="handleAdd()">➕ {{ t('zcard.subsite.addSubsite') }}</ElButton>
+          <ElButton type="primary" @click="handleAdd()"><ArtSvgIcon icon="ri:add-line" /> {{ t('zcard.subsite.addSubsite') }}</ElButton>
         </div>
       </div>
 

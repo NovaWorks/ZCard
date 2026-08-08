@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { queryOrders, type OrderDetail } from '@/api/orders'
 import { formatMoney } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
+import AppIcon from '@/components/AppIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -53,14 +54,14 @@ onMounted(async () => {
     <div class="bg-white rounded-card border border-border p-8 shadow-card text-center">
       <!-- 加载中 -->
       <template v-if="loading">
-        <div class="w-16 h-16 mx-auto bg-primary-light rounded-full flex items-center justify-center text-3xl mb-4 animate-pulse">⏳</div>
+        <div class="w-16 h-16 mx-auto bg-primary-light rounded-full flex items-center justify-center mb-4 animate-pulse"><AppIcon name="ri:time-line" class="w-8 h-8" /></div>
         <h2 class="text-lg font-bold text-ink mb-1">{{ t('order.payResult.confirmingTitle') }}</h2>
         <p class="text-xs text-ink-muted">{{ t('order.payResult.confirmingHint') }}</p>
       </template>
 
       <!-- 取消支付 -->
       <template v-else-if="isCancel">
-        <div class="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center text-3xl mb-4">😕</div>
+        <div class="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4"><AppIcon name="ri:emotion-sad-line" class="w-8 h-8" /></div>
         <h2 class="text-lg font-bold text-ink mb-1">{{ t('order.payResult.cancelTitle') }}</h2>
         <p class="text-xs text-ink-muted mb-5">{{ t('order.payResult.cancelHint') }}</p>
         <div class="flex gap-2 justify-center">
@@ -71,7 +72,7 @@ onMounted(async () => {
 
       <!-- 支付成功 -->
       <template v-else-if="paid && order">
-        <div class="w-16 h-16 mx-auto bg-green-50 rounded-full flex items-center justify-center text-3xl mb-4">✅</div>
+        <div class="w-16 h-16 mx-auto bg-green-50 rounded-full flex items-center justify-center mb-4"><AppIcon name="ri:checkbox-circle-line" class="w-8 h-8" /></div>
         <h2 class="text-lg font-bold text-ink mb-1">{{ t('order.payResult.successTitle') }}</h2>
         <p class="text-xs text-ink-muted mb-4">{{ t('order.payResult.orderNoLabel', { no: order.order_no }) }}</p>
         <div class="bg-surface-subtle rounded-field p-3 mb-5 text-left">
@@ -95,7 +96,7 @@ onMounted(async () => {
 
       <!-- 等待回调(支付了但状态未更新) -->
       <template v-else>
-        <div class="w-16 h-16 mx-auto bg-amber-50 rounded-full flex items-center justify-center text-3xl mb-4">⏰</div>
+        <div class="w-16 h-16 mx-auto bg-amber-50 rounded-full flex items-center justify-center mb-4"><AppIcon name="ri:time-line" class="w-8 h-8" /></div>
         <h2 class="text-lg font-bold text-ink mb-1">{{ t('order.payResult.processingTitle') }}</h2>
         <p class="text-xs text-ink-muted mb-5" v-if="orderNo">{{ t('order.payResult.processingWithNo', { no: orderNo }) }}<br/>{{ t('order.payResult.processingWithNoNext') }}</p>
         <p class="text-xs text-ink-muted mb-5" v-else>{{ t('order.payResult.processingNoNo') }}</p>
