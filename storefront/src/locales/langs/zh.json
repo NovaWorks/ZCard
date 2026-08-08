@@ -274,7 +274,7 @@
       "cartEmpty": "购物车还是空的",
       "continueShopping": "去逛逛",
       "selectChannel": "请选择支付方式",
-      "balanceLabel": "余额 ¥{amount}"
+      "balanceLabel": "余额 {amount}"
     },
     "myOrders": {
       "title": "我的订单",

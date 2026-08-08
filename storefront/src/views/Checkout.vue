@@ -283,7 +283,7 @@ async function loadChannels() {
 
 async function submit() {
   if (!items.value.length) { err.value = t('order.checkout.cartEmpty'); return }
-  if (!selectedChannelId.value) { err.value = t('order.checkout.selectChannel'); return }
+  if (selectedChannelId.value === null) { err.value = t('order.checkout.selectChannel'); return }
   if (!auth.isLoggedIn && !guestCheckoutAllowed.value) {
     err.value = t('order.checkout.guestOnlyHint'); return
   }
@@ -311,7 +311,7 @@ async function submit() {
 }
 
 async function doSubmit() {
-  if (!selectedChannelId.value) return
+  if (selectedChannelId.value === null) return
   const channelId = selectedChannelId.value
   const isBalance = selectedChannel.value?.code === 'balance'
   // 余额支付必须登录
@@ -569,7 +569,7 @@ const channelPayTypes = (ch: PaymentChannel) => {
                   <span
                     v-if="ch.code === 'balance' && ch.balance !== undefined"
                     class="block text-[10px] text-ink-muted"
-                  >{{ t('order.checkout.balanceLabel', { amount: formatMoney(ch.balance, displayCur) }) }}</span
+                  >{{ t('order.checkout.balanceLabel', { amount: formatMoney(ch.balance, null) }) }}</span
                   >
                   <span
                     v-else-if="ch.target_currency"
