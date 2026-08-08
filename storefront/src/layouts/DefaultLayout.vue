@@ -1,16 +1,25 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watchEffect } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import NoticeModal from '@/components/NoticeModal.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { getStorefrontSettings } from '@/api/settings'
+import { on as onEvent } from '@/utils/eventBus'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
 const maintenanceMode = ref(false)
 const maintenanceMessage = ref('')
+const noticeModalRef = ref<InstanceType<typeof NoticeModal> | null>(null)
+
+// 监听顶部公告入口点击事件 → 打开公告弹窗
+let offNotice: (() => void) | null = null
+onMounted(() => {
+  offNotice = onEvent('notice:open', () => noticeModalRef.value?.open())
+})
+onUnmounted(() => offNotice?.())
 
 // SEO:动态设置标题和 meta description
 watchEffect(() => {
@@ -62,7 +71,7 @@ onMounted(async () => {
       <RouterView />
     </main>
     <AppFooter />
-    <!-- 公告弹窗:首次访问弹出(有公告内容时) -->
-    <NoticeModal />
+    <!-- 公告弹窗:首次访问弹出(有公告内容时);顶部公告入口可随时打开 -->
+    <NoticeModal ref="noticeModalRef" />
   </div>
 </template>

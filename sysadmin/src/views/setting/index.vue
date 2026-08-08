@@ -37,6 +37,10 @@
             <ElFormItem :label="t('zcard.setting.footerSocial')">
               <ElInput v-model="form.footerSocialJson" type="textarea" :rows="6" placeholder="JSON" />
             </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.footerHelpLinks')">
+              <ElInput v-model="form.footerHelpLinksJson" type="textarea" :rows="4" placeholder="JSON" />
+              <span class="form-tip">{{ t('zcard.setting.footerHelpLinksTip') }}</span>
+            </ElFormItem>
             <ElFormItem :label="t('zcard.setting.footerAnalytics')">
               <ElInput v-model="form.footer_analytics" type="textarea" :rows="5" :placeholder="t('zcard.setting.footerAnalyticsPlaceholder')" />
             </ElFormItem>
@@ -444,6 +448,7 @@
     footerLinksJson: string
     footerContactJson: string
     footerSocialJson: string
+    footerHelpLinksJson: string
     hotTagCategoriesJson: string
     category_nav_style: string
     list_default_view: string
@@ -532,6 +537,7 @@
     footerLinksJson: '[]',
     footerContactJson: '[]',
     footerSocialJson: '[]',
+    footerHelpLinksJson: '[]',
     hotTagCategoriesJson: '[]',
     category_nav_style: 'pills',
     list_default_view: 'grid',
@@ -782,6 +788,7 @@
       form.footerLinksJson = toText(data.footer_links)
       form.footerContactJson = toText(data.footer_contact)
       form.footerSocialJson = toText(data.footer_social)
+      form.footerHelpLinksJson = toText(data.footer_help_links)
       form.hotTagCategoriesJson = toText(data.hot_tag_categories)
     } catch (e) {
       // 拦截器处理
@@ -802,8 +809,9 @@
     const links = parseArr(form.footerLinksJson)
     const contact = parseArr(form.footerContactJson)
     const social = parseArr(form.footerSocialJson)
+    const helpLinks = parseArr(form.footerHelpLinksJson)
     const hotTags = parseArr(form.hotTagCategoriesJson)
-    if (links === null || contact === null || social === null || hotTags === null) {
+    if (links === null || contact === null || social === null || helpLinks === null || hotTags === null) {
       ElMessage.error(t('zcard.setting.jsonFormatError'))
       return
     }
@@ -815,11 +823,13 @@
         footer_links: links,
         footer_contact: contact,
         footer_social: social,
+        footer_help_links: helpLinks,
         hot_tag_categories: hotTags,
       }
       delete (payload as any).footerLinksJson
       delete (payload as any).footerContactJson
       delete (payload as any).footerSocialJson
+      delete (payload as any).footerHelpLinksJson
       delete (payload as any).hotTagCategoriesJson
       // 卡密加密密钥:仅在填写时提交(留空=保持原值);回显值为脱敏占位,不得覆盖
       if (cardEncryptionKey.value.trim()) {

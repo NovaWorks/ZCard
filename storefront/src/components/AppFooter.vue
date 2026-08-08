@@ -16,6 +16,7 @@ const siteName = computed(() => cfg.value?.site_name || 'ZCard')
 const siteLogo = computed(() => cfg.value?.site_logo || '')
 const about = computed(() => cfg.value?.footer_about || '')
 const links = computed(() => cfg.value?.footer_links || [])
+const helpLinks = computed(() => cfg.value?.footer_help_links || [])
 const contacts = computed(() => cfg.value?.footer_contact || [])
 const copyright = computed(() => cfg.value?.footer_copyright || `© ${new Date().getFullYear()} ${siteName.value}`)
 
@@ -142,14 +143,17 @@ function isExternal(url: string) {
           </ul>
         </div>
 
-        <!-- 栏 4:帮助中心 -->
+        <!-- 栏 4:帮助中心(后台页脚配置可编辑) -->
         <div>
           <h4 class="text-sm font-bold text-ink mb-3">{{ t('footer.helpTitle') }}</h4>
           <ul class="space-y-2">
-            <li><router-link to="/orders/query" class="text-xs text-ink-soft hover:text-primary transition">{{ t('nav.orders') }}</router-link></li>
-            <li><router-link to="/orders/mine" class="text-xs text-ink-soft hover:text-primary transition">{{ t('nav.mine') }}</router-link></li>
-            <li><span class="text-xs text-ink-soft">{{ t('footer.helpFaq') }}</span></li>
-            <li><span class="text-xs text-ink-soft">{{ t('footer.helpNotice') }}</span></li>
+            <li v-if="!helpLinks.length">
+              <router-link to="/orders/query" class="text-xs text-ink-soft hover:text-primary transition">{{ t('nav.orders') }}</router-link>
+            </li>
+            <li v-for="h in helpLinks" :key="h.title">
+              <router-link v-if="h.url" :to="h.url" class="text-xs text-ink-soft hover:text-primary transition">{{ h.title }}</router-link>
+              <span v-else class="text-xs text-ink-soft">{{ h.title }}</span>
+            </li>
           </ul>
         </div>
       </div>

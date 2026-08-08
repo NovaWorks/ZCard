@@ -39,6 +39,16 @@ function close() {
   // 记录已关闭,本次会话不再弹(刷新后重新弹,避免永久打扰)
   localStorage.setItem(NOTICE_DISMISSED_KEY, '1')
 }
+
+/** 手动打开弹窗(顶部公告入口点击时调用) */
+function open() {
+  if (noticeHtml.value.trim()) {
+    visible.value = true
+  }
+}
+
+// 暴露 open/close 供父组件调用(公告顶部入口)
+defineExpose({ open, close })
 </script>
 
 <template>

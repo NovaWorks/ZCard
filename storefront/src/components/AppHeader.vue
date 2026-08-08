@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useSettingsStore } from '@/stores/settings'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useCartStore } from '@/stores/cart'
+import { emit } from '@/utils/eventBus'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -20,6 +21,11 @@ onMounted(() => {
 })
 const siteName = computed(() => settings.config?.site_name || 'ZCard')
 const siteLogo = computed(() => settings.config?.site_logo || '')
+// 有公告内容时显示顶部公告入口(点击重新弹出公告弹窗)
+const hasNotice = computed(() => !!settings.config?.site_notice?.trim())
+function openNotice() {
+  emit('notice:open')
+}
 // 货币切换:set 后整页刷新以重新拉取价格
 const currencySel = computed({
   get: () => prefs.currency,
@@ -52,7 +58,13 @@ const mobileMenuOpen = ref(false)
   <!-- 顶部品牌条 (深蓝渐变) -->
   <div class="bg-gradient-to-r from-primary-hover to-primary text-white text-xs">
     <div class="max-w-6xl mx-auto px-4 h-8 flex items-center justify-between overflow-hidden">
-      <span class="opacity-90 truncate">{{ t('nav.brandBar.slogan') }}</span>
+      <span class="opacity-90 truncate flex items-center gap-2 min-w-0">
+        <span class="truncate">{{ t('nav.brandBar.slogan') }}</span>
+        <!-- 公告入口:有公告时显示,点击重新弹出公告弹窗 -->
+        <button v-if="hasNotice" @click="openNotice" class="shrink-0 inline-flex items-center gap-1 hover:opacity-80 transition cursor-pointer">
+          📢 <span class="underline underline-offset-2">{{ t('nav.brandBar.notice') }}</span>
+        </button>
+      </span>
       <div class="hidden sm:flex items-center gap-3 opacity-90 shrink-0">
         <span>{{ t('nav.brandBar.securePay') }}</span>
         <span>{{ t('nav.brandBar.privacy') }}</span>

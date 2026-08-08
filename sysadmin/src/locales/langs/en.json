@@ -1256,6 +1256,8 @@
       "footerContactPlaceholder": "JSON array, e.g. [{\"label\":\"QQ\",\"value\":\"10000\"}]",
       "footerSocial": "Social Media",
       "footerSocialPlaceholder": "JSON array, e.g. [{\"name\":\"Telegram\",\"icon\":\"✈️\",\"url\":\"https://t.me/xxx\"}]",
+      "footerHelpLinks": "Help Center",
+      "footerHelpLinksTip": "JSON array, e.g. [{\"title\":\"FAQ\",\"url\":\"/orders/query\"}], empty url shows as plain text",
       "footerAnalytics": "Analytics Code",
       "footerAnalyticsPlaceholder": "Paste Baidu/Google Analytics JS code, injected into storefront page bottom",
       "footerCopyright": "Copyright",

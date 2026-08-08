@@ -88,6 +88,11 @@ class StorefrontConfig
                 ['name' => '微信', 'icon' => '🟢', 'url' => ''],
                 ['name' => 'Discord', 'icon' => '🎮', 'url' => ''],
             ],
+            // 帮助中心(页脚栏4):后台可配置的链接/文本列表
+            'footer_help_links' => [
+                ['title' => '常见问题', 'url' => '/orders/query'],
+                ['title' => '购买须知', 'url' => ''],
+            ],
             'footer_copyright' => '© 2026 ZCard · 现代化插件制自动发卡系统',
             // 第三方统计代码(百度统计/Google Analytics 等,原样注入到页面底部)
             'footer_analytics' => '',

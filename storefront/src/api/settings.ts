@@ -56,6 +56,7 @@ export interface StorefrontSettings {
   footer_links: FooterLink[]
   footer_contact: FooterContact[]
   footer_social: FooterSocial[]
+  footer_help_links: FooterLink[]
   footer_copyright: string
   footer_analytics: string
   // 邮件/短信/提现(后台配置,前台一般不直接使用)
