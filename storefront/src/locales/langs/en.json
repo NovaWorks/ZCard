@@ -273,7 +273,8 @@
       "payable": "Total Due",
       "cartEmpty": "Your cart is empty",
       "continueShopping": "Keep Shopping",
-      "selectChannel": "Please select a payment method"
+      "selectChannel": "Please select a payment method",
+      "balanceLabel": "Balance: ¥{amount}"
     },
     "myOrders": {
       "title": "My Orders",

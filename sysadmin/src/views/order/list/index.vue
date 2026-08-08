@@ -292,6 +292,8 @@
   }[s] || 'info') as any
 
   const channelName = (code: string) => {
+    // 余额支付:未在支付通道表中,单独映射
+    if (code === 'balance') return t('zcard.order.payBalance')
     const ch = channels.value.find(c => c.code === code)
     return ch ? ch.name : code
   }

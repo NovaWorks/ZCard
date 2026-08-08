@@ -91,7 +91,8 @@ async function loadChannels() {
   loading.value = true
   err.value = ''
   try {
-    channels.value = await getChannels()
+    // 充值不能用余额支付,过滤 balance 通道
+    channels.value = (await getChannels()).filter(c => c.code !== 'balance')
   } catch (e: any) {
     err.value = e?.response?.data?.message || t('order.pay.channelLoadFailed')
   } finally {

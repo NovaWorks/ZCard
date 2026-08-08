@@ -1,5 +1,30 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\BillController as AdminBillController;
+use App\Http\Controllers\Api\Admin\CardController as AdminCardController;
+use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController;
+use App\Http\Controllers\Api\Admin\CommissionController as AdminCommissionController;
+use App\Http\Controllers\Api\Admin\CouponController as AdminCouponController;
+use App\Http\Controllers\Api\Admin\CurrencyController as AdminCurrencyController;
+use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Api\Admin\MediaCategoryController as AdminMediaCategoryController;
+use App\Http\Controllers\Api\Admin\MediaController as AdminMediaController;
+use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
+use App\Http\Controllers\Api\Admin\PaymentChannelController as AdminPaymentChannelController;
+use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
+use App\Http\Controllers\Api\Admin\ProductSkuController as AdminProductSkuController;
+use App\Http\Controllers\Api\Admin\RechargeController as AdminRechargeController;
+use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
+use App\Http\Controllers\Api\Admin\SettingController as AdminSettingController;
+use App\Http\Controllers\Api\Admin\SubsiteController as AdminSubsiteController;
+use App\Http\Controllers\Api\Admin\SupplierAccountController;
+use App\Http\Controllers\Api\Admin\SupplierPriceController;
+use App\Http\Controllers\Api\Admin\SupplySourceController;
+use App\Http\Controllers\Api\Admin\UpdateController as AdminUpdateController;
+use App\Http\Controllers\Api\Admin\UploadController as AdminUploadController;
+use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Api\Admin\UserGroupController as AdminUserGroupController;
+use App\Http\Controllers\Api\Admin\WithdrawalController as AdminWithdrawalController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CaptchaController;
 use App\Http\Controllers\Api\CardController;
@@ -7,7 +32,9 @@ use App\Http\Controllers\Api\CardImportController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CouponController;
 use App\Http\Controllers\Api\CurrencyController;
+use App\Http\Controllers\Api\DistributionController;
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\MySupplyController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProductController;
@@ -19,6 +46,7 @@ use App\Http\Controllers\Api\Supply\SupplyController;
 use App\Http\Controllers\Api\Supply\SupplyOrderController;
 use App\Http\Controllers\Api\Supply\SupplyProductController;
 use App\Http\Controllers\Api\WithdrawalController;
+use App\Http\Controllers\InstallController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -81,35 +109,6 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // 后台管理 API(Sanctum token)
-use App\Http\Controllers\Api\Admin\BillController as AdminBillController;
-use App\Http\Controllers\Api\Admin\CardController as AdminCardController;
-use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController;
-use App\Http\Controllers\Api\Admin\CommissionController as AdminCommissionController;
-use App\Http\Controllers\Api\Admin\CouponController as AdminCouponController;
-use App\Http\Controllers\Api\Admin\CurrencyController as AdminCurrencyController;
-use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
-use App\Http\Controllers\Api\Admin\MediaCategoryController as AdminMediaCategoryController;
-use App\Http\Controllers\Api\Admin\MediaController as AdminMediaController;
-use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
-use App\Http\Controllers\Api\Admin\PaymentChannelController as AdminPaymentChannelController;
-use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
-use App\Http\Controllers\Api\Admin\ProductSkuController as AdminProductSkuController;
-use App\Http\Controllers\Api\Admin\RechargeController as AdminRechargeController;
-use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
-use App\Http\Controllers\Api\Admin\SettingController as AdminSettingController;
-use App\Http\Controllers\Api\Admin\SubsiteController as AdminSubsiteController;
-use App\Http\Controllers\Api\Admin\SupplierAccountController;
-use App\Http\Controllers\Api\Admin\SupplierPriceController;
-use App\Http\Controllers\Api\Admin\SupplySourceController;
-use App\Http\Controllers\Api\Admin\UpdateController as AdminUpdateController;
-use App\Http\Controllers\Api\Admin\UploadController as AdminUploadController;
-use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
-use App\Http\Controllers\Api\Admin\UserGroupController as AdminUserGroupController;
-use App\Http\Controllers\Api\Admin\WithdrawalController as AdminWithdrawalController;
-use App\Http\Controllers\Api\DistributionController;
-use App\Http\Controllers\Api\MySupplyController;
-use App\Http\Controllers\InstallController;
-
 Route::middleware(['auth:sanctum', 'admin.role'])->prefix('admin')->group(function () {
     // 仪表盘(概览/趋势/排行)
     Route::get('dashboard/overview', [AdminDashboardController::class, 'overview']);
@@ -316,6 +315,9 @@ Route::get('/orders/query', [OrderController::class, 'query'])->middleware(['dis
 Route::get('/payments/channels', [PaymentController::class, 'channels'])->name('api.payments.channels');
 Route::post('/payments/create', [PaymentController::class, 'create'])->name('api.payments.create');
 Route::post('/payments/batch-create', [PaymentController::class, 'batchCreate'])->name('api.payments.batch-create');
+// 余额支付(需登录,校验订单归属;订单管理可见 payment_channel=balance)
+Route::post('/payments/balance', [PaymentController::class, 'balancePay'])->middleware(['display.currency', 'set.locale'])->name('api.payments.balance');
+Route::post('/payments/balance-batch', [PaymentController::class, 'balanceBatchPay'])->middleware(['display.currency', 'set.locale'])->name('api.payments.balance-batch');
 // 支付回调:易支付(889 等)文档明确异步通知走 GET,部分平台走 POST,统一用 any 兼容。
 // 驱动 verifyCallback 内部已 array_merge(query, post) 兼容两种传参方式。
 Route::any('/payments/callback/{channel}', [PaymentController::class, 'callback'])->name('api.payments.callback');

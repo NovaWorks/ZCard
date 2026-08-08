@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getProduct, type Product } from '@/api/products'
 import { createOrder, createBatchOrders } from '@/api/orders'
-import { getChannels, createPayment, createBatchPayment, type PaymentChannel, type PaymentResult } from '@/api/payments'
+import { getChannels, createPayment, createBatchPayment, balancePay, balanceBatchPay, type PaymentChannel, type PaymentResult } from '@/api/payments'
 import { useSettingsStore } from '@/stores/settings'
 import { useAuthStore } from '@/stores/auth'
 import { formatMoney } from '@/utils/money'
@@ -313,6 +313,12 @@ async function submit() {
 async function doSubmit() {
   if (!selectedChannelId.value) return
   const channelId = selectedChannelId.value
+  const isBalance = selectedChannel.value?.code === 'balance'
+  // 余额支付必须登录
+  if (isBalance && !auth.isLoggedIn) {
+    err.value = t('order.checkout.guestOnlyHint')
+    return
+  }
   err.value = ''
   submitting.value = true
   try {
@@ -330,6 +336,12 @@ async function doSubmit() {
         coupon_code: couponCode.value.trim() || undefined,
         extra: undefined,
       })
+      if (isBalance) {
+        await balanceBatchPay(res.order_ids)
+        cart.clear()
+        router.push({ path: '/pay/result', query: { order_no: res.orders[0]?.order_no || '' } })
+        return
+      }
       const result = await createBatchPayment(res.order_ids, channelId)
       cart.clear()
       handleResult(result)
@@ -346,6 +358,11 @@ async function doSubmit() {
         coupon_code: couponCode.value.trim() || undefined,
         extra: { ...controlValues.value },
       } as any)
+      if (isBalance) {
+        await balancePay(res.order_no)
+        router.push({ path: '/pay/result', query: { order_no: res.order_no } })
+        return
+      }
       const result = await createPayment(res.order_no, channelId)
       handleResult(result)
     }
@@ -380,6 +397,7 @@ const PAY_TYPE_META: Record<string, { icon: string; label: string }> = {
   usdt: { icon: 'ri:coins-line', label: 'USDT' },
   tron: { icon: 'ri:coins-line', label: 'TRON' },
   trx: { icon: 'ri:coins-line', label: 'TRX' },
+  balance: { icon: 'ri:wallet-3-line', label: '余额支付' },
 }
 
 /** 通道对应的支付方式列表(带图标与名称);无 pay_types 时回退到通道自身 */
@@ -549,7 +567,12 @@ const channelPayTypes = (ch: PaymentChannel) => {
                     {{ channelPayTypes(ch).map((p) => p.label).join(' / ') }}
                   </span>
                   <span
-                    v-if="ch.target_currency"
+                    v-if="ch.code === 'balance' && ch.balance !== undefined"
+                    class="block text-[10px] text-ink-muted"
+                  >{{ t('order.checkout.balanceLabel', { amount: formatMoney(ch.balance, displayCur) }) }}</span
+                  >
+                  <span
+                    v-else-if="ch.target_currency"
                     class="block text-[10px] text-ink-muted"
                     >{{ t('order.pay.receiveLabel', { symbol: '', code: ch.target_currency }) }}</span
                   >

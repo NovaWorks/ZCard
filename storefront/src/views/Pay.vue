@@ -3,8 +3,9 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { mockPay } from '@/api/orders'
-import { getChannels, createPayment, type PaymentChannel } from '@/api/payments'
+import { getChannels, createPayment, balancePay, type PaymentChannel } from '@/api/payments'
 import { usePreferencesStore } from '@/stores/preferences'
+import { formatMoney } from '@/utils/money'
 import AppIcon from '@/components/AppIcon.vue'
 
 const route = useRoute()
@@ -42,6 +43,7 @@ const PAY_TYPE_META: Record<string, { icon: string; label: string }> = {
   usdt: { icon: 'ri:coins-line', label: 'USDT' },
   tron: { icon: 'ri:coins-line', label: 'TRON' },
   trx: { icon: 'ri:coins-line', label: 'TRX' },
+  balance: { icon: 'ri:wallet-3-line', label: '余额支付' },
 }
 
 /** 通道对应的支付方式列表;无 pay_types 时回退到通道自身 */
@@ -83,6 +85,12 @@ async function selectChannel(channel: PaymentChannel) {
   err.value = ''
   payingChannelId.value = channel.id
   try {
+    // 余额支付:直接扣款成功,跳结果页
+    if (channel.code === 'balance') {
+      await balancePay(orderNo)
+      router.push({ path: '/pay/result', query: { order_no: orderNo } })
+      return
+    }
     const result = await createPayment(orderNo, channel.id)
     handleResult(result)
   } catch (e: any) {
@@ -196,7 +204,10 @@ async function pay() {
                     .map((p) => p.label)
                     .join(' / ')
             }}</span>
-            <span v-if="ch.target_currency" class="block text-[10px] font-normal text-ink-muted">
+            <span v-if="ch.code === 'balance' && ch.balance !== undefined" class="block text-[10px] font-normal text-ink-muted">
+              {{ t('order.checkout.balanceLabel', { amount: formatMoney(ch.balance, null) }) }}
+            </span>
+            <span v-else-if="ch.target_currency" class="block text-[10px] font-normal text-ink-muted">
               {{ t('order.pay.receiveLabel', { symbol: currencySymbol(ch.target_currency), code: ch.target_currency }) }}
             </span>
           </span>

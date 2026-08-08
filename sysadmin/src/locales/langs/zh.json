@@ -788,7 +788,8 @@
       "deviceAndroid": "Android",
       "deviceOther": "其他",
       "createIp": "IP地址",
-      "createIpPlaceholder": "搜索IP"
+      "createIpPlaceholder": "搜索IP",
+      "payBalance": "余额支付"
     },
     "bill": {
       "title": "账单管理",

@@ -5,7 +5,7 @@ export interface PaymentChannel {
   name: string
   code: string
   icon: string
-  /** 支持的支付方式标识(如 alipay/wechat/paypal/usdt) */
+  /** 支持的支付方式标识(如 alipay/wechat/paypal/usdt/balance) */
   pay_types?: string[]
   supported_currencies?: string[]
   target_currency?: string | null
@@ -13,6 +13,8 @@ export interface PaymentChannel {
   fee?: number
   fee_type?: string
   fee_bearer?: string
+  /** 余额支付通道:当前用户余额(分) */
+  balance?: number
 }
 
 export interface PaymentResult {
@@ -37,3 +39,17 @@ export const createBatchPayment = (orderIds: number[], channelId: number) =>
     order_ids: orderIds,
     channel_id: channelId,
   })
+
+/** 余额支付单个订单(需登录) */
+export const balancePay = (orderNo: string) =>
+  request.post<unknown, BalancePayResult>('/payments/balance', { order_no: orderNo })
+
+/** 购物车聚合余额支付 */
+export const balanceBatchPay = (orderIds: number[]) =>
+  request.post<unknown, BalancePayResult>('/payments/balance-batch', { order_ids: orderIds })
+
+export interface BalancePayResult {
+  orders: { order_no: string; status: string; delivered: boolean }[]
+  amount: number
+  balance_after: number
+}

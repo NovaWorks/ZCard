@@ -788,7 +788,8 @@
       "deviceAndroid": "Android",
       "deviceOther": "Other",
       "createIp": "IP Address",
-      "createIpPlaceholder": "Search IP"
+      "createIpPlaceholder": "Search IP",
+      "payBalance": "Balance"
     },
     "bill": {
       "title": "Bills",

@@ -1,1 +1,0 @@
-import{t as e}from"./request-DZdhMyWt.js";var t=()=>e.get(`/payments/channels`),n=(t,n)=>e.post(`/payments/create`,{order_no:t,channel_id:n}),r=(t,n)=>e.post(`/payments/batch-create`,{order_ids:t,channel_id:n});export{n,t as r,r as t};
