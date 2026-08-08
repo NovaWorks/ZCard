@@ -28,8 +28,11 @@ class OrderController extends Controller
         ]);
 
         // 游客下单限制
+        // 注意:本路由不在 auth:sanctum 组内,$request->user() 默认走 web guard(session),
+        // 无法解析 storefront 发送的 Bearer token → 恒为 null(登录用户也被当游客)。
+        // 必须显式用 sanctum guard 解析,否则订单 user_id 恒为空,"我的订单"查不到。
         $guestCheckout = StorefrontConfig::get('guest_checkout') ?? true;
-        if (! $guestCheckout && ! $request->user()) {
+        if (! $guestCheckout && ! $request->user('sanctum')) {
             return response()->json(['message' => __('messages.guest_only')], 403);
         }
 
@@ -51,7 +54,7 @@ class OrderController extends Controller
                     'extra' => $data['extra'] ?? null,
                     'coupon_code' => $data['coupon_code'] ?? null,
                     'card_id' => $data['card_id'] ?? null,
-                    'user_id' => $request->user()?->id,
+                    'user_id' => $request->user('sanctum')?->id,
                     'create_ip' => $request->ip(),
                     'create_device' => $this->detectDevice($request),
                 ],
@@ -106,7 +109,7 @@ class OrderController extends Controller
         ]);
 
         $guestCheckout = StorefrontConfig::get('guest_checkout') ?? true;
-        if (! $guestCheckout && ! $request->user()) {
+        if (! $guestCheckout && ! $request->user('sanctum')) {
             return response()->json(['message' => __('messages.guest_only')], 403);
         }
 
@@ -124,7 +127,7 @@ class OrderController extends Controller
                     'password' => $data['password'] ?? null,
                     'extra' => $data['extra'] ?? null,
                     'coupon_code' => $data['coupon_code'] ?? null,
-                    'user_id' => $request->user()?->id,
+                    'user_id' => $request->user('sanctum')?->id,
                     'create_ip' => $request->ip(),
                     'create_device' => $this->detectDevice($request),
                 ],
