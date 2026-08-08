@@ -35,6 +35,16 @@ export const tradeRoutes: AppRouteRecord = {
       },
     },
     {
+      path: '/recharge/list',
+      name: 'RechargeList',
+      component: '/recharge/list',
+      meta: {
+        title: 'menus.recharge.title',
+        icon: 'ri:bank-card-line',
+        keepAlive: true,
+      },
+    },
+    {
       path: '/commissionmgt/index',
       name: 'CommissionIndex',
       component: '/commission/list/index',

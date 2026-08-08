@@ -1,17 +1,17 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CaptchaController;
 use App\Http\Controllers\Api\CardController;
 use App\Http\Controllers\Api\CardImportController;
-use App\Http\Controllers\Api\CaptchaController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CouponController;
 use App\Http\Controllers\Api\CurrencyController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentController;
-use App\Http\Controllers\Api\RechargeController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\RechargeController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\StorefrontSettingsController;
 use App\Http\Controllers\Api\SubsiteConsoleController;
@@ -26,9 +26,9 @@ Route::get('/health', HealthController::class)->name('api.health');
 
 // 安装向导(无需认证,安装前可用)
 Route::prefix('install')->group(function () {
-    Route::get('/status', [\App\Http\Controllers\InstallController::class, 'status'])->name('api.install.status');
-    Route::post('/test-db', [\App\Http\Controllers\InstallController::class, 'testDb'])->name('api.install.test-db');
-    Route::post('/run', [\App\Http\Controllers\InstallController::class, 'run'])->name('api.install.run');
+    Route::get('/status', [InstallController::class, 'status'])->name('api.install.status');
+    Route::post('/test-db', [InstallController::class, 'testDb'])->name('api.install.test-db');
+    Route::post('/run', [InstallController::class, 'run'])->name('api.install.run');
 });
 
 // 前台认证(游客,不需 auth)— 限流防暴力破解
@@ -45,9 +45,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/auth/password', [AuthController::class, 'updatePassword'])->name('api.auth.password');
     Route::get('/orders/mine', [OrderController::class, 'myOrders'])->name('api.orders.mine');
     // 三级分销(推广中心)
-    Route::get('/distribution/stats', [\App\Http\Controllers\Api\DistributionController::class, 'stats'])->name('api.distribution.stats');
-    Route::get('/distribution/referrals', [\App\Http\Controllers\Api\DistributionController::class, 'referrals'])->name('api.distribution.referrals');
-    Route::get('/distribution/commissions', [\App\Http\Controllers\Api\DistributionController::class, 'commissions'])->name('api.distribution.commissions');
+    Route::get('/distribution/stats', [DistributionController::class, 'stats'])->name('api.distribution.stats');
+    Route::get('/distribution/referrals', [DistributionController::class, 'referrals'])->name('api.distribution.referrals');
+    Route::get('/distribution/commissions', [DistributionController::class, 'commissions'])->name('api.distribution.commissions');
     // 提现(需登录)
     Route::post('/withdrawals', [WithdrawalController::class, 'request'])->name('api.withdrawals.request');
     Route::get('/withdrawals/history', [WithdrawalController::class, 'history'])->name('api.withdrawals.history');
@@ -59,9 +59,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // 自助供货对接(个人中心 API 对接):获取/查看供货凭证
     Route::prefix('supplier-account')->group(function () {
-        Route::get('/me', [\App\Http\Controllers\Api\MySupplyController::class, 'me'])->name('api.mysupply.me');
-        Route::get('/secret', [\App\Http\Controllers\Api\MySupplyController::class, 'showSecret'])->name('api.mysupply.secret');
-        Route::post('/regenerate', [\App\Http\Controllers\Api\MySupplyController::class, 'regenerate'])->name('api.mysupply.regenerate');
+        Route::get('/me', [MySupplyController::class, 'me'])->name('api.mysupply.me');
+        Route::get('/secret', [MySupplyController::class, 'showSecret'])->name('api.mysupply.secret');
+        Route::post('/regenerate', [MySupplyController::class, 'regenerate'])->name('api.mysupply.regenerate');
     });
 
     // 分站主自助控制台(只在主站)
@@ -81,27 +81,34 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // 后台管理 API(Sanctum token)
+use App\Http\Controllers\Api\Admin\BillController as AdminBillController;
 use App\Http\Controllers\Api\Admin\CardController as AdminCardController;
 use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController;
-use App\Http\Controllers\Api\Admin\CurrencyController as AdminCurrencyController;
-use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
-use App\Http\Controllers\Api\Admin\UpdateController as AdminUpdateController;
-use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
-use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
-use App\Http\Controllers\Api\Admin\BillController as AdminBillController;
 use App\Http\Controllers\Api\Admin\CommissionController as AdminCommissionController;
 use App\Http\Controllers\Api\Admin\CouponController as AdminCouponController;
+use App\Http\Controllers\Api\Admin\CurrencyController as AdminCurrencyController;
+use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Api\Admin\MediaCategoryController as AdminMediaCategoryController;
+use App\Http\Controllers\Api\Admin\MediaController as AdminMediaController;
+use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\PaymentChannelController as AdminPaymentChannelController;
-use App\Http\Controllers\Api\Admin\WithdrawalController as AdminWithdrawalController;
 use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Api\Admin\ProductSkuController as AdminProductSkuController;
+use App\Http\Controllers\Api\Admin\RechargeController as AdminRechargeController;
+use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Api\Admin\SettingController as AdminSettingController;
 use App\Http\Controllers\Api\Admin\SubsiteController as AdminSubsiteController;
+use App\Http\Controllers\Api\Admin\SupplierAccountController;
+use App\Http\Controllers\Api\Admin\SupplierPriceController;
+use App\Http\Controllers\Api\Admin\SupplySourceController;
+use App\Http\Controllers\Api\Admin\UpdateController as AdminUpdateController;
 use App\Http\Controllers\Api\Admin\UploadController as AdminUploadController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\Admin\UserGroupController as AdminUserGroupController;
-use App\Http\Controllers\Api\Admin\MediaController as AdminMediaController;
-use App\Http\Controllers\Api\Admin\MediaCategoryController as AdminMediaCategoryController;
+use App\Http\Controllers\Api\Admin\WithdrawalController as AdminWithdrawalController;
+use App\Http\Controllers\Api\DistributionController;
+use App\Http\Controllers\Api\MySupplyController;
+use App\Http\Controllers\InstallController;
 
 Route::middleware(['auth:sanctum', 'admin.role'])->prefix('admin')->group(function () {
     // 仪表盘(概览/趋势/排行)
@@ -190,6 +197,11 @@ Route::middleware(['auth:sanctum', 'admin.role'])->prefix('admin')->group(functi
     Route::apiResource('orders', AdminOrderController::class)->only(['index', 'show']);
     Route::post('orders/{id}/close', [AdminOrderController::class, 'close']);
 
+    // 充值单管理(列表/详情/统计)
+    // 注意:stats 必须先于 apiResource 注册,否则会被 GET /recharges/{recharge} 当作参数吃掉。
+    Route::get('recharges/stats', [AdminRechargeController::class, 'stats']);
+    Route::apiResource('recharges', AdminRechargeController::class)->only(['index', 'show']);
+
     // 卡密管理(不含明文,安全)
     // 注意:静态路由(export/stats/destroy)必须先于资源式 cards 注册,
     // 否则会被 GET /cards/{id} 这种带参数的解析吃掉。
@@ -227,33 +239,33 @@ Route::middleware(['auth:sanctum', 'admin.role'])->prefix('admin')->group(functi
     Route::post('subsites/product-settings', [AdminSubsiteController::class, 'upsertProductSetting']);
 
     // 供货账号管理(spec §7.1)
-    Route::apiResource('supplier-accounts', \App\Http\Controllers\Api\Admin\SupplierAccountController::class)
+    Route::apiResource('supplier-accounts', SupplierAccountController::class)
         ->parameter('supplier-accounts', 'supplierAccount');
-    Route::post('supplier-accounts/{supplierAccount}/reset-secret', [\App\Http\Controllers\Api\Admin\SupplierAccountController::class, 'resetSecret']);
-    Route::post('supplier-accounts/{supplierAccount}/recharge', [\App\Http\Controllers\Api\Admin\SupplierAccountController::class, 'recharge']);
-    Route::post('supplier-accounts/{supplierAccount}/adjust', [\App\Http\Controllers\Api\Admin\SupplierAccountController::class, 'adjust']);
-    Route::get('supplier-accounts/{supplierAccount}/ledger', [\App\Http\Controllers\Api\Admin\SupplierAccountController::class, 'ledger']);
+    Route::post('supplier-accounts/{supplierAccount}/reset-secret', [SupplierAccountController::class, 'resetSecret']);
+    Route::post('supplier-accounts/{supplierAccount}/recharge', [SupplierAccountController::class, 'recharge']);
+    Route::post('supplier-accounts/{supplierAccount}/adjust', [SupplierAccountController::class, 'adjust']);
+    Route::get('supplier-accounts/{supplierAccount}/ledger', [SupplierAccountController::class, 'ledger']);
     // 专属定价(账号维度)
-    Route::get('supplier-accounts/{supplierAccount}/prices', [\App\Http\Controllers\Api\Admin\SupplierPriceController::class, 'indexForAccount']);
-    Route::put('supplier-accounts/{supplierAccount}/prices', [\App\Http\Controllers\Api\Admin\SupplierPriceController::class, 'updateForAccount']);
-    Route::delete('supplier-accounts/{supplierAccount}/prices/{priceId}', [\App\Http\Controllers\Api\Admin\SupplierPriceController::class, 'destroyForAccount']);
+    Route::get('supplier-accounts/{supplierAccount}/prices', [SupplierPriceController::class, 'indexForAccount']);
+    Route::put('supplier-accounts/{supplierAccount}/prices', [SupplierPriceController::class, 'updateForAccount']);
+    Route::delete('supplier-accounts/{supplierAccount}/prices/{priceId}', [SupplierPriceController::class, 'destroyForAccount']);
     // 专属定价(商品维度)
-    Route::get('products/{product}/supply-prices', [\App\Http\Controllers\Api\Admin\SupplierPriceController::class, 'indexForProduct']);
-    Route::put('products/{product}/supply-prices', [\App\Http\Controllers\Api\Admin\SupplierPriceController::class, 'updateForProduct']);
+    Route::get('products/{product}/supply-prices', [SupplierPriceController::class, 'indexForProduct']);
+    Route::put('products/{product}/supply-prices', [SupplierPriceController::class, 'updateForProduct']);
 
     // 货源对接设置(spec §6.1)
     // 注意:静态 GET supply-sources/drivers 必须先于 apiResource 注册,
     // 否则会被 apiResource 的 show({supplySource}) 当作参数吃掉。
-    Route::get('supply-sources/drivers', [\App\Http\Controllers\Api\Admin\SupplySourceController::class, 'drivers']);
-    Route::apiResource('supply-sources', \App\Http\Controllers\Api\Admin\SupplySourceController::class)
+    Route::get('supply-sources/drivers', [SupplySourceController::class, 'drivers']);
+    Route::apiResource('supply-sources', SupplySourceController::class)
         ->parameter('supply-sources', 'supplySource');
-    Route::post('supply-sources/{supplySource}/test', [\App\Http\Controllers\Api\Admin\SupplySourceController::class, 'test']);
-    Route::post('supply-sources/{supplySource}/sync', [\App\Http\Controllers\Api\Admin\SupplySourceController::class, 'sync']);
-    Route::get('supply-sources/{supplySource}/sync-status', [\App\Http\Controllers\Api\Admin\SupplySourceController::class, 'syncStatus']);
+    Route::post('supply-sources/{supplySource}/test', [SupplySourceController::class, 'test']);
+    Route::post('supply-sources/{supplySource}/sync', [SupplySourceController::class, 'sync']);
+    Route::get('supply-sources/{supplySource}/sync-status', [SupplySourceController::class, 'syncStatus']);
     // 商品预览(实时拉取上游,供勾选) + 勾选导入 + 调试
-    Route::get('supply-sources/{supplySource}/products/preview', [\App\Http\Controllers\Api\Admin\SupplySourceController::class, 'previewProducts']);
-    Route::post('supply-sources/{supplySource}/products/import', [\App\Http\Controllers\Api\Admin\SupplySourceController::class, 'importProducts']);
-    Route::get('supply-sources/{supplySource}/products/debug', [\App\Http\Controllers\Api\Admin\SupplySourceController::class, 'debugProducts']);
+    Route::get('supply-sources/{supplySource}/products/preview', [SupplySourceController::class, 'previewProducts']);
+    Route::post('supply-sources/{supplySource}/products/import', [SupplySourceController::class, 'importProducts']);
+    Route::get('supply-sources/{supplySource}/products/debug', [SupplySourceController::class, 'debugProducts']);
 });
 
 // 公开货币列表(供前台货币切换器,不需要 display.currency 中间件)
@@ -314,7 +326,7 @@ Route::any('/payments/callback/{channel}', [PaymentController::class, 'callback'
 Route::get('/payments/return/{code}', function (Request $request, string $code) {
     $bizNo = $request->query('order_no') ?: $request->query('out_trade_no');
     if (is_string($bizNo) && str_starts_with($bizNo, 'RCH')) {
-        return redirect('/recharge/result?recharge_no=' . urlencode($bizNo));
+        return redirect('/recharge/result?recharge_no='.urlencode($bizNo));
     }
     $query = http_build_query(array_filter([
         'code' => $code,
@@ -322,20 +334,22 @@ Route::get('/payments/return/{code}', function (Request $request, string $code) 
         'session_id' => $request->query('session_id'),
         'out_trade_no' => $request->query('out_trade_no'),
     ]));
-    return redirect('/pay/result?' . $query);
+
+    return redirect('/pay/result?'.$query);
 })->name('payment.return');
 
 Route::get('/payments/cancel/{code}', function (Request $request, string $code) {
     $bizNo = $request->query('order_no') ?: $request->query('out_trade_no');
     if (is_string($bizNo) && str_starts_with($bizNo, 'RCH')) {
-        return redirect('/recharge/result?status=cancel&recharge_no=' . urlencode($bizNo));
+        return redirect('/recharge/result?status=cancel&recharge_no='.urlencode($bizNo));
     }
     $query = http_build_query(array_filter([
         'code' => $code,
         'order_no' => $request->query('order_no'),
         'out_trade_no' => $request->query('out_trade_no'),
     ]));
-    return redirect('/pay/result?status=cancel&' . $query);
+
+    return redirect('/pay/result?status=cancel&'.$query);
 })->name('payment.cancel');
 
 // payment.notify = 异步通知,与 callback 同义(部分第三方用 notify_url 命名)。

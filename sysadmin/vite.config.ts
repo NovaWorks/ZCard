@@ -70,6 +70,18 @@ export default ({ mode }: { mode: string }) => {
     plugins: [
       vue(),
       tailwindcss(),
+      {
+        // SPA 入口 HTML 注入 no-cache meta:更新后浏览器不再用缓存的旧 index.html
+        // 引用已删除的旧 hash JS(NoCacheHtml 中间件只对走 Laravel 的请求生效,
+        // 静态服务环境下 index.html 不经框架,必须靠产物自带防缓存标记)。
+        name: 'inject-no-cache-meta',
+        transformIndexHtml(html: string) {
+          return html.replace(
+            '<head>',
+            '<head>\n    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />\n    <meta http-equiv="Pragma" content="no-cache" />\n    <meta http-equiv="Expires" content="0" />'
+          )
+        }
+      },
       // 自动按需导入 API
       AutoImport({
         imports: ['vue', 'vue-router', 'pinia', '@vueuse/core'],

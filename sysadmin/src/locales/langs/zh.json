@@ -414,6 +414,10 @@
     },
     "media": {
       "title": "素材管理"
+    },
+    "recharge": {
+      "title": "充值管理",
+      "list": "充值列表"
     }
   },
   "table": {
@@ -1597,6 +1601,30 @@
       "empty": "暂无图片",
       "singleSelectTip": "点击图片即选中",
       "multiSelectTip": "点击图片多选"
+    },
+    "recharge": {
+      "listTitle": "充值单列表",
+      "keyword": "关键字",
+      "searchPlaceholder": "充值单号/用户名/邮箱",
+      "status": "状态",
+      "target": "充值目标",
+      "statusPending": "待支付",
+      "statusPaid": "已支付",
+      "statusClosed": "已关闭",
+      "targetBalance": "个人余额",
+      "targetSupply": "供货余额",
+      "rechargeNo": "充值单号",
+      "user": "用户",
+      "userId": "用户 ID",
+      "amount": "金额",
+      "createTime": "创建时间",
+      "paidTime": "支付时间",
+      "detail": "充值详情",
+      "statCount": "充值单数",
+      "statPending": "待支付金额",
+      "statPaid": "已支付金额",
+      "statTotal": "充值总额",
+      "statClosed": "已关闭金额"
     }
   }
 }

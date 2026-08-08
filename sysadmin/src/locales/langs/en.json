@@ -414,6 +414,10 @@
     },
     "media": {
       "title": "Media Library"
+    },
+    "recharge": {
+      "title": "Recharge",
+      "list": "Recharge List"
     }
   },
   "table": {
@@ -1597,6 +1601,30 @@
       "empty": "No images yet",
       "singleSelectTip": "Click an image to select",
       "multiSelectTip": "Click images to select multiple"
+    },
+    "recharge": {
+      "listTitle": "Recharge List",
+      "keyword": "Keyword",
+      "searchPlaceholder": "Recharge No / Username / Email",
+      "status": "Status",
+      "target": "Target",
+      "statusPending": "Pending",
+      "statusPaid": "Paid",
+      "statusClosed": "Closed",
+      "targetBalance": "Balance",
+      "targetSupply": "Supply",
+      "rechargeNo": "Recharge No",
+      "user": "User",
+      "userId": "User ID",
+      "amount": "Amount",
+      "createTime": "Created At",
+      "paidTime": "Paid At",
+      "detail": "Recharge Detail",
+      "statCount": "Total",
+      "statPending": "Pending Amount",
+      "statPaid": "Paid Amount",
+      "statTotal": "Total Amount",
+      "statClosed": "Closed Amount"
     }
   }
 }
