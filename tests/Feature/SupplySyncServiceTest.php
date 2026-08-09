@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Category;
 use App\Models\Merchant;
 use App\Models\SupplySource;
 use App\Models\User;
@@ -90,5 +91,63 @@ class SupplySyncServiceTest extends TestCase
         $this->assertStringContainsString('https://cdn.example.com/c.png', $desc); // 绝对 URL 不动
         $this->assertStringContainsString('//cdn2.example.com/d.png', $desc);     // 协议相对不动
         $this->assertStringContainsString('data:image/png;base64,xxx', $desc);    // data: 不动
+    }
+
+    public function test_sync_auto_creates_upstream_category(): void
+    {
+        $source = $this->makeSource([]);
+        $service = app(SupplySyncService::class);
+
+        $dto = new UpstreamProduct(
+            code: 'UP_CAT_1', name: '同步商品', price: 800, factoryPrice: 500,
+            categoryCode: 'CAT_A', categoryName: '上游分类A',
+        );
+        $product = $service->upsertProduct($source, $dto);
+
+        $this->assertNotNull($product->category_id, '同步商品应自动归入创建的分类,而不是落到"无分类"');
+        $category = $product->category;
+        $this->assertSame('CAT_A', $category->slug);
+        $this->assertSame('上游分类A', $category->name);
+        $this->assertSame(1, (int) $category->merchant_id);
+    }
+
+    public function test_resync_reuses_existing_upstream_category(): void
+    {
+        $source = $this->makeSource([]);
+        $service = app(SupplySyncService::class);
+
+        $service->upsertProduct($source, new UpstreamProduct(
+            code: 'UP_CAT_2', name: 'A', price: 800, factoryPrice: 500,
+            categoryCode: 'CAT_B', categoryName: '分类B',
+        ));
+        // 再次同步同一分类下另一个商品
+        $p2 = $service->upsertProduct($source, new UpstreamProduct(
+            code: 'UP_CAT_3', name: 'B', price: 800, factoryPrice: 500,
+            categoryCode: 'CAT_B', categoryName: '分类B',
+        ));
+
+        $this->assertSame(1, Category::where('slug', 'CAT_B')->count(), '分类不应重复创建');
+        $this->assertSame($p2->category_id, $p2->category_id);
+        // 两个商品归入同一分类
+        $catId = Category::where('slug', 'CAT_B')->value('id');
+        $this->assertSame($catId, (int) $p2->category_id);
+    }
+
+    public function test_category_map_takes_priority_over_auto_create(): void
+    {
+        $source = $this->makeSource([]);
+        $service = app(SupplySyncService::class);
+        $localCat = Category::create([
+            'merchant_id' => 1, 'name' => '本地分类', 'slug' => 'local-cat', 'sort' => 0, 'status' => 1,
+        ]);
+
+        $dto = new UpstreamProduct(
+            code: 'UP_CAT_4', name: 'A', price: 800, factoryPrice: 500,
+            categoryCode: 'CAT_C', categoryName: '上游分类C',
+        );
+        $product = $service->upsertProduct($source, $dto, categoryMap: ['CAT_C' => $localCat->id]);
+
+        $this->assertSame($localCat->id, (int) $product->category_id);
+        $this->assertNull(Category::where('slug', 'CAT_C')->first(), '显式映射时不应自动创建分类');
     }
 }

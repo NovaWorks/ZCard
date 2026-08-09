@@ -65,7 +65,7 @@ class SupplySyncService
                 'images' => $this->normalizeImages($source, $dto->images, $dto->cover),
                 'factory_price' => $dto->factoryPrice,
                 'stock_cache' => $dto->stockQuantity, // 上游库存缓存
-                'category_id' => $this->resolveCategoryId($source, $dto->categoryCode, $categoryMap),
+                'category_id' => $this->resolveCategoryId($source, $dto->categoryCode, $dto->categoryName, $categoryMap),
                 'upstream_synced_at' => now(),
                 'hide' => ! $dto->isActive ? true : $existing->hide, // 上游下架→标隐藏,不删
             ];
@@ -112,7 +112,7 @@ class SupplySyncService
             'stock_type' => 'card',
             'status' => ($price === null || ! ($source->settings['auto_list'] ?? true)) ? 0 : 1,
             'hide' => ! $dto->isActive ? true : false,
-            'category_id' => $this->resolveCategoryId($source, $dto->categoryCode, $categoryMap),
+            'category_id' => $this->resolveCategoryId($source, $dto->categoryCode, $dto->categoryName, $categoryMap),
             'upstream_source_id' => $source->id,
             'upstream_product_code' => $dto->code,
             'stock_cache' => $dto->stockQuantity, // 上游库存缓存(-1=无限)
@@ -208,9 +208,12 @@ class SupplySyncService
 
     /**
      * 解析商品应归入的本地分类 id。
-     * 优先级:勾选导入时的显式映射(category_map) > 上游分类 code 匹配本地 slug > null。
+     * 优先级:勾选导入时的显式映射(category_map) > 上游分类 code 匹配本地 slug > 自动创建。
+     *
+     * 自动创建:全量/增量同步时上游分类不会预先存在本地,若只做 slug 匹配会全部落到
+     * "无分类"。此处按上游分类 code 自动创建一级分类(merchant 1 下),保证同步商品有分类。
      */
-    private function resolveCategoryId(SupplySource $source, ?string $upstreamCatCode, ?array $categoryMap = null): ?int
+    private function resolveCategoryId(SupplySource $source, ?string $upstreamCatCode, ?string $upstreamCatName = null, ?array $categoryMap = null): ?int
     {
         if ($upstreamCatCode !== null && $categoryMap !== null && isset($categoryMap[$upstreamCatCode])) {
             return (int) $categoryMap[$upstreamCatCode] ?: null;
@@ -218,9 +221,25 @@ class SupplySyncService
         if (! $upstreamCatCode) {
             return null;
         }
-        $cat = Category::where('slug', $upstreamCatCode)->first();
 
-        return $cat?->id;
+        $cat = Category::where('merchant_id', self::MAIN_MERCHANT_ID)
+            ->where('slug', $upstreamCatCode)
+            ->first();
+        if ($cat) {
+            return $cat->id;
+        }
+
+        // 自动创建上游分类(幂等:unique(merchant_id, slug))
+        $cat = Category::firstOrCreate(
+            ['merchant_id' => self::MAIN_MERCHANT_ID, 'slug' => mb_substr($upstreamCatCode, 0, 100)],
+            [
+                'name' => $upstreamCatName ? mb_substr($upstreamCatName, 0, 100) : $upstreamCatCode,
+                'sort' => 0,
+                'status' => 1,
+            ],
+        );
+
+        return $cat->id;
     }
 
     private function uniqueSlug(string $name, string $code, bool $forceUnique = false): string
