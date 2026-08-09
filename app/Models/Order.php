@@ -40,6 +40,11 @@ class Order extends Model implements Payable
         return $this->hasMany(OrderDelivery::class);
     }
 
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
     // ===== Payable 实现 =====
 
     public function getPayableKey(): string

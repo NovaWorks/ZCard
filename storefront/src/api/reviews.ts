@@ -23,3 +23,13 @@ export const createReview = (data: {
   rating: number
   content?: string
 }) => request.post<unknown, { id: number; status: string }>('/reviews', data)
+
+/** 当前用户对该商品的可评价状态(登录后调用) */
+export interface ReviewEligibility {
+  allow_post_review: boolean
+  can_review: boolean
+  reviewed: boolean
+  order_id: number | null
+}
+export const getReviewEligibility = (productId: number) =>
+  request.get<unknown, ReviewEligibility>(`/reviews/eligibility/${productId}`)

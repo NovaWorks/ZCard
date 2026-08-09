@@ -8,6 +8,7 @@ use App\Models\Card;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Product;
+use App\Models\Review;
 use App\Models\SubsiteOrderSnapshot;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -462,8 +463,15 @@ class OrderService
             ->limit(50)
             ->get();
 
+        // 批量查已评价订单(供前端展示"评价"入口)
+        $reviewedOrderIds = Review::whereIn('order_id', $orders->pluck('id'))
+            ->pluck('order_id')
+            ->all();
+
         return $orders->map(fn ($o) => [
+            'id' => $o->id,
             'order_no' => $o->order_no,
+            'product_id' => $o->product_id,
             'product_name' => $o->product?->name,
             'product_cover' => $o->product?->cover,
             'quantity' => $o->quantity,
@@ -474,6 +482,7 @@ class OrderService
             'status' => $o->status,
             'created_at' => $o->created_at?->toDateTimeString(),
             'paid_at' => $o->paid_at?->toDateTimeString(),
+            'reviewed' => in_array($o->id, $reviewedOrderIds, true),
             'cards' => $o->orderDeliveries?->map(fn ($d) => $d->card_content)->toArray() ?? [],
         ])->toArray();
     }

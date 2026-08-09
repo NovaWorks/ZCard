@@ -282,7 +282,16 @@
       "loadFailed": "Failed to load orders",
       "cardCollapsed": "View cards ({n})",
       "cardExpanded": "Collapse cards",
-      "pendingHint": "Order pending payment, delivered automatically after payment"
+      "pendingHint": "Order pending payment, delivered automatically after payment",
+      "reviewBtn": "Write Review",
+      "reviewedLabel": "Reviewed",
+      "reviewTitle": "Review Product",
+      "reviewRatingLabel": "Rating",
+      "reviewContentPlaceholder": "Share your experience (optional)",
+      "reviewSubmit": "Submit",
+      "reviewSubmitting": "Submitting…",
+      "reviewSuccess": "Review submitted, thank you!",
+      "reviewFailed": "Failed to submit review, please retry"
     },
     "pay": {
       "title": "Order Pending Payment",

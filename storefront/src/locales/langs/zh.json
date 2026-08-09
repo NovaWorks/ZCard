@@ -282,7 +282,16 @@
       "loadFailed": "加载订单失败",
       "cardCollapsed": "查看卡密({n})",
       "cardExpanded": "收起卡密",
-      "pendingHint": "订单待支付,支付后自动发货"
+      "pendingHint": "订单待支付,支付后自动发货",
+      "reviewBtn": "写评价",
+      "reviewedLabel": "已评价",
+      "reviewTitle": "评价商品",
+      "reviewRatingLabel": "评分",
+      "reviewContentPlaceholder": "说说商品怎么样(选填)",
+      "reviewSubmit": "提交评价",
+      "reviewSubmitting": "提交中…",
+      "reviewSuccess": "评价成功,感谢您的反馈!",
+      "reviewFailed": "评价提交失败,请重试"
     },
     "pay": {
       "title": "订单待支付",

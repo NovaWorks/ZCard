@@ -5,10 +5,13 @@ export interface CreatedOrder {
   amount_base?: number; amount_display?: number; display_currency?: string
 }
 export interface OrderDetail {
+  id?: number
   order_no: string; status: string; product_name?: string; product_cover?: string | null
-  quantity: number; amount: number; cards: string[]
+  product_id?: number; quantity: number; amount: number; cards: string[]
   created_at: string; paid_at?: string
   amount_base?: number; amount_display?: number; display_currency?: string; exchange_rate?: number
+  /** 该订单是否已评价(供"评价"入口显示) */
+  reviewed?: boolean
 }
 export const createOrder = (data: {
   product_id: number; sku_id?: number; qty: number; card_id?: number

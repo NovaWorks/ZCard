@@ -3,7 +3,7 @@ import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getProduct, type Product } from '@/api/products'
-import { getProductReviews, type ReviewItem } from '@/api/reviews'
+import { getProductReviews, getReviewEligibility, createReview, type ReviewItem } from '@/api/reviews'
 import { useSettingsStore } from '@/stores/settings'
 import { formatMoney } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
@@ -99,6 +99,15 @@ const reviewRating = ref(0)
 const reviewCount = ref(0)
 const reviewList = ref<ReviewItem[]>([])
 
+// 写评价入口(登录 + 已购买未评价 + 后台允许评价)
+const canReview = ref(false)
+const reviewOrderId = ref<number | null>(null)
+const reviewVisible = ref(false)
+const reviewStars = ref(5)
+const reviewContent = ref('')
+const reviewSubmitting = ref(false)
+const reviewMsg = ref('')
+
 onMounted(async () => {
   try {
     product.value = await getProduct(route.params.id as string)
@@ -112,7 +121,44 @@ onMounted(async () => {
     reviewCount.value = data.count || 0
     reviewList.value = data.list || []
   } catch (e) { /* 评价加载失败不阻塞页面 */ }
+
+  // 登录用户:查询可评价状态(购买过该商品且未评价)
+  if (localStorage.getItem('zcard_token') && product.value?.id) {
+    try {
+      const el = await getReviewEligibility(product.value.id)
+      canReview.value = el.can_review
+      reviewOrderId.value = el.order_id
+    } catch { /* 未登录/接口异常不显示入口 */ }
+  }
 })
+
+function openReview() {
+  reviewStars.value = 5
+  reviewContent.value = ''
+  reviewMsg.value = ''
+  reviewVisible.value = true
+}
+
+async function submitReview() {
+  if (!product.value?.id || !reviewOrderId.value) return
+  reviewSubmitting.value = true
+  reviewMsg.value = ''
+  try {
+    await createReview({
+      product_id: product.value.id,
+      order_id: reviewOrderId.value,
+      rating: reviewStars.value,
+      content: reviewContent.value.trim() || undefined,
+    })
+    reviewMsg.value = t('order.myOrders.reviewSuccess')
+    canReview.value = false
+    setTimeout(() => { reviewVisible.value = false }, 1200)
+  } catch (e: any) {
+    reviewMsg.value = e?.response?.data?.message || t('order.myOrders.reviewFailed')
+  } finally {
+    reviewSubmitting.value = false
+  }
+}
 
 const fmtDate = (d: string | null) => d ? String(d).slice(0, 10) : ''
 /** 已加入购物车状态(按钮短暂反馈) */
@@ -369,8 +415,46 @@ function buy() {
             class="flex-1 bg-gradient-to-r from-primary to-primary-hover text-white font-bold py-3 rounded-card shadow-md hover:shadow-pop transition"
           >{{ t('product.detail.buyNow') }}</button>
         </div>
+
+        <!-- 写评价入口:登录 + 购买过该商品且未评价 + 后台允许评价 -->
+        <button v-if="canReview" @click="openReview"
+          class="mt-3 w-full border border-primary/40 text-primary text-xs font-medium py-2 rounded-card hover:bg-primary-light transition">
+          {{ t('order.myOrders.reviewBtn') }}
+        </button>
       </div>
     </div>
+
+    <!-- 评价弹窗 -->
+    <Teleport to="body">
+      <div v-if="reviewVisible" class="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/50" @click.self="reviewVisible = false">
+        <div class="bg-white rounded-card shadow-pop max-w-md w-full overflow-hidden">
+          <div class="flex items-center justify-between px-5 py-3 border-b border-border bg-surface-subtle">
+            <span class="text-sm font-bold text-ink">{{ t('order.myOrders.reviewTitle') }}</span>
+            <button @click="reviewVisible = false" class="w-7 h-7 rounded-full flex items-center justify-center text-ink-muted hover:bg-border hover:text-ink transition text-lg leading-none">×</button>
+          </div>
+          <div class="px-5 py-4">
+            <div v-if="product" class="text-xs text-ink-muted mb-3">{{ product.name }}</div>
+            <div class="flex items-center gap-1 mb-4">
+              <span class="text-xs text-ink-soft mr-2">{{ t('order.myOrders.reviewRatingLabel') }}</span>
+              <button v-for="n in 5" :key="n" type="button" @click="reviewStars = n" class="text-2xl leading-none transition">
+                <span :class="n <= reviewStars ? 'text-orange-400' : 'text-border'">★</span>
+              </button>
+            </div>
+            <textarea v-model="reviewContent" :placeholder="t('order.myOrders.reviewContentPlaceholder')"
+              rows="3" maxlength="1000"
+              class="w-full px-3 py-2 border border-border rounded-field text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition"></textarea>
+            <div v-if="reviewMsg" :class="['mt-2 text-xs', reviewMsg === t('order.myOrders.reviewSuccess') ? 'text-success' : 'text-danger']">{{ reviewMsg }}</div>
+          </div>
+          <div class="flex justify-end gap-2 px-5 py-3 border-t border-border">
+            <button @click="reviewVisible = false" class="px-4 py-1.5 rounded-field border border-border text-ink-soft text-xs hover:bg-surface-subtle transition">{{ t('common.cancel') }}</button>
+            <button @click="submitReview" :disabled="reviewSubmitting"
+              class="px-4 py-1.5 rounded-field bg-primary text-white text-xs font-medium hover:bg-primary-hover transition disabled:opacity-50">
+              {{ reviewSubmitting ? t('order.myOrders.reviewSubmitting') : t('order.myOrders.reviewSubmit') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- 靓号自选弹窗 -->
     <Teleport to="body">

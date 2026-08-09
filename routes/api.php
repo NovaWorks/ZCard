@@ -282,7 +282,9 @@ Route::middleware(['display.currency', 'set.locale'])->group(function () {
 });
 
 // 提交评价(需登录)
-Route::middleware('auth:sanctum')->post('/reviews', [ReviewController::class, 'store'])->name('api.reviews.store');
+    Route::middleware('auth:sanctum')->post('/reviews', [ReviewController::class, 'store'])->name('api.reviews.store');
+    // 可评价状态(需登录):静态路由先于资源式注册
+    Route::middleware('auth:sanctum')->get('/reviews/eligibility/{productId}', [ReviewController::class, 'eligibility'])->name('api.reviews.eligibility');
 Route::get('/settings/storefront', [StorefrontSettingsController::class, 'show'])->middleware(['display.currency', 'set.locale'])->name('api.settings.storefront');
 
 // 验证码(图形验证码,基于 mews/captcha)
