@@ -345,8 +345,25 @@ ZCard/
 | `php artisan migrate` | 运行数据库迁移 |
 | `php artisan test` | 运行测试（56 passed） |
 | `php artisan tinker` | Tinker REPL |
+| `php artisan queue:work` | **生产必配**：队列消费进程（见下方「⚠️ 必须启动队列进程」） |
 | `cd storefront && pnpm build` | 重新编译前台（开发时） |
 | `cd sysadmin && pnpm build` | 重新编译后台（开发时） |
+
+> ### ⚠️ 必须启动队列进程（生产环境）
+>
+> 下列功能依赖后台队列（`QUEUE_CONNECTION=database`，任务存在数据库表中）：
+>
+> - **上游货源拿货**：顾客下单支付后，异步拿货任务 `FetchFromUpstream` 由队列消费（货源为 `async` 模式、或同步拿货失败自动转异步时**必依赖队列**）。**队列不运行 = 订单已支付但永远拿不到上游卡密**。
+> - **大批量卡密导入**（>5000 条走 `ImportCardsJob`）
+> - 其他异步任务
+>
+> 启动方式（生产用 supervisor 托管，见《部署安装指南》第 4 步）：
+>
+> ```bash
+> php artisan queue:work --tries=3 --timeout=300
+> ```
+>
+> 验证：`ps aux | grep queue:work` 应有进程；`php artisan queue:monitor` 可查看队列健康度。
 
 ---
 
