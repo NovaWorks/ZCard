@@ -291,7 +291,8 @@
       "reviewSubmit": "Submit",
       "reviewSubmitting": "Submitting…",
       "reviewSuccess": "Review submitted, thank you!",
-      "reviewFailed": "Failed to submit review, please retry"
+      "reviewFailed": "Failed to submit review, please retry",
+      "payNow": "Pay Now"
     },
     "pay": {
       "title": "Order Pending Payment",

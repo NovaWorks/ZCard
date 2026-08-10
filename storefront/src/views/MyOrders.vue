@@ -151,9 +151,13 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- 待支付提示 -->
-        <div v-else-if="o.status === 'pending'" class="mt-3 text-xs text-orange-600">
-          {{ t('order.myOrders.pendingHint') }}
+        <!-- 待支付:提示 + 去支付按钮(跳转支付页,支持第三方/余额支付) -->
+        <div v-else-if="o.status === 'pending'" class="mt-3 pt-3 border-t border-border flex items-center justify-between gap-3">
+          <span class="text-xs text-orange-600">{{ t('order.myOrders.pendingHint') }}</span>
+          <button @click="router.push('/pay/' + o.order_no)"
+            class="shrink-0 px-4 py-1.5 rounded-pill bg-primary text-white text-xs font-medium hover:bg-primary-hover transition">
+            {{ t('order.myOrders.payNow') }}
+          </button>
         </div>
 
         <!-- 评价入口:已支付 + 未评价 + 后台允许评价 -->

@@ -291,7 +291,8 @@
       "reviewSubmit": "提交评价",
       "reviewSubmitting": "提交中…",
       "reviewSuccess": "评价成功,感谢您的反馈!",
-      "reviewFailed": "评价提交失败,请重试"
+      "reviewFailed": "评价提交失败,请重试",
+      "payNow": "去支付"
     },
     "pay": {
       "title": "订单待支付",
