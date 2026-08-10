@@ -170,7 +170,7 @@ class OkPayDriver implements PaymentDriver
 
     public function getInfo(): array
     {
-        return ['name' => 'OKPay', 'icon' => '₮'];
+        return ['name' => 'OKPay', 'icon' => 'okpay'];
     }
 
     public function getPayTypes(array $config): array

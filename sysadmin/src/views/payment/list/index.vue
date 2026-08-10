@@ -18,7 +18,7 @@
       >
         <div class="channel-head">
           <div class="channel-icon">
-            <img v-if="channel.icon" :src="channel.icon" :alt="channel.name" />
+            <PayBrandIcon v-if="channel.icon" :brand="channel.icon" :size="32" />
             <ElIcon v-else :size="32"><Wallet /></ElIcon>
           </div>
           <div class="channel-meta">
@@ -54,7 +54,7 @@
           v-model="addChecked[d.code]"
           class="driver-item"
         >
-          <span class="driver-icon">{{ d.icon }}</span>
+          <span class="driver-icon"><PayBrandIcon :brand="d.icon" :size="20" /></span>
           <span class="driver-name">{{ d.name }}</span>
         </ElCheckbox>
       </div>
@@ -464,7 +464,8 @@
 
     .driver-icon {
       margin-right: 8px;
-      font-size: 18px;
+      display: inline-flex;
+      align-items: center;
     }
 
     .driver-name {

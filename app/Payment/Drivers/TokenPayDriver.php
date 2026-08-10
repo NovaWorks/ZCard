@@ -152,7 +152,7 @@ class TokenPayDriver implements PaymentDriver
 
     public function getInfo(): array
     {
-        return ['name' => 'TokenPay', 'icon' => '₮'];
+        return ['name' => 'TokenPay', 'icon' => 'tokenpay'];
     }
 
     public function getPayTypes(array $config): array

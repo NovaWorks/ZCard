@@ -153,7 +153,7 @@ class UsdtDriver implements PaymentDriver
     {
         return [
             'name' => 'USDT',
-            'icon' => '₮',
+            'icon' => 'usdt',
         ];
     }
 

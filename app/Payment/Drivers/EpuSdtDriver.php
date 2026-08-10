@@ -180,7 +180,7 @@ class EpuSdtDriver extends AbstractPaymentDriver
     {
         return [
             'name' => 'EpuSdt(USDT)',
-            'icon' => '₮',
+            'icon' => 'usdt',
         ];
     }
 

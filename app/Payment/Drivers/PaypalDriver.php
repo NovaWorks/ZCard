@@ -154,7 +154,7 @@ class PaypalDriver extends AbstractPaymentDriver
     {
         return [
             'name' => 'PayPal',
-            'icon' => '🅿️',
+            'icon' => 'paypal',
         ];
     }
 

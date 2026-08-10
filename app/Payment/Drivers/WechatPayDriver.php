@@ -135,7 +135,7 @@ class WechatPayDriver implements PaymentDriver
     {
         return [
             'name' => '微信支付',
-            'icon' => '💚',
+            'icon' => 'wechat',
         ];
     }
 

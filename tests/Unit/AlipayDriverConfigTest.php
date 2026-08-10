@@ -69,4 +69,21 @@ class AlipayDriverConfigTest extends TestCase
         $this->assertSame(['web'], $driver->getPayTypes([]));
         $this->assertSame(['web'], $driver->getPayTypes(['pay_type' => 'web']));
     }
+
+    public function test_sn_mode_passes_cert_sns_without_paths(): void
+    {
+        $cfg = $this->buildConfig([
+            'app_id' => '2021000000000000',
+            'private_key' => 'k',
+            'app_public_cert_sn' => 'SN-APP-123',
+            'alipay_root_cert_sn' => 'SN-ROOT-456',
+        ]);
+
+        $alipay = $cfg['alipay']['default'];
+        $this->assertSame('SN-APP-123', $alipay['app_public_cert_sn']);
+        $this->assertSame('SN-ROOT-456', $alipay['alipay_root_cert_sn']);
+        // SN 模式下证书路径可为空(yansongda 优先读 SN)
+        $this->assertNull($alipay['app_public_cert_path']);
+        $this->assertNull($alipay['alipay_root_cert_path']);
+    }
 }

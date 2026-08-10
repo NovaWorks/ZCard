@@ -269,7 +269,7 @@ class EpayDriver extends AbstractPaymentDriver
     {
         return [
             'name' => '易支付',
-            'icon' => '🔗',
+            'icon' => 'epay',
         ];
     }
 

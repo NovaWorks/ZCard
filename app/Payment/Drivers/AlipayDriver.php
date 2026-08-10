@@ -29,6 +29,11 @@ class AlipayDriver implements PaymentDriver
                 'default' => [
                     'app_id' => $config['app_id'] ?? '',
                     'app_secret_cert' => $config['private_key'] ?? '',
+                    // 两种验签方式二选一:
+                    // A. SN 直填(推荐,开放平台「密钥管理」页可复制,无需证书文件)
+                    'app_public_cert_sn' => $config['app_public_cert_sn'] ?? null,
+                    'alipay_root_cert_sn' => $config['alipay_root_cert_sn'] ?? null,
+                    // B. 证书路径或 PEM 内容(自动落盘 storage/app/certs)
                     'app_public_cert_path' => $this->resolveCertPath($config['app_public_cert_path'] ?? null, 'app'),
                     'alipay_root_cert_path' => $this->resolveCertPath($config['alipay_root_cert_path'] ?? null, 'root'),
                     'mode' => $mode,
@@ -147,17 +152,29 @@ class AlipayDriver implements PaymentDriver
                 'type' => 'textarea',
                 'required' => true,
             ],
+            'app_public_cert_sn' => [
+                'label' => '应用公钥证书 SN(推荐,与证书二选一)',
+                'type' => 'text',
+                'required' => false,
+                'help' => '开放平台 → 密钥管理 → 查看应用公钥证书 → 复制「SN」字段;填了 SN 则无需填下方证书',
+            ],
+            'alipay_root_cert_sn' => [
+                'label' => '支付宝根证书 SN(推荐,与证书二选一)',
+                'type' => 'text',
+                'required' => false,
+                'help' => '开放平台 → 密钥管理 → 查看支付宝根证书 → 复制「SN」字段',
+            ],
             'app_public_cert_path' => [
                 'label' => '应用公钥证书(路径或 PEM 内容)',
                 'type' => 'textarea',
-                'required' => true,
-                'help' => '支付宝开放平台「密钥管理」下载 appCertPublicKey.crt;可填服务器文件路径,或直接粘贴证书内容(-----BEGIN CERTIFICATE----- 开头)',
+                'required' => false,
+                'help' => '未填 SN 时必填。开放平台「密钥管理」下载 appCertPublicKey.crt;可填服务器文件路径,或直接粘贴证书内容(-----BEGIN CERTIFICATE----- 开头)',
             ],
             'alipay_root_cert_path' => [
                 'label' => '支付宝根证书(路径或 PEM 内容)',
                 'type' => 'textarea',
-                'required' => true,
-                'help' => '支付宝开放平台下载 alipayRootCert.crt;同上可填路径或粘贴内容',
+                'required' => false,
+                'help' => '未填 SN 时必填。开放平台下载 alipayRootCert.crt;同上可填路径或粘贴内容',
             ],
             'pay_type' => [
                 'label' => '支付方式',
@@ -197,7 +214,7 @@ class AlipayDriver implements PaymentDriver
     {
         return [
             'name' => '支付宝',
-            'icon' => 'ri:alipay-line',
+            'icon' => 'alipay',
         ];
     }
 

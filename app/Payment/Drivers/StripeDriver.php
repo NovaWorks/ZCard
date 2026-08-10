@@ -103,7 +103,7 @@ class StripeDriver extends AbstractPaymentDriver
     {
         return [
             'name' => 'Stripe',
-            'icon' => '💳',
+            'icon' => 'stripe',
         ];
     }
 

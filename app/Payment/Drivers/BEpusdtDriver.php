@@ -203,7 +203,7 @@ class BEpusdtDriver extends AbstractPaymentDriver
     {
         return [
             'name' => 'BEpusdt',
-            'icon' => '🪙',
+            'icon' => 'usdt',
         ];
     }
 

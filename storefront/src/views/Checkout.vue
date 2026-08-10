@@ -12,6 +12,7 @@ import { calcChannelFee } from '@/utils/fee'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useCartStore, type CartItem } from '@/stores/cart'
 import AppIcon from '@/components/AppIcon.vue'
+import PayBrandIcon from '@/components/PayBrandIcon.vue'
 
 interface ControlField {
   type: string; label: string; name: string; required: boolean; options?: string[]
@@ -386,21 +387,21 @@ function doSubmitConfirmed() {
 
 /** 支付方式标识 → 展示信息(图标/名称)。参考 dujiao-next/acg-faka 收银台:显示具体支付方式而非通道名 */
 const PAY_TYPE_META: Record<string, { icon: string; label: string }> = {
-  alipay: { icon: 'ri:alipay-line', label: '支付宝' },
-  wechat: { icon: 'ri:wechat-line', label: '微信支付' },
-  wxpay: { icon: 'ri:wechat-line', label: '微信支付' },
-  qqpay: { icon: 'ri:qq-line', label: 'QQ 钱包' },
-  bank: { icon: 'ri:bank-line', label: '云闪付 / 网银' },
-  jdpay: { icon: 'ri:shopping-bag-line', label: '京东支付' },
-  paypal: { icon: 'ri:paypal-line', label: 'PayPal' },
-  stripe: { icon: 'ri:bank-card-2-line', label: 'Stripe' },
-  usdt: { icon: 'ri:coins-line', label: 'USDT' },
-  tron: { icon: 'ri:coins-line', label: 'TRON' },
-  trx: { icon: 'ri:coins-line', label: 'TRX' },
-  balance: { icon: 'ri:wallet-3-line', label: '余额支付' },
-  h5: { icon: 'ri:alipay-line', label: '手机网站支付' },
-  scan: { icon: 'ri:qr-scan-line', label: '当面付扫码' },
-  pos: { icon: 'ri:alipay-line', label: '刷卡支付' },
+  alipay: { icon: 'alipay', label: '支付宝' },
+  wechat: { icon: 'wechat', label: '微信支付' },
+  wxpay: { icon: 'wechat', label: '微信支付' },
+  qqpay: { icon: 'qqpay', label: 'QQ 钱包' },
+  bank: { icon: 'bank', label: '云闪付 / 网银' },
+  jdpay: { icon: 'jdpay', label: '京东支付' },
+  paypal: { icon: 'paypal', label: 'PayPal' },
+  stripe: { icon: 'stripe', label: 'Stripe' },
+  usdt: { icon: 'usdt', label: 'USDT' },
+  tron: { icon: 'usdt', label: 'TRON' },
+  trx: { icon: 'usdt', label: 'TRX' },
+  balance: { icon: 'balance', label: '余额支付' },
+  h5: { icon: 'alipay', label: '手机网站支付' },
+  scan: { icon: 'alipay', label: '当面付扫码' },
+  pos: { icon: 'alipay', label: '刷卡支付' },
 }
 
 /** 通道对应的支付方式列表(带图标与名称);无 pay_types 时回退到通道自身 */
@@ -561,7 +562,7 @@ const channelPayTypes = (ch: PaymentChannel) => {
                 <span class="flex items-center gap-2 shrink-0">
                   <template v-for="pt in channelPayTypes(ch)" :key="pt.type">
                     <span class="w-8 h-8 rounded-lg bg-surface-subtle flex items-center justify-center text-lg">
-                      <AppIcon :name="pt.icon" class="w-4.5 h-4.5" />
+                      <PayBrandIcon :brand="pt.icon" :size="18" />
                     </span>
                   </template>
                 </span>

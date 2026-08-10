@@ -130,7 +130,7 @@ class CodePayDriver extends AbstractPaymentDriver
     {
         return [
             'name' => '码支付',
-            'icon' => '📋',
+            'icon' => 'codepay',
         ];
     }
 
