@@ -619,7 +619,8 @@
       "seoKeywordsPlaceholder": "e.g. gmail, 2FA, accounts",
       "seoKeywordsTip": "Comma separated; empty = category + product name",
       "seoDescription": "SEO Description",
-      "seoDescriptionPlaceholder": "Brief summary for search engines; empty = first 150 chars of description"
+      "seoDescriptionPlaceholder": "Brief summary for search engines; empty = first 150 chars of description",
+      "supplierSource": "Supplier"
     },
     "category": {
       "title": "Categories",

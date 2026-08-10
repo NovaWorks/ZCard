@@ -27,6 +27,10 @@ class ProductController extends Controller
         if ($categoryId = $request->input('category_id')) {
             $query->where('category_id', $categoryId);
         }
+        // 按货源商筛选(上游供货商品,如某供货商跑路需整体下架)
+        if ($sourceId = $request->input('upstream_source_id')) {
+            $query->where('upstream_source_id', $sourceId);
+        }
         if ($request->has('is_featured') && $request->input('is_featured') !== null) {
             $query->where('is_featured', $request->boolean('is_featured'));
         }

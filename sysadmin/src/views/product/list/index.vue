@@ -68,6 +68,11 @@
               <ElOption :label="t('zcard.product.stockAvailable')" value="available" />
             </ElSelect>
           </ElFormItem>
+          <ElFormItem :label="t('zcard.product.supplierSource')">
+            <ElSelect v-model="searchForm.upstream_source_id" :placeholder="t('zcard.product.all')" clearable style="width: 160px">
+              <ElOption v-for="s in supplySources" :key="s.id" :label="s.name" :value="s.id" />
+            </ElSelect>
+          </ElFormItem>
           <ElFormItem>
             <ElButton type="primary" @click="handleSearch">{{ t('zcard.common.search') }}</ElButton>
             <ElButton @click="handleReset">{{ t('zcard.common.reset') }}</ElButton>
@@ -854,6 +859,7 @@
     type UserGroup
   } from '@/api/products'
   import { getAllCategories, type Category } from '@/api/categories'
+  import { getSupplySources, type SupplySource } from '@/api/supply'
   import { uploadImage } from '@/api/upload'
   import MediaPicker from '@/components/business/media-picker/index.vue'
   import { MdEditor } from 'md-editor-v3'
@@ -909,14 +915,19 @@
     is_featured?: number
     stock_type?: string
     stock_status?: string
+    upstream_source_id?: number
   }>({
     keyword: undefined,
     status: undefined,
     category_id: undefined,
     is_featured: undefined,
     stock_type: undefined,
-    stock_status: undefined
+    stock_status: undefined,
+    upstream_source_id: undefined
   })
+
+  /** 货源商列表(筛选下拉) */
+  const supplySources = ref<SupplySource[]>([])
 
   /** 分类列表(扁平化后供下拉使用) */
   const categories = ref<{ id: number; name: string }[]>([])
@@ -955,6 +966,14 @@
   }
 
   /** 拉取商品列表 */
+  /** 加载货源商(筛选下拉选项) */
+  const loadSupplySources = async () => {
+    try {
+      const res = await getSupplySources({ per_page: 100 })
+      supplySources.value = res.data || []
+    } catch { /* 无货源商不影响列表 */ }
+  }
+
   const fetchData = async () => {
     loading.value = true
     try {
@@ -966,7 +985,8 @@
         category_id: searchForm.category_id,
         is_featured: searchForm.is_featured,
         stock_type: searchForm.stock_type,
-        stock_status: searchForm.stock_status
+        stock_status: searchForm.stock_status,
+        upstream_source_id: searchForm.upstream_source_id
       })
       tableData.value = (res.data || []).map((p) => ({
         ...p,
@@ -1811,6 +1831,7 @@
       searchForm.stock_status = 'out'
     }
     loadCategories()
+    loadSupplySources()
     fetchData()
     fetchStats()
   })

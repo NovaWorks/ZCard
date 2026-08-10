@@ -56,6 +56,8 @@ export interface ProductListParams {
   is_featured?: number
   stock_type?: string
   stock_status?: string
+  /** 货源商筛选(上游供货商品) */
+  upstream_source_id?: number
 }
 
 /** 获取商品列表 */

@@ -619,7 +619,8 @@
       "seoKeywordsPlaceholder": "如:谷歌邮箱,带2FA,账号",
       "seoKeywordsTip": "逗号分隔;留空自动使用 分类名+商品名",
       "seoDescription": "SEO 描述",
-      "seoDescriptionPlaceholder": "简要介绍商品,用于搜索引擎展示;留空自动取商品描述前150字"
+      "seoDescriptionPlaceholder": "简要介绍商品,用于搜索引擎展示;留空自动取商品描述前150字",
+      "supplierSource": "货源商"
     },
     "category": {
       "title": "分类管理",
