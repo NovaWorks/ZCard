@@ -56,6 +56,7 @@ import RIQqLine from '~icons/ri/qq-line'
 import RIPaypalLine from '~icons/ri/paypal-line'
 import RILockLine from '~icons/ri/lock-line'
 import RIWallet3Line from '~icons/ri/wallet-3-line'
+import RIQrScanLine from '~icons/ri/qr-scan-line'
 
 /** 名称 → 图标组件映射(与 Iconify 命名一致,如 "ri:bank-card-line") */
 const MAP: Record<string, any> = {
@@ -104,6 +105,7 @@ const MAP: Record<string, any> = {
   'ri:paypal-line': RIPaypalLine,
   'ri:lock-line': RILockLine,
   'ri:wallet-3-line': RIWallet3Line,
+  'ri:qr-scan-line': RIQrScanLine,
 }
 
 const props = defineProps<{ name?: string }>()

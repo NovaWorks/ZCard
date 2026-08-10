@@ -44,6 +44,9 @@ const PAY_TYPE_META: Record<string, { icon: string; label: string }> = {
   tron: { icon: 'ri:coins-line', label: 'TRON' },
   trx: { icon: 'ri:coins-line', label: 'TRX' },
   balance: { icon: 'ri:wallet-3-line', label: '余额支付' },
+  h5: { icon: 'ri:alipay-line', label: '手机网站支付' },
+  scan: { icon: 'ri:qr-scan-line', label: '当面付扫码' },
+  pos: { icon: 'ri:alipay-line', label: '刷卡支付' },
 }
 
 /** 通道对应的支付方式列表;无 pay_types 时回退到通道自身 */
