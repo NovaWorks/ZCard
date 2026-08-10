@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
+import { useSettingsStore } from '@/stores/settings'
+import { setSeo } from '@/utils/seo'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -40,6 +42,19 @@ router.beforeEach((to) => {
   }
   if (to.meta.requiresAuth && !localStorage.getItem('zcard_token')) {
     return { name: 'login', query: { redirect: to.fullPath } }
+  }
+})
+
+// 路由切换后重置为站点默认 SEO(商品等页面加载后再覆盖标题/描述)
+router.afterEach(() => {
+  const settings = useSettingsStore()
+  if (settings.config) {
+    setSeo({
+      title: settings.config.site_name || 'ZCard',
+      description: settings.config.site_description || '',
+      keywords: settings.config.site_keywords || '',
+      type: 'website',
+    })
   }
 })
 

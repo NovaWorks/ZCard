@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getProduct, type Product } from '@/api/products'
 import { getProductReviews, getReviewEligibility, createReview, type ReviewItem } from '@/api/reviews'
+import { setSeo } from '@/utils/seo'
 import { useSettingsStore } from '@/stores/settings'
 import { formatMoney } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
@@ -112,6 +113,16 @@ onMounted(async () => {
   try {
     product.value = await getProduct(route.params.id as string)
     selectedSku.value = product.value.skus?.[0]?.id ?? null
+    // 商品级 SEO:标题 = 商品名,关键词/描述 = 后端自动组合(可后台自定义 seo_*)
+    const siteName = settings.config?.site_name || 'ZCard'
+    const seo = (product.value as any)?.seo || {}
+    setSeo({
+      title: seo.title ? `${seo.title} - ${siteName}` : `${product.value.name} - ${siteName}`,
+      description: seo.description || '',
+      keywords: seo.keywords || '',
+      image: product.value.cover || undefined,
+      type: 'product',
+    })
   } catch (e) { err.value = t('product.detail.notFound') }
 
   // 拉取合并评价(真实 + 虚拟)

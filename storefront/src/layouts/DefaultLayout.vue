@@ -7,6 +7,7 @@ import NoticeModal from '@/components/NoticeModal.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { getStorefrontSettings } from '@/api/settings'
 import { on as onEvent } from '@/utils/eventBus'
+import { setSeo } from '@/utils/seo'
 import AppIcon from '@/components/AppIcon.vue'
 
 const { t } = useI18n()
@@ -22,19 +23,16 @@ onMounted(() => {
 })
 onUnmounted(() => offNotice?.())
 
-// SEO:动态设置标题和 meta description
+// SEO:站点默认标题/描述/关键词(商品等页面会覆盖标题与描述)
 watchEffect(() => {
   const config = settings.config
   if (config) {
-    document.title = config.site_name || 'ZCard'
-    // 设置 meta description
-    let metaDesc = document.querySelector('meta[name="description"]')
-    if (!metaDesc) {
-      metaDesc = document.createElement('meta')
-      metaDesc.setAttribute('name', 'description')
-      document.head.appendChild(metaDesc)
-    }
-    metaDesc.setAttribute('content', config.site_description || config.site_name || 'ZCard')
+    setSeo({
+      title: config.site_name || 'ZCard',
+      description: config.site_description || '',
+      keywords: config.site_keywords || '',
+      type: 'website',
+    })
   }
 })
 

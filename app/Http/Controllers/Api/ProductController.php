@@ -145,7 +145,21 @@ class ProductController extends Controller
                 : null,
         ];
         if ($detail) {
+            // SEO:未自定义时自动组合(标题=商品名,关键词=分类+商品名,描述=商品描述摘要)
+            $categoryName = $p->category?->name;
+            $seoTitle = $p->seo_title ?: $p->name;
+            $seoKeywords = $p->seo_keywords ?: implode(',', array_filter([
+                $categoryName, $p->name,
+            ]));
+            $seoDescription = $p->seo_description
+                ?: ($p->description ? mb_substr(strip_tags($p->description), 0, 150) : '');
+
             $data = array_merge($data, [
+                'seo' => [
+                    'title' => $seoTitle,
+                    'keywords' => $seoKeywords,
+                    'description' => $seoDescription,
+                ],
                 'description' => $p->description,
                 'images' => $p->images ?? [],
                 'category' => $p->category?->only(['id', 'name', 'slug']),

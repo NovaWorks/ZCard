@@ -16,6 +16,8 @@ class Product extends Model
         // 供货上游来源(Phase 1)
         'upstream_source_id', 'upstream_product_code', 'upstream_synced_at', 'stock_cache',
         'category_id', 'name', 'slug', 'description', 'price',
+        // SEO(自定义标题/关键词/描述,留空前端自动组合)
+        'seo_title', 'seo_keywords', 'seo_description',
         'factory_price', 'draft_premium',
         'member_price', 'cover', 'images', 'stock_type', 'stock_visible',
         'control_config', 'delivery_mode', 'sort', 'status',

@@ -69,6 +69,7 @@ class StorefrontConfig
             'site_url' => '',
             'site_logo' => '',
             'site_description' => 'ZCard — 现代化插件制虚拟商品自动发卡平台,7×24 小时极速发货,安全可靠。',
+            'site_keywords' => '虚拟商品,自动发卡,卡密,游戏账号,会员充值',
             'footer_about' => 'ZCard 是现代化的插件制虚拟商品自动发卡平台,7×24 小时极速发货、安全可靠,为您提供优质的数字商品购物体验。',
             'footer_links' => [
                 ['title' => '首页', 'url' => '/'],
@@ -116,7 +117,6 @@ class StorefrontConfig
             'sms_sign_name' => '',
             'sms_template_code' => '',           // 验证码模板 CODE
             'sms_delivery_template_code' => '',   // 发货通知模板 CODE
-
 
             // 提现设置(预留)
             'cash_min' => 100,

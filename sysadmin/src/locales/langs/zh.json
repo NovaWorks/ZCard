@@ -611,7 +611,15 @@
       "levelDiscount": "相当于折扣",
       "levelDiscountUnit": "折",
       "featuredYes": "已推荐",
-      "featuredNo": "未推荐"
+      "featuredNo": "未推荐",
+      "seoSection": "SEO 设置(搜索引擎优化)",
+      "seoTitle": "SEO 标题",
+      "seoTitlePlaceholder": "留空自动使用商品名",
+      "seoKeywords": "SEO 关键词",
+      "seoKeywordsPlaceholder": "如:谷歌邮箱,带2FA,账号",
+      "seoKeywordsTip": "逗号分隔;留空自动使用 分类名+商品名",
+      "seoDescription": "SEO 描述",
+      "seoDescriptionPlaceholder": "简要介绍商品,用于搜索引擎展示;留空自动取商品描述前150字"
     },
     "category": {
       "title": "分类管理",
@@ -1289,7 +1297,10 @@
       "supplyRateLimit": "供货 API 限流",
       "supplyRateLimitTip": "对外供货 API 每账号每分钟最大请求数,超出返回 429",
       "supplyTimestampSkew": "签名时间窗口(秒)",
-      "supplyTimestampSkewTip": "供货 API 请求 timestamp 与服务器时间差超过此值则拒绝(防重放)。建议 300(5 分钟)"
+      "supplyTimestampSkewTip": "供货 API 请求 timestamp 与服务器时间差超过此值则拒绝(防重放)。建议 300(5 分钟)",
+      "siteKeywords": "SEO 关键词",
+      "siteKeywordsPlaceholder": "如:虚拟商品,自动发卡,卡密",
+      "siteKeywordsTip": "逗号分隔,用于搜索引擎收录与分享展示"
     },
     "common": {
       "id": "ID",

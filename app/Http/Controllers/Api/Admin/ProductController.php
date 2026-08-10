@@ -52,6 +52,9 @@ class ProductController extends Controller
         $data = $request->validate([
             'name' => 'required|string|max:150',
             'slug' => 'nullable|string|max:150',
+            'seo_title' => 'nullable|string|max:200',
+            'seo_keywords' => 'nullable|string|max:255',
+            'seo_description' => 'nullable|string|max:2000',
             'category_id' => 'nullable|integer',
             'description' => 'nullable|string',
             'cover' => 'nullable|string',
@@ -114,6 +117,9 @@ class ProductController extends Controller
         $data = $request->validate([
             'name' => 'sometimes|string|max:150',
             'slug' => 'sometimes|string|max:150',
+            'seo_title' => 'nullable|string|max:200',
+            'seo_keywords' => 'nullable|string|max:255',
+            'seo_description' => 'nullable|string|max:2000',
             'category_id' => 'nullable|integer',
             'description' => 'nullable|string',
             'cover' => 'nullable|string',

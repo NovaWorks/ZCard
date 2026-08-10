@@ -307,6 +307,19 @@
               <span class="form-hint">{{ t('zcard.product.descriptionHint') }}</span>
             </ElFormItem>
 
+            <!-- SEO 设置(留空自动用商品名/分类/摘要组合) -->
+            <ElDivider content-position="left">{{ t('zcard.product.seoSection') }}</ElDivider>
+            <ElFormItem :label="t('zcard.product.seoTitle')">
+              <ElInput v-model="formData.seo_title" :placeholder="t('zcard.product.seoTitlePlaceholder')" maxlength="200" show-word-limit />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.product.seoKeywords')">
+              <ElInput v-model="formData.seo_keywords" :placeholder="t('zcard.product.seoKeywordsPlaceholder')" maxlength="255" show-word-limit />
+              <span class="form-hint">{{ t('zcard.product.seoKeywordsTip') }}</span>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.product.seoDescription')">
+              <ElInput v-model="formData.seo_description" type="textarea" :rows="3" :placeholder="t('zcard.product.seoDescriptionPlaceholder')" maxlength="2000" show-word-limit />
+            </ElFormItem>
+
             <ElFormItem :label="t('zcard.product.cover')">
               <ElUpload
                 :show-file-list="false"
@@ -1170,6 +1183,9 @@
     slug: string
     category_id: number | null
     description: string
+    seo_title: string
+    seo_keywords: string
+    seo_description: string
     cover: string
     priceYuan: number
     factoryPriceYuan: number
@@ -1201,6 +1217,9 @@
     slug: '',
     category_id: null,
     description: '',
+    seo_title: '',
+    seo_keywords: '',
+    seo_description: '',
     cover: '',
     priceYuan: 0,
     factoryPriceYuan: 0,
@@ -1605,6 +1624,9 @@
       slug: row.slug || '',
       category_id: row.category_id,
       description: row.description || '',
+      seo_title: row.seo_title || '',
+      seo_keywords: row.seo_keywords || '',
+      seo_description: row.seo_description || '',
       cover: row.cover || '',
       priceYuan: Number(((Number(row.price) || 0) / 100).toFixed(2)),
       factoryPriceYuan: Number(((Number(row.factory_price) || 0) / 100).toFixed(2)),
@@ -1708,7 +1730,9 @@
       slug: formData.slug || undefined,
       category_id: formData.category_id,
       description: marked.parse(formData.description || ''),
-      cover: formData.cover || undefined,
+      seo_title: formData.seo_title || undefined,
+      seo_keywords: formData.seo_keywords || undefined,
+      seo_description: formData.seo_description || undefined,      cover: formData.cover || undefined,
       images: galleryUrls.value.length ? galleryUrls.value : undefined,
       price: Math.round(formData.priceYuan * 100),
       factory_price: Math.round(formData.factoryPriceYuan * 100),

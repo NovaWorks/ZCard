@@ -17,6 +17,9 @@ export interface Product {
   factory_price?: number // 分
   draft_premium?: number // 分
   description?: string | null
+  seo_title?: string | null
+  seo_keywords?: string | null
+  seo_description?: string | null
   cover?: string | null
   images?: string[] | null
   member_price?: Record<string, number> | null

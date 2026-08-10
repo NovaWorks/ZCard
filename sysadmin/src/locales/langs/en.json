@@ -611,7 +611,15 @@
       "levelDiscount": "Discount",
       "levelDiscountUnit": "x off",
       "featuredYes": "Featured",
-      "featuredNo": "Not Featured"
+      "featuredNo": "Not Featured",
+      "seoSection": "SEO Settings",
+      "seoTitle": "SEO Title",
+      "seoTitlePlaceholder": "Leave empty to use product name",
+      "seoKeywords": "SEO Keywords",
+      "seoKeywordsPlaceholder": "e.g. gmail, 2FA, accounts",
+      "seoKeywordsTip": "Comma separated; empty = category + product name",
+      "seoDescription": "SEO Description",
+      "seoDescriptionPlaceholder": "Brief summary for search engines; empty = first 150 chars of description"
     },
     "category": {
       "title": "Categories",
@@ -1289,7 +1297,10 @@
       "supplyRateLimit": "Supply API Rate Limit",
       "supplyRateLimitTip": "Max requests per account per minute for the supply API; exceeds returns 429",
       "supplyTimestampSkew": "Signature Time Window (s)",
-      "supplyTimestampSkewTip": "Supply API requests whose timestamp differs from server time beyond this value are rejected (replay prevention). Recommended 300 (5 min)"
+      "supplyTimestampSkewTip": "Supply API requests whose timestamp differs from server time beyond this value are rejected (replay prevention). Recommended 300 (5 min)",
+      "siteKeywords": "SEO Keywords",
+      "siteKeywordsPlaceholder": "e.g. virtual goods, auto delivery, card keys",
+      "siteKeywordsTip": "Comma separated, used for search engines and sharing"
     },
     "common": {
       "id": "ID",

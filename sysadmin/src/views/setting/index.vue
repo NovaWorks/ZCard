@@ -17,6 +17,10 @@
             <ElFormItem :label="t('zcard.setting.siteDescription')">
               <ElInput v-model="form.site_description" type="textarea" :rows="2" :placeholder="t('zcard.setting.siteDescriptionPlaceholder')" maxlength="120" show-word-limit />
             </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.siteKeywords')">
+              <ElInput v-model="form.site_keywords" :placeholder="t('zcard.setting.siteKeywordsPlaceholder')" />
+              <span class="form-tip">{{ t('zcard.setting.siteKeywordsTip') }}</span>
+            </ElFormItem>
             <ElFormItem :label="t('zcard.setting.footerCopyright')">
               <ElInput v-model="form.footer_copyright" :placeholder="t('zcard.setting.footerCopyrightPlaceholder')" />
             </ElFormItem>
@@ -468,6 +472,7 @@
     site_url: string
     site_logo: string
     site_description: string
+    site_keywords: string
     footer_copyright: string
     footer_about: string
     footer_analytics: string
@@ -557,6 +562,7 @@
     site_url: '',
     site_logo: '',
     site_description: '',
+    site_keywords: '',
     footer_copyright: '',
     footer_about: '',
     footer_analytics: '',
@@ -748,6 +754,7 @@
         site_url: coerce(data.site_url, d.site_url),
         site_logo: coerce(data.site_logo, d.site_logo),
         site_description: coerce(data.site_description, d.site_description),
+        site_keywords: coerce(data.site_keywords, d.site_keywords),
         footer_copyright: coerce(data.footer_copyright, d.footer_copyright),
         footer_about: coerce(data.footer_about, d.footer_about),
         footer_analytics: coerce(data.footer_analytics, d.footer_analytics),
