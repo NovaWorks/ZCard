@@ -59,7 +59,7 @@ class SupplySyncService
             // 例外1:price<=0 是导入定价失败的脏数据,重算。
             // 例外2:勾选导入显式传了 pricing → 按本次所选策略重新定价。
             $update = [
-                'name' => $dto->name,
+                'name' => $this->truncate($dto->name, 500),
                 'description' => $this->normalizeDescription($source, $dto->description),
                 'cover' => $this->normalizeCover($source, $dto->cover),
                 'images' => $this->normalizeImages($source, $dto->images, $dto->cover),
@@ -102,8 +102,8 @@ class SupplySyncService
     {
         return Product::create([
             'merchant_id' => self::MAIN_MERCHANT_ID,
-            'name' => $dto->name,
-            'slug' => $this->uniqueSlug($dto->name, $dto->code, $unique),
+            'name' => $this->truncate($dto->name, 500),
+            'slug' => $this->truncate($this->uniqueSlug($dto->name, $dto->code, $unique), 250),
             'description' => $this->normalizeDescription($source, $dto->description),
             'cover' => $this->normalizeCover($source, $dto->cover),
             'images' => $this->normalizeImages($source, $dto->images, $dto->cover),
@@ -240,6 +240,12 @@ class SupplySyncService
         );
 
         return $cat->id;
+    }
+
+    /** 按数据库字段长度截断(上游名称可能超长,防 Data too long 报错) */
+    private function truncate(string $value, int $length): string
+    {
+        return mb_strlen($value) > $length ? mb_substr($value, 0, $length) : $value;
     }
 
     private function uniqueSlug(string $name, string $code, bool $forceUnique = false): string

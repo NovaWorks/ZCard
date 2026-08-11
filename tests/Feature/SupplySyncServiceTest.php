@@ -150,4 +150,19 @@ class SupplySyncServiceTest extends TestCase
         $this->assertSame($localCat->id, (int) $product->category_id);
         $this->assertNull(Category::where('slug', 'CAT_C')->first(), '显式映射时不应自动创建分类');
     }
+
+    public function test_sync_truncates_oversized_product_name(): void
+    {
+        $source = $this->makeSource([]);
+        $service = app(SupplySyncService::class);
+
+        $longName = '💎【带余额】【高概率可充值】美国-香港-中国-韩国-日本-台湾-澳大利亚-挪威-巴西-沙特阿拉伯-卢森堡-中国大陆-南非-奥地利-阿拉伯联合酋长国-爱尔兰-希腊-瑞士-葡萄牙-中国-法国-德国-英国-西班牙-意大利-荷兰-比利时-波兰-瑞典-丹麦-芬兰-挪威-俄罗斯-乌克兰-土耳其-印度-印尼-泰国-越南-菲律宾-马来西亚-新加坡-新西兰-加拿大-墨西哥-阿根廷-智利-哥伦比亚-秘鲁-埃及-尼日利亚-肯尼亚-摩洛哥-阿联酋-卡塔尔-科威特-巴林-阿曼-约旦-黎巴嫩-以色列-塞浦路斯-马耳他-冰岛-爱尔兰-匈牙利-捷克-斯洛伐克-斯洛文尼亚-克罗地亚-塞尔维亚-保加利亚-罗马尼亚-立陶宛-拉脱维亚-爱沙尼亚-白俄罗斯-摩尔多瓦-格鲁吉亚-亚美尼亚-阿塞拜疆-哈萨克斯坦-乌兹别克斯坦-土库曼斯坦-吉尔吉斯斯坦-塔吉克斯坦-蒙古-朝鲜-斯里兰卡-孟加拉国-巴基斯坦-阿富汗-伊朗-伊拉克-叙利亚-也门-约旦-巴勒斯坦';
+
+        $product = $service->upsertProduct($source, new UpstreamProduct(
+            code: 'UP_LONG_1', name: $longName, price: 800, factoryPrice: 500,
+        ));
+
+        $this->assertLessThanOrEqual(500, mb_strlen($product->fresh()->name));
+        $this->assertLessThanOrEqual(250, mb_strlen($product->fresh()->slug));
+    }
 }
