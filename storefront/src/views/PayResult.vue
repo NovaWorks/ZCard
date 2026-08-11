@@ -48,7 +48,9 @@ const countdownText = computed(() => {
 function startCountdown(createdAt?: string) {
   if (!createdAt) return
   stopCountdown()
-  const created = new Date(createdAt.replace(' ', 'T')).getTime()
+  // 后端 created_at 为 UTC 字符串(如 '2026-08-11 13:30:32'),必须按 UTC 解析(+Z),
+  // 否则浏览器按本地时区解析会偏差数小时(如 +7 时区显示 68:05 而非 15:00)
+  const created = new Date(createdAt.replace(' ', 'T') + 'Z').getTime()
   if (Number.isNaN(created)) return
   const deadline = created + closeMinutes.value * 60 * 1000
   const tick = () => {
