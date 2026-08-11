@@ -421,8 +421,8 @@ class OrderService
             'display_currency' => $o->display_currency,
             'exchange_rate' => $o->exchange_rate,
             'status' => $o->status,
-            'created_at' => $o->created_at?->toDateTimeString(),
-            'paid_at' => $o->paid_at?->toDateTimeString(),
+            'created_at' => $o->created_at?->toIso8601String(),
+            'paid_at' => $o->paid_at?->toIso8601String(),
             'cards' => $o->status === 'paid'
                 ? ($o->orderDeliveries?->map(fn ($d) => $d->card_content)->toArray() ?? [])
                 : [],
@@ -480,8 +480,8 @@ class OrderService
             'display_currency' => $o->display_currency,
             'exchange_rate' => $o->exchange_rate,
             'status' => $o->status,
-            'created_at' => $o->created_at?->toDateTimeString(),
-            'paid_at' => $o->paid_at?->toDateTimeString(),
+            'created_at' => $o->created_at?->toIso8601String(),
+            'paid_at' => $o->paid_at?->toIso8601String(),
             'reviewed' => in_array($o->id, $reviewedOrderIds, true),
             'cards' => $o->orderDeliveries?->map(fn ($d) => $d->card_content)->toArray() ?? [],
         ])->toArray();

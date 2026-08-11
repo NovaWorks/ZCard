@@ -29,8 +29,8 @@ const statusClass = (s: string) => ({
 
 const fmtDate = (d?: string) => {
   if (!d) return ''
-  // 后端返回 'Y-m-d H:i:s',直接展示即可
-  return d
+  // 后端返回带时区 ISO8601(如 '2026-08-11T05:30:32+00:00'),截取到分钟展示
+  return String(d).slice(0, 16).replace('T', ' ')
 }
 
 function toggle(orderNo: string) {
