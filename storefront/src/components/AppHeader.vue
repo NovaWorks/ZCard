@@ -22,6 +22,26 @@ onMounted(() => {
 })
 const siteName = computed(() => settings.config?.site_name || 'ZCard')
 const siteLogo = computed(() => settings.config?.site_logo || '')
+// 顶部品牌条文案:后台可配置(支持中英,英文留空回退中文,中文留空回退 i18n 默认)
+const isEn = computed(() => (prefs.language || 'zh') === 'en')
+const brandSlogan = computed(() => {
+  const cfg = settings.config
+  if (!cfg) return t('nav.brandBar.slogan')
+  const v = isEn.value ? (cfg.brand_slogan_en || cfg.brand_slogan) : cfg.brand_slogan
+  return v || t('nav.brandBar.slogan')
+})
+const brandSecure = computed(() => {
+  const cfg = settings.config
+  if (!cfg) return t('nav.brandBar.securePay')
+  const v = isEn.value ? (cfg.brand_secure_en || cfg.brand_secure) : cfg.brand_secure
+  return v || t('nav.brandBar.securePay')
+})
+const brandPrivacy = computed(() => {
+  const cfg = settings.config
+  if (!cfg) return t('nav.brandBar.privacy')
+  const v = isEn.value ? (cfg.brand_privacy_en || cfg.brand_privacy) : cfg.brand_privacy
+  return v || t('nav.brandBar.privacy')
+})
 // 有公告内容时显示顶部公告入口(点击重新弹出公告弹窗)
 const hasNotice = computed(() => !!settings.config?.site_notice?.trim())
 function openNotice() {
@@ -60,11 +80,11 @@ const mobileMenuOpen = ref(false)
   <div class="bg-gradient-to-r from-primary-hover to-primary text-white text-xs">
     <div class="max-w-6xl mx-auto px-4 h-8 flex items-center justify-between overflow-hidden">
       <span class="opacity-90 truncate flex items-center gap-2 min-w-0">
-        <span class="truncate">{{ t('nav.brandBar.slogan') }}</span>
+        <span class="truncate">{{ brandSlogan }}</span>
       </span>
       <div class="hidden sm:flex items-center gap-3 opacity-90 shrink-0">
-        <span>{{ t('nav.brandBar.securePay') }}</span>
-        <span>{{ t('nav.brandBar.privacy') }}</span>
+        <span>✓ {{ brandSecure }}</span>
+        <span>✓ {{ brandPrivacy }}</span>
       </div>
     </div>
   </div>

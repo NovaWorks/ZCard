@@ -1303,7 +1303,17 @@
       "supplyTimestampSkewTip": "供货 API 请求 timestamp 与服务器时间差超过此值则拒绝(防重放)。建议 300(5 分钟)",
       "siteKeywords": "SEO 关键词",
       "siteKeywordsPlaceholder": "如:虚拟商品,自动发卡,卡密",
-      "siteKeywordsTip": "逗号分隔,用于搜索引擎收录与分享展示"
+      "siteKeywordsTip": "逗号分隔,用于搜索引擎收录与分享展示",
+      "brandBar": "顶部品牌条文案",
+      "brandSlogan": "标语(中文)",
+      "brandSloganEn": "标语(English)",
+      "brandSloganPlaceholder": "如:全球领先的虚拟商品自动发卡平台 · 7×24 小时极速发货",
+      "brandSecure": "安全支付(中文)",
+      "brandSecureEn": "安全支付(English)",
+      "brandSecurePlaceholder": "如:安全支付",
+      "brandPrivacy": "隐私保护(中文)",
+      "brandPrivacyEn": "隐私保护(English)",
+      "brandPrivacyPlaceholder": "如:隐私保护"
     },
     "common": {
       "id": "ID",

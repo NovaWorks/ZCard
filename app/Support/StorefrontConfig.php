@@ -70,6 +70,13 @@ class StorefrontConfig
             'site_logo' => '',
             'site_description' => 'ZCard — 现代化插件制虚拟商品自动发卡平台,7×24 小时极速发货,安全可靠。',
             'site_keywords' => '虚拟商品,自动发卡,卡密,游戏账号,会员充值',
+            // 顶部品牌条文案(后台可自定义;英文留空回退中文;中文留空回退前端 i18n 默认)
+            'brand_slogan' => '全球领先的虚拟商品自动发卡平台 · 7×24 小时极速发货',
+            'brand_slogan_en' => 'Leading virtual goods auto-delivery platform · 24/7 instant dispatch',
+            'brand_secure' => '安全支付',
+            'brand_secure_en' => 'Secure payment',
+            'brand_privacy' => '隐私保护',
+            'brand_privacy_en' => 'Privacy protected',
             'footer_about' => 'ZCard 是现代化的插件制虚拟商品自动发卡平台,7×24 小时极速发货、安全可靠,为您提供优质的数字商品购物体验。',
             'footer_links' => [
                 ['title' => '首页', 'url' => '/'],

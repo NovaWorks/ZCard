@@ -51,6 +51,14 @@ export interface StorefrontSettings {
   site_url: string
   site_logo: string
   site_description: string
+  site_keywords?: string
+  // 顶部品牌条(后台可配置,英文留空回退中文)
+  brand_slogan?: string
+  brand_slogan_en?: string
+  brand_secure?: string
+  brand_secure_en?: string
+  brand_privacy?: string
+  brand_privacy_en?: string
   // 页脚
   footer_about: string
   footer_links: FooterLink[]

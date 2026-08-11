@@ -21,6 +21,25 @@
               <ElInput v-model="form.site_keywords" :placeholder="t('zcard.setting.siteKeywordsPlaceholder')" />
               <span class="form-tip">{{ t('zcard.setting.siteKeywordsTip') }}</span>
             </ElFormItem>
+            <ElDivider content-position="left">{{ t('zcard.setting.brandBar') }}</ElDivider>
+            <ElFormItem :label="t('zcard.setting.brandSlogan')">
+              <ElInput v-model="form.brand_slogan" :placeholder="t('zcard.setting.brandSloganPlaceholder')" maxlength="100" show-word-limit />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.brandSloganEn')">
+              <ElInput v-model="form.brand_slogan_en" :placeholder="t('zcard.setting.brandSloganPlaceholder')" maxlength="160" show-word-limit />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.brandSecure')">
+              <ElInput v-model="form.brand_secure" :placeholder="t('zcard.setting.brandSecurePlaceholder')" maxlength="30" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.brandSecureEn')">
+              <ElInput v-model="form.brand_secure_en" :placeholder="t('zcard.setting.brandSecurePlaceholder')" maxlength="30" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.brandPrivacy')">
+              <ElInput v-model="form.brand_privacy" :placeholder="t('zcard.setting.brandPrivacyPlaceholder')" maxlength="30" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.brandPrivacyEn')">
+              <ElInput v-model="form.brand_privacy_en" :placeholder="t('zcard.setting.brandPrivacyPlaceholder')" maxlength="30" />
+            </ElFormItem>
             <ElFormItem :label="t('zcard.setting.footerCopyright')">
               <ElInput v-model="form.footer_copyright" :placeholder="t('zcard.setting.footerCopyrightPlaceholder')" />
             </ElFormItem>
@@ -473,6 +492,12 @@
     site_logo: string
     site_description: string
     site_keywords: string
+    brand_slogan: string
+    brand_slogan_en: string
+    brand_secure: string
+    brand_secure_en: string
+    brand_privacy: string
+    brand_privacy_en: string
     footer_copyright: string
     footer_about: string
     footer_analytics: string
@@ -563,6 +588,12 @@
     site_logo: '',
     site_description: '',
     site_keywords: '',
+    brand_slogan: '',
+    brand_slogan_en: '',
+    brand_secure: '',
+    brand_secure_en: '',
+    brand_privacy: '',
+    brand_privacy_en: '',
     footer_copyright: '',
     footer_about: '',
     footer_analytics: '',
@@ -755,6 +786,12 @@
         site_logo: coerce(data.site_logo, d.site_logo),
         site_description: coerce(data.site_description, d.site_description),
         site_keywords: coerce(data.site_keywords, d.site_keywords),
+        brand_slogan: coerce(data.brand_slogan, d.brand_slogan),
+        brand_slogan_en: coerce(data.brand_slogan_en, d.brand_slogan_en),
+        brand_secure: coerce(data.brand_secure, d.brand_secure),
+        brand_secure_en: coerce(data.brand_secure_en, d.brand_secure_en),
+        brand_privacy: coerce(data.brand_privacy, d.brand_privacy),
+        brand_privacy_en: coerce(data.brand_privacy_en, d.brand_privacy_en),
         footer_copyright: coerce(data.footer_copyright, d.footer_copyright),
         footer_about: coerce(data.footer_about, d.footer_about),
         footer_analytics: coerce(data.footer_analytics, d.footer_analytics),
