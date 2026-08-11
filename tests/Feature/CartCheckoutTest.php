@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\InsufficientStockException;
 use App\Models\Card;
 use App\Models\Category;
 use App\Models\Coupon;
@@ -11,6 +12,7 @@ use App\Models\Payment;
 use App\Models\PaymentChannel;
 use App\Models\Product;
 use App\Models\User;
+use App\Payment\Drivers\EpayDriver;
 use App\Support\CardCipher;
 use App\Support\OrderService;
 use App\Support\PaymentService;
@@ -39,18 +41,19 @@ class CartCheckoutTest extends TestCase
     {
         $u = User::factory()->create();
         $m = Merchant::firstOrCreate(['slug' => 'default'], ['user_id' => $u->id, 'name' => '主站', 'status' => 1, 'commission_rate' => 0]);
-        $c = Category::create(['merchant_id' => $m->id, 'name' => 'C', 'slug' => 'c' . uniqid(), 'sort' => 0]);
+        $c = Category::create(['merchant_id' => $m->id, 'name' => 'C', 'slug' => 'c'.uniqid(), 'sort' => 0]);
         $p = Product::create([
             'merchant_id' => $m->id, 'category_id' => $c->id, 'name' => $slug,
-            'slug' => $slug . uniqid(), 'price' => $price, 'factory_price' => (int) ($price * 0.6),
+            'slug' => $slug.uniqid(), 'price' => $price, 'factory_price' => (int) ($price * 0.6),
             'stock_type' => 'card', 'delivery_mode' => 'status', 'status' => true, 'sort' => 0,
         ]);
         for ($i = 0; $i < $stock; $i++) {
             Card::create(array_merge([
                 'product_id' => $p->id,
                 'status' => Card::STATUS_UNUSED,
-            ], CardCipher::encryptWithHash($slug . '-' . $i . uniqid())));
+            ], CardCipher::encryptWithHash($slug.'-'.$i.uniqid())));
         }
+
         return $p;
     }
 
@@ -110,7 +113,7 @@ class CartCheckoutTest extends TestCase
         $p1 = $this->makeProduct('A', 10000, 1);
         $p2 = $this->makeProduct('B', 5000, 1);
 
-        $this->expectException(\App\Exceptions\InsufficientStockException::class);
+        $this->expectException(InsufficientStockException::class);
         app(OrderService::class)->batchCreate([
             ['product_id' => $p1->id, 'qty' => 1],
             ['product_id' => $p2->id, 'qty' => 5], // 库存不足
@@ -139,7 +142,7 @@ class CartCheckoutTest extends TestCase
             ['merchant_id' => 1, 'code' => 'epay'],
             [
                 'name' => '易支付',
-                'driver' => \App\Payment\Drivers\EpayDriver::class,
+                'driver' => EpayDriver::class,
                 'config' => ['gateway_url' => 'https://pay.test', 'pid' => '1', 'key' => 'abc', 'sign_type' => 'md5'],
                 'enabled' => true, 'sort' => 0,
             ],
@@ -178,7 +181,7 @@ class CartCheckoutTest extends TestCase
             ['merchant_id' => 1, 'code' => 'epay'],
             [
                 'name' => '易支付',
-                'driver' => \App\Payment\Drivers\EpayDriver::class,
+                'driver' => EpayDriver::class,
                 'config' => ['gateway_url' => 'https://pay.test', 'pid' => '1', 'key' => 'abc', 'sign_type' => 'md5'],
                 'enabled' => true, 'sort' => 0,
             ],
@@ -186,5 +189,65 @@ class CartCheckoutTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         app(PaymentService::class)->createBatchPayment($orders->pluck('id')->all(), $channel->id);
+    }
+
+    public function test_epay_trade_finished_callback_marks_matching_payment_and_order_paid(): void
+    {
+        $this->seedBase();
+        $product = $this->makeProduct('EPAY-CALLBACK', 2100, 1);
+        $order = app(OrderService::class)->batchCreate(
+            [['product_id' => $product->id, 'qty' => 1]],
+            ['contact' => 'callback@example.com'],
+        )->first();
+        $channel = PaymentChannel::updateOrCreate(
+            ['merchant_id' => 1, 'code' => 'epay'],
+            [
+                'name' => '易支付',
+                'driver' => EpayDriver::class,
+                'config' => [
+                    'url' => 'https://pay.test',
+                    'pid' => '1001',
+                    'key' => 'secret-001',
+                    'sign_type' => 'MD5',
+                ],
+                'enabled' => true,
+                'sort' => 0,
+            ],
+        );
+        app(PaymentService::class)->createPayment($order, $channel->id);
+
+        $params = [
+            'pid' => '1001',
+            'out_trade_no' => $order->order_no,
+            'trade_no' => 'EPAY-PAID-001',
+            'money' => '21.00',
+            'trade_status' => 'TRADE_FINISHED',
+            'sign_type' => 'MD5',
+        ];
+        $params['sign'] = md5($this->epaySignContent($params).'secret-001');
+
+        $this->post('/api/payments/notify/epay', $params)
+            ->assertOk()
+            ->assertSeeText('success');
+
+        $this->assertSame('paid', $order->fresh()->status);
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'channel' => 'epay',
+            'status' => 'success',
+        ]);
+    }
+
+    private function epaySignContent(array $params): string
+    {
+        unset($params['sign'], $params['sign_type']);
+        $params = array_filter($params, fn ($value) => $value !== '' && $value !== null);
+        ksort($params);
+
+        return implode('&', array_map(
+            fn ($key, $value) => $key.'='.$value,
+            array_keys($params),
+            $params,
+        ));
     }
 }

@@ -14,6 +14,7 @@ use App\Support\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
 {
@@ -125,7 +126,18 @@ class PaymentController extends Controller
 
     public function callback(string $channel, Request $request, PaymentService $service)
     {
-        $result = $service->handleCallback($channel, $request);
+        try {
+            $result = $service->handleCallback($channel, $request);
+        } catch (\Throwable $e) {
+            Log::error('支付回调处理异常', [
+                'channel' => $channel,
+                'out_trade_no' => trim((string) $request->input('out_trade_no', '')),
+                'exception' => $e,
+            ]);
+
+            // 易支付等网关以响应正文判断是否重试；异常时返回 fail 而不是暴露内部错误。
+            return response('fail');
+        }
 
         return response($result === 'success' ? 'success' : $result);
     }

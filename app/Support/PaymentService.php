@@ -14,6 +14,7 @@ use App\Payment\Contracts\PaymentDriver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class PaymentService
 {
@@ -220,26 +221,26 @@ class PaymentService
     {
         $channel = PaymentChannel::where('code', $channelCode)->first();
         if (! $channel) {
-            return 'fail: channel not found';
+            return $this->callbackFailure('channel not found', ['channel' => $channelCode]);
         }
 
         // 安全兜底:凭据未配置则拒绝(防空 key 伪造签名,参考 acg-faka payCredentialConfigured)
         $config = $channel->config ?? [];
         if (! $this->credentialsConfigured($config)) {
-            return 'fail: credentials not configured';
+            return $this->callbackFailure('credentials not configured', ['channel' => $channelCode]);
         }
 
         $driver = $this->resolveDriver($channel);
         $data = $driver->verifyCallback($request, $config);
 
         if (! $data) {
-            return 'fail: verify failed';
+            return $this->callbackFailure('verify failed', ['channel' => $channelCode]);
         }
 
         // 驱动统一返回 out_trade_no(=商户业务单号),按前缀分流到订单或充值单
         $bizNo = $data['out_trade_no'] ?? $data['order_no'] ?? null;
         if (! $bizNo) {
-            return 'fail: biz_no missing';
+            return $this->callbackFailure('biz_no missing', ['channel' => $channelCode]);
         }
 
         if (str_starts_with($bizNo, 'RCH')) {
@@ -256,7 +257,10 @@ class PaymentService
     {
         $order = Order::where('order_no', $orderNo)->first();
         if (! $order) {
-            return 'fail: order not found';
+            return $this->callbackFailure('order not found', [
+                'channel' => $channelCode,
+                'order_no' => $orderNo,
+            ]);
         }
 
         // 幂等:订单已支付则直接返回 success(第三方停止重试)
@@ -265,15 +269,29 @@ class PaymentService
         }
 
         // 金额校验:驱动回调 amount 是目标货币最小单位,对比该订单最近一笔 payment 的 charged_amount
-        $payment = Payment::where('order_id', $order->id)->orderByDesc('id')->first();
-        $expectFen = $payment ? (int) $payment->charged_amount : (int) $order->amount;
-        $actualFen = (int) ($data['amount'] ?? -1);
-        if ($actualFen !== $expectFen) {
-            return 'fail: amount mismatch';
+        $payment = Payment::where('order_id', $order->id)
+            ->where('channel', $channelCode)
+            ->orderByDesc('id')
+            ->first();
+        if (! $payment) {
+            return $this->callbackFailure('payment not found', [
+                'channel' => $channelCode,
+                'order_no' => $orderNo,
+            ]);
         }
 
-        Payment::where('order_id', $order->id)->where('channel', $channelCode)
-            ->update(['status' => 'success', 'paid_at' => now(), 'raw' => $request->all()]);
+        $expectFen = (int) $payment->charged_amount;
+        $actualFen = (int) ($data['amount'] ?? -1);
+        if ($actualFen !== $expectFen) {
+            return $this->callbackFailure('amount mismatch', [
+                'channel' => $channelCode,
+                'order_no' => $orderNo,
+                'expected_amount' => $expectFen,
+                'actual_amount' => $actualFen,
+            ]);
+        }
+
+        $payment->update(['status' => 'success', 'paid_at' => now(), 'raw' => $request->all()]);
 
         // 聚合支付(order_ids 非空):主订单的支付流水关联了多个订单,统一 markPaid
         $orderNos = Order::whereIn('id', ! empty($payment->order_ids) ? $payment->order_ids : [$order->id])
@@ -305,7 +323,10 @@ class PaymentService
     {
         $recharge = Recharge::where('recharge_no', $rechargeNo)->first();
         if (! $recharge) {
-            return 'fail: recharge not found';
+            return $this->callbackFailure('recharge not found', [
+                'channel' => $channelCode,
+                'recharge_no' => $rechargeNo,
+            ]);
         }
 
         // 幂等:已支付(已入账)直接返回 success
@@ -314,24 +335,39 @@ class PaymentService
         }
 
         // 金额校验
-        $payment = Payment::where('recharge_id', $recharge->id)->orderByDesc('id')->first();
-        $expectFen = $payment ? (int) $payment->charged_amount : (int) $recharge->amount;
+        $payment = Payment::where('recharge_id', $recharge->id)
+            ->where('channel', $channelCode)
+            ->orderByDesc('id')
+            ->first();
+        if (! $payment) {
+            return $this->callbackFailure('payment not found', [
+                'channel' => $channelCode,
+                'recharge_no' => $rechargeNo,
+            ]);
+        }
+
+        $expectFen = (int) $payment->charged_amount;
         $actualFen = (int) ($data['amount'] ?? -1);
         if ($actualFen !== $expectFen) {
-            return 'fail: amount mismatch';
+            return $this->callbackFailure('amount mismatch', [
+                'channel' => $channelCode,
+                'recharge_no' => $rechargeNo,
+                'expected_amount' => $expectFen,
+                'actual_amount' => $actualFen,
+            ]);
         }
 
         // 标记支付流水 + 充值单为已支付 → 入账余额,全部在同一事务内,
         // 保证原子性(任一步失败整体回滚,避免"已标 paid 但未入账"或"入账成功但回滚状态"的不一致)。
         // 事务返回值:null=并发已处理(幂等直接返回 success),非 null=本次完成转换。
-        $converted = DB::transaction(function () use ($recharge, $channelCode, $request) {
+        $converted = DB::transaction(function () use ($recharge, $payment, $request) {
             $locked = Recharge::where('id', $recharge->id)->lockForUpdate()->firstOrFail();
             // 并发回调:另一请求已将状态改为 paid → 本次不重复入账
             if ($locked->status !== Recharge::STATUS_PENDING) {
                 return null;
             }
             $locked->update(['status' => Recharge::STATUS_PAID, 'paid_at' => now()]);
-            Payment::where('recharge_id', $locked->id)->where('channel', $channelCode)
+            Payment::whereKey($payment->id)
                 ->update(['status' => 'success', 'paid_at' => now(), 'raw' => $request->all()]);
 
             // 入账(同事务):BillService::record 内部 DB::transaction 会退化为保存点,
@@ -365,6 +401,13 @@ class PaymentService
         }
 
         return 'success';
+    }
+
+    private function callbackFailure(string $reason, array $context = []): string
+    {
+        Log::warning('支付回调处理失败', ['reason' => $reason, ...$context]);
+
+        return 'fail: '.$reason;
     }
 
     private function resolveDriver(PaymentChannel $channel): PaymentDriver

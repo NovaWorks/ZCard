@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\PaymentChannel;
 use App\Payment\Contracts\PaymentDriver;
+use App\Payment\PaymentUrlGenerator;
 use App\Support\PaymentService;
 use App\Support\StorefrontConfig;
 use Illuminate\Http\JsonResponse;
@@ -163,8 +164,12 @@ class PaymentChannelController extends Controller
             $fields[] = $f;
         }
 
-        // 回调地址(异步通知),供后台参考
-        $callbackUrl = rtrim(config('app.url'), '/').'/api/payments/callback/'.$channel->code;
+        // 与支付驱动提交给网关的 notify_url 共用同一真理源。
+        $callbackUrl = app(PaymentUrlGenerator::class)->named(
+            'payment.notify',
+            ['channel' => $channel->code],
+            $channel->config ?? [],
+        );
 
         return response()->json([
             'channel_id' => $channel->id,

@@ -7,7 +7,7 @@ use App\Payment\Contracts\Payable;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Log;
 
 /**
  * 易支付(EPay / 彩虹易支付)驱动。
@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\URL;
  *
  * 签名方式(可配置):
  * - MD5(V1,默认):ksort → key=value 用 & 拼接 → 末尾直接追加 key → md5 小写
- * - RSA(V2 / SHA256WithRSA):ksort → key=value 用 & 拼接 → 商户私钥 SHA256 签名 → base64
+ * - RSA/RSA2(V2 / SHA256WithRSA):ksort → key=value 用 & 拼接 → 商户私钥 SHA256 签名 → base64
  *
  * 下单方式:
  * - submit.php(跳转收银台):GET {url}/submit.php?{签名参数} 跳转
@@ -27,13 +27,12 @@ use Illuminate\Support\Facades\URL;
  * - 勾选多个 → 不传 type,用户在收银台自选
  * - 勾选单个 → 直接传该 type
  *
- * 回调:GET query 或 POST 传参,trade_status==TRADE_SUCCESS 为成功,返回 "success"。
+ * 回调:GET query 或 POST 传参,TRADE_SUCCESS/TRADE_FINISHED 为成功,返回 "success"。
  */
 class EpayDriver extends AbstractPaymentDriver
 {
-
     /**
-     * 签名:按 sign_type 分流 MD5 / RSA。
+     * 签名:按 sign_type 分流 MD5 / RSA / RSA2。
      *
      * MD5(V1):参数排序 → key=value& → 末尾追加商户 key → md5 小写
      * RSA(V2):参数排序 → key=value& → 商户私钥 SHA256 签名 → base64
@@ -53,8 +52,12 @@ class EpayDriver extends AbstractPaymentDriver
         }
         $query = implode('&', $parts);
 
-        // MD5:末尾直接追加商户 key
-        if (strtoupper($signType) === 'RSA') {
+        $algorithm = $this->normalizeSignType($signType);
+        if ($algorithm === null) {
+            throw new \RuntimeException('易支付签名方式不受支持');
+        }
+
+        if ($algorithm === 'RSA') {
             return $this->rsaSign($query, $secret);
         }
 
@@ -66,20 +69,14 @@ class EpayDriver extends AbstractPaymentDriver
      */
     protected function rsaSign(string $data, string $privateKey): string
     {
-        // 私钥可能是 PKCS#8 原文或带 PEM 头;统一处理
-        $pem = $privateKey;
-        if (! str_contains($pem, '-----BEGIN')) {
-            $pem = "-----BEGIN RSA PRIVATE KEY-----\n"
-                .wordwrap($privateKey, 64, "\n", true)
-                ."\n-----END RSA PRIVATE KEY-----";
-        }
-
-        $key = openssl_pkey_get_private($pem);
+        $key = $this->parsePrivateKey($privateKey);
         if ($key === false) {
             throw new \RuntimeException('易支付 RSA 私钥格式错误');
         }
 
-        openssl_sign($data, $signature, $key, OPENSSL_ALGO_SHA256);
+        if (! openssl_sign($data, $signature, $key, OPENSSL_ALGO_SHA256)) {
+            throw new \RuntimeException('易支付 RSA 签名失败');
+        }
 
         return base64_encode($signature);
     }
@@ -90,21 +87,83 @@ class EpayDriver extends AbstractPaymentDriver
      */
     protected function rsaVerify(string $data, string $publicKey, string $sign): bool
     {
-        $pem = $publicKey;
-        if (! str_contains($pem, '-----BEGIN')) {
-            $pem = "-----BEGIN PUBLIC KEY-----\n"
-                .wordwrap($publicKey, 64, "\n", true)
-                ."\n-----END PUBLIC KEY-----";
-        }
-
-        $key = openssl_pkey_get_public($pem);
+        $key = $this->parsePublicKey($publicKey);
         if ($key === false) {
             return false;
         }
 
-        $result = openssl_verify($data, base64_decode($sign), $key, OPENSSL_ALGO_SHA256);
+        // 某些 GET 回调未正确转义 base64 的 "+",PHP 会解析为空格,兼容恢复。
+        $signature = base64_decode(str_replace(' ', '+', trim($sign)), true);
+        if ($signature === false) {
+            return false;
+        }
+
+        $result = openssl_verify($data, $signature, $key, OPENSSL_ALGO_SHA256);
 
         return $result === 1;
+    }
+
+    /** 兼容 PKCS#1/PKCS#8 私钥、完整 PEM、裸 Base64 与转义换行。 */
+    private function parsePrivateKey(string $privateKey): \OpenSSLAsymmetricKey|false
+    {
+        foreach ($this->keyCandidates($privateKey, ['PRIVATE KEY', 'RSA PRIVATE KEY']) as $candidate) {
+            $key = openssl_pkey_get_private($candidate);
+            if ($key !== false) {
+                return $key;
+            }
+        }
+
+        return false;
+    }
+
+    /** 兼容 PKCS#1/X.509 SubjectPublicKeyInfo 公钥及常见文本形态。 */
+    private function parsePublicKey(string $publicKey): \OpenSSLAsymmetricKey|false
+    {
+        foreach ($this->keyCandidates($publicKey, ['PUBLIC KEY', 'RSA PUBLIC KEY']) as $candidate) {
+            $key = openssl_pkey_get_public($candidate);
+            if ($key !== false) {
+                return $key;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return list<string> */
+    private function keyCandidates(string $rawKey, array $pemTypes): array
+    {
+        $normalized = trim(str_replace(
+            ['\\r\\n', '\\n', '\\r', "\r\n", "\r"],
+            ["\n", "\n", "\n", "\n", "\n"],
+            $rawKey,
+        ));
+        if ($normalized === '') {
+            return [];
+        }
+        if (str_contains($normalized, '-----BEGIN')) {
+            return [$normalized];
+        }
+
+        $body = preg_replace('/\s+/', '', $normalized) ?? '';
+        if ($body === '') {
+            return [];
+        }
+
+        return array_map(
+            fn (string $type) => "-----BEGIN {$type}-----\n"
+                .wordwrap($body, 64, "\n", true)
+                ."\n-----END {$type}-----",
+            $pemTypes,
+        );
+    }
+
+    private function normalizeSignType(string $signType): ?string
+    {
+        return match (strtoupper(trim($signType))) {
+            'MD5' => 'MD5',
+            'RSA', 'RSA2', 'SHA256WITHRSA' => 'RSA',
+            default => null,
+        };
     }
 
     public function pay(Payable $order, array $config): PaymentResult
@@ -112,7 +171,10 @@ class EpayDriver extends AbstractPaymentDriver
         $pid = $config['pid'] ?? '';
         $key = $config['key'] ?? '';
         $apiUrl = rtrim($config['url'] ?? '', '/');
-        $signType = strtoupper($config['sign_type'] ?? 'MD5');
+        $signType = strtoupper(trim((string) ($config['sign_type'] ?? 'MD5')));
+        if ($this->normalizeSignType($signType) === null) {
+            throw new \RuntimeException('易支付签名方式不受支持');
+        }
 
         // 支付方式:多选配置,下单时按勾选数量决定是否传 type
         // - 勾选多个或空 → 不传 type,跳聚合收银台让用户自选
@@ -153,33 +215,52 @@ class EpayDriver extends AbstractPaymentDriver
 
         // 验签算法:优先用回调自带的 sign_type 字段(易支付 889 等平台回调默认 RSA),
         // 其次回退到通道配置。若只按配置判断,回调 sign_type 与配置不一致时会用错算法 → 验签恒失败。
-        $callbackSignType = strtoupper((string) ($data['sign_type'] ?? ''));
-        $signType = $callbackSignType !== '' ? $callbackSignType : strtoupper($config['sign_type'] ?? 'MD5');
+        $callbackSignType = strtoupper(trim((string) ($data['sign_type'] ?? '')));
+        $signType = $callbackSignType !== ''
+            ? $callbackSignType
+            : strtoupper(trim((string) ($config['sign_type'] ?? 'MD5')));
+        $algorithm = $this->normalizeSignType($signType);
+        if ($algorithm === null) {
+            return $this->rejectCallback('unsupported_sign_type', $data);
+        }
 
-        $tradeStatus = $data['trade_status'] ?? '';
-        if ($tradeStatus !== 'TRADE_SUCCESS') {
-            return null;
+        $tradeStatus = strtoupper(trim((string) ($data['trade_status'] ?? '')));
+        if (! in_array($tradeStatus, ['TRADE_SUCCESS', 'TRADE_FINISHED'], true)) {
+            return $this->rejectCallback('trade_status_not_success', $data);
+        }
+
+        // 校验回调归属,防止其他商户的合法回调注入当前渠道。
+        $configuredPid = trim((string) ($config['pid'] ?? ''));
+        $callbackPid = trim((string) ($data['pid'] ?? ''));
+        if ($configuredPid === '' || $callbackPid === '' || ! hash_equals($configuredPid, $callbackPid)) {
+            return $this->rejectCallback('pid_mismatch', $data);
         }
 
         $provided = (string) ($data['sign'] ?? '');
+        if (trim($provided) === '') {
+            return $this->rejectCallback('signature_missing', $data);
+        }
 
         // 验签:MD5 用共享密钥(商户 key)重签比对;RSA 用平台公钥校验(方向相反)
-        if ($signType === 'RSA') {
-            $platformPublicKey = $config['platform_public_key'] ?? '';
-            if ($platformPublicKey === '') {
-                return null; // RSA 模式未配平台公钥 → 无法验签
+        if ($algorithm === 'RSA') {
+            $platformPublicKey = (string) ($config['platform_public_key'] ?? '');
+            if (trim($platformPublicKey) === '') {
+                return $this->rejectCallback('platform_public_key_missing', $data);
             }
             // 重现签名原文(与 sign() 内部一致)
             $params = Arr::where($data, fn ($v, $k) => $k !== 'sign' && $k !== 'sign_type' && $v !== '' && $v !== null);
             ksort($params);
             $query = implode('&', array_map(fn ($k, $v) => $k.'='.$v, array_keys($params), $params));
             if (! $this->rsaVerify($query, $platformPublicKey, $provided)) {
-                return null;
+                return $this->rejectCallback('rsa_signature_invalid', $data);
             }
         } else {
+            if ($key === '') {
+                return $this->rejectCallback('merchant_key_missing', $data);
+            }
             $expected = $this->sign($data, $key, $signType);
             if (! hash_equals($expected, $provided)) {
-                return null;
+                return $this->rejectCallback('md5_signature_invalid', $data);
             }
         }
 
@@ -191,6 +272,19 @@ class EpayDriver extends AbstractPaymentDriver
         ];
     }
 
+    private function rejectCallback(string $reason, array $data): null
+    {
+        Log::warning('易支付回调验证失败', [
+            'reason' => $reason,
+            'out_trade_no' => trim((string) ($data['out_trade_no'] ?? '')),
+            'trade_no' => trim((string) ($data['trade_no'] ?? '')),
+            'trade_status' => trim((string) ($data['trade_status'] ?? '')),
+            'sign_type' => trim((string) ($data['sign_type'] ?? '')),
+        ]);
+
+        return null;
+    }
+
     public function getConfigFields(): array
     {
         return [
@@ -199,11 +293,12 @@ class EpayDriver extends AbstractPaymentDriver
                 'type' => 'select',
                 'options' => [
                     'MD5' => 'MD5(V1 接口,传统易支付)',
-                    'RSA' => 'RSA / SHA256WithRSA(V2 接口,889 等新版易支付默认)',
+                    'RSA2' => 'RSA2 / SHA256WithRSA(V2 接口,推荐)',
+                    'RSA' => 'RSA / SHA256WithRSA(V2 兼容值)',
                 ],
                 'required' => true,
                 'default' => 'MD5',
-                'help' => '按易支付平台要求选择。889 平台默认 RSA;传统易支付用 MD5。RSA 需在「商户密钥/私钥」填商户私钥,并在「平台公钥」填平台公钥。',
+                'help' => '按平台要求选择。RSA 与 RSA2 均使用 SHA256WithRSA;支持常见 PEM、裸 Base64 和转义换行密钥。',
             ],
             'pid' => [
                 'label' => '商户 ID(PID)',
@@ -214,13 +309,13 @@ class EpayDriver extends AbstractPaymentDriver
                 'label' => '商户密钥 / 私钥',
                 'type' => 'textarea',
                 'required' => true,
-                'help' => 'MD5 方式:填商户密钥(KEY)。RSA 方式:填商户私钥(PKCS#8,可含 -----BEGIN PRIVATE KEY----- 头尾),用于下单签名。',
+                'help' => 'MD5:填商户密钥。RSA/RSA2:填 PKCS#1 或 PKCS#8 商户私钥,可带 PEM 头尾或仅填 Base64 主体。',
             ],
             'platform_public_key' => [
-                'label' => '平台公钥(仅 RSA)',
+                'label' => '平台公钥(仅 RSA/RSA2)',
                 'type' => 'textarea',
                 'required' => false,
-                'help' => '仅 RSA 方式必填:易支付平台公钥,用于校验回调签名(平台用其私钥签名)。MD5 方式留空。',
+                'help' => 'RSA/RSA2 必填。支持 PKCS#1 或 X.509 公钥、完整 PEM、裸 Base64 和转义换行格式;MD5 留空。',
             ],
             'url' => [
                 'label' => '易支付网关地址',

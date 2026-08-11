@@ -3,10 +3,10 @@
 namespace App\Filament\Pages;
 
 use App\Models\PaymentChannel;
+use App\Payment\PaymentUrlGenerator;
 use App\Support\PaymentService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Illuminate\Support\Facades\URL;
 
 class PaymentChannels extends Page
 {
@@ -25,7 +25,7 @@ class PaymentChannels extends Page
         return '支付通道';
     }
 
-    public static function getNavigationGroup(): string | \UnitEnum | null
+    public static function getNavigationGroup(): string|\UnitEnum|null
     {
         return '系统';
     }
@@ -35,7 +35,7 @@ class PaymentChannels extends Page
         return 2;
     }
 
-    public static function getNavigationIcon(): string | \BackedEnum | null
+    public static function getNavigationIcon(): string|\BackedEnum|null
     {
         return 'heroicon-o-credit-card';
     }
@@ -74,7 +74,7 @@ class PaymentChannels extends Page
         }
 
         try {
-            return (new $driverClass())->getInfo();
+            return (new $driverClass)->getInfo();
         } catch (\Throwable $e) {
             return ['icon' => '💳', 'description' => null];
         }
@@ -99,7 +99,7 @@ class PaymentChannels extends Page
         }
 
         try {
-            $driver = new $driverClass();
+            $driver = new $driverClass;
             $this->configFields = $driver->getConfigFields();
         } catch (\Throwable $e) {
             $this->configFields = [];
@@ -110,7 +110,7 @@ class PaymentChannels extends Page
             'id' => $channel->id,
             'name' => $channel->name,
             'code' => $channel->code,
-            'callback_url' => $this->buildCallbackUrl($channel->code),
+            'callback_url' => $this->buildCallbackUrl($channel->code, $channel->config ?? []),
         ];
 
         $this->dispatch('open-modal', id: 'configureChannel');
@@ -172,7 +172,7 @@ class PaymentChannels extends Page
             if (! empty($field['required']) && empty($data[$fieldKey])) {
                 Notification::make()
                     ->danger()
-                    ->title('请填写: ' . ($field['label'] ?? $fieldKey))
+                    ->title('请填写: '.($field['label'] ?? $fieldKey))
                     ->send();
 
                 $this->halt();
@@ -182,12 +182,12 @@ class PaymentChannels extends Page
         return $data;
     }
 
-    protected function buildCallbackUrl(string $code): string
+    protected function buildCallbackUrl(string $code, array $config = []): string
     {
-        if (app('router')->has('api.payments.callback')) {
-            return route('api.payments.callback', ['channel' => $code]);
-        }
-
-        return URL::to('/api/payments/callback/' . $code);
+        return app(PaymentUrlGenerator::class)->named(
+            'payment.notify',
+            ['channel' => $code],
+            $config,
+        );
     }
 }
