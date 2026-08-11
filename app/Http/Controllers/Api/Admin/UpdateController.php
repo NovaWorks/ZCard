@@ -112,6 +112,7 @@ class UpdateController extends Controller
     public function update(Request $request): JsonResponse
     {
         $currentVersion = AppHelper::version();
+        $userFilesPreserved = false;
 
         // 原子锁防止并发更新/回退；文件仅供前端展示运行状态。
         $operationLock = Cache::lock('zcard:system-update', 600);
@@ -142,8 +143,10 @@ class UpdateController extends Controller
             $this->ensureGitSafeDirectory();
             $this->ensureHttpsRemote();
             $this->preserveUserFiles();
-            // fetch 远程 → reset --hard origin/main(工作区已被 preserveUserFiles 清理干净)
-            $output = $this->shell('cd '.base_path().' && '.$this->gitCmd('fetch origin main').' 2>&1 && '.$this->gitCmd('reset --hard origin/main').' 2>&1');
+            $userFilesPreserved = true;
+            // 显式更新远程跟踪引用,并以本次 fetch 的 FETCH_HEAD 为准。
+            // 部分客户仓库缺少 remote.origin.fetch,仅 fetch origin main 不会更新 origin/main。
+            $output = $this->shell($this->gitSyncCommand(), true, 'Git 同步失败');
             $this->log($logFile, $output);
 
             // 检测致命错误(网络问题、文件权限等),必须在 restoreUserFiles 之前:
@@ -159,10 +162,16 @@ class UpdateController extends Controller
                 throw new \RuntimeException('Git pull 失败: '.$output);
             }
             $this->restoreUserFiles();
+            $userFilesPreserved = false;
+            $this->assertGitReferenceMatches('FETCH_HEAD');
 
             // Step 4: composer install(设置 COMPOSER_HOME 避免容器无 HOME)
             $this->log($logFile, '安装依赖...');
-            $output = $this->shell('cd '.base_path().' && COMPOSER_HOME=/tmp/composer composer install --no-dev --optimize-autoloader --no-interaction 2>&1');
+            $output = $this->shell(
+                'cd '.base_path().' && COMPOSER_HOME=/tmp/composer composer install --no-dev --optimize-autoloader --no-interaction 2>&1',
+                true,
+                'Composer 安装失败(请确认服务器使用 Composer 2.2 或更高版本)'
+            );
             $this->log($logFile, $output);
 
             // Step 5: 数据库迁移
@@ -213,6 +222,9 @@ class UpdateController extends Controller
             ]);
 
         } catch (\Throwable $e) {
+            if ($userFilesPreserved) {
+                $this->restoreUserFiles();
+            }
             // 失败:记录错误,退出维护模式,清缓存,保留日志
             $this->log($logFile, '更新失败: '.$e->getMessage());
             $this->log($logFile, '清理缓存 + 退出维护模式...');
@@ -243,6 +255,7 @@ class UpdateController extends Controller
      */
     public function rollback(): JsonResponse
     {
+        $userFilesPreserved = false;
         $operationLock = Cache::lock('zcard:system-update', 600);
         if (! $operationLock->get()) {
             return response()->json(['message' => '已有更新或回退正在进行中,无法回退'], 409);
@@ -264,7 +277,12 @@ class UpdateController extends Controller
             $this->ensureGitSafeDirectory();
             $this->ensureHttpsRemote();
             $this->preserveUserFiles();
-            $output = $this->shell('cd '.base_path().' && '.$this->gitCmd('reset --hard HEAD~1').' 2>&1');
+            $userFilesPreserved = true;
+            $output = $this->shell(
+                'cd '.base_path().' && '.$this->gitCmd('reset --hard HEAD~1').' 2>&1',
+                true,
+                'Git 回退失败'
+            );
             $this->log($logFile, $output);
 
             // reset 失败要在 restoreUserFiles 之前检测,避免恢复 .env 时的权限异常掩盖真正的失败原因
@@ -272,10 +290,15 @@ class UpdateController extends Controller
                 throw new \RuntimeException('Git 回退失败: '.$output);
             }
             $this->restoreUserFiles();
+            $userFilesPreserved = false;
 
             // Step 3: 安装依赖(可能需要降级)
             $this->log($logFile, '安装依赖...');
-            $output = $this->shell('cd '.base_path().' && COMPOSER_HOME=/tmp/composer composer install --no-dev --optimize-autoloader --no-interaction 2>&1');
+            $output = $this->shell(
+                'cd '.base_path().' && COMPOSER_HOME=/tmp/composer composer install --no-dev --optimize-autoloader --no-interaction 2>&1',
+                true,
+                'Composer 安装失败(请确认服务器使用 Composer 2.2 或更高版本)'
+            );
             $this->log($logFile, $output);
 
             // Step 4: 数据库回滚迁移
@@ -316,6 +339,9 @@ class UpdateController extends Controller
             ]);
 
         } catch (\Throwable $e) {
+            if ($userFilesPreserved) {
+                $this->restoreUserFiles();
+            }
             $this->log($logFile, '回退失败: '.$e->getMessage());
             $this->clearBootstrapCache();
             try {
@@ -365,7 +391,7 @@ class UpdateController extends Controller
      * 优先用 Symfony Process(更可靠的错误处理);若 proc_open 被 disable_functions
      * 禁用(宝塔常见),抛出含清晰提示的异常,而非 PHP fatal error。
      */
-    private function shell(string $command): string
+    private function shell(string $command, bool $mustSucceed = false, string $failureMessage = '命令执行失败'): string
     {
         if (! $this->canExec()) {
             throw new \RuntimeException(
@@ -378,7 +404,12 @@ class UpdateController extends Controller
         $process->setTimeout(600);
         $process->run();
 
-        return $process->getOutput().$process->getErrorOutput();
+        $output = $process->getOutput().$process->getErrorOutput();
+        if ($mustSucceed && ! $process->isSuccessful()) {
+            throw new \RuntimeException($failureMessage.'(退出码 '.$process->getExitCode().'): '.$output);
+        }
+
+        return $output;
     }
 
     /**
@@ -482,7 +513,8 @@ class UpdateController extends Controller
                 $path = trim(substr($path, strpos($path, ' -> ') + 4));
             }
             $path = trim($path, '"');
-            if ($path !== '') {
+            // VERSION 是发布元数据,必须跟随目标提交,不能作为用户改动恢复。
+            if ($path !== '' && $path !== 'VERSION') {
                 $files[] = $path;
             }
         }
@@ -523,6 +555,12 @@ class UpdateController extends Controller
             }
             // 备份内的相对路径 = 原始项目相对路径
             $relativePath = substr($file->getPathname(), strlen($dir.'/'));
+            // 兼容旧更新器遗留的备份:旧 VERSION 不得覆盖本次拉取的新版本号。
+            if ($relativePath === 'VERSION') {
+                @unlink($file->getPathname());
+
+                continue;
+            }
             $fullPath = base_path($relativePath);
             // 确保目标目录存在(git pull 可能删除了旧的空目录)
             $parent = dirname($fullPath);
@@ -580,6 +618,39 @@ class UpdateController extends Controller
     private function gitCmd(string $command): string
     {
         return 'git -c safe.directory='.escapeshellarg(base_path()).' '.$command;
+    }
+
+    /**
+     * 拉取 main 并显式刷新 origin/main,最终以本次 fetch 的 FETCH_HEAD 为准。
+     */
+    private function gitSyncCommand(): string
+    {
+        return 'cd '.base_path()
+            .' && '.$this->gitCmd('fetch --force origin main:refs/remotes/origin/main').' 2>&1'
+            .' && '.$this->gitCmd('reset --hard FETCH_HEAD').' 2>&1';
+    }
+
+    /**
+     * 更新完成前核对 HEAD,避免远程引用陈旧时仍返回“更新成功”。
+     */
+    private function assertGitReferenceMatches(string $reference): void
+    {
+        $head = trim($this->shell(
+            'cd '.base_path().' && '.$this->gitCmd('rev-parse HEAD').' 2>&1',
+            true,
+            '读取当前 Git 提交失败'
+        ));
+        $expected = trim($this->shell(
+            'cd '.base_path().' && '.$this->gitCmd('rev-parse '.escapeshellarg($reference)).' 2>&1',
+            true,
+            '读取目标 Git 提交失败'
+        ));
+
+        if (! preg_match('/^[0-9a-f]{40}$/i', $head)
+            || ! preg_match('/^[0-9a-f]{40}$/i', $expected)
+            || ! hash_equals(strtolower($expected), strtolower($head))) {
+            throw new \RuntimeException("Git 提交校验失败: 当前 HEAD={$head}, 目标={$expected}");
+        }
     }
 
     /**
