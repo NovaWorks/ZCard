@@ -36,8 +36,8 @@
               />
             </ElFormItem>
 
-            <!-- 推拽验证 -->
-            <div class="relative pb-5 mt-6">
+            <!-- 推拽验证(与登录验证码开关联动:关闭时不显示) -->
+            <div v-if="captchaEnabled" class="relative pb-5 mt-6">
               <div
                 class="relative z-[2] overflow-hidden select-none rounded-lg border border-transparent tad-300"
                 :class="{ '!border-[#FF4E4F]': !isPassing && isClickPass }"
@@ -155,7 +155,10 @@
       const data = await res.json()
       captchaEnabled.value = !!data.enabled
       captchaSrc.value = data.src || ''
-      if (!data.enabled) formData.captcha = ''
+      if (!data.enabled) {
+        formData.captcha = ''
+        isPassing.value = true
+      }
     } catch {
       captchaEnabled.value = false
     }
@@ -183,8 +186,8 @@
       const valid = await formRef.value.validate()
       if (!valid) return
 
-      // 拖拽验证
-      if (!isPassing.value) {
+      // 拖拽验证(仅开启登录验证码时要求)
+      if (captchaEnabled.value && !isPassing.value) {
         isClickPass.value = true
         return
       }

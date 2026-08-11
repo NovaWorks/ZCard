@@ -62,10 +62,11 @@ declare namespace Api {
 
   /** 认证类型 */
   namespace Auth {
-    /** 登录参数（ZCard 使用 email 登录） */
+    /** 登录参数（ZCard 使用 email 登录;captcha 为图形验证码,后台开启登录验证码时必填） */
     interface LoginParams {
       email: string
       password: string
+      captcha?: string
     }
 
     /** 登录响应（ZCard Sanctum: 直接返回 { token, user }） */

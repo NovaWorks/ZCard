@@ -66,7 +66,16 @@ class AlipayDriver extends AbstractPaymentDriver
             $resp = $this->postGateway($this->gatewayUrl($config), $params);
             $body = $resp['alipay_trade_precreate_response'] ?? [];
             if (($body['code'] ?? '') !== '10000' || empty($body['qr_code'])) {
-                throw new \RuntimeException('支付宝当面付下单失败: '.($body['sub_msg'] ?? $body['msg'] ?? '未知错误'));
+                $subCode = $body['sub_code'] ?? '';
+                $subMsg = $body['sub_msg'] ?? ($body['msg'] ?? '未知错误');
+                // 常见:isv.products-not-open-error=未开通当面付产品;
+                //      isv.invalid-signature=密钥/签名错误
+                $hint = match ($subCode) {
+                    'isv.products-not-open-error' => '(未开通当面付产品,请到开放平台产品中心开通)',
+                    'isv.invalid-signature', 'isv.insufficient-isv-permissions' => '(签名或权限错误,请核对应用私钥/支付宝公钥)',
+                    default => '',
+                };
+                throw new \RuntimeException("支付宝当面付下单失败: {$subMsg} [{$subCode}] {$hint}");
             }
 
             return PaymentResult::qrcode((string) $body['qr_code']);
