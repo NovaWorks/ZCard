@@ -3,87 +3,117 @@
 namespace Tests\Unit;
 
 use App\Payment\Drivers\AlipayDriver;
+use Illuminate\Http\Request;
 use Tests\TestCase;
 
 /**
- * 支付宝驱动配置构建:证书模式必填项(app_public_cert_path / alipay_root_cert_path)
- * 与 PEM 内容自动落盘逻辑。修复「缺少支付宝配置 -- [app_public_cert_path]」回归。
+ * 支付宝原生公钥模式(RSA2):签名-验签闭环、回调解析、支付方式映射。
+ * 回归:加签方式用「密钥」(应用私钥+支付宝公钥),无需证书。
  */
 class AlipayDriverConfigTest extends TestCase
 {
-    private function buildConfig(array $config): array
+    private function keyPair(): array
     {
+        $res = openssl_pkey_new([
+            'private_key_bits' => 2048,
+            'private_key_type' => OPENSSL_KEYTYPE_RSA,
+        ]);
+        openssl_pkey_export($res, $privateKey);
+        $pub = openssl_pkey_get_details($res);
+
+        return [$privateKey, $pub['key']];
+    }
+
+    public function test_verify_callback_validates_rsa2_signature(): void
+    {
+        [$privateKey, $publicKey] = $this->keyPair();
         $driver = new AlipayDriver;
-        $method = new \ReflectionMethod($driver, 'buildConfig');
 
-        return $method->invoke($driver, $config);
-    }
-
-    public function test_build_config_includes_cert_paths(): void
-    {
-        $cfg = $this->buildConfig([
+        $params = [
             'app_id' => '2021000000000000',
-            'private_key' => '---PRIVATE---',
-            'app_public_cert_path' => '/data/certs/appCertPublicKey.crt',
-            'alipay_root_cert_path' => '/data/certs/alipayRootCert.crt',
+            'trade_no' => '2026081022000000000000000000',
+            'out_trade_no' => 'ORDTEST001',
+            'total_amount' => '10.00',
+            'trade_status' => 'TRADE_SUCCESS',
+            'notify_time' => '2026-08-10 12:00:00',
+        ];
+        $params['sign_type'] = 'RSA2';
+        // 官方签名规则:sign 与 sign_type 均不参与签名内容
+        $signParams = $params;
+        unset($signParams['sign_type']);
+        ksort($signParams);
+        $content = '';
+        foreach ($signParams as $k => $v) {
+            if ($v === '') {
+                continue;
+            }
+            $content .= $k.'='.$v.'&';
+        }
+        $content = rtrim($content, '&');
+        openssl_sign($content, $sign, $privateKey, OPENSSL_ALGO_SHA256);
+        $params['sign'] = base64_encode($sign);
+
+        $result = $driver->verifyCallback(Request::create('/api/payments/callback/alipay', 'POST', $params), [
+            'alipay_public_key' => $publicKey,
         ]);
 
-        $alipay = $cfg['alipay']['default'];
-        $this->assertSame('2021000000000000', $alipay['app_id']);
-        $this->assertSame('---PRIVATE---', $alipay['app_secret_cert']);
-        $this->assertSame('/data/certs/appCertPublicKey.crt', $alipay['app_public_cert_path']);
-        $this->assertSame('/data/certs/alipayRootCert.crt', $alipay['alipay_root_cert_path']);
-        // 证书模式下不应再把公钥混用
-        $this->assertArrayNotHasKey('app_public_cert', $alipay);
-        $this->assertArrayNotHasKey('alipay_public_cert', $alipay);
+        $this->assertNotNull($result);
+        $this->assertSame('ORDTEST001', $result['out_trade_no']);
+        $this->assertSame(1000, $result['amount']);
     }
 
-    public function test_pem_content_is_written_to_cert_dir(): void
+    public function test_verify_callback_rejects_bad_signature(): void
     {
-        $pem = "-----BEGIN CERTIFICATE-----\nMIIBpzCCAQ2gAwIBAgIJAOe9Lef123456\n-----END CERTIFICATE-----";
-        $cfg = $this->buildConfig([
+        [$privateKey, $publicKey] = $this->keyPair();
+        $driver = new AlipayDriver;
+
+        $params = [
             'app_id' => 'x',
-            'private_key' => 'k',
-            'app_public_cert_path' => $pem,
-            'alipay_root_cert_path' => $pem,
+            'out_trade_no' => 'ORDX',
+            'total_amount' => '1.00',
+            'trade_status' => 'TRADE_SUCCESS',
+        ];
+        openssl_sign('tampered-content', $sign, $privateKey, OPENSSL_ALGO_SHA256);
+        $params['sign'] = base64_encode($sign);
+
+        $result = $driver->verifyCallback(Request::create('/api/payments/callback/alipay', 'POST', $params), [
+            'alipay_public_key' => $publicKey,
         ]);
 
-        $alipay = $cfg['alipay']['default'];
-        $this->assertFileExists($alipay['app_public_cert_path']);
-        $this->assertFileExists($alipay['alipay_root_cert_path']);
-        $this->assertSame($pem, file_get_contents($alipay['app_public_cert_path']));
-        // 同内容幂等:两次 build 得到同一文件
-        $cfg2 = $this->buildConfig([
+        $this->assertNull($result);
+    }
+
+    public function test_verify_callback_rejects_non_success_status(): void
+    {
+        [$privateKey, $publicKey] = $this->keyPair();
+        $driver = new AlipayDriver;
+
+        $params = [
             'app_id' => 'x',
-            'private_key' => 'k',
-            'app_public_cert_path' => $pem,
-            'alipay_root_cert_path' => $pem,
+            'out_trade_no' => 'ORDX',
+            'total_amount' => '1.00',
+            'trade_status' => 'WAIT_BUYER_PAY',
+        ];
+        ksort($params);
+        $content = '';
+        foreach ($params as $k => $v) {
+            $content .= $k.'='.$v.'&';
+        }
+        openssl_sign(rtrim($content, '&'), $sign, $privateKey, OPENSSL_ALGO_SHA256);
+        $params['sign'] = base64_encode($sign);
+
+        $result = $driver->verifyCallback(Request::create('/api/payments/callback/alipay', 'POST', $params), [
+            'alipay_public_key' => $publicKey,
         ]);
-        $this->assertSame($alipay['app_public_cert_path'], $cfg2['alipay']['default']['app_public_cert_path']);
+
+        $this->assertNull($result);
     }
 
     public function test_pay_types_returns_configured_type(): void
     {
         $driver = new AlipayDriver;
-        $this->assertSame(['scan'], $driver->getPayTypes(['pay_type' => 'scan']));
-        $this->assertSame(['web'], $driver->getPayTypes([]));
+        $this->assertSame(['scan'], $driver->getPayTypes([]));
         $this->assertSame(['web'], $driver->getPayTypes(['pay_type' => 'web']));
-    }
-
-    public function test_sn_mode_passes_cert_sns_without_paths(): void
-    {
-        $cfg = $this->buildConfig([
-            'app_id' => '2021000000000000',
-            'private_key' => 'k',
-            'app_public_cert_sn' => 'SN-APP-123',
-            'alipay_root_cert_sn' => 'SN-ROOT-456',
-        ]);
-
-        $alipay = $cfg['alipay']['default'];
-        $this->assertSame('SN-APP-123', $alipay['app_public_cert_sn']);
-        $this->assertSame('SN-ROOT-456', $alipay['alipay_root_cert_sn']);
-        // SN 模式下证书路径可为空(yansongda 优先读 SN)
-        $this->assertNull($alipay['app_public_cert_path']);
-        $this->assertNull($alipay['alipay_root_cert_path']);
+        $this->assertSame(['scan'], $driver->getPayTypes(['pay_type' => 'scan']));
     }
 }

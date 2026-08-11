@@ -2,129 +2,183 @@
 
 namespace App\Payment\Drivers;
 
+use App\Payment\AbstractPaymentDriver;
 use App\Payment\Contracts\Payable;
-use App\Payment\Contracts\PaymentDriver;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
-use Yansongda\Pay\Pay;
 
-class AlipayDriver implements PaymentDriver
+/**
+ * 支付宝原生驱动(公钥模式 RSA2,参考 dujiao-next / acg-faka)。
+ *
+ * 加签方式为「密钥」:只需要 应用 APPID + 应用私钥 + 支付宝公钥 三项,
+ * 无需证书(应用公钥证书/支付宝根证书)。签名与验签口径:
+ * - 下单:公共参数 + biz_content → 剔除空值与 sign → ksort → k=v& → RSA2(SHA256) → base64
+ * - 回调:剔除 sign/sign_type 与空值 → ksort → k=v& → 支付宝公钥 openssl_verify
+ *
+ * 支持支付方式(通道配置 pay_type):
+ * - scan 当面付扫码 alipay.trade.precreate → 二维码
+ * - web  电脑网站支付 alipay.trade.page.pay → 自动提交表单
+ * - h5   手机网站支付 alipay.trade.wap.pay → 自动提交表单
+ * - pos  刷卡支付 alipay.trade.pay
+ */
+class AlipayDriver extends AbstractPaymentDriver
 {
-    /**
-     * 构建传给 yansongda/laravel-pay v3 的配置数组。
-     *
-     * 注意:yansongda v3 支付宝强制「证书模式」,必须提供应用公钥证书与支付宝根证书
-     * (app_public_cert_path / alipay_root_cert_path,或对应 SN),
-     * 否则报「缺少支付宝配置 -- [app_public_cert_path]」。
-     * 证书字段兼容两种填法:服务器文件路径(PEM) 或 直接粘贴 PEM 内容(自动写入 storage/app/certs)。
-     */
-    protected function buildConfig(array $config): array
-    {
-        $mode = ($config['mode'] ?? 'normal') === 'sandbox'
-            ? Pay::MODE_SANDBOX
-            : Pay::MODE_NORMAL;
+    private const GATEWAY = 'https://openapi.alipay.com/gateway.do';
 
-        return [
-            'alipay' => [
-                'default' => [
-                    'app_id' => $config['app_id'] ?? '',
-                    'app_secret_cert' => $config['private_key'] ?? '',
-                    // 两种验签方式二选一:
-                    // A. SN 直填(推荐,开放平台「密钥管理」页可复制,无需证书文件)
-                    'app_public_cert_sn' => $config['app_public_cert_sn'] ?? null,
-                    'alipay_root_cert_sn' => $config['alipay_root_cert_sn'] ?? null,
-                    // B. 证书路径或 PEM 内容(自动落盘 storage/app/certs)
-                    'app_public_cert_path' => $this->resolveCertPath($config['app_public_cert_path'] ?? null, 'app'),
-                    'alipay_root_cert_path' => $this->resolveCertPath($config['alipay_root_cert_path'] ?? null, 'root'),
-                    'mode' => $mode,
-                ],
-            ],
-        ];
-    }
-
-    /** 证书字段兼容「路径」与「PEM 内容」两种填法 */
-    private function resolveCertPath(?string $value, string $name): ?string
-    {
-        if (empty($value)) {
-            return null;
-        }
-        if (! str_contains($value, '-----BEGIN')) {
-            return $value;
-        }
-        $dir = storage_path('app/certs');
-        if (! is_dir($dir)) {
-            @mkdir($dir, 0755, true);
-        }
-        $file = $dir.'/alipay_'.$name.'_'.md5($value).'.crt';
-        if (! file_exists($file)) {
-            file_put_contents($file, $value);
-        }
-
-        return $file;
-    }
+    private const GATEWAY_SANDBOX = 'https://openapi-sandbox.dl.alipaydev.com/gateway.do';
 
     public function pay(Payable $order, array $config): PaymentResult
     {
-        Pay::config($this->buildConfig($config));
+        $payType = $config['pay_type'] ?? 'scan';
+        $method = match ($payType) {
+            'web' => 'alipay.trade.page.pay',
+            'h5' => 'alipay.trade.wap.pay',
+            'pos' => 'alipay.trade.pay',
+            default => 'alipay.trade.precreate',
+        };
 
-        $payType = $config['pay_type'] ?? 'web';
-        $params = [
+        $biz = [
             'out_trade_no' => $order->getPayableKey(),
             'total_amount' => bcdiv((string) $order->getPayableAmount(), '100', 2),
             'subject' => $order->getPayableKey(),
         ];
-
-        return match ($payType) {
-            'h5' => $this->handleResponse(Pay::alipay()->h5(array_merge($params, [
-                'quit_url' => rtrim(config('app.url'), '/').'/pay/result?order_no='.$order->getPayableKey(),
-            ]))),
-            'scan' => $this->scanPay($order, $params),
-            'pos' => $this->handleResponse(Pay::alipay()->pos($params)),
-            default => $this->handleResponse(Pay::alipay()->web($params)),
-        };
-    }
-
-    /** 当面付扫码:返回二维码内容(code_url) */
-    private function scanPay(Payable $order, array $params): PaymentResult
-    {
-        $result = Pay::alipay()->scan($params);
-        $codeUrl = is_array($result)
-            ? ($result['code_url'] ?? null)
-            : (property_exists($result, 'code_url') ? $result->code_url : null);
-
-        if (! $codeUrl && method_exists($result, 'get')) {
-            $codeUrl = $result->get('code_url');
+        if ($payType === 'h5') {
+            $biz['quit_url'] = rtrim(config('app.url'), '/').'/pay/result?order_no='.$order->getPayableKey();
+            $biz['product_code'] = 'QUICK_WAP_WAY';
         }
 
-        return PaymentResult::qrcode((string) $codeUrl);
-    }
+        $params = [
+            'app_id' => $config['app_id'] ?? '',
+            'method' => $method,
+            'format' => 'JSON',
+            'charset' => 'utf-8',
+            'sign_type' => 'RSA2',
+            'timestamp' => date('Y-m-d H:i:s'),
+            'version' => '1.0',
+            'notify_url' => $this->namedUrl('payment.notify', ['channel' => 'alipay'], $config),
+            'return_url' => $this->namedUrl('payment.return', ['code' => 'alipay'], $config).'?order_no='.$order->getPayableKey(),
+            'biz_content' => json_encode($biz, JSON_UNESCAPED_UNICODE),
+        ];
+        $params['sign'] = $this->rsaSign($params, $config['private_key'] ?? '');
 
-    /** 统一处理 Response/HTML 结果:302 跳转 → redirect,其余按 HTML 表单 */
-    private function handleResponse($result): PaymentResult
-    {
-        if (method_exists($result, 'getHeader')) {
-            $location = $result->getHeader('Location')[0] ?? null;
-            if ($location) {
-                return PaymentResult::redirect((string) $location);
+        // 当面付扫码:POST 网关解析 qr_code
+        if ($method === 'alipay.trade.precreate') {
+            $resp = $this->postGateway($this->gatewayUrl($config), $params);
+            $body = $resp['alipay_trade_precreate_response'] ?? [];
+            if (($body['code'] ?? '') !== '10000' || empty($body['qr_code'])) {
+                throw new \RuntimeException('支付宝当面付下单失败: '.($body['sub_msg'] ?? $body['msg'] ?? '未知错误'));
             }
+
+            return PaymentResult::qrcode((string) $body['qr_code']);
         }
 
-        $body = method_exists($result, 'getBody') ? (string) $result->getBody() : (string) $result;
+        // 其余方式:返回自动提交表单(浏览器 POST 到网关)
+        return PaymentResult::form($this->buildAutoSubmitForm($this->gatewayUrl($config), $params));
+    }
 
-        return PaymentResult::form($body);
+    /** 签名内容:剔除 sign 与空值,按 key 升序拼接 k=v& */
+    private function buildSignContent(array $params): string
+    {
+        ksort($params);
+        $parts = [];
+        foreach ($params as $k => $v) {
+            if ($k === 'sign' || $v === '' || $v === null) {
+                continue;
+            }
+            $parts[] = $k.'='.$v;
+        }
+
+        return implode('&', $parts);
+    }
+
+    /** RSA2 签名(应用私钥),支持 PKCS8/PKCS1、带/不带 PEM 头 */
+    private function rsaSign(array $params, string $privateKeyRaw): string
+    {
+        $key = $this->normalizePem($privateKeyRaw, 'PRIVATE KEY');
+        $content = $this->buildSignContent($params);
+        if (! openssl_sign($content, $sign, $key, OPENSSL_ALGO_SHA256)) {
+            throw new \RuntimeException('支付宝签名失败: 请检查应用私钥是否正确');
+        }
+
+        return base64_encode($sign);
+    }
+
+    /** 回调验签:剔除 sign/sign_type/空值 → ksort → 支付宝公钥 RSA2 校验 */
+    private function verifySign(array $data, string $publicKeyRaw): bool
+    {
+        $sign = $data['sign'] ?? null;
+        unset($data['sign'], $data['sign_type']);
+        if (! $sign) {
+            return false;
+        }
+        $pubKey = $this->normalizePem($publicKeyRaw, 'PUBLIC KEY');
+        $content = $this->buildSignContent($data);
+
+        return openssl_verify($content, base64_decode((string) $sign), $pubKey, OPENSSL_ALGO_SHA256) === 1;
+    }
+
+    /** 私钥/公钥自动补 PEM 头(兼容开放平台复制内容不带头) */
+    private function normalizePem(string $raw, string $type): string
+    {
+        $raw = str_replace('\\n', "\n", trim($raw));
+        if ($raw === '') {
+            throw new \RuntimeException('密钥为空');
+        }
+        if (! str_contains($raw, 'BEGIN')) {
+            $raw = "-----BEGIN {$type}-----\n".$raw."\n-----END {$type}-----";
+        }
+
+        return $raw;
+    }
+
+    private function gatewayUrl(array $config): string
+    {
+        return ($config['mode'] ?? 'normal') === 'sandbox' ? self::GATEWAY_SANDBOX : self::GATEWAY;
+    }
+
+    /** POST 支付宝网关(application/x-www-form-urlencoded) */
+    private function postGateway(string $url, array $params): array
+    {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+        $body = curl_exec($ch);
+        $err = curl_error($ch);
+        curl_close($ch);
+
+        if ($err) {
+            throw new \RuntimeException('支付宝网关请求失败: '.$err);
+        }
+        $json = json_decode((string) $body, true);
+        if (! is_array($json)) {
+            throw new \RuntimeException('支付宝响应解析失败: '.mb_substr((string) $body, 0, 200));
+        }
+
+        return $json;
+    }
+
+    /** 构造自动提交表单 HTML(web/h5/pos 跳转网关) */
+    private function buildAutoSubmitForm(string $url, array $params): string
+    {
+        $inputs = '';
+        foreach ($params as $k => $v) {
+            $inputs .= '<input type="hidden" name="'.htmlspecialchars((string) $k).'" value="'.htmlspecialchars((string) $v).'"/>';
+        }
+
+        return '<form id="alipay_submit" name="alipay_submit" action="'.htmlspecialchars($url).'" method="POST">'
+            .$inputs
+            .'<input type="submit" value="立即支付" style="display:none;"/>'
+            .'</form><script>document.forms["alipay_submit"].submit();</script>';
     }
 
     public function verifyCallback(Request $request, array $config): ?array
     {
-        Pay::config($this->buildConfig($config));
-
-        try {
-            $result = Pay::alipay()->callback($request->all());
-        } catch (\Throwable $e) {
+        $data = $request->all();
+        if (! $this->verifySign($data, $config['alipay_public_key'] ?? '')) {
             return null;
         }
-
-        $data = method_exists($result, 'all') ? $result->all() : (array) $result;
 
         $tradeStatus = $data['trade_status'] ?? null;
         if (! in_array($tradeStatus, ['TRADE_SUCCESS', 'TRADE_FINISHED'], true)) {
@@ -134,7 +188,7 @@ class AlipayDriver implements PaymentDriver
         return [
             'channel_order_no' => $data['trade_no'] ?? null,
             'out_trade_no' => $data['out_trade_no'] ?? null,
-            'amount' => (int) round(bcmul((string) ($data['total_amount'] ?? 0), '100', 3)),
+            'amount' => (int) round(bcmul((string) ($data['total_amount'] ?? 0), '100', 3)), // 元→分
             'raw' => $data,
         ];
     }
@@ -148,45 +202,28 @@ class AlipayDriver implements PaymentDriver
                 'required' => true,
             ],
             'private_key' => [
-                'label' => '应用私钥(应用密钥/私钥 PEM 内容)',
+                'label' => '应用私钥(密钥管理 → 应用私钥)',
                 'type' => 'textarea',
                 'required' => true,
+                'help' => '支付宝开放平台 → 密钥管理 → 应用私钥,复制完整内容(支持带或不带 -----BEGIN PRIVATE KEY----- 头)',
             ],
-            'app_public_cert_sn' => [
-                'label' => '应用公钥证书 SN(推荐,与证书二选一)',
-                'type' => 'text',
-                'required' => false,
-                'help' => '开放平台 → 密钥管理 → 查看应用公钥证书 → 复制「SN」字段;填了 SN 则无需填下方证书',
-            ],
-            'alipay_root_cert_sn' => [
-                'label' => '支付宝根证书 SN(推荐,与证书二选一)',
-                'type' => 'text',
-                'required' => false,
-                'help' => '开放平台 → 密钥管理 → 查看支付宝根证书 → 复制「SN」字段',
-            ],
-            'app_public_cert_path' => [
-                'label' => '应用公钥证书(路径或 PEM 内容)',
+            'alipay_public_key' => [
+                'label' => '支付宝公钥(密钥管理 → 支付宝公钥)',
                 'type' => 'textarea',
-                'required' => false,
-                'help' => '未填 SN 时必填。开放平台「密钥管理」下载 appCertPublicKey.crt;可填服务器文件路径,或直接粘贴证书内容(-----BEGIN CERTIFICATE----- 开头)',
-            ],
-            'alipay_root_cert_path' => [
-                'label' => '支付宝根证书(路径或 PEM 内容)',
-                'type' => 'textarea',
-                'required' => false,
-                'help' => '未填 SN 时必填。开放平台下载 alipayRootCert.crt;同上可填路径或粘贴内容',
+                'required' => true,
+                'help' => '密钥管理 → 查看支付宝公钥,复制完整内容(支持带或不带 -----BEGIN PUBLIC KEY----- 头)',
             ],
             'pay_type' => [
                 'label' => '支付方式',
                 'type' => 'select',
                 'options' => [
+                    'scan' => '当面付扫码(生成二维码)',
                     'web' => '电脑网站支付(PC 页面)',
                     'h5' => '手机网站支付(H5)',
-                    'scan' => '当面付扫码(生成二维码)',
                     'pos' => '刷卡支付(付款码)',
                 ],
                 'required' => true,
-                'default' => 'web',
+                'default' => 'scan',
             ],
             'mode' => [
                 'label' => '运行模式',
@@ -220,7 +257,7 @@ class AlipayDriver implements PaymentDriver
 
     public function getPayTypes(array $config): array
     {
-        return [$config['pay_type'] ?? 'web'];
+        return [$config['pay_type'] ?? 'scan'];
     }
 
     public function getSupportedCurrencies(): array
