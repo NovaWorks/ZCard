@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\SupplySource;
 use App\Supply\Dto\UpstreamProduct;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -59,7 +60,7 @@ class SupplySyncService
             // 例外1:price<=0 是导入定价失败的脏数据,重算。
             // 例外2:勾选导入显式传了 pricing → 按本次所选策略重新定价。
             $update = [
-                'name' => $this->truncate($dto->name, 145),
+                'name' => $this->truncate($dto->name, 'name'),
                 'description' => $this->normalizeDescription($source, $dto->description),
                 'cover' => $this->normalizeCover($source, $dto->cover),
                 'images' => $this->normalizeImages($source, $dto->images, $dto->cover),
@@ -102,8 +103,8 @@ class SupplySyncService
     {
         return Product::create([
             'merchant_id' => self::MAIN_MERCHANT_ID,
-            'name' => $this->truncate($dto->name, 145),
-            'slug' => $this->truncate($this->uniqueSlug($dto->name, $dto->code, $unique), 145),
+            'name' => $this->truncate($dto->name, 'name'),
+            'slug' => $this->truncate($this->uniqueSlug($dto->name, $dto->code, $unique), 'slug'),
             'description' => $this->normalizeDescription($source, $dto->description),
             'cover' => $this->normalizeCover($source, $dto->cover),
             'images' => $this->normalizeImages($source, $dto->images, $dto->cover),
@@ -242,9 +243,27 @@ class SupplySyncService
         return $cat->id;
     }
 
-    /** 按数据库字段长度截断(上游名称可能超长,防 Data too long 报错) */
-    private function truncate(string $value, int $length): string
+    /** 按数据库字段实际长度截断(上游名称可能超长,防 Data too long 报错)。
+     * 运行时读取列定义(迁移扩容后=500,未迁移=150),自适应任何环境。 */
+    private function truncate(string $value, string $column): string
     {
+        static $limits = [];
+        if (! isset($limits[$column])) {
+            $limits[$column] = 150; // 兜底
+            try {
+                $row = DB::selectOne(
+                    'SHOW COLUMNS FROM products WHERE Field = ?',
+                    [$column],
+                );
+                if ($row && preg_match('/\((\d+)\)/', $row->Type ?? '', $m)) {
+                    $limits[$column] = (int) $m[1];
+                }
+            } catch (\Throwable $e) {
+                // 查询失败用兜底值
+            }
+        }
+        $length = $limits[$column];
+
         return mb_strlen($value) > $length ? mb_substr($value, 0, $length) : $value;
     }
 

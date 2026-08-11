@@ -61,7 +61,9 @@ class SyncSupplySourceProducts implements ShouldQueue
             $source->update(['last_synced_at' => now(), 'last_error' => null]);
             Log::info("supply sync done source={$source->id} created={$created} updated={$updated} hidden={$hidden}");
         } catch (Throwable $e) {
-            $source->update(['last_error' => $e->getMessage()]);
+            // last_error 截断(界面展示用,避免长 SQL/堆栈刷屏)
+            $msg = $e->getMessage();
+            $source->update(['last_error' => mb_strlen($msg) > 500 ? mb_substr($msg, 0, 500).'…' : $msg]);
             Log::error("supply sync failed source={$source->id}: {$e->getMessage()}");
             throw $e;
         }
