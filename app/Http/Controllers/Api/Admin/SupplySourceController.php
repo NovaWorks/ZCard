@@ -10,6 +10,7 @@ use App\Supply\SupplyManager;
 use App\Supply\SupplySyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
 
@@ -139,6 +140,14 @@ class SupplySourceController extends Controller
      */
     public function previewProducts(SupplySource $supplySource): JsonResponse
     {
+        // 预览结果缓存 60 秒(仅成功结果缓存):上游商品多时实时拉全量可能超过前端
+        // 超时,重复点击直接命中缓存;导入成功后自动失效(见 importProducts)。
+        $cacheKey = 'supply:preview:'.$supplySource->id;
+        $cached = Cache::get($cacheKey);
+        if ($cached !== null) {
+            return response()->json($cached);
+        }
+
         try {
             $driver = app(SupplyManager::class)->driver($supplySource);
             $items = $this->listAllProducts($driver);
@@ -196,11 +205,14 @@ class SupplySourceController extends Controller
                 ];
             }
 
-            return response()->json([
+            $data = [
                 'ok' => true,
                 'total' => count($items),
                 'categories' => $tree,
-            ]);
+            ];
+            Cache::put($cacheKey, $data, 60);
+
+            return response()->json($data);
         } catch (\Throwable $e) {
             return response()->json(['ok' => false, 'error' => $e->getMessage()], 500);
         }
@@ -275,6 +287,8 @@ class SupplySourceController extends Controller
             }
 
             $supplySource->update(['last_synced_at' => now(), 'last_error' => null]);
+            // 导入成功:失效预览缓存,下次预览重新拉取(已导入标记更新)
+            Cache::forget('supply:preview:'.$supplySource->id);
 
             return response()->json([
                 'ok' => true,

@@ -116,9 +116,10 @@ export interface SupplyPreviewResult {
   error?: string
 }
 
-/** 实时拉取上游商品(按分类树,供勾选导入) */
+/** 实时拉取上游商品(按分类树,供勾选导入)。
+ * 上游商品多时耗时可能超过默认 15s,单独放宽到 120s。 */
 export const previewSupplyProducts = (id: number) =>
-  request.get<SupplyPreviewResult>({ url: `/admin/supply-sources/${id}/products/preview` })
+  request.get<SupplyPreviewResult>({ url: `/admin/supply-sources/${id}/products/preview`, timeout: 120000 })
 
 /** 勾选导入商品到本地 */
 export const importSupplyProducts = (
