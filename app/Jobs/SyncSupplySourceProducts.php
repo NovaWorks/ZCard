@@ -41,7 +41,9 @@ class SyncSupplySourceProducts implements ShouldQueue
             $created = $updated = $hidden = 0;
 
             do {
-                $result = $driver->listProducts($updatedAfter, $page);
+                // 同步模式补查真实库存(fetchStock=true):上游 items 对手动发货商品
+                // 不返回 stock,逐个补查(并发10)让库存准确
+                $result = $driver->listProducts($updatedAfter, $page, fetchStock: true);
                 foreach ($result['items'] as $dto) {
                     $exists = Product::where('upstream_source_id', $source->id)
                         ->where('upstream_product_code', $dto->code)->exists();

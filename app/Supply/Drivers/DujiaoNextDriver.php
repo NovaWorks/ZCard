@@ -82,7 +82,7 @@ class DujiaoNextDriver implements SupplyDriver
         ))->all();
     }
 
-    public function listProducts(?Carbon $updatedAfter, int $page): array
+    public function listProducts(?Carbon $updatedAfter, int $page, bool $fetchStock = false): array
     {
         $path = '/api/v1/upstream/products';
         $query = ['page' => $page, 'page_size' => 50];

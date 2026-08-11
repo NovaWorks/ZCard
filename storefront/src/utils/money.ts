@@ -18,3 +18,13 @@ export function formatMoney(minUnit: number, cur: CurrencyInfo | null | undefine
   const body = cur.symbol_position === 'before' ? `${cur.symbol}${value}` : `${value}${cur.symbol}`
   return negative ? `-${body}` : body
 }
+
+/**
+ * 库存展示:上游商品库存可能为负数(-1 = 无限,其他负数为未知/充足)。
+ * 负数统一显示 ∞,0/正数显示原数量。
+ */
+export function stockText(stock: number | null | undefined): string {
+  if (stock === null || stock === undefined) return '∞'
+  if (stock < 0) return '∞'
+  return String(stock)
+}

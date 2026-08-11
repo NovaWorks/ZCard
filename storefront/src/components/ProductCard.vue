@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
-import { formatMoney } from '@/utils/money'
+import { formatMoney, stockText } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
 import type { Product } from '@/api/products'
 
@@ -40,7 +40,7 @@ function go() { router.push(`/product/${props.product.slug}`) }
       </div>
       <div class="flex justify-between items-center mt-1 text-[10px] text-ink-muted">
         <span v-if="settings.config?.show_sales">{{ t('common.sold') }} {{ product.sales }}</span>
-        <span v-if="settings.config?.show_stock">{{ t('common.stock') }} {{ product.stock }}</span>
+        <span v-if="settings.config?.show_stock">{{ t('common.stock') }} {{ stockText(product.stock) }}</span>
       </div>
     </div>
   </div>
@@ -56,7 +56,7 @@ function go() { router.push(`/product/${props.product.slug}`) }
       <div class="flex items-center gap-2 mt-0.5">
         <span v-if="settings.config?.show_price !== false" class="text-price font-bold text-sm">{{ priceText }}</span>
         <span v-if="settings.config?.show_sales" class="text-[10px] text-ink-muted">{{ t('common.sold') }} {{ product.sales }}</span>
-        <span v-if="settings.config?.show_stock" class="text-[10px] text-ink-muted">{{ t('common.stock') }} {{ product.stock }}</span>
+        <span v-if="settings.config?.show_stock" class="text-[10px] text-ink-muted">{{ t('common.stock') }} {{ stockText(product.stock) }}</span>
       </div>
     </div>
     <button class="bg-primary text-white text-xs px-3 py-1.5 rounded-field hover:bg-primary-hover transition">{{ t('common.buy') }}</button>

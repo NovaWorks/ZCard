@@ -100,7 +100,7 @@ class AcgFakaDriver implements SupplyDriver
         return [];
     }
 
-    public function listProducts(?Carbon $updatedAfter, int $page): array
+    public function listProducts(?Carbon $updatedAfter, int $page, bool $fetchStock = false): array
     {
         $data = $this->signedPost('/shared/commodity/items', []);
         $items = [];
@@ -110,7 +110,69 @@ class AcgFakaDriver implements SupplyDriver
             }
         }
 
+        // 同步模式:items 接口只对「卡密自动发货」商品返回 stock,
+        // 手动发货商品(-1)需逐个调 /shared/commodity/stock 补查真实库存(并发 10)。
+        if ($fetchStock) {
+            $this->fillMissingStocks($items);
+        }
+
         return ['items' => $items, 'total' => count($items), 'page' => 1, 'has_more' => false];
+    }
+
+    /** 并发补查缺失库存(仅同步 Job 调用;预览不查避免 4000+ 商品超时) */
+    private function fillMissingStocks(array &$items): void
+    {
+        $missing = [];
+        foreach ($items as $dto) {
+            if ($dto->stockQuantity === -1) {
+                $missing[] = $dto;
+            }
+        }
+        if (empty($missing)) {
+            return;
+        }
+
+        $chunks = array_chunk($missing, 10);
+        foreach ($chunks as $chunk) {
+            $stockValues = [];
+            try {
+                $responses = Http::pool(fn ($pool) => collect($chunk)->map(
+                    fn ($dto) => $pool->as($dto->code)->asForm()->timeout($this->requestTimeout())
+                        ->post($this->baseUrl().'/shared/commodity/stock', $this->signedParams(['code' => $dto->code]))
+                ));
+                foreach ($responses as $code => $resp) {
+                    $data = $resp->json() ?? [];
+                    $stockValues[$code] = (int) ($data['data']['stock'] ?? -1);
+                }
+            } catch (\Throwable $e) {
+                // 补查失败保持 -1(无限),不阻断同步
+            }
+
+            foreach ($chunk as $dto) {
+                if (isset($stockValues[$dto->code])) {
+                    // UpstreamProduct 为 readonly:PHP 8.3 允许 clone 时重新初始化
+                    $clone = clone $dto;
+                    $clone->stockQuantity = $stockValues[$dto->code];
+                    foreach ($items as $i => $it) {
+                        if ($it->code === $dto->code) {
+                            $items[$i] = $clone;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** 生成带签名的请求参数(供并发补查库存复用) */
+    private function signedParams(array $params): array
+    {
+        $creds = $this->credentials();
+        $params['app_id'] = $creds['app_id'];
+        $params['app_key'] = $creds['app_key'];
+        $params['sign'] = $this->sign($params);
+
+        return $params;
     }
 
     public function getProduct(string $code): ?UpstreamProduct
