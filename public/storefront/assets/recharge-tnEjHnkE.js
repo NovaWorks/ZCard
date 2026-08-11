@@ -1,1 +1,0 @@
-import{t as e}from"./request-DZdhMyWt.js";var t=(t,n=`balance`)=>e.post(`/recharges`,{amount:t,target:n}),n=()=>e.get(`/recharges/history`),r=t=>e.get(`/recharges/${t}/status`),i=(t,n)=>e.post(`/payments/create`,{order_no:t,channel_id:n});export{r as i,i as n,n as r,t};

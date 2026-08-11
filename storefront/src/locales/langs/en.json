@@ -327,7 +327,9 @@
       "viewOrderDetail": "View order details",
       "orderQuery": "Track Order",
       "continueShopping": "Continue Shopping",
-      "backHome": "Back Home"
+      "backHome": "Back Home",
+      "scanTitle": "Scan to Pay",
+      "scanHint": "Scan with Alipay App to complete payment, result refreshes automatically"
     }
   },
   "product": {

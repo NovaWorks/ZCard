@@ -1,1 +1,0 @@
-import{n as e,t}from"./request-DZdhMyWt.js";var n=e({createBatchOrders:()=>i,createOrder:()=>r,getMyOrders:()=>s,mockPay:()=>a,queryOrders:()=>o}),r=e=>t.post(`/orders`,e),i=e=>t.post(`/orders/batch`,e),a=e=>t.post(`/orders/${e}/mock-pay`),o=(e,n)=>t.get(`/orders/query`,{params:{keyword:e,password:n}}),s=()=>t.get(`/orders/mine`);export{n as a,a as i,r as n,o,s as r,i as t};

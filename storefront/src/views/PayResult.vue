@@ -13,10 +13,21 @@ const { t } = useI18n()
 const prefs = usePreferencesStore()
 
 const orderNo = computed(() => (route.query.order_no as string) || (route.query.out_trade_no as string) || '')
+const qrcodeContent = computed(() => (route.query.qrcode as string) || '')
 const isCancel = computed(() => route.query.status === 'cancel')
 const loading = ref(true)
 const order = ref<OrderDetail | null>(null)
 const paid = ref(false)
+
+// 二维码渲染(canvas)
+const qrCanvas = ref<HTMLCanvasElement | null>(null)
+async function renderQrcode() {
+  if (!qrcodeContent.value || !qrCanvas.value) return
+  try {
+    const QRCode = (await import('qrcode')).default
+    await QRCode.toCanvas(qrCanvas.value, qrcodeContent.value, { width: 240, margin: 2 })
+  } catch { /* 二维码渲染失败不阻塞页面 */ }
+}
 
 /**
  * 查询订单状态。
@@ -46,6 +57,11 @@ onMounted(async () => {
   if (isCancel.value) {
     loading.value = false
     return
+  }
+  // 二维码场景:渲染二维码(当面付扫码),同时有订单号则轮询支付状态
+  if (qrcodeContent.value) {
+    loading.value = false
+    renderQrcode()
   }
   // 没有订单号(部分第三方回跳不带),只能提示等待
   if (!orderNo.value) {
@@ -86,6 +102,21 @@ onMounted(async () => {
         <div class="flex gap-2 justify-center">
           <button @click="router.push('/orders/query')" class="px-4 py-2 text-xs bg-surface-subtle text-ink-soft rounded-field hover:bg-border transition">{{ t('order.payResult.orderQuery') }}</button>
           <button @click="router.push('/')" class="px-4 py-2 text-xs bg-primary text-white rounded-field hover:bg-primary-hover transition">{{ t('order.payResult.continueShopping') }}</button>
+        </div>
+      </template>
+
+      <!-- 扫码支付:展示二维码(当面付),轮询等待支付结果 -->
+      <template v-else-if="qrcodeContent && !paid">
+        <div class="w-16 h-16 mx-auto bg-primary-light rounded-full flex items-center justify-center mb-4"><AppIcon name="ri:qr-scan-line" class="w-8 h-8" /></div>
+        <h2 class="text-lg font-bold text-ink mb-1">{{ t('order.payResult.scanTitle') }}</h2>
+        <p class="text-xs text-ink-muted mb-4">{{ t('order.payResult.scanHint') }}</p>
+        <div class="flex justify-center mb-4">
+          <canvas ref="qrCanvas" class="bg-white rounded-card border border-border p-2"></canvas>
+        </div>
+        <div v-if="orderNo" class="text-xs text-ink-muted mb-5">{{ t('order.payResult.processingWithNo', { no: orderNo }) }}</div>
+        <div class="flex justify-center gap-2">
+          <button @click="router.push('/orders/query')" class="px-4 py-2 text-xs bg-primary text-white rounded-field hover:bg-primary-hover transition">{{ t('order.payResult.orderQuery') }}</button>
+          <button @click="router.push('/')" class="px-4 py-2 text-xs bg-surface-subtle text-ink-soft rounded-field hover:bg-border transition">{{ t('order.payResult.backHome') }}</button>
         </div>
       </template>
 

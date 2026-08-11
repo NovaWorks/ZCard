@@ -327,7 +327,9 @@
       "viewOrderDetail": "查看订单详情",
       "orderQuery": "订单查询",
       "continueShopping": "继续购物",
-      "backHome": "返回首页"
+      "backHome": "返回首页",
+      "scanTitle": "扫码支付",
+      "scanHint": "请使用支付宝 App 扫描二维码完成支付,支付成功后自动刷新"
     }
   },
   "product": {

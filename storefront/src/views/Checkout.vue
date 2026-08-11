@@ -261,14 +261,15 @@ async function loadChannels() {
   }
 }
 
-/** 支付结果:跳转链接 / 展示二维码 / 自动提交表单 */function handleResult(result: PaymentResult) {
+/** 支付结果:跳转链接 / 展示二维码 / 自动提交表单 */
+function handleResult(result: PaymentResult, orderNo = '') {
   if (result.type === 'redirect' && result.redirect_url) {
     window.location.href = result.redirect_url
     return
   }
   if (result.type === 'qrcode' && result.qrcode_content) {
-    // 二维码场景:跳结果页展示(轮询逻辑在结果页/支付页已有)
-    router.push({ path: '/pay/result', query: { order_no: '', qrcode: result.qrcode_content } })
+    // 二维码场景:跳结果页展示(带订单号供轮询;结果页渲染二维码)
+    router.push({ path: '/pay/result', query: { order_no: orderNo, qrcode: result.qrcode_content } })
     return
   }
   if (result.type === 'form' && result.form_html) {
@@ -345,7 +346,7 @@ async function doSubmit() {
       }
       const result = await createBatchPayment(res.order_ids, channelId)
       cart.clear()
-      handleResult(result)
+      handleResult(result, res.orders[0]?.order_no || '')
     } else {
       const it = items.value[0]
       const res = await createOrder({
@@ -365,7 +366,7 @@ async function doSubmit() {
         return
       }
       const result = await createPayment(res.order_no, channelId)
-      handleResult(result)
+      handleResult(result, res.order_no)
     }
   } catch (e: any) {
     err.value = e?.response?.data?.message || t('order.checkout.submitFailed')
