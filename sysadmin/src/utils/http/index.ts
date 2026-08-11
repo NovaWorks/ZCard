@@ -67,6 +67,8 @@ axiosInstance.interceptors.request.use(
     const { accessToken } = useUserStore()
     // ZCard Sanctum: Bearer token 格式
     if (accessToken) request.headers.set('Authorization', `Bearer ${accessToken}`)
+    // 标识管理端来源:后端据此对登录/注册跳过图形验证码(sysadmin 用滑块+限流防暴力)
+    request.headers.set('X-Client', 'sysadmin')
 
     if (request.data && !(request.data instanceof FormData) && !request.headers['Content-Type']) {
       request.headers.set('Content-Type', 'application/json')

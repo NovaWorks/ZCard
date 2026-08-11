@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\CaptchaService;
+use App\Support\MailService;
 use App\Support\StorefrontConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -55,7 +56,7 @@ class AuthController extends Controller
         $pid = 0;
         $referrerName = trim((string) ($data['referrer'] ?? ''));
         if ($referrerName !== '') {
-            $referrerUser = \App\Models\User::where('username', $referrerName)->first();
+            $referrerUser = User::where('username', $referrerName)->first();
             if ($referrerUser && $referrerUser->username !== $data['username']) {
                 $pid = $referrerUser->id;
             }
@@ -89,7 +90,10 @@ class AuthController extends Controller
         ]);
 
         // 登录验证码校验
-        if (CaptchaService::isEnabled('login')) {
+        // 管理端(sysadmin)登录页只有滑块验证、无图形验证码输入框:
+        // 带 X-Client: sysadmin 头时跳过图形验证码(防暴力由路由 throttle 限流承担)。
+        $isAdminClient = $request->header('X-Client') === 'sysadmin';
+        if (CaptchaService::isEnabled('login') && ! $isAdminClient) {
             if (! CaptchaService::verify('login', $data['captcha'] ?? null)) {
                 throw ValidationException::withMessages([
                     'captcha' => [__('messages.captcha_error')],
@@ -165,8 +169,8 @@ class AuthController extends Controller
     public function updateProfile(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'username' => 'sometimes|string|min:2|max:50|unique:users,username,' . $request->user()->id,
-            'email' => 'sometimes|email|max:100|unique:users,email,' . $request->user()->id,
+            'username' => 'sometimes|string|min:2|max:50|unique:users,username,'.$request->user()->id,
+            'email' => 'sometimes|email|max:100|unique:users,email,'.$request->user()->id,
         ]);
 
         $user = $request->user();
@@ -186,8 +190,8 @@ class AuthController extends Controller
         ]);
 
         // 图形验证码校验(注册场景的验证码复用)
-        if (\App\Support\CaptchaService::isEnabled('register')) {
-            if (! \App\Support\CaptchaService::verify('register', $data['captcha'] ?? null)) {
+        if (CaptchaService::isEnabled('register')) {
+            if (! CaptchaService::verify('register', $data['captcha'] ?? null)) {
                 throw ValidationException::withMessages([
                     'captcha' => [__('messages.auth.captcha_error')],
                 ]);
@@ -207,7 +211,7 @@ class AuthController extends Controller
         cache()->put("reset_code_sent:{$data['email']}", true, 60);
 
         try {
-            \App\Support\MailService::sendCaptchaEmail($data['email'], $code);
+            MailService::sendCaptchaEmail($data['email'], $code);
         } catch (\Throwable $e) {
             throw ValidationException::withMessages([
                 'email' => [__('messages.auth.mail_send_failed')],
