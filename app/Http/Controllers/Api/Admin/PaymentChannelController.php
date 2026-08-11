@@ -10,6 +10,7 @@ use App\Support\PaymentService;
 use App\Support\StorefrontConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 /**
  * 后台支付通道管理。列表(含 driver 信息)、保存 config、切换 enabled,
@@ -122,6 +123,27 @@ class PaymentChannelController extends Controller
             $data['config'] = array_merge($oldConfig, $submitted);
         }
 
+        // 驱动可选提供配置归一/校验。易支付用此处统一 gateway_url、
+        // submit.php 尾缀和 type 形态;启用前必须在服务端确认凭据完整。
+        $driverClass = $channel->driver;
+        $driver = class_exists($driverClass) ? new $driverClass : null;
+        $effectiveConfig = $data['config'] ?? ($channel->config ?? []);
+        try {
+            if ($driver && method_exists($driver, 'normalizeConfig')) {
+                $effectiveConfig = $driver->normalizeConfig($effectiveConfig);
+                if (isset($data['config'])) {
+                    $data['config'] = $effectiveConfig;
+                }
+            }
+            $willEnable = (bool) ($data['enabled'] ?? $channel->enabled);
+            if ($willEnable && $driver && method_exists($driver, 'validateConfig')) {
+                $effectiveConfig = $driver->validateConfig($effectiveConfig);
+                $data['config'] = $effectiveConfig;
+            }
+        } catch (\RuntimeException $e) {
+            throw ValidationException::withMessages(['config' => $e->getMessage()]);
+        }
+
         $channel->update($data);
 
         return response()->json($this->channelArray($channel->fresh()));
@@ -166,7 +188,7 @@ class PaymentChannelController extends Controller
 
         // 与支付驱动提交给网关的 notify_url 共用同一真理源。
         $callbackUrl = app(PaymentUrlGenerator::class)->named(
-            'payment.notify',
+            $channel->code === 'epay' ? 'api.payments.callback' : 'payment.notify',
             ['channel' => $channel->code],
             $channel->config ?? [],
         );

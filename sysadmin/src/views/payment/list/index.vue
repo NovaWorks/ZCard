@@ -123,11 +123,20 @@
             <code>{{ callbackUrl }}</code>
             <el-button text size="small" @click="copyText(callbackUrl)">{{ t('zcard.payment.copy') }}</el-button>
           </div>
-          <div class="callback-tip">{{ t('zcard.payment.callbackTip') }}</div>
+          <div class="callback-tip">{{ isEpay ? t('zcard.payment.epayCallbackTip') : t('zcard.payment.callbackTip') }}</div>
         </el-alert>
 
+        <el-alert
+          v-if="isEpay"
+          :type="isLegacyEpay ? 'warning' : 'success'"
+          :closable="false"
+          show-icon
+          class="callback-alert"
+          :title="isLegacyEpay ? t('zcard.payment.epayLegacyTip') : t('zcard.payment.epaySimpleTip')"
+        />
+
         <ElFormItem
-          v-for="field in configFields"
+          v-for="field in visibleConfigFields"
           :key="field.key"
           :label="field.label"
           :required="field.required && !(isSensitive(field.key) && currentChannel?.config?.[field.key])"
@@ -237,6 +246,10 @@
   const isConfigured = (channel: PaymentChannel): boolean => {
     const cfg = channel.config
     if (!cfg || typeof cfg !== 'object') return false
+    if (channel.code === 'epay') {
+      const types = Array.isArray(cfg.type) ? cfg.type : (cfg.type ? [cfg.type] : [])
+      return Boolean(cfg.url || cfg.gateway_url) && Boolean(cfg.pid) && Boolean(cfg.key) && types.length > 0
+    }
     // 至少有一个非空值才算已配置
     return Object.values(cfg).some((v) => v !== '' && v !== null && v !== undefined)
   }
@@ -330,6 +343,16 @@
   /** 该通道的异步回调地址 */
   const callbackUrl = ref('')
 
+  const isEpay = computed(() => currentChannel.value?.code === 'epay')
+  const isLegacyEpay = computed(() => {
+    if (!isEpay.value) return false
+    const signType = String(currentChannel.value?.config?.sign_type || '').toUpperCase()
+    return ['RSA', 'RSA2', 'SHA256WITHRSA'].includes(signType)
+  })
+  const visibleConfigFields = computed(() =>
+    configFields.value.filter((field) => !field.legacy || isLegacyEpay.value)
+  )
+
   const configForm = reactive<{ enabled: boolean; fee: number; fee_type: string; fee_bearer: string; values: Record<string, any> }>({
     enabled: false,
     fee: 0,
@@ -398,6 +421,17 @@
   /** 保存配置 */
   const handleSave = async () => {
     if (!currentChannel.value) return
+    // 前端先给出字段级提示;后端仍会再次强制校验。
+    const missing = visibleConfigFields.value.find((field) => {
+      if (!field.required) return false
+      const value = configForm.values[field.key]
+      if (isSensitive(field.key) && currentChannel.value?.config?.[field.key]) return false
+      return value === '' || value === null || value === undefined || (Array.isArray(value) && value.length === 0)
+    })
+    if (missing) {
+      ElMessage.error(t('zcard.payment.requiredField', { field: missing.label }))
+      return
+    }
     // 敏感字段为空时,不回传(保留后端已存值);非空才更新
     const values: Record<string, any> = {}
     configFields.value.forEach((f) => {

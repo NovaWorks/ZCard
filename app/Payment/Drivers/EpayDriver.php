@@ -18,19 +18,23 @@ use Illuminate\Support\Facades\Log;
  * - MD5(V1,默认):ksort → key=value 用 & 拼接 → 末尾直接追加 key → md5 小写
  * - RSA/RSA2(V2 / SHA256WithRSA):ksort → key=value 用 & 拼接 → 商户私钥 SHA256 签名 → base64
  *
- * 下单方式:
- * - submit.php(跳转收银台):GET {url}/submit.php?{签名参数} 跳转
- *   type 不传 → 聚合收银台(用户自选支付宝/微信等)
- *   type 传单个 → 直接进对应支付通道
- *
- * 支付方式(type)支持多选:商户在后台勾选要支持的支付方式,
- * - 勾选多个 → 不传 type,用户在收银台自选
- * - 勾选单个 → 直接传该 type
+ * 下单方式:GET {url}/submit.php?{签名参数} 跳转。
+ * 参考 acg-faka,每次下单都明确传递用户选中的 type,不把多种方式
+ * 折叠为一个无 type 的聚合按钮。
  *
  * 回调:GET query 或 POST 传参,TRADE_SUCCESS/TRADE_FINISHED 为成功,返回 "success"。
  */
 class EpayDriver extends AbstractPaymentDriver
 {
+    private const PAY_TYPES = [
+        'alipay' => '支付宝',
+        'wxpay' => '微信支付',
+        'qqpay' => 'QQ 钱包',
+        'bank' => '云闪付 / 网银',
+        'jdpay' => '京东支付',
+        'paypal' => 'PayPal',
+    ];
+
     /**
      * 签名:按 sign_type 分流 MD5 / RSA / RSA2。
      *
@@ -168,36 +172,37 @@ class EpayDriver extends AbstractPaymentDriver
 
     public function pay(Payable $order, array $config): PaymentResult
     {
-        $pid = $config['pid'] ?? '';
-        $key = $config['key'] ?? '';
-        $apiUrl = rtrim($config['url'] ?? '', '/');
+        $config = $this->validateConfig($config);
+        $pid = $config['pid'];
+        $key = $config['key'];
+        $apiUrl = $config['url'];
         $signType = strtoupper(trim((string) ($config['sign_type'] ?? 'MD5')));
         if ($this->normalizeSignType($signType) === null) {
             throw new \RuntimeException('易支付签名方式不受支持');
         }
 
-        // 支付方式:多选配置,下单时按勾选数量决定是否传 type
-        // - 勾选多个或空 → 不传 type,跳聚合收银台让用户自选
-        // - 只勾选 1 个 → 传该 type,直接进对应通道
-        $types = $config['type'] ?? [];
-        if (is_string($types)) {
-            $types = array_filter(array_map('trim', explode(',', $types)));
+        // acg-faka 会把用户选中的支付 code 明确作为 type 提交。
+        // ZCard 由 PaymentService 将本次选择放入瞬时配置,不写回数据库。
+        $payType = trim((string) ($config['_selected_pay_type'] ?? ''));
+        $types = $this->normalizePayTypes($config['type'] ?? []);
+        // 兼容升级前未传 pay_type 的旧前端:回退到已启用方式的第一个。
+        if ($payType === '' && $types !== []) {
+            $payType = $types[0];
         }
-        $types = array_values(array_filter((array) $types, fn ($v) => $v !== ''));
-        $payType = count($types) === 1 ? $types[0] : '';
+        if ($payType === '' || ! in_array($payType, $types, true)) {
+            throw new \RuntimeException('请选择具体的易支付方式');
+        }
 
         $params = [
             'pid' => $pid,
             'out_trade_no' => $order->getPayableKey(),
-            'notify_url' => $this->namedUrl('payment.notify', ['channel' => 'epay'], $config),
+            'notify_url' => $this->namedUrl('api.payments.callback', ['channel' => 'epay'], $config),
             'return_url' => $this->namedUrl('payment.return', ['code' => 'epay'], $config).'?order_no='.$order->getPayableKey(),
             'name' => $order->getPayableKey(),
             'money' => bcdiv((string) $order->getPayableAmount(), '100', 2), // 分→元
+            'type' => $payType,
+            'sitename' => (string) config('app.name', 'ZCard'),
         ];
-        // type 仅在勾选单个支付方式时传(否则走聚合收银台)
-        if ($payType !== '') {
-            $params['type'] = $payType;
-        }
 
         $params['sign'] = $this->sign($params, $key, $signType);
         $params['sign_type'] = $signType;
@@ -209,16 +214,19 @@ class EpayDriver extends AbstractPaymentDriver
 
     public function verifyCallback(Request $request, array $config): ?array
     {
+        $config = $this->normalizeConfig($config);
         $key = $config['key'] ?? '';
-        // 易支付回调可能走 GET query 或 POST body,合并读取
-        $data = array_merge($request->query(), $request->post());
+        // Illuminate Request::all() 同时兼容表单和 JSON,再合并 query 兼容 GET 通知。
+        $data = array_merge($request->query(), $request->all());
+        foreach ($data as $value) {
+            if (! is_scalar($value) && $value !== null) {
+                return $this->rejectCallback('payload_invalid', $data);
+            }
+        }
 
-        // 验签算法:优先用回调自带的 sign_type 字段(易支付 889 等平台回调默认 RSA),
-        // 其次回退到通道配置。若只按配置判断,回调 sign_type 与配置不一致时会用错算法 → 验签恒失败。
-        $callbackSignType = strtoupper(trim((string) ($data['sign_type'] ?? '')));
-        $signType = $callbackSignType !== ''
-            ? $callbackSignType
-            : strtoupper(trim((string) ($config['sign_type'] ?? 'MD5')));
+        // 验签算法必须以服务端已保存配置为准,回调参数不能自行切换算法。
+        // 新配置固定 MD5;仅历史 RSA/RSA2 配置继续走兼容分支。
+        $signType = strtoupper(trim((string) ($config['sign_type'] ?? 'MD5')));
         $algorithm = $this->normalizeSignType($signType);
         if ($algorithm === null) {
             return $this->rejectCallback('unsupported_sign_type', $data);
@@ -232,7 +240,7 @@ class EpayDriver extends AbstractPaymentDriver
         // 校验回调归属,防止其他商户的合法回调注入当前渠道。
         $configuredPid = trim((string) ($config['pid'] ?? ''));
         $callbackPid = trim((string) ($data['pid'] ?? ''));
-        if ($configuredPid === '' || $callbackPid === '' || ! hash_equals($configuredPid, $callbackPid)) {
+        if ($configuredPid === '' || ($callbackPid !== '' && ! hash_equals($configuredPid, $callbackPid))) {
             return $this->rejectCallback('pid_mismatch', $data);
         }
 
@@ -259,15 +267,20 @@ class EpayDriver extends AbstractPaymentDriver
                 return $this->rejectCallback('merchant_key_missing', $data);
             }
             $expected = $this->sign($data, $key, $signType);
-            if (! hash_equals($expected, $provided)) {
+            if (! hash_equals($expected, strtolower($provided))) {
                 return $this->rejectCallback('md5_signature_invalid', $data);
             }
+        }
+
+        $money = trim((string) ($data['money'] ?? ''));
+        if ($money === '' || ! preg_match('/^\d+(?:\.\d{1,2})?$/D', $money)) {
+            return $this->rejectCallback('amount_invalid', $data);
         }
 
         return [
             'channel_order_no' => $data['trade_no'] ?? null,
             'out_trade_no' => $data['out_trade_no'] ?? null,
-            'amount' => (int) round(bcmul((string) ($data['money'] ?? 0), '100', 3)), // 元→分
+            'amount' => (int) bcmul($money, '100', 0), // 元→分,避免浮点精度参与金额校验
             'raw' => $data,
         ];
     }
@@ -288,76 +301,108 @@ class EpayDriver extends AbstractPaymentDriver
     public function getConfigFields(): array
     {
         return [
-            'sign_type' => [
-                'label' => '签名方式',
-                'type' => 'select',
-                'options' => [
-                    'MD5' => 'MD5(V1 接口,传统易支付)',
-                    'RSA2' => 'RSA2 / SHA256WithRSA(V2 接口,推荐)',
-                    'RSA' => 'RSA / SHA256WithRSA(V2 兼容值)',
-                ],
+            'url' => [
+                'label' => '支付网关',
+                'type' => 'text',
                 'required' => true,
-                'default' => 'MD5',
-                'help' => '按平台要求选择。RSA 与 RSA2 均使用 SHA256WithRSA;支持常见 PEM、裸 Base64 和转义换行密钥。',
+                'placeholder' => '如 https://pay.example.com',
+                'help' => '只填易支付站点根地址;如果粘贴了 /submit.php,保存时会自动去除。',
             ],
             'pid' => [
-                'label' => '商户 ID(PID)',
+                'label' => '商户 ID',
                 'type' => 'text',
                 'required' => true,
             ],
             'key' => [
-                'label' => '商户密钥 / 私钥',
-                'type' => 'textarea',
+                'label' => '商户密钥',
+                'type' => 'password',
                 'required' => true,
-                'help' => 'MD5:填商户密钥。RSA/RSA2:填 PKCS#1 或 PKCS#8 商户私钥,可带 PEM 头尾或仅填 Base64 主体。',
-            ],
-            'platform_public_key' => [
-                'label' => '平台公钥(仅 RSA/RSA2)',
-                'type' => 'textarea',
-                'required' => false,
-                'help' => 'RSA/RSA2 必填。支持 PKCS#1 或 X.509 公钥、完整 PEM、裸 Base64 和转义换行格式;MD5 留空。',
-            ],
-            'url' => [
-                'label' => '易支付网关地址',
-                'type' => 'text',
-                'required' => true,
-                'placeholder' => '如 https://pay.example.com',
+                'help' => '填写易支付商户后台中的 KEY;保存后不回显,留空表示保留原值。',
             ],
             'type' => [
-                'label' => '支持的支付方式(多选)',
+                'label' => '前台支付方式',
                 'type' => 'multiselect',
-                'options' => [
-                    'alipay' => '支付宝',
-                    'wxpay' => '微信支付',
-                    'qqpay' => 'QQ 钱包',
-                    'bank' => '云闪付 / 网银',
-                    'jdpay' => '京东支付',
-                    'paypal' => 'PayPal',
-                ],
-                'required' => false,
+                'options' => self::PAY_TYPES,
+                'required' => true,
                 'default' => ['alipay', 'wxpay'],
-                'help' => '勾选要支持的支付方式(可多选)。勾选多个时,用户在易支付收银台自选;只勾选一个则直接进入该支付通道。具体可用方式以易支付商户后台开通为准。',
+                'help' => '前台会分别显示选中的方式,下单时会明确向易支付提交 type。',
             ],
-            'notify_domain' => [
-                'label' => '回调域名(可选)',
-                'type' => 'text',
-                'required' => false,
-                'placeholder' => '如 https://kmigo.com',
-                'help' => '回调地址默认用当前运行域名自动生成(部署到哪个域名就用哪个)。仅当回调入口与站点域名不一致(如走 CDN/独立公网入口)时才需填写。',
+            // 仅用于识别并维护历史 RSA/RSA2 配置;新配置不展示。
+            'sign_type' => [
+                'label' => '历史签名方式',
+                'type' => 'select',
+                'options' => ['RSA2' => 'RSA2 / SHA256WithRSA', 'RSA' => 'RSA / SHA256WithRSA'],
+                'required' => true,
+                'legacy' => true,
             ],
-            'target_currency' => [
-                'label' => '收款货币',
-                'type' => 'text',
-                'required' => false,
-                'default' => 'CNY',
-            ],
-            'exchange_rate' => [
-                'label' => '汇率(基础货币→收款货币)',
-                'type' => 'text',
-                'required' => false,
-                'default' => '1',
+            'platform_public_key' => [
+                'label' => '平台公钥(历史 RSA 配置)',
+                'type' => 'textarea',
+                'required' => true,
+                'legacy' => true,
             ],
         ];
+    }
+
+    /**
+     * 兼容历史 gateway_url/type 形态,并将用户粘贴的 submit.php 归一为网关根地址。
+     */
+    public function normalizeConfig(array $config): array
+    {
+        $url = trim((string) ($config['url'] ?? $config['gateway_url'] ?? ''));
+        $url = preg_replace('~/+(?:submit|mapi)\.php/?$~i', '', $url) ?? $url;
+        $config['url'] = rtrim($url, '/');
+        unset($config['gateway_url']);
+        $config['pid'] = trim((string) ($config['pid'] ?? ''));
+        $config['type'] = $this->normalizePayTypes($config['type'] ?? ['alipay']);
+        $config['sign_type'] = strtoupper(trim((string) ($config['sign_type'] ?? 'MD5'))) ?: 'MD5';
+
+        return $config;
+    }
+
+    /** 返回已归一且可用的配置,下单与后台启用前共用。 */
+    public function validateConfig(array $config): array
+    {
+        $config = $this->normalizeConfig($config);
+        if ($config['url'] === '' || filter_var($config['url'], FILTER_VALIDATE_URL) === false
+            || ! in_array(strtolower((string) parse_url($config['url'], PHP_URL_SCHEME)), ['http', 'https'], true)
+            || parse_url($config['url'], PHP_URL_USER) !== null
+            || parse_url($config['url'], PHP_URL_PASS) !== null
+            || parse_url($config['url'], PHP_URL_QUERY) !== null
+            || parse_url($config['url'], PHP_URL_FRAGMENT) !== null) {
+            throw new \RuntimeException('请填写正确的易支付网关地址');
+        }
+        if ($config['pid'] === '') {
+            throw new \RuntimeException('请填写易支付商户 ID');
+        }
+        if (trim((string) ($config['key'] ?? '')) === '') {
+            throw new \RuntimeException('请填写易支付商户密钥');
+        }
+        if ($config['type'] === []) {
+            throw new \RuntimeException('请至少启用一种易支付方式');
+        }
+        $algorithm = $this->normalizeSignType($config['sign_type']);
+        if ($algorithm === null) {
+            throw new \RuntimeException('易支付签名方式不受支持');
+        }
+        if ($algorithm === 'RSA' && trim((string) ($config['platform_public_key'] ?? '')) === '') {
+            throw new \RuntimeException('历史 RSA 配置缺少平台公钥');
+        }
+
+        return $config;
+    }
+
+    /** @return list<string> */
+    private function normalizePayTypes(mixed $types): array
+    {
+        if (is_string($types)) {
+            $types = preg_split('/[,\s]+/', $types, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map(fn ($type) => trim((string) $type), is_array($types) ? $types : []),
+            fn (string $type) => array_key_exists($type, self::PAY_TYPES),
+        )));
     }
 
     public function getInfo(): array
@@ -370,13 +415,9 @@ class EpayDriver extends AbstractPaymentDriver
 
     public function getPayTypes(array $config): array
     {
-        // 聚合收银台:支持多种支付方式(后台 config.type 多选,默认 alipay+wxpay)
-        $types = $config['type'] ?? ['alipay', 'wxpay'];
-        if (is_string($types)) {
-            $types = array_filter(array_map('trim', explode(',', $types)));
-        }
+        $types = $this->normalizePayTypes($config['type'] ?? ['alipay', 'wxpay']);
 
-        return array_values(array_filter((array) $types, fn ($v) => $v !== ''));
+        return $types === [] ? ['alipay'] : $types;
     }
 
     public function getSupportedCurrencies(): array

@@ -185,7 +185,7 @@ class PaymentChannels extends Page
     protected function buildCallbackUrl(string $code, array $config = []): string
     {
         return app(PaymentUrlGenerator::class)->named(
-            'payment.notify',
+            $code === 'epay' ? 'api.payments.callback' : 'payment.notify',
             ['channel' => $code],
             $config,
         );

@@ -93,6 +93,8 @@ class StorefrontConfig
             // 系统运维
             'maintenance_mode' => false,
             'maintenance_message' => '系统维护中,请稍后再来访问。',
+            // 支付回调公网入口;留空时根据当前访问域名/site_url 自动生成。
+            'payment_callback_domain' => '',
             'site_notice' => '',
 
             // 站点与页脚信息(全前台通用,后台「店铺设置-站点信息」编辑)

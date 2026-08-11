@@ -68,6 +68,7 @@ class PaymentController extends Controller
         $data = $request->validate([
             'order_no' => 'required|string',
             'channel_id' => 'required|integer|exists:payment_channels,id',
+            'pay_type' => 'nullable|string|max:32',
         ]);
 
         $bizNo = $data['order_no'];
@@ -96,7 +97,7 @@ class PaymentController extends Controller
         }
 
         try {
-            $result = $service->createPayment($payable, $data['channel_id']);
+            $result = $service->createPayment($payable, $data['channel_id'], $data['pay_type'] ?? null);
 
             return response()->json($result);
         } catch (\Throwable $e) {
@@ -113,10 +114,11 @@ class PaymentController extends Controller
             'order_ids' => 'required|array|min:1',
             'order_ids.*' => 'integer',
             'channel_id' => 'required|integer|exists:payment_channels,id',
+            'pay_type' => 'nullable|string|max:32',
         ]);
 
         try {
-            $result = $service->createBatchPayment($data['order_ids'], $data['channel_id']);
+            $result = $service->createBatchPayment($data['order_ids'], $data['channel_id'], $data['pay_type'] ?? null);
 
             return response()->json($result);
         } catch (\Throwable $e) {

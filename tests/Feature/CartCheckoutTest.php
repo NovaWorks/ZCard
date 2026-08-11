@@ -143,7 +143,12 @@ class CartCheckoutTest extends TestCase
             [
                 'name' => '易支付',
                 'driver' => EpayDriver::class,
-                'config' => ['gateway_url' => 'https://pay.test', 'pid' => '1', 'key' => 'abc', 'sign_type' => 'md5'],
+                'config' => [
+                    'url' => 'https://pay.test/submit.php',
+                    'pid' => '1',
+                    'key' => 'abc',
+                    'type' => ['alipay', 'wxpay'],
+                ],
                 'enabled' => true, 'sort' => 0,
             ],
         );
@@ -151,9 +156,13 @@ class CartCheckoutTest extends TestCase
         $result = app(PaymentService::class)->createBatchPayment(
             $orders->pluck('id')->all(),
             $channel->id,
+            'wxpay',
         );
 
         $this->assertNotEmpty($result['redirect_url'] ?? $result['form_html'] ?? '');
+        parse_str((string) parse_url($result['redirect_url'], PHP_URL_QUERY), $query);
+        $this->assertSame('wxpay', $query['type']);
+        $this->assertStringStartsWith('https://pay.test/submit.php?', $result['redirect_url']);
         $payment = Payment::where('order_ids', '!=', null)->orderByDesc('id')->first();
         $this->assertNotNull($payment);
         $this->assertCount(2, $payment->order_ids);
@@ -182,7 +191,7 @@ class CartCheckoutTest extends TestCase
             [
                 'name' => '易支付',
                 'driver' => EpayDriver::class,
-                'config' => ['gateway_url' => 'https://pay.test', 'pid' => '1', 'key' => 'abc', 'sign_type' => 'md5'],
+                'config' => ['url' => 'https://pay.test', 'pid' => '1', 'key' => 'abc', 'type' => ['alipay']],
                 'enabled' => true, 'sort' => 0,
             ],
         );

@@ -67,6 +67,7 @@ const controlValues = ref<Record<string, string>>({})
 // 支付渠道
 const channels = ref<PaymentChannel[]>([])
 const selectedChannelId = ref<number | null>(null)
+const selectedPayType = ref<string | undefined>(undefined)
 const submitting = ref(false)
 
 // 下单验证码
@@ -265,7 +266,9 @@ async function loadChannels() {
   try {
     channels.value = await getChannels()
     if (channels.value.length && selectedChannelId.value === null) {
-      selectedChannelId.value = channels.value[0].id
+      const first = channels.value[0]
+      selectedChannelId.value = first.id
+      selectedPayType.value = first.code === 'epay' ? first.pay_types?.[0] : undefined
     }
   } catch {
     channels.value = []
@@ -356,7 +359,7 @@ async function doSubmit() {
         router.push({ path: '/pay/result', query: { order_no: res.orders[0]?.order_no || '' } })
         return
       }
-      const result = await createBatchPayment(res.order_ids, channelId)
+      const result = await createBatchPayment(res.order_ids, channelId, selectedPayType.value)
       cart.clear()
       handleResult(result, res.orders[0]?.order_no || '')
     } else {
@@ -378,7 +381,7 @@ async function doSubmit() {
         router.push({ path: '/pay/result', query: { order_no: res.order_no } })
         return
       }
-      const result = await createPayment(res.order_no, channelId)
+      const result = await createPayment(res.order_no, channelId, selectedPayType.value)
       handleResult(result, res.order_no)
     }
   } catch (e: any) {
@@ -429,6 +432,30 @@ const channelPayTypes = (ch: PaymentChannel) => {
     }))
   }
   return [{ type: ch.code, icon: ch.icon || 'ri:bank-card-2-line', label: channelLabel(ch) }]
+}
+
+const paymentOptions = computed(() => channels.value.flatMap((channel) => {
+  const types = channelPayTypes(channel)
+  if (channel.code === 'epay') {
+    return types.map((payType) => ({
+      key: `${channel.id}:${payType.type}`,
+      channel,
+      payType: payType.type as string | undefined,
+      types: [payType],
+    }))
+  }
+  return [{ key: String(channel.id), channel, payType: undefined as string | undefined, types }]
+}))
+
+const selectedPaymentKey = computed(() =>
+  selectedChannelId.value === null
+    ? ''
+    : `${selectedChannelId.value}${selectedPayType.value ? `:${selectedPayType.value}` : ''}`
+)
+
+const selectPaymentOption = (channel: PaymentChannel, payType?: string) => {
+  selectedChannelId.value = channel.id
+  selectedPayType.value = payType
 }
 </script>
 
@@ -551,15 +578,15 @@ const channelPayTypes = (ch: PaymentChannel) => {
           <!-- 支付渠道 -->
           <div class="bg-white rounded-card border border-border p-4">
             <h3 class="text-sm font-bold text-ink mb-3">{{ t('order.checkout.payMethod') }}</h3>
-            <div v-if="channels.length" class="space-y-2">
+            <div v-if="paymentOptions.length" class="space-y-2">
               <button
-                v-for="ch in channels"
-                :key="ch.id"
+                v-for="option in paymentOptions"
+                :key="option.key"
                 type="button"
-                @click="selectedChannelId = ch.id"
+                @click="selectPaymentOption(option.channel, option.payType)"
                 :class="[
                   'w-full flex items-center gap-3 border rounded-card px-3 py-2.5 text-left transition',
-                  selectedChannelId === ch.id
+                  selectedPaymentKey === option.key
                     ? 'border-primary bg-primary-light ring-2 ring-primary/15'
                     : 'border-border hover:border-primary/40 hover:bg-primary-light/30'
                 ]"
@@ -567,14 +594,14 @@ const channelPayTypes = (ch: PaymentChannel) => {
                 <span
                   :class="[
                     'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition',
-                    selectedChannelId === ch.id ? 'border-primary' : 'border-ink-muted/40'
+                    selectedPaymentKey === option.key ? 'border-primary' : 'border-ink-muted/40'
                   ]"
                 >
-                  <span v-if="selectedChannelId === ch.id" class="w-2 h-2 rounded-full bg-primary"></span>
+                  <span v-if="selectedPaymentKey === option.key" class="w-2 h-2 rounded-full bg-primary"></span>
                 </span>
                 <!-- 支付方式(按 pay_types 展示图标+名称,非通道名) -->
                 <span class="flex items-center gap-2 shrink-0">
-                  <template v-for="pt in channelPayTypes(ch)" :key="pt.type">
+                  <template v-for="pt in option.types" :key="pt.type">
                     <span class="w-8 h-8 rounded-lg bg-surface-subtle flex items-center justify-center text-lg">
                       <PayBrandIcon :brand="pt.icon" :size="18" />
                     </span>
@@ -582,17 +609,17 @@ const channelPayTypes = (ch: PaymentChannel) => {
                 </span>
                 <span class="flex-1 min-w-0">
                   <span class="block text-sm font-medium text-ink">
-                    {{ channelPayTypes(ch).map((p) => p.label).join(' / ') }}
+                    {{ option.types.map((p) => p.label).join(' / ') }}
                   </span>
                   <span
-                    v-if="ch.code === 'balance' && ch.balance !== undefined"
+                    v-if="option.channel.code === 'balance' && option.channel.balance !== undefined"
                     class="block text-[10px] text-ink-muted"
-                  >{{ t('order.checkout.balanceLabel', { amount: formatMoney(ch.balance, null) }) }}</span
+                  >{{ t('order.checkout.balanceLabel', { amount: formatMoney(option.channel.balance, null) }) }}</span
                   >
                   <span
-                    v-else-if="ch.target_currency"
+                    v-else-if="option.channel.target_currency"
                     class="block text-[10px] text-ink-muted"
-                    >{{ t('order.pay.receiveLabel', { symbol: '', code: ch.target_currency }) }}</span
+                    >{{ t('order.pay.receiveLabel', { symbol: '', code: option.channel.target_currency }) }}</span
                   >
                 </span>
               </button>

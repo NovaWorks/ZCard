@@ -20,7 +20,7 @@ const rechargeNo = computed(() => route.params.rechargeNo as string)
 const channels = ref<PaymentChannel[]>([])
 const loading = ref(true)
 const err = ref('')
-const payingChannelId = ref<number | null>(null)
+const payingOptionKey = ref<string | null>(null)
 const amountFen = ref(0)
 
 /** 手续费提示文案:原价 + 手续费 = 应付(供用户在付款前确认) */
@@ -72,6 +72,19 @@ const channelPayTypes = (ch: PaymentChannel) => {
   return [{ type: ch.code, icon: ch.icon || 'ri:bank-card-2-line', label: ch.name }]
 }
 
+const paymentOptions = computed(() => channels.value.flatMap((channel) => {
+  const types = channelPayTypes(channel)
+  if (channel.code === 'epay') {
+    return types.map((payType) => ({
+      key: `${channel.id}:${payType.type}`,
+      channel,
+      payType: payType.type as string | undefined,
+      types: [payType],
+    }))
+  }
+  return [{ key: String(channel.id), channel, payType: undefined as string | undefined, types }]
+}))
+
 onMounted(async () => {
   void prefs.load()
   // 拉一次充值单状态拿金额用于展示;同时加载通道
@@ -104,17 +117,17 @@ async function loadChannels() {
   }
 }
 
-async function selectChannel(channel: PaymentChannel) {
-  if (payingChannelId.value !== null) return
+async function selectChannel(channel: PaymentChannel, payType: string | undefined, optionKey: string) {
+  if (payingOptionKey.value !== null) return
   err.value = ''
-  payingChannelId.value = channel.id
+  payingOptionKey.value = optionKey
   try {
-    const result = await createRechargePayment(rechargeNo.value, channel.id)
+    const result = await createRechargePayment(rechargeNo.value, channel.id, payType)
     handleResult(result)
   } catch (e: any) {
     err.value = e?.response?.data?.message || t('order.pay.payFailed')
   } finally {
-    payingChannelId.value = null
+    payingOptionKey.value = null
   }
 }
 
@@ -171,19 +184,19 @@ function stopPolling() {
 
       <div v-else-if="err" class="text-danger text-xs mb-3">{{ err }}</div>
 
-      <div v-if="!loading && channels.length" class="grid grid-cols-1 gap-2 mb-4">
+      <div v-if="!loading && paymentOptions.length" class="grid grid-cols-1 gap-2 mb-4">
         <button
-          v-for="ch in channels"
-          :key="ch.id"
+          v-for="option in paymentOptions"
+          :key="option.key"
           type="button"
-          :disabled="payingChannelId !== null"
-          @click="selectChannel(ch)"
+          :disabled="payingOptionKey !== null"
+          @click="selectChannel(option.channel, option.payType, option.key)"
           class="flex items-center gap-3 border border-border rounded-card px-3 py-3 text-left hover:border-primary hover:bg-primary-light transition disabled:opacity-50"
-          :class="payingChannelId === ch.id ? 'border-primary ring-2 ring-primary/20' : ''"
+          :class="payingOptionKey === option.key ? 'border-primary ring-2 ring-primary/20' : ''"
         >
           <!-- 支付方式图标(按 pay_types 展开,与收银台一致) -->
           <span class="flex items-center gap-1 shrink-0">
-            <template v-for="pt in channelPayTypes(ch).slice(0, 2)" :key="pt.type">
+            <template v-for="pt in option.types" :key="pt.type">
               <span class="w-8 h-8 rounded-lg bg-surface-subtle flex items-center justify-center text-lg">
                 <PayBrandIcon :brand="pt.icon" :size="18" />
               </span>
@@ -191,14 +204,14 @@ function stopPolling() {
           </span>
           <span class="flex-1 min-w-0">
             <span class="block text-sm font-medium text-ink">
-              {{ payingChannelId === ch.id ? t('order.pay.processing') : channelPayTypes(ch).map((p) => p.label).join(' / ') }}
+              {{ payingOptionKey === option.key ? t('order.pay.processing') : option.types.map((p) => p.label).join(' / ') }}
             </span>
-            <span v-if="ch.target_currency" class="block text-[10px] font-normal text-ink-muted">
-              {{ t('order.pay.receiveLabel', { symbol: currencySymbol(ch.target_currency), code: ch.target_currency }) }}
+            <span v-if="option.channel.target_currency" class="block text-[10px] font-normal text-ink-muted">
+              {{ t('order.pay.receiveLabel', { symbol: currencySymbol(option.channel.target_currency), code: option.channel.target_currency }) }}
             </span>
             <!-- 客户承担手续费提示:点击前告知用户需另付手续费 -->
-            <span v-if="ch.fee_bearer === 'customer' && Number(ch.fee ?? 0) > 0" class="block text-[10px] font-normal text-price">
-              {{ feeTip(ch) }}
+            <span v-if="option.channel.fee_bearer === 'customer' && Number(option.channel.fee ?? 0) > 0" class="block text-[10px] font-normal text-price">
+              {{ feeTip(option.channel) }}
             </span>
           </span>
         </button>

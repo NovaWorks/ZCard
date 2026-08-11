@@ -32,8 +32,9 @@ export const getRechargeStatus = (rechargeNo: string) =>
  * 发起充值支付。
  * 复用 /payments/create(后端按 RCH 前缀识别为充值单)。
  */
-export const createRechargePayment = (rechargeNo: string, channelId: number) =>
+export const createRechargePayment = (rechargeNo: string, channelId: number, payType?: string) =>
   request.post<unknown, PaymentResult>('/payments/create', {
     order_no: rechargeNo,
     channel_id: channelId,
+    pay_type: payType || undefined,
   })

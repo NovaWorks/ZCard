@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { mockPay } from '@/api/orders'
@@ -18,7 +18,7 @@ const orderNo = route.params.orderNo as string
 const channels = ref<PaymentChannel[]>([])
 const loading = ref(true)
 const err = ref('')
-const payingChannelId = ref<number | null>(null)
+const payingOptionKey = ref<string | null>(null)
 const mockPaying = ref(false)
 
 // 二维码 / 表单弹层
@@ -63,6 +63,20 @@ const channelPayTypes = (ch: PaymentChannel) => {
   return [{ type: ch.code, icon: ch.icon || 'ri:bank-card-2-line', label: ch.name }]
 }
 
+/** 易支付按 type 展开为独立按钮;其他驱动保持原通道展示。 */
+const paymentOptions = computed(() => channels.value.flatMap((channel) => {
+  const types = channelPayTypes(channel)
+  if (channel.code === 'epay') {
+    return types.map((payType) => ({
+      key: `${channel.id}:${payType.type}`,
+      channel,
+      payType: payType.type as string | undefined,
+      types: [payType],
+    }))
+  }
+  return [{ key: String(channel.id), channel, payType: undefined as string | undefined, types }]
+}))
+
 onMounted(async () => {
   // 偏好(含货币元信息)用于展示通道收款币种;失败不阻塞
   void prefs.load()
@@ -84,10 +98,10 @@ async function loadChannels() {
   }
 }
 
-async function selectChannel(channel: PaymentChannel) {
-  if (payingChannelId.value !== null) return
+async function selectChannel(channel: PaymentChannel, payType: string | undefined, optionKey: string) {
+  if (payingOptionKey.value !== null) return
   err.value = ''
-  payingChannelId.value = channel.id
+  payingOptionKey.value = optionKey
   try {
     // 余额支付:直接扣款成功,跳结果页
     if (channel.code === 'balance') {
@@ -95,12 +109,12 @@ async function selectChannel(channel: PaymentChannel) {
       router.push({ path: '/pay/result', query: { order_no: orderNo } })
       return
     }
-    const result = await createPayment(orderNo, channel.id)
+    const result = await createPayment(orderNo, channel.id, payType)
     handleResult(result)
   } catch (e: any) {
     err.value = e?.response?.data?.message || t('order.pay.payFailed')
   } finally {
-    payingChannelId.value = null
+    payingOptionKey.value = null
   }
 }
 
@@ -191,18 +205,18 @@ async function pay() {
       <div v-else-if="err" class="text-danger text-xs mb-3">{{ err }}</div>
 
       <!-- 通道列表 -->
-      <div v-if="!loading && channels.length" class="grid grid-cols-2 gap-2 mb-4">
+      <div v-if="!loading && paymentOptions.length" class="grid grid-cols-2 gap-2 mb-4">
         <button
-          v-for="ch in channels"
-          :key="ch.id"
+          v-for="option in paymentOptions"
+          :key="option.key"
           type="button"
-          :disabled="payingChannelId !== null"
-          @click="selectChannel(ch)"
+          :disabled="payingOptionKey !== null"
+          @click="selectChannel(option.channel, option.payType, option.key)"
           class="flex items-center gap-2 border border-border rounded-card px-3 py-3 text-left hover:border-primary hover:bg-primary-light transition disabled:opacity-50"
-          :class="payingChannelId === ch.id ? 'border-primary ring-2 ring-primary/20' : ''"
+          :class="payingOptionKey === option.key ? 'border-primary ring-2 ring-primary/20' : ''"
         >
           <span class="flex items-center gap-1.5 shrink-0">
-            <template v-for="pt in channelPayTypes(ch)" :key="pt.type">
+            <template v-for="pt in option.types" :key="pt.type">
               <span class="w-7 h-7 rounded-md bg-surface-subtle flex items-center justify-center text-base">
                 <PayBrandIcon :brand="pt.icon" :size="16" />
               </span>
@@ -210,17 +224,17 @@ async function pay() {
           </span>
           <span class="text-sm font-medium text-ink leading-tight">
             <span class="block">{{
-              payingChannelId === ch.id
+              payingOptionKey === option.key
                 ? t('order.pay.processing')
-                : channelPayTypes(ch)
+                : option.types
                     .map((p) => p.label)
                     .join(' / ')
             }}</span>
-            <span v-if="ch.code === 'balance' && ch.balance !== undefined" class="block text-[10px] font-normal text-ink-muted">
-              {{ t('order.checkout.balanceLabel', { amount: formatMoney(ch.balance, null) }) }}
+            <span v-if="option.channel.code === 'balance' && option.channel.balance !== undefined" class="block text-[10px] font-normal text-ink-muted">
+              {{ t('order.checkout.balanceLabel', { amount: formatMoney(option.channel.balance, null) }) }}
             </span>
-            <span v-else-if="ch.target_currency" class="block text-[10px] font-normal text-ink-muted">
-              {{ t('order.pay.receiveLabel', { symbol: currencySymbol(ch.target_currency), code: ch.target_currency }) }}
+            <span v-else-if="option.channel.target_currency" class="block text-[10px] font-normal text-ink-muted">
+              {{ t('order.pay.receiveLabel', { symbol: currencySymbol(option.channel.target_currency), code: option.channel.target_currency }) }}
             </span>
           </span>
         </button>

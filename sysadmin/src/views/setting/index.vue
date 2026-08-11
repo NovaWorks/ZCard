@@ -280,6 +280,10 @@
             <ElFormItem :label="t('zcard.setting.maintenanceMessage')">
               <ElInput v-model="form.maintenance_message" type="textarea" :rows="2" :placeholder="t('zcard.setting.maintenanceMessagePlaceholder')" />
             </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.paymentCallbackDomain')">
+              <ElInput v-model="form.payment_callback_domain" placeholder="https://example.com" />
+              <span class="form-tip">{{ t('zcard.setting.paymentCallbackDomainTip') }}</span>
+            </ElFormItem>
             <ElFormItem :label="t('zcard.setting.siteNotice')">
               <ArtWangEditor v-model="form.site_notice" mode="default" :placeholder="t('zcard.setting.siteNoticePlaceholder')" />
               <span class="form-tip">{{ t('zcard.setting.siteNoticeHint') }}</span>
@@ -544,6 +548,7 @@
     // 系统运维
     maintenance_mode: boolean
     maintenance_message: string
+    payment_callback_domain: string
     site_notice: string
     // 邮件设置
     mail_enabled: boolean
@@ -639,6 +644,7 @@
     username_min_length: 3,
     maintenance_mode: false,
     maintenance_message: '系统维护中,请稍后再来访问。',
+    payment_callback_domain: '',
     site_notice: '',
     mail_enabled: false,
     mail_host: '',
@@ -835,6 +841,7 @@
         username_min_length: Number(coerce(data.username_min_length, d.username_min_length)),
         maintenance_mode: coerceBool(data.maintenance_mode, d.maintenance_mode),
         maintenance_message: coerce(data.maintenance_message, d.maintenance_message),
+        payment_callback_domain: coerce(data.payment_callback_domain, d.payment_callback_domain),
         site_notice: coerce(data.site_notice, d.site_notice),
         mail_enabled: coerceBool(data.mail_enabled, d.mail_enabled),
         mail_host: coerce(data.mail_host, d.mail_host),

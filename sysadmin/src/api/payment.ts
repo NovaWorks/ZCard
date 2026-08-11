@@ -43,6 +43,8 @@ export interface ConfigField {
   default?: any
   /** 帮助说明 */
   help?: string
+  /** 仅历史配置显示(如易支付 RSA/RSA2) */
+  legacy?: boolean
 }
 
 /** 获取支付渠道列表 */

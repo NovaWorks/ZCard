@@ -63,7 +63,7 @@ class PaymentService
      * 同时服务于发卡订单(Order)与充值单(Recharge):两者均实现 Payable,
      * 驱动只读取单号与金额,与本服务无关业务差异。
      */
-    public function createPayment(Payable $payable, int $channelId): array
+    public function createPayment(Payable $payable, int $channelId, ?string $payType = null): array
     {
         $channel = PaymentChannel::findOrFail($channelId);
         if (! $channel->enabled) {
@@ -71,7 +71,7 @@ class PaymentService
         }
 
         $driver = $this->resolveDriver($channel);
-        $config = $channel->config ?? [];
+        $config = $this->configForPayment($driver, $channel->config ?? [], $payType);
         // 通道目标货币 + 汇率(spec §5.3):作为审计元数据记录。
         // 注意:各驱动 pay() 实际以「基础货币」金额向网关发起收款(未做通道换算),
         // 因此 charged_amount = payable.amount(基础货币分),与驱动 verifyCallback 回报的
@@ -143,7 +143,7 @@ class PaymentService
      *
      * @return array 驱动 PaymentResult 的 toArray()
      */
-    public function createBatchPayment(array $orderIds, int $channelId): array
+    public function createBatchPayment(array $orderIds, int $channelId, ?string $payType = null): array
     {
         $channel = PaymentChannel::findOrFail($channelId);
         if (! $channel->enabled) {
@@ -192,7 +192,7 @@ class PaymentService
         };
 
         $driver = $this->resolveDriver($channel);
-        $config = $channel->config ?? [];
+        $config = $this->configForPayment($driver, $channel->config ?? [], $payType);
         $supported = $driver->getSupportedCurrencies();
         $targetCur = strtoupper($config['target_currency'] ?? ($supported[0] ?? 'CNY'));
         $rate = (float) ($config['exchange_rate'] ?? 1);
@@ -255,64 +255,69 @@ class PaymentService
      */
     private function handleOrderCallback(string $orderNo, string $channelCode, array $data, Request $request): string
     {
-        $order = Order::where('order_no', $orderNo)->first();
-        if (! $order) {
-            return $this->callbackFailure('order not found', [
-                'channel' => $channelCode,
-                'order_no' => $orderNo,
-            ]);
-        }
-
-        // 幂等:订单已支付则直接返回 success(第三方停止重试)
-        if ($order->status === 'paid') {
-            return 'success';
-        }
-
-        // 金额校验:驱动回调 amount 是目标货币最小单位,对比该订单最近一笔 payment 的 charged_amount
-        $payment = Payment::where('order_id', $order->id)
-            ->where('channel', $channelCode)
-            ->orderByDesc('id')
-            ->first();
-        if (! $payment) {
-            return $this->callbackFailure('payment not found', [
-                'channel' => $channelCode,
-                'order_no' => $orderNo,
-            ]);
-        }
-
-        $expectFen = (int) $payment->charged_amount;
-        $actualFen = (int) ($data['amount'] ?? -1);
-        if ($actualFen !== $expectFen) {
-            return $this->callbackFailure('amount mismatch', [
-                'channel' => $channelCode,
-                'order_no' => $orderNo,
-                'expected_amount' => $expectFen,
-                'actual_amount' => $actualFen,
-            ]);
-        }
-
-        $payment->update(['status' => 'success', 'paid_at' => now(), 'raw' => $request->all()]);
-
-        // 聚合支付(order_ids 非空):主订单的支付流水关联了多个订单,统一 markPaid
-        $orderNos = Order::whereIn('id', ! empty($payment->order_ids) ? $payment->order_ids : [$order->id])
-            ->pluck('order_no')
-            ->all();
-
-        // markPaid 内部有 lockForUpdate + 状态检查,并发时第二个会抛异常
-        // 捕获后视为幂等(已被其他并发请求处理),返回 success 让第三方停止重试
-        foreach ($orderNos as $orderNo) {
-            try {
-                app(OrderService::class)->markPaid($orderNo);
-            } catch (\RuntimeException $e) {
-                $fresh = Order::where('order_no', $orderNo)->first();
-                if ($fresh && $fresh->status === 'paid') {
-                    continue;
-                }
-                throw $e;
+        return DB::transaction(function () use ($orderNo, $channelCode, $data, $request): string {
+            // 以主订单行锁串行化同一笔回调,防止并发通知重复发货。
+            $order = Order::where('order_no', $orderNo)->lockForUpdate()->first();
+            if (! $order) {
+                return $this->callbackFailure('order not found', [
+                    'channel' => $channelCode,
+                    'order_no' => $orderNo,
+                ]);
             }
-        }
 
-        return 'success';
+            if ($order->status === 'paid') {
+                return 'success';
+            }
+
+            $payment = Payment::where('order_id', $order->id)
+                ->where('channel', $channelCode)
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->first();
+            if (! $payment) {
+                return $this->callbackFailure('payment not found', [
+                    'channel' => $channelCode,
+                    'order_no' => $orderNo,
+                ]);
+            }
+
+            $expectFen = (int) $payment->charged_amount;
+            $actualFen = (int) ($data['amount'] ?? -1);
+            if ($actualFen !== $expectFen) {
+                return $this->callbackFailure('amount mismatch', [
+                    'channel' => $channelCode,
+                    'order_no' => $orderNo,
+                    'expected_amount' => $expectFen,
+                    'actual_amount' => $actualFen,
+                ]);
+            }
+
+            // 聚合支付(order_ids 非空):主订单的支付流水关联了多个订单,统一 markPaid。
+            $orderNos = Order::whereIn('id', ! empty($payment->order_ids) ? $payment->order_ids : [$order->id])
+                ->pluck('order_no')
+                ->all();
+
+            foreach ($orderNos as $paidOrderNo) {
+                try {
+                    app(OrderService::class)->markPaid($paidOrderNo);
+                } catch (\RuntimeException $e) {
+                    $fresh = Order::where('order_no', $paidOrderNo)->first();
+                    if ($fresh && $fresh->status === 'paid') {
+                        continue;
+                    }
+                    throw $e;
+                }
+            }
+
+            // 只在所有订单标记支付与同步发货成功后再更新流水;异常时整体回滚。
+            $payment->update([
+                'status' => 'success',
+                'paid_at' => now(),
+                'raw' => $data['raw'] ?? $request->all(),
+            ]);
+
+            return 'success';
+        });
     }
 
     /**
@@ -418,6 +423,26 @@ class PaymentService
         }
 
         return new $driverClass;
+    }
+
+    /**
+     * 校验用户本次选中的支付方式,并以瞬时字段传给驱动。
+     * 该字段不会写回 payment_channels.config。
+     */
+    private function configForPayment(PaymentDriver $driver, array $config, ?string $payType): array
+    {
+        $payType = trim((string) $payType);
+        if ($payType === '') {
+            return $config;
+        }
+
+        $allowed = $driver->getPayTypes($config);
+        if (! in_array($payType, $allowed, true)) {
+            throw new \RuntimeException('选择的支付方式未启用');
+        }
+        $config['_selected_pay_type'] = $payType;
+
+        return $config;
     }
 
     /**
