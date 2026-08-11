@@ -19,7 +19,7 @@ class MediaService
     private const DISK = 'public';
 
     /** 支持的文件类型 */
-    private const ALLOWED_MIMES = ['jpeg', 'png', 'webp', 'gif', 'svg'];
+    private const ALLOWED_MIMES = ['jpeg', 'png', 'webp', 'gif'];
 
     /** 单文件大小上限:10MB */
     private const MAX_SIZE_KB = 10240;
@@ -213,7 +213,7 @@ class MediaService
         // 存储文件名取磁盘上实际保存的名称(store 会按随机串命名)
         $filename = basename($path);
 
-        // 图片尺寸(非光栅图如 SVG 无尺寸,忽略不报错)
+        // 图片尺寸
         $width = $height = null;
         $realPath = Storage::disk(self::DISK)->path($path);
         if (function_exists('getimagesize') && ($size = @getimagesize($realPath)) !== false) {

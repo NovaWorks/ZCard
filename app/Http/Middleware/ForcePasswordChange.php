@@ -9,7 +9,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * 首次登录强制改密（spec §7.3）。
- * super_admin/merchant 角色登录后若 password_changed_at 为 null → 跳改密页。
+ * super_admin 登录后若 password_changed_at 为 null → 跳改密页。
  * Filament 登录后访问非改密页时拦截。
  */
 class ForcePasswordChange
@@ -23,7 +23,7 @@ class ForcePasswordChange
         }
 
         // 只约束后台角色
-        if (! $user->hasRole(['super_admin', 'merchant'])) {
+        if (! $user->hasRole('super_admin')) {
             return $next($request);
         }
 

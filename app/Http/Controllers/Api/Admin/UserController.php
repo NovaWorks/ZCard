@@ -21,8 +21,8 @@ class UserController extends Controller
         if ($keyword = trim((string) $request->input('keyword', ''))) {
             $query->where(function ($q) use ($keyword) {
                 $q->where('username', 'like', "%{$keyword}%")
-                  ->orWhere('email', 'like', "%{$keyword}%")
-                  ->orWhere('phone', 'like', "%{$keyword}%");
+                    ->orWhere('email', 'like', "%{$keyword}%")
+                    ->orWhere('phone', 'like', "%{$keyword}%");
             });
         }
 
@@ -59,34 +59,34 @@ class UserController extends Controller
     {
         $data = $request->validate([
             'username' => 'required|string|max:60|unique:users,username',
-            'email'    => 'required|email|max:150|unique:users,email',
-            'password' => 'required|string|min:6|max:60',
-            'name'     => 'nullable|string|max:60',
-            'status'   => 'nullable|integer|in:0,1',
-            'phone'    => 'nullable|string|max:30',
-            'qq'       => 'nullable|string|max:20',
-            'avatar'   => 'nullable|string|max:255',
-            'points'   => 'nullable|integer|min:0',
-            'pid'      => 'nullable|integer|min:0',
+            'email' => 'required|email|max:150|unique:users,email',
+            'password' => 'required|string|min:10|max:72',
+            'name' => 'nullable|string|max:60',
+            'status' => 'nullable|integer|in:0,1',
+            'phone' => 'nullable|string|max:30',
+            'qq' => 'nullable|string|max:20',
+            'avatar' => 'nullable|string|max:255',
+            'points' => 'nullable|integer|min:0',
+            'pid' => 'nullable|integer|min:0',
             'group_id' => 'nullable|integer|min:0',
-            'balance'  => 'nullable|integer',
-            'roles'    => 'nullable|array',
-            'roles.*'  => 'string|exists:roles,name',
+            'balance' => 'nullable|integer',
+            'roles' => 'nullable|array',
+            'roles.*' => 'string|exists:roles,name',
         ]);
 
         $user = User::create([
             'username' => $data['username'],
-            'email'    => $data['email'],
+            'email' => $data['email'],
             'password' => $data['password'],
-            'name'     => $data['name'] ?? null,
-            'status'   => isset($data['status']) ? (int) $data['status'] : 1,
-            'phone'    => $data['phone'] ?? null,
-            'qq'       => $data['qq'] ?? null,
-            'avatar'   => $data['avatar'] ?? null,
-            'points'   => $data['points'] ?? 0,
-            'pid'      => $data['pid'] ?? 0,
+            'name' => $data['name'] ?? null,
+            'status' => isset($data['status']) ? (int) $data['status'] : 1,
+            'phone' => $data['phone'] ?? null,
+            'qq' => $data['qq'] ?? null,
+            'avatar' => $data['avatar'] ?? null,
+            'points' => $data['points'] ?? 0,
+            'pid' => $data['pid'] ?? 0,
             'group_id' => $data['group_id'] ?? 0,
-            'balance'  => $data['balance'] ?? 0,
+            'balance' => $data['balance'] ?? 0,
         ]);
 
         if (! empty($data['roles'])) {
@@ -106,39 +106,49 @@ class UserController extends Controller
         $user = User::findOrFail($id);
 
         $data = $request->validate([
-            'username' => 'sometimes|string|max:60|unique:users,username,' . $id,
-            'email'    => 'sometimes|email|max:150|unique:users,email,' . $id,
-            'password' => 'sometimes|string|min:6|max:60',
-            'name'     => 'nullable|string|max:60',
-            'status'   => 'sometimes|integer|in:0,1',
-            'phone'    => 'nullable|string|max:30',
-            'qq'       => 'nullable|string|max:20',
-            'avatar'   => 'nullable|string|max:255',
-            'points'   => 'nullable|integer|min:0',
-            'pid'      => 'nullable|integer|min:0',
+            'username' => 'sometimes|string|max:60|unique:users,username,'.$id,
+            'email' => 'sometimes|email|max:150|unique:users,email,'.$id,
+            'password' => 'sometimes|string|min:10|max:72',
+            'name' => 'nullable|string|max:60',
+            'status' => 'sometimes|integer|in:0,1',
+            'phone' => 'nullable|string|max:30',
+            'qq' => 'nullable|string|max:20',
+            'avatar' => 'nullable|string|max:255',
+            'points' => 'nullable|integer|min:0',
+            'pid' => 'nullable|integer|min:0',
             'group_id' => 'nullable|integer|min:0',
-            'balance'  => 'nullable|integer',
-            'roles'    => 'nullable|array',
-            'roles.*'  => 'string|exists:roles,name',
+            'balance' => 'nullable|integer',
+            'roles' => 'nullable|array',
+            'roles.*' => 'string|exists:roles,name',
         ]);
 
         $user->update([
             'username' => $data['username'] ?? $user->username,
-            'email'    => $data['email'] ?? $user->email,
+            'email' => $data['email'] ?? $user->email,
             'password' => $data['password'] ?? $user->password,
-            'name'     => array_key_exists('name', $data) ? $data['name'] : $user->name,
-            'status'   => array_key_exists('status', $data) ? (int) $data['status'] : $user->status,
-            'phone'    => array_key_exists('phone', $data) ? $data['phone'] : $user->phone,
-            'qq'       => array_key_exists('qq', $data) ? $data['qq'] : $user->qq,
-            'avatar'   => array_key_exists('avatar', $data) ? $data['avatar'] : $user->avatar,
-            'points'   => array_key_exists('points', $data) ? (int) $data['points'] : $user->points,
-            'pid'      => array_key_exists('pid', $data) ? (int) $data['pid'] : $user->pid,
+            'name' => array_key_exists('name', $data) ? $data['name'] : $user->name,
+            'status' => array_key_exists('status', $data) ? (int) $data['status'] : $user->status,
+            'phone' => array_key_exists('phone', $data) ? $data['phone'] : $user->phone,
+            'qq' => array_key_exists('qq', $data) ? $data['qq'] : $user->qq,
+            'avatar' => array_key_exists('avatar', $data) ? $data['avatar'] : $user->avatar,
+            'points' => array_key_exists('points', $data) ? (int) $data['points'] : $user->points,
+            'pid' => array_key_exists('pid', $data) ? (int) $data['pid'] : $user->pid,
             'group_id' => array_key_exists('group_id', $data) ? (int) $data['group_id'] : $user->group_id,
-            'balance'  => array_key_exists('balance', $data) ? (int) $data['balance'] : $user->balance,
+            'balance' => array_key_exists('balance', $data) ? (int) $data['balance'] : $user->balance,
         ]);
 
         if (array_key_exists('roles', $data)) {
             $user->syncRoles($data['roles'] ?? []);
+        }
+
+        // 权限、状态或密码变化后，旧令牌不得继续沿用原授权。
+        if (array_key_exists('roles', $data)
+            || array_key_exists('status', $data)
+            || array_key_exists('password', $data)) {
+            if (array_key_exists('password', $data)) {
+                $user->forceFill(['password_changed_at' => now()])->save();
+            }
+            $user->tokens()->delete();
         }
 
         return response()->json($user->fresh()->load(['roles', 'userGroup', 'parent']));

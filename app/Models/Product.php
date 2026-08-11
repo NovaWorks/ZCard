@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\HtmlContentSanitizer;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -48,6 +50,15 @@ class Product extends Model
             'level_disable' => 'boolean',
             'dedup' => 'boolean',
         ];
+    }
+
+    /** 历史数据与新写入数据均在模型边界清理，避免存储型 XSS。 */
+    protected function description(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => HtmlContentSanitizer::sanitize($value),
+            set: fn ($value) => HtmlContentSanitizer::sanitize($value),
+        );
     }
 
     public function merchant(): BelongsTo

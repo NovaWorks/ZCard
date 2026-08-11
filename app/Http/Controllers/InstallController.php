@@ -76,6 +76,10 @@ class InstallController extends Controller
      */
     public function testDb(Request $request): JsonResponse
     {
+        if ($this->isInstalled()) {
+            return response()->json(['message' => '系统已安装'], 403);
+        }
+
         $data = $request->validate([
             'host' => ['required', 'string', 'regex:/^[a-zA-Z0-9._\-.:]+$/'],
             'port' => 'required|integer|between:1,65535',
@@ -98,7 +102,7 @@ class InstallController extends Controller
         } catch (\PDOException $e) {
             return response()->json([
                 'success' => false,
-                'message' => '连接失败: '.$e->getMessage(),
+                'message' => '数据库连接失败，请检查地址、端口和凭据',
             ], 422);
         }
     }
@@ -120,7 +124,7 @@ class InstallController extends Controller
             'db_username' => 'required|string|max:100',
             'db_password' => 'nullable|string',
             'admin_email' => 'required|email',
-            'admin_password' => 'required|string|min:6',
+            'admin_password' => 'required|string|min:10|max:72',
         ]);
 
         try {

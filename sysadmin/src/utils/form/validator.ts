@@ -101,7 +101,7 @@ export function validateAccount(value: string): boolean {
  * 验证密码
  * @param value 密码字符串
  * @returns 返回验证结果，true表示格式正确
- * @description 规则：6-20位，必须包含字母和数字
+ * @description 规则：8-20位，必须包含字母和数字
  */
 export function validatePassword(value: string): boolean {
   if (!value || typeof value !== 'string') {
@@ -111,7 +111,7 @@ export function validatePassword(value: string): boolean {
   const trimmedValue = value.trim()
 
   // 长度检查
-  if (trimmedValue.length < 6 || trimmedValue.length > 20) {
+  if (trimmedValue.length < 8 || trimmedValue.length > 20) {
     return false
   }
 
@@ -162,7 +162,7 @@ export function getPasswordStrength(value: string): PasswordStrength {
 
   const trimmedValue = value.trim()
 
-  if (trimmedValue.length < 6) {
+  if (trimmedValue.length < 8) {
     return PasswordStrength.WEAK
   }
 

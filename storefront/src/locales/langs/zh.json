@@ -188,7 +188,7 @@
     "noThumb": "缩略",
     "validation": {
       "fillCaptcha": "请输入验证码",
-      "minPassword": "密码至少 6 位",
+      "minPassword": "密码至少 8 位",
       "passwordMismatch": "两次输入的密码不一致"
     },
     "orderStatus": {
@@ -416,7 +416,7 @@
       "username": "用户名",
       "usernamePlaceholder": "请输入用户名",
       "emailPlaceholder": "请输入邮箱",
-      "passwordPlaceholder": "至少 6 位",
+      "passwordPlaceholder": "至少 8 位",
       "confirmPassword": "确认密码",
       "confirmPasswordPlaceholder": "请再次输入密码",
       "fillAllRequired": "请填写所有必填项",
@@ -442,7 +442,7 @@
       "codePlaceholder": "6位验证码",
       "resend": "重发",
       "newPassword": "新密码",
-      "newPasswordPlaceholder": "至少 6 位",
+      "newPasswordPlaceholder": "至少 8 位",
       "confirmNewPassword": "确认新密码",
       "confirmPlaceholder": "请再次输入",
       "resetting": "重置中...",

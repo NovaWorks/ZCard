@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Setting;
+use Illuminate\Support\Facades\Crypt;
 
 /**
  * 店铺外观配置辅助(spec §3.3, group=storefront)。
@@ -10,6 +11,34 @@ use App\Models\Setting;
  */
 class StorefrontConfig
 {
+    public const SECRET_MASK = '••••••••';
+
+    /** 必须加密保存且不得通过接口回显的配置。 */
+    private const SECRET_KEYS = [
+        'card_encryption_key',
+        'mail_password',
+        'sms_access_key',
+        'sms_access_secret',
+    ];
+
+    /** 前台确实需要的公开配置白名单。 */
+    private const PUBLIC_KEYS = [
+        'category_nav_style', 'list_default_view', 'grid_columns', 'page_size', 'default_order',
+        'show_stock', 'show_sales', 'show_price', 'show_description', 'show_reviews',
+        'show_out_of_stock', 'allow_post_review', 'review_need_audit', 'show_featured',
+        'featured_count', 'show_hot_tags', 'hot_tag_categories', 'order_query_password',
+        'order_query_faqs', 'trade_captcha', 'order_close_minutes', 'contact_type',
+        'guest_checkout', 'require_contact', 'register_open', 'register_type',
+        'captcha_register', 'captcha_login', 'username_min_length', 'forget_type',
+        'site_notice', 'site_name', 'site_url', 'site_logo', 'site_description', 'site_keywords',
+        'brand_slogan', 'brand_slogan_en', 'brand_secure', 'brand_secure_en',
+        'brand_privacy', 'brand_privacy_en', 'footer_about', 'footer_links',
+        'footer_contact', 'footer_social', 'footer_help_links', 'footer_copyright',
+        'cash_min', 'cash_fee', 'cash_type_alipay', 'cash_type_wechat', 'cash_type_usdt',
+        'base_currency', 'default_display_currency', 'enabled_languages', 'default_language',
+        'distribution_enabled', 'subsite_enabled',
+    ];
+
     /** 所有配置 key 及默认值 */
     public static function defaults(): array
     {
@@ -167,36 +196,103 @@ class StorefrontConfig
     /** 取全部配置(合并默认值),数组返回 */
     public static function all(): array
     {
-        $rows = Setting::where('group', 'storefront')->pluck('value', 'key');
+        $rows = Setting::where('group', 'storefront')->get()->keyBy('key');
         $merged = self::defaults();
         foreach ($merged as $key => $default) {
             if (isset($rows[$key])) {
-                $merged[$key] = $rows[$key];
+                $merged[$key] = $rows[$key]->value;
             }
         }
-        // value 列是 json cast,pluck 后可能是 array
-        // 敏感密钥脱敏:不向任何调用方暴露 card_encryption_key 真实值(含前台 settings API)
-        if (! empty($merged['card_encryption_key'])) {
-            $merged['card_encryption_key'] = '••••••••';
+
+        foreach (self::SECRET_KEYS as $key) {
+            if (! empty($merged[$key])) {
+                $merged[$key] = self::SECRET_MASK;
+            }
         }
 
         return $merged;
     }
 
+    /** 公开前台配置：严格白名单，并在返回前清理富文本和 URL。 */
+    public static function public(): array
+    {
+        $config = array_intersect_key(self::all(), array_flip(self::PUBLIC_KEYS));
+        $config['site_notice'] = HtmlContentSanitizer::sanitize((string) ($config['site_notice'] ?? ''));
+
+        foreach (['site_url', 'site_logo'] as $key) {
+            $config[$key] = self::safePublicUrl((string) ($config[$key] ?? ''));
+        }
+        foreach (['footer_links', 'footer_social', 'footer_help_links'] as $key) {
+            $config[$key] = array_map(function ($item) {
+                if (is_array($item) && array_key_exists('url', $item)) {
+                    $item['url'] = self::safePublicUrl((string) $item['url']);
+                }
+
+                return $item;
+            }, is_array($config[$key] ?? null) ? $config[$key] : []);
+        }
+
+        return $config;
+    }
+
     /** 取单个值 */
     public static function get(string $key): mixed
     {
-        return self::all()[$key] ?? null;
+        if (! array_key_exists($key, self::defaults())) {
+            return null;
+        }
+
+        $row = Setting::where('group', 'storefront')->where('key', $key)->first();
+        $value = $row?->value ?? self::defaults()[$key];
+
+        if (in_array($key, self::SECRET_KEYS, true) && is_string($value) && $value !== '') {
+            try {
+                return Crypt::decryptString($value);
+            } catch (\Throwable) {
+                // 兼容升级前的历史明文，迁移会将其转为密文。
+                return $value;
+            }
+        }
+
+        return $value;
     }
 
     /** 批量保存 */
     public static function setMany(array $kv): void
     {
+        $defaults = self::defaults();
         foreach ($kv as $key => $value) {
+            if (! array_key_exists($key, $defaults)) {
+                continue;
+            }
+
+            if (in_array($key, self::SECRET_KEYS, true)) {
+                if ($value === null || $value === '' || $value === self::SECRET_MASK) {
+                    continue;
+                }
+                $value = Crypt::encryptString((string) $value);
+            }
+
+            if ($key === 'site_notice') {
+                $value = HtmlContentSanitizer::sanitize((string) $value);
+            }
+
             Setting::updateOrCreate(
-                ['key' => $key],
-                ['value' => $value, 'group' => 'storefront']
+                ['key' => $key, 'group' => 'storefront'],
+                ['value' => $value]
             );
         }
+    }
+
+    private static function safePublicUrl(string $url): string
+    {
+        $url = trim($url);
+        if ($url === '' || (str_starts_with($url, '/') && ! str_starts_with($url, '//')) || str_starts_with($url, '#')) {
+            return $url;
+        }
+
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+
+        return in_array($scheme, ['http', 'https', 'mailto', 'tel'], true) ? $url : '';
     }
 }

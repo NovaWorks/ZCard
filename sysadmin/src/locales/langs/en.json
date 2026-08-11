@@ -199,7 +199,7 @@
       "confirmPasswordRequired": "Please enter your password again",
       "passwordMismatch": "The two passwords are inconsistent!",
       "usernameLength": "The length is 3 to 20 characters",
-      "passwordLength": "The password length cannot be less than 6 digits",
+      "passwordLength": "The password length cannot be less than 8 characters",
       "agreementRequired": "Please agree to the privacy policy"
     },
     "agreeText": "I agree",

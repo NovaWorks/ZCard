@@ -63,10 +63,10 @@ Route::prefix('install')->group(function () {
 Route::middleware('throttle:5,1')->post('/auth/register', [AuthController::class, 'register'])->name('api.auth.register');
 Route::middleware('throttle:5,1')->post('/auth/login', [AuthController::class, 'login'])->name('api.auth.login');
 Route::middleware('throttle:3,1')->post('/auth/send-reset-code', [AuthController::class, 'sendResetCode'])->name('api.auth.send-reset-code');
-Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('api.auth.reset-password');
+Route::middleware('throttle:5,1')->post('/auth/reset-password', [AuthController::class, 'resetPassword'])->name('api.auth.reset-password');
 
 // 需登录
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'active.user'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
     Route::get('/auth/me', [AuthController::class, 'me'])->name('api.auth.me');
     Route::put('/auth/profile', [AuthController::class, 'updateProfile'])->name('api.auth.profile');
@@ -109,7 +109,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // 后台管理 API(Sanctum token)
-Route::middleware(['auth:sanctum', 'admin.role'])->prefix('admin')->group(function () {
+Route::middleware(['auth:sanctum', 'active.user', 'admin.role', 'audit.admin'])->prefix('admin')->group(function () {
     // 仪表盘(概览/趋势/排行)
     Route::get('dashboard/overview', [AdminDashboardController::class, 'overview']);
     Route::get('dashboard/trends', [AdminDashboardController::class, 'trends']);
@@ -282,9 +282,9 @@ Route::middleware(['display.currency', 'set.locale'])->group(function () {
 });
 
 // 提交评价(需登录)
-    Route::middleware('auth:sanctum')->post('/reviews', [ReviewController::class, 'store'])->name('api.reviews.store');
-    // 可评价状态(需登录):静态路由先于资源式注册
-    Route::middleware('auth:sanctum')->get('/reviews/eligibility/{productId}', [ReviewController::class, 'eligibility'])->name('api.reviews.eligibility');
+Route::middleware(['auth:sanctum', 'active.user'])->post('/reviews', [ReviewController::class, 'store'])->name('api.reviews.store');
+// 可评价状态(需登录):静态路由先于资源式注册
+Route::middleware(['auth:sanctum', 'active.user'])->get('/reviews/eligibility/{productId}', [ReviewController::class, 'eligibility'])->name('api.reviews.eligibility');
 Route::get('/settings/storefront', [StorefrontSettingsController::class, 'show'])->middleware(['display.currency', 'set.locale'])->name('api.settings.storefront');
 
 // 验证码(图形验证码,基于 mews/captcha)
@@ -298,14 +298,14 @@ Route::get('/captcha/{scene?}', function (Request $request, $scene = 'default') 
 })->name('api.captcha.src');
 
 // 卡密导入与库存(管理类,需 Sanctum token)— API-first:Filament 和 API 共用 Service 层
-Route::middleware('auth:sanctum')->prefix('cards')->group(function () {
+Route::middleware(['auth:sanctum', 'active.user', 'admin.role', 'audit.admin'])->prefix('cards')->group(function () {
     Route::post('/import', [CardImportController::class, 'import'])->name('api.cards.import');
     Route::get('/import-status/{id}', [CardImportController::class, 'status'])->name('api.cards.import-status');
     Route::post('/import/{id}/revoke', [CardImportController::class, 'revoke'])->name('api.cards.revoke');
     Route::get('/export/{productId}', [CardController::class, 'export'])->name('api.cards.export');
 });
-Route::middleware('auth:sanctum')->get('/products/{id}/stock', [CardController::class, 'stock'])->name('api.products.stock');
-Route::middleware('auth:sanctum')->get('/cards', [CardController::class, 'index'])->name('api.cards.index');
+Route::middleware(['auth:sanctum', 'active.user', 'admin.role'])->get('/products/{id}/stock', [CardController::class, 'stock'])->name('api.products.stock');
+Route::middleware(['auth:sanctum', 'active.user', 'admin.role'])->get('/cards', [CardController::class, 'index'])->name('api.cards.index');
 
 // 订单(游客,不需 auth)— API-first:前台和后台都调 OrderService
 Route::post('/orders', [OrderController::class, 'create'])->middleware(['display.currency', 'set.locale'])->name('api.orders.create');
@@ -362,7 +362,7 @@ Route::any('/payments/notify/{channel}', [PaymentController::class, 'callback'])
 
 Route::get('/user', function (Request $request) {
     return $request->user();
-})->middleware('auth:sanctum');
+})->middleware(['auth:sanctum', 'active.user']);
 
 // ===== 供货 API(对外供货,spec §4.3) =====
 Route::prefix('supply')->middleware(['supply.auth', 'supply.rate'])

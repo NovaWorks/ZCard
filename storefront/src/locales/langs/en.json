@@ -188,7 +188,7 @@
     "noThumb": "Thumb",
     "validation": {
       "fillCaptcha": "Please enter the captcha",
-      "minPassword": "Password must be at least 6 characters",
+      "minPassword": "Password must be at least 8 characters",
       "passwordMismatch": "The two passwords do not match"
     },
     "orderStatus": {
@@ -416,7 +416,7 @@
       "username": "Username",
       "usernamePlaceholder": "Enter username",
       "emailPlaceholder": "Enter email",
-      "passwordPlaceholder": "At least 6 characters",
+      "passwordPlaceholder": "At least 8 characters",
       "confirmPassword": "Confirm Password",
       "confirmPasswordPlaceholder": "Enter password again",
       "fillAllRequired": "Please fill in all required fields",
@@ -442,7 +442,7 @@
       "codePlaceholder": "6-digit code",
       "resend": "Resend",
       "newPassword": "New Password",
-      "newPasswordPlaceholder": "At least 6 characters",
+      "newPasswordPlaceholder": "At least 8 characters",
       "confirmNewPassword": "Confirm New Password",
       "confirmPlaceholder": "Enter again",
       "resetting": "Resetting...",

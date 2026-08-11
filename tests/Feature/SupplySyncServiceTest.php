@@ -63,6 +63,24 @@ class SupplySyncServiceTest extends TestCase
         $this->assertSame(999, (int) $p2->price); // 售价不动(售价保护)
     }
 
+    public function test_resync_keeps_locally_edited_product_name(): void
+    {
+        $source = $this->makeSource([]);
+        $service = app(SupplySyncService::class);
+
+        $product = $service->upsertProduct($source, new UpstreamProduct(
+            code: 'UP_NAME', name: '上游原名', price: 500, factoryPrice: 500,
+        ));
+        $product->update(['name' => '本地运营名称']);
+
+        $service->upsertProduct($source, new UpstreamProduct(
+            code: 'UP_NAME', name: '上游篡改名称', price: 600, factoryPrice: 600,
+        ));
+
+        $this->assertSame('本地运营名称', $product->fresh()->name);
+        $this->assertSame(600, (int) $product->fresh()->factory_price);
+    }
+
     public function test_inactive_upstream_product_gets_hidden(): void
     {
         $source = $this->makeSource([]);
@@ -90,7 +108,7 @@ class SupplySyncServiceTest extends TestCase
         $this->assertStringContainsString('https://x.com/b.png', $desc);          // 相对路径拼 base_url
         $this->assertStringContainsString('https://cdn.example.com/c.png', $desc); // 绝对 URL 不动
         $this->assertStringContainsString('//cdn2.example.com/d.png', $desc);     // 协议相对不动
-        $this->assertStringContainsString('data:image/png;base64,xxx', $desc);    // data: 不动
+        $this->assertStringNotContainsString('data:image/png;base64,xxx', $desc); // data: 媒体协议被安全清理
     }
 
     public function test_sync_auto_creates_upstream_category(): void

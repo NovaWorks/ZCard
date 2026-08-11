@@ -7,6 +7,7 @@ use App\Models\Card;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\UserGroup;
+use App\Support\SecurityAudit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -117,6 +118,7 @@ class ProductController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $product = Product::findOrFail($id);
+        $before = $product->only(['name', 'slug', 'price', 'status', 'hide']);
 
         $data = $request->validate([
             'name' => 'sometimes|string|max:150',
@@ -157,6 +159,19 @@ class ProductController extends Controller
         ]);
 
         $product->update($data);
+
+        $after = $product->fresh()->only(array_keys($before));
+        $changes = [];
+        foreach ($before as $key => $value) {
+            if ($value !== $after[$key]) {
+                $changes[$key] = ['before' => $value, 'after' => $after[$key]];
+            }
+        }
+        if ($changes !== []) {
+            SecurityAudit::record($request, 'product.updated', Product::class, $product->id, [
+                'changes' => $changes,
+            ]);
+        }
 
         return response()->json($product->fresh());
     }

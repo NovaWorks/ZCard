@@ -31,7 +31,7 @@ class MediaController extends Controller
     {
         $data = $request->validate([
             'files' => 'required|array|min:1|max:20',
-            'files.*' => 'required|image|mimes:jpeg,png,webp,gif,svg|max:10240',
+            'files.*' => 'required|image|mimes:jpeg,png,webp,gif|max:10240',
             'category_id' => 'nullable|integer',
         ]);
 

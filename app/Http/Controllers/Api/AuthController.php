@@ -26,7 +26,7 @@ class AuthController extends Controller
         $rules = [
             'username' => 'required|string|max:50|unique:users,username',
             'email' => 'required|email|max:255|unique:users,email',
-            'password' => 'required|string|min:6|max:50',
+            'password' => 'required|string|min:8|max:72',
             'captcha' => 'nullable|string',
             'referrer' => 'nullable|string|max:50',
         ];
@@ -144,7 +144,7 @@ class AuthController extends Controller
     {
         $data = $request->validate([
             'current_password' => 'required|string',
-            'password' => 'required|string|min:6|max:50|confirmed',
+            'password' => 'required|string|min:8|max:72|confirmed',
         ]);
 
         $user = $request->user();
@@ -155,7 +155,11 @@ class AuthController extends Controller
             ]);
         }
 
-        $user->update(['password' => $data['password']]);
+        $user->update([
+            'password' => $data['password'],
+            'password_changed_at' => now(),
+        ]);
+        $user->tokens()->delete();
 
         return response()->json(['message' => __('messages.auth.password_changed')]);
     }
@@ -182,7 +186,7 @@ class AuthController extends Controller
     public function sendResetCode(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'email' => 'required|email|exists:users,email',
+            'email' => 'required|email|max:255',
             'captcha' => 'nullable|string',
         ]);
 
@@ -195,25 +199,37 @@ class AuthController extends Controller
             }
         }
 
-        // 生成 6 位验证码,存入缓存(5 分钟)
-        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        cache()->put("reset_code:{$data['email']}", $code, 300);
-
         // 限频:60 秒内不可重发
-        if (cache()->has("reset_code_sent:{$data['email']}")) {
+        $email = strtolower(trim($data['email']));
+        $emailKey = hash('sha256', $email);
+        if (cache()->has("reset_code_sent:{$emailKey}")) {
             throw ValidationException::withMessages([
                 'email' => [__('messages.auth.reset_code_throttle')],
             ]);
         }
-        cache()->put("reset_code_sent:{$data['email']}", true, 60);
+
+        $user = User::where('email', $email)->where('status', 1)->first();
+        if (! $user) {
+            // 不暴露邮箱是否注册；仍写冷却键，避免枚举和滥用。
+            cache()->put("reset_code_sent:{$emailKey}", true, 60);
+
+            return response()->json(['message' => __('messages.auth.reset_code_sent')]);
+        }
+
+        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         try {
-            MailService::sendCaptchaEmail($data['email'], $code);
+            MailService::sendCaptchaEmail($email, $code);
         } catch (\Throwable $e) {
             throw ValidationException::withMessages([
                 'email' => [__('messages.auth.mail_send_failed')],
             ]);
         }
+
+        // 邮件成功后才保存验证码，避免把已发送验证码覆盖为用户收不到的新值。
+        cache()->put("reset_code:{$emailKey}", Hash::make($code), 300);
+        cache()->put("reset_code_sent:{$emailKey}", true, 60);
+        cache()->forget("reset_attempts:{$emailKey}");
 
         return response()->json(['message' => __('messages.auth.reset_code_sent')]);
     }
@@ -224,25 +240,38 @@ class AuthController extends Controller
     public function resetPassword(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'email' => 'required|email|exists:users,email',
+            'email' => 'required|email|max:255',
             'code' => 'required|string|size:6',
-            'password' => 'required|string|min:6|max:50',
+            'password' => 'required|string|min:8|max:72',
         ]);
 
-        $cachedCode = cache()->get("reset_code:{$data['email']}");
-        if (! $cachedCode || $cachedCode !== $data['code']) {
+        $email = strtolower(trim($data['email']));
+        $emailKey = hash('sha256', $email);
+        $attemptKey = "reset_attempts:{$emailKey}";
+        $attempts = (int) cache()->get($attemptKey, 0);
+        if ($attempts >= 5) {
             throw ValidationException::withMessages([
                 'code' => [__('messages.auth.reset_code_invalid')],
             ]);
         }
 
-        $user = User::where('email', $data['email'])->first();
+        $cachedCode = cache()->get("reset_code:{$emailKey}");
+        $user = User::where('email', $email)->where('status', 1)->first();
+        if (! is_string($cachedCode) || ! $user || ! Hash::check($data['code'], $cachedCode)) {
+            cache()->put($attemptKey, $attempts + 1, 300);
+            throw ValidationException::withMessages([
+                'code' => [__('messages.auth.reset_code_invalid')],
+            ]);
+        }
+
         $user->update([
             'password' => $data['password'],
             'password_changed_at' => now(),
         ]);
+        $user->tokens()->delete();
 
-        cache()->forget("reset_code:{$data['email']}");
+        cache()->forget("reset_code:{$emailKey}");
+        cache()->forget($attemptKey);
 
         return response()->json(['message' => __('messages.auth.password_reset')]);
     }

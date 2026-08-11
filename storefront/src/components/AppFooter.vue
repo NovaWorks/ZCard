@@ -9,7 +9,6 @@ const settings = useSettingsStore()
 // 确保配置已加载(页脚为全局组件,兜底加载避免直达子页时 config 为 null)
 onMounted(() => {
   settings.load()
-  injectAnalytics()
 })
 const cfg = computed(() => settings.config)
 
@@ -40,23 +39,6 @@ const socials = computed(() =>
 const visibleContacts = computed(() =>
   (cfg.value?.footer_contact || []).filter(c => c.value && c.value.trim())
 )
-
-/** 注入第三方统计代码(百度统计/Google Analytics) */
-function injectAnalytics() {
-  const code = cfg.value?.footer_analytics
-  if (!code || !code.trim()) return
-  // 创建 script 标签注入到 body 底部
-  const div = document.createElement('div')
-  div.innerHTML = code.trim()
-  // 提取 script 标签并重新创建(直接 innerHTML 的 script 不会执行)
-  div.querySelectorAll('script').forEach(oldScript => {
-    const newScript = document.createElement('script')
-    Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value))
-    newScript.textContent = oldScript.textContent
-    oldScript.replaceWith(newScript)
-  })
-  document.body.appendChild(div)
-}
 
 /** 内部链接(router 跳转) vs 外部链接(新窗口) */
 function isExternal(url: string) {

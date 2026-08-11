@@ -66,7 +66,7 @@ async function handleReset() {
   err.value = ''
   msg.value = ''
   if (!code.value) { err.value = t('auth.forget.fillCode'); return }
-  if (newPassword.value.length < 6) { err.value = t('common.validation.minPassword'); return }
+  if (newPassword.value.length < 8) { err.value = t('common.validation.minPassword'); return }
   if (newPassword.value !== confirmPassword.value) { err.value = t('common.validation.passwordMismatch'); return }
   loading.value = true
   try {

@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Merchant;
+use App\Models\Order;
 use App\Models\SubsiteDomain;
 use App\Models\SubsiteLedgerEntry;
 use App\Models\SubsiteProductSetting;
-use App\Models\Withdrawal;
+use App\Support\DomainVerificationService;
+use App\Support\SubsiteWithdrawalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -21,6 +23,7 @@ class SubsiteConsoleController extends Controller
         if (! $merchant) {
             return response()->json(['message' => '您还没有分站'], 404);
         }
+
         return response()->json($merchant->load('domains'));
     }
 
@@ -28,7 +31,9 @@ class SubsiteConsoleController extends Controller
     public function finance(Request $request): JsonResponse
     {
         $merchant = $this->getMySubsite($request);
-        if (! $merchant) return response()->json(['message' => '无分站'], 404);
+        if (! $merchant) {
+            return response()->json(['message' => '无分站'], 404);
+        }
 
         $available = SubsiteLedgerEntry::where('merchant_id', $merchant->id)->where('status', 'available')->sum('amount');
         $pending = SubsiteLedgerEntry::where('merchant_id', $merchant->id)->where('status', 'pending')->sum('amount');
@@ -45,7 +50,10 @@ class SubsiteConsoleController extends Controller
     public function ledger(Request $request): JsonResponse
     {
         $merchant = $this->getMySubsite($request);
-        if (! $merchant) return response()->json(['message' => '无分站'], 404);
+        if (! $merchant) {
+            return response()->json(['message' => '无分站'], 404);
+        }
+
         return response()->json(
             SubsiteLedgerEntry::where('merchant_id', $merchant->id)->orderByDesc('id')->limit(100)->get()
         );
@@ -55,12 +63,21 @@ class SubsiteConsoleController extends Controller
     public function bindDomain(Request $request): JsonResponse
     {
         $merchant = $this->getMySubsite($request);
-        if (! $merchant) return response()->json(['message' => '无分站'], 404);
+        if (! $merchant) {
+            return response()->json(['message' => '无分站'], 404);
+        }
         $data = $request->validate([
-            'domain' => 'required|string|max:255',
+            'domain' => [
+                'required', 'string', 'max:253',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! DomainVerificationService::isSafePublicDomain((string) $value)) {
+                        $fail('请输入可解析的公网域名，不要包含协议、端口或路径');
+                    }
+                },
+            ],
             'type' => 'required|in:subdomain,custom',
         ]);
-        $domain = strtolower(trim($data['domain']));
+        $domain = strtolower(rtrim(trim($data['domain']), '.'));
         $row = SubsiteDomain::create([
             'merchant_id' => $merchant->id,
             'domain' => $domain,
@@ -71,6 +88,7 @@ class SubsiteConsoleController extends Controller
             'verified_at' => $data['type'] === 'subdomain' ? now() : null,
             'is_primary' => ! SubsiteDomain::where('merchant_id', $merchant->id)->exists(),
         ]);
+
         return response()->json($row, 201);
     }
 
@@ -78,15 +96,20 @@ class SubsiteConsoleController extends Controller
     public function verifyDomain(Request $request, int $domainId): JsonResponse
     {
         $merchant = $this->getMySubsite($request);
-        if (! $merchant) return response()->json(['message' => '无分站'], 404);
+        if (! $merchant) {
+            return response()->json(['message' => '无分站'], 404);
+        }
 
         $domain = SubsiteDomain::where('id', $domainId)->where('merchant_id', $merchant->id)->first();
-        if (! $domain) return response()->json(['message' => '域名不存在'], 404);
+        if (! $domain) {
+            return response()->json(['message' => '域名不存在'], 404);
+        }
         if ($domain->verification_status === 'verified') {
             return response()->json(['message' => '域名已验证', 'verified' => true]);
         }
 
-        $result = \App\Support\DomainVerificationService::verify($domain);
+        $result = DomainVerificationService::verify($domain);
+
         return response()->json($result, $result['verified'] ? 200 : 422);
     }
 
@@ -94,19 +117,26 @@ class SubsiteConsoleController extends Controller
     public function domainInstructions(Request $request, int $domainId): JsonResponse
     {
         $merchant = $this->getMySubsite($request);
-        if (! $merchant) return response()->json(['message' => '无分站'], 404);
+        if (! $merchant) {
+            return response()->json(['message' => '无分站'], 404);
+        }
 
         $domain = SubsiteDomain::where('id', $domainId)->where('merchant_id', $merchant->id)->first();
-        if (! $domain) return response()->json(['message' => '域名不存在'], 404);
+        if (! $domain) {
+            return response()->json(['message' => '域名不存在'], 404);
+        }
 
-        return response()->json(\App\Support\DomainVerificationService::getInstructions($domain));
+        return response()->json(DomainVerificationService::getInstructions($domain));
     }
 
     /** 商品配置列表 */
     public function productSettings(Request $request): JsonResponse
     {
         $merchant = $this->getMySubsite($request);
-        if (! $merchant) return response()->json(['message' => '无分站'], 404);
+        if (! $merchant) {
+            return response()->json(['message' => '无分站'], 404);
+        }
+
         return response()->json(
             SubsiteProductSetting::where('merchant_id', $merchant->id)->with('product:id,name,slug,price')->get()
         );
@@ -116,7 +146,9 @@ class SubsiteConsoleController extends Controller
     public function upsertProductSetting(Request $request): JsonResponse
     {
         $merchant = $this->getMySubsite($request);
-        if (! $merchant) return response()->json(['message' => '无分站'], 404);
+        if (! $merchant) {
+            return response()->json(['message' => '无分站'], 404);
+        }
         $data = $request->validate([
             'product_id' => 'required|exists:products,id',
             'is_listed' => 'boolean',
@@ -129,6 +161,7 @@ class SubsiteConsoleController extends Controller
             ['merchant_id' => $merchant->id, 'product_id' => $data['product_id'], 'sku_id' => 0],
             $data
         );
+
         return response()->json($setting, 201);
     }
 
@@ -136,7 +169,9 @@ class SubsiteConsoleController extends Controller
     public function requestWithdrawal(Request $request): JsonResponse
     {
         $merchant = $this->getMySubsite($request);
-        if (! $merchant) return response()->json(['message' => '无分站'], 404);
+        if (! $merchant) {
+            return response()->json(['message' => '无分站'], 404);
+        }
         $data = $request->validate([
             'amount' => 'required|numeric|min:0.01',
             'method' => 'required|in:alipay,wechat,usdt',
@@ -144,9 +179,10 @@ class SubsiteConsoleController extends Controller
             'account_name' => 'required|string|max:50',
         ]);
         try {
-            $w = \App\Support\SubsiteWithdrawalService::request(
+            $w = SubsiteWithdrawalService::request(
                 $merchant->id, (int) round($data['amount'] * 100), $data['method'], $data['account'], $data['account_name']
             );
+
             return response()->json($w, 201);
         } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 400);
@@ -157,7 +193,9 @@ class SubsiteConsoleController extends Controller
     public function updateBranding(Request $request): JsonResponse
     {
         $merchant = $this->getMySubsite($request);
-        if (! $merchant) return response()->json(['message' => '无分站'], 404);
+        if (! $merchant) {
+            return response()->json(['message' => '无分站'], 404);
+        }
         $data = $request->validate([
             'site_name' => 'nullable|string|max:120',
             'logo' => 'nullable|string|max:500',
@@ -166,6 +204,7 @@ class SubsiteConsoleController extends Controller
         $settings = $merchant->settings ?? [];
         $settings = array_merge($settings, array_filter($data, fn ($v) => $v !== null));
         $merchant->update(['settings' => $settings]);
+
         return response()->json($merchant);
     }
 
@@ -173,9 +212,11 @@ class SubsiteConsoleController extends Controller
     public function orders(Request $request): JsonResponse
     {
         $merchant = $this->getMySubsite($request);
-        if (! $merchant) return response()->json(['message' => '无分站'], 404);
+        if (! $merchant) {
+            return response()->json(['message' => '无分站'], 404);
+        }
 
-        $orders = \App\Models\Order::where('subsite_id', $merchant->id)
+        $orders = Order::where('subsite_id', $merchant->id)
             ->with('product:id,name,slug', 'buyer:id,username')
             ->select(['id', 'order_no', 'product_id', 'user_id', 'quantity', 'amount', 'subsite_profit', 'status', 'created_at', 'paid_at'])
             ->orderByDesc('id')

@@ -100,15 +100,15 @@ class AdminCurrencyControllerTest extends TestCase
         $resp->assertStatus(403);
     }
 
-    public function test_merchant_role_can_access_admin_api(): void
+    public function test_merchant_role_cannot_access_global_admin_api(): void
     {
-        // merchant 角色也可访问管理接口
+        // merchant 没有完整资源隔离，只能使用分站自助控制台。
         $user = User::factory()->create();
         $user->assignRole('merchant');
         $token = $user->createToken('test')->plainTextToken;
 
         $resp = $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->getJson('/api/admin/currencies');
-        $resp->assertOk();
+        $resp->assertStatus(403);
     }
 }

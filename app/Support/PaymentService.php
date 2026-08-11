@@ -2,14 +2,19 @@
 
 namespace App\Support;
 
+use App\Models\Bill;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\PaymentChannel;
 use App\Models\Recharge;
+use App\Models\SupplierAccount;
+use App\Models\SupplierLedgerEntry;
 use App\Payment\Contracts\Payable;
 use App\Payment\Contracts\PaymentDriver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+
 class PaymentService
 {
     public function getEnabledChannels(): Collection
@@ -83,14 +88,24 @@ class PaymentService
         $original = $payable;
         [$feeFen, $payAmountFen] = $this->calcFee($channel, (int) $payable->getPayableAmount());
         if ($payAmountFen !== (int) $payable->getPayableAmount()) {
-            $payable = new class($payable, $payAmountFen) implements Payable {
+            $payable = new class($payable, $payAmountFen) implements Payable
+            {
                 public function __construct(private Payable $inner, private int $amount) {}
 
-                public function getPayableKey(): string { return $this->inner->getPayableKey(); }
+                public function getPayableKey(): string
+                {
+                    return $this->inner->getPayableKey();
+                }
 
-                public function getPayableAmount(): int { return $this->amount; }
+                public function getPayableAmount(): int
+                {
+                    return $this->amount;
+                }
 
-                public function getPayableType(): string { return $this->inner->getPayableType(); }
+                public function getPayableType(): string
+                {
+                    return $this->inner->getPayableType();
+                }
             };
         }
 
@@ -111,7 +126,7 @@ class PaymentService
         } elseif ($original instanceof Order) {
             $payload['order_id'] = $original->id;
         } else {
-            throw new \RuntimeException('不支持的 Payable 类型: ' . get_class($original));
+            throw new \RuntimeException('不支持的 Payable 类型: '.get_class($original));
         }
         Payment::create($payload);
 
@@ -155,7 +170,8 @@ class PaymentService
         [$feeFen, $payTotal] = $this->calcFee($channel, $total);
 
         // 聚合 Payable:单号取主订单,金额取总和(含客户承担手续费),驱动只关心这两项
-        $payable = new class($main, $payTotal) implements Payable {
+        $payable = new class($main, $payTotal) implements Payable
+        {
             public function __construct(private Order $main, private int $total) {}
 
             public function getPayableKey(): string
@@ -308,7 +324,7 @@ class PaymentService
         // 标记支付流水 + 充值单为已支付 → 入账余额,全部在同一事务内,
         // 保证原子性(任一步失败整体回滚,避免"已标 paid 但未入账"或"入账成功但回滚状态"的不一致)。
         // 事务返回值:null=并发已处理(幂等直接返回 success),非 null=本次完成转换。
-        $converted = \Illuminate\Support\Facades\DB::transaction(function () use ($recharge, $channelCode, $request) {
+        $converted = DB::transaction(function () use ($recharge, $channelCode, $request) {
             $locked = Recharge::where('id', $recharge->id)->lockForUpdate()->firstOrFail();
             // 并发回调:另一请求已将状态改为 paid → 本次不重复入账
             if ($locked->status !== Recharge::STATUS_PENDING) {
@@ -320,13 +336,13 @@ class PaymentService
 
             // 入账(同事务):BillService::record 内部 DB::transaction 会退化为保存点,
             // 抛异常时整体回滚(recharge + payment + bill + balance 一起回退)。
-            if ($locked->target === \App\Models\Recharge::TARGET_SUPPLY) {
+            if ($locked->target === Recharge::TARGET_SUPPLY) {
                 // 供货余额充值:入账到用户的供货账号(自助 API 对接预存)。
-                $supplier = \App\Models\SupplierAccount::where('user_id', $locked->user_id)->firstOrFail();
+                $supplier = SupplierAccount::where('user_id', $locked->user_id)->firstOrFail();
                 $supplier->increment('balance', (int) $locked->amount);
-                \App\Models\SupplierLedgerEntry::create([
+                SupplierLedgerEntry::create([
                     'supplier_account_id' => $supplier->id,
-                    'type' => \App\Models\SupplierLedgerEntry::TYPE_RECHARGE,
+                    'type' => SupplierLedgerEntry::TYPE_RECHARGE,
                     'amount' => (int) $locked->amount,
                     'balance_after' => $supplier->balance,
                     'remark' => __('messages.recharge.credit', ['no' => $locked->recharge_no]),
@@ -335,7 +351,7 @@ class PaymentService
                 BillService::record(
                     $locked->user_id,
                     (int) $locked->amount,
-                    \App\Models\Bill::TYPE_INCOME,
+                    Bill::TYPE_INCOME,
                     __('messages.recharge.credit', ['no' => $locked->recharge_no]),
                 );
             }
@@ -357,7 +373,8 @@ class PaymentService
         if (! class_exists($driverClass)) {
             throw new \RuntimeException("支付 Driver 不存在: {$driverClass}");
         }
-        return new $driverClass();
+
+        return new $driverClass;
     }
 
     /**
@@ -375,14 +392,14 @@ class PaymentService
         }
 
         $drivers = [];
-        foreach (glob($dir . '/*Driver.php') as $file) {
-            $className = 'App\\Payment\\Drivers\\' . basename($file, '.php');
+        foreach (glob($dir.'/*Driver.php') as $file) {
+            $className = 'App\\Payment\\Drivers\\'.basename($file, '.php');
             if (! class_exists($className) || ! is_subclass_of($className, PaymentDriver::class)) {
                 continue;
             }
             try {
                 /** @var PaymentDriver $instance */
-                $instance = new $className();
+                $instance = new $className;
                 $info = $instance->getInfo();
                 // code 从类名派生(如 AlipayDriver → alipay),与预置 seed 保持一致
                 $code = strtolower(str_replace('Driver', '', basename($file, '.php')));
@@ -401,7 +418,6 @@ class PaymentService
         return $drivers;
     }
 
-
     /**
      * 检查凭据是否已配置(至少有一个敏感字段非空)。
      * 参考自 acg-faka payCredentialConfigured,防止空 key 伪造签名。
@@ -415,12 +431,13 @@ class PaymentService
                 return true;
             }
         }
+
         return false;
     }
 
     public function saveChannelConfig(int $channelId, array $config): void
     {
-        PaymentChannel::where('id', $channelId)->update(['config' => $config]);
+        PaymentChannel::findOrFail($channelId)->update(['config' => $config]);
     }
 
     public function toggleChannel(int $channelId, bool $enabled): void

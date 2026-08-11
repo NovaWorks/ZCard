@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Exceptions\InsufficientStockException;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Support\CaptchaService;
 use App\Support\OrderService;
 use App\Support\StorefrontConfig;
@@ -32,7 +33,8 @@ class OrderController extends Controller
         // 无法解析 storefront 发送的 Bearer token → 恒为 null(登录用户也被当游客)。
         // 必须显式用 sanctum guard 解析,否则订单 user_id 恒为空,"我的订单"查不到。
         $guestCheckout = StorefrontConfig::get('guest_checkout') ?? true;
-        if (! $guestCheckout && ! $request->user('sanctum')) {
+        $user = $this->activeUser($request);
+        if (! $guestCheckout && ! $user) {
             return response()->json(['message' => __('messages.guest_only')], 403);
         }
 
@@ -54,7 +56,7 @@ class OrderController extends Controller
                     'extra' => $data['extra'] ?? null,
                     'coupon_code' => $data['coupon_code'] ?? null,
                     'card_id' => $data['card_id'] ?? null,
-                    'user_id' => $request->user('sanctum')?->id,
+                    'user_id' => $user?->id,
                     'create_ip' => $request->ip(),
                     'create_device' => $this->detectDevice($request),
                 ],
@@ -109,7 +111,8 @@ class OrderController extends Controller
         ]);
 
         $guestCheckout = StorefrontConfig::get('guest_checkout') ?? true;
-        if (! $guestCheckout && ! $request->user('sanctum')) {
+        $user = $this->activeUser($request);
+        if (! $guestCheckout && ! $user) {
             return response()->json(['message' => __('messages.guest_only')], 403);
         }
 
@@ -127,7 +130,7 @@ class OrderController extends Controller
                     'password' => $data['password'] ?? null,
                     'extra' => $data['extra'] ?? null,
                     'coupon_code' => $data['coupon_code'] ?? null,
-                    'user_id' => $request->user('sanctum')?->id,
+                    'user_id' => $user?->id,
                     'create_ip' => $request->ip(),
                     'create_device' => $this->detectDevice($request),
                 ],
@@ -156,7 +159,8 @@ class OrderController extends Controller
     public function mockPay(string $orderNo, OrderService $service): JsonResponse
     {
         // 安全:模拟支付仅限开发/测试环境,生产环境禁用(否则任何人可白嫖订单+触发佣金)
-        if (! app()->environment('local', 'testing')) {
+        if (! app()->environment('testing')
+            && (! app()->environment('local') || ! config('zcard.allow_mock_payment', false))) {
             return response()->json(['message' => 'Not available'], 404);
         }
 
@@ -171,6 +175,13 @@ class OrderController extends Controller
         } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 400);
         }
+    }
+
+    private function activeUser(Request $request): ?User
+    {
+        $user = $request->user('sanctum');
+
+        return $user && (int) $user->status === 1 ? $user : null;
     }
 
     public function query(Request $request, OrderService $service): JsonResponse

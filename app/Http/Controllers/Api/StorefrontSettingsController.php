@@ -10,7 +10,7 @@ class StorefrontSettingsController extends Controller
 {
     public function show(): JsonResponse
     {
-        $config = StorefrontConfig::all();
+        $config = StorefrontConfig::public();
 
         // 分站白标覆盖(spec §8.1):分站域名命中时,用分站自定义站点名/Logo/公告覆盖主站配置。
         $subsite = request()->attributes->get('subsite');

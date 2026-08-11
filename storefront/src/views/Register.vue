@@ -55,7 +55,7 @@ async function submit() {
     err.value = t('auth.register.usernameMinLen', { n: minLen.value })
     return
   }
-  if (password.value.length < 6) {
+  if (password.value.length < 8) {
     err.value = t('common.validation.minPassword')
     return
   }

@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
 import AppIcon from '@/components/AppIcon.vue'
+import DOMPurify from 'dompurify'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -13,18 +14,12 @@ const visible = ref(false)
 
 const noticeHtml = computed(() => settings.config?.site_notice || '')
 
-/**
- * 公告内容做基本 XSS 过滤(与商品描述一致):
- * 移除 script/iframe/style/link 与 on* 事件属性,防注入。
- */
+/** 公告在后端清理后，前端再次使用成熟库做纵深防护。 */
 const sanitizedNotice = computed(() => {
-  const html = noticeHtml.value
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<link[\s\S]*?>/gi, '')
-    .replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+  return DOMPurify.sanitize(noticeHtml.value, {
+    USE_PROFILES: { html: true },
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
+  })
 })
 
 // 监听公告内容:settings 异步加载完成后自动弹出(不能只靠 onMounted,

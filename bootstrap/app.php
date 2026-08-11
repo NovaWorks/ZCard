@@ -1,17 +1,21 @@
 <?php
 
+use App\Http\Middleware\AuditAdminAction;
 use App\Http\Middleware\EnsureInstalled;
 use App\Http\Middleware\MaintenanceMiddleware;
 use App\Http\Middleware\NoCacheHtml;
+use App\Http\Middleware\RequireActiveUser;
 use App\Http\Middleware\RequireAdminRole;
 use App\Http\Middleware\RequireMainSite;
 use App\Http\Middleware\ResolveDisplayCurrency;
 use App\Http\Middleware\ResolveSubsite;
+use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\SupplyAuth;
 use App\Http\Middleware\SupplyRateLimit;
 use App\Models\SupplySource;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -35,13 +39,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // SPA 入口 HTML 不缓存(防止更新后旧 index.html 引用已删除的 hash JS → 404 白屏)
         $middleware->append(NoCacheHtml::class);
+        $middleware->append(SecurityHeaders::class);
 
         // API 路由加入 Session 支持(mews/captcha 验证码需要 session 存储)
         // 注意:必须同时加 EncryptCookies —— 验证码图片走 web 组(有 EncryptCookies),
         // 若 api 组不加,图片请求写入的加密 session cookie 在下单校验时无法解密,
         // session 对不上 → 验证码恒定报错(主因 A:线上域名不在 SANCTUM_STATEFUL_DOMAINS 时的缺陷)。
         $middleware->api(prepend: [
-            \Illuminate\Cookie\Middleware\EncryptCookies::class,
+            EncryptCookies::class,
             StartSession::class,
             MaintenanceMiddleware::class,
             ResolveSubsite::class,
@@ -54,6 +59,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'set.locale' => SetLocale::class,
             'require.main.site' => RequireMainSite::class,
             'admin.role' => RequireAdminRole::class,
+            'active.user' => RequireActiveUser::class,
+            'audit.admin' => AuditAdminAction::class,
             'supply.auth' => SupplyAuth::class,
             'supply.rate' => SupplyRateLimit::class,
         ]);

@@ -39,7 +39,7 @@ class PaymentController extends Controller
         });
 
         // 余额支付(登录用户可见,不占支付通道表;id=0 与库表通道区分)
-        if ($user = $request->user('sanctum')) {
+        if ($user = $this->activeUser($request)) {
             $channels->push([
                 'id' => 0,
                 'name' => '余额支付',
@@ -76,7 +76,7 @@ class PaymentController extends Controller
             // 充值单强归属:必须登录,且只能为本人充值单发起支付(防越权)
             // 注意:本路由不在 auth:sanctum 组内,$request->user() 默认走 web guard(session),
             // 无法解析 Bearer token → 恒为 null。必须显式用 sanctum guard 解析。
-            $userId = $request->user('sanctum')?->id;
+            $userId = $this->activeUser($request)?->id;
             if (! $userId) {
                 return response()->json(['message' => __('messages.recharge.login_required')], 401);
             }
@@ -136,7 +136,7 @@ class PaymentController extends Controller
      */
     public function balancePay(Request $request, OrderService $orderService): JsonResponse
     {
-        $userId = $request->user('sanctum')?->id;
+        $userId = $this->activeUser($request)?->id;
         if (! $userId) {
             return response()->json(['message' => __('messages.recharge.login_required')], 401);
         }
@@ -160,7 +160,7 @@ class PaymentController extends Controller
      */
     public function balanceBatchPay(Request $request, OrderService $orderService): JsonResponse
     {
-        $userId = $request->user('sanctum')?->id;
+        $userId = $this->activeUser($request)?->id;
         if (! $userId) {
             return response()->json(['message' => __('messages.recharge.login_required')], 401);
         }
@@ -228,5 +228,12 @@ class PaymentController extends Controller
             'amount' => $total,
             'balance_after' => (int) User::find($userId)?->balance,
         ];
+    }
+
+    private function activeUser(Request $request): ?User
+    {
+        $user = $request->user('sanctum');
+
+        return $user && (int) $user->status === 1 ? $user : null;
     }
 }

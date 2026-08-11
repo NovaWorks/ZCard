@@ -72,8 +72,8 @@ const handleInstall = async () => {
     error.value = '两次输入的密码不一致'
     return
   }
-  if (adminForm.value.password.length < 6) {
-    error.value = '密码至少 6 位'
+  if (adminForm.value.password.length < 10) {
+    error.value = '管理员密码至少 10 位'
     return
   }
 
@@ -258,7 +258,7 @@ onMounted(() => {
               </div>
               <div>
                 <label class="block text-sm font-medium text-ink mb-1.5">管理员密码</label>
-                <input v-model="adminForm.password" type="password" placeholder="至少 6 位"
+                <input v-model="adminForm.password" type="password" placeholder="至少 10 位"
                   class="w-full px-4 py-2.5 border border-border rounded-field text-sm focus:border-primary focus:outline-none">
               </div>
               <div>

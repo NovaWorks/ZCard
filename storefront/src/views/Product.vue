@@ -10,6 +10,7 @@ import { formatMoney } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
 import AppIcon from '@/components/AppIcon.vue'
 import { useCartStore } from '@/stores/cart'
+import DOMPurify from 'dompurify'
 
 const route = useRoute()
 const router = useRouter()
@@ -57,18 +58,13 @@ const galleryImages = computed(() => {
   return product.value?.cover ? [product.value.cover] : []
 })
 
-/**
- * 商品描述支持 HTML 渲染(v-html)。做基本 XSS 过滤:
- * 移除 script/iframe/style 等危险标签与 on* 事件属性。
- */
+/** 商品描述在后端清理后，前端再次使用成熟库做纵深防护。 */
 const sanitizedDescription = computed(() => {
   const html = product.value?.description || ''
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<link[\s\S]*?>/gi, '')
-    .replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+  return DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true },
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
+  })
 })
 
 /** 描述富文本容器引用(用于事件委托收集图片) */

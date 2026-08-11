@@ -142,6 +142,19 @@ class MediaLibraryTest extends TestCase
         ])->assertStatus(422);
     }
 
+    public function test_upload_rejects_svg_active_content(): void
+    {
+        $token = $this->adminToken();
+        $svg = UploadedFile::fake()->createWithContent(
+            'active.svg',
+            '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+        );
+
+        $this->withToken($token)->post('/api/admin/media/upload', [
+            'files' => [$svg],
+        ])->assertStatus(422);
+    }
+
     public function test_media_list_search_sort_paginate(): void
     {
         $token = $this->adminToken();

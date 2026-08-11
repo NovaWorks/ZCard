@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\PaymentChannel;
 use App\Payment\Contracts\PaymentDriver;
 use App\Support\PaymentService;
+use App\Support\StorefrontConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 /**
  * 后台支付通道管理。列表(含 driver 信息)、保存 config、切换 enabled,
@@ -49,7 +49,7 @@ class PaymentChannelController extends Controller
             ->firstWhere('code', $data['code']);
 
         if (! $driver) {
-            return response()->json(['message' => '未知的支付驱动: ' . $data['code']], 422);
+            return response()->json(['message' => '未知的支付驱动: '.$data['code']], 422);
         }
 
         // 幂等:已存在同 code 渠道则直接返回(可能是之前被删除的,恢复显示)
@@ -69,7 +69,7 @@ class PaymentChannelController extends Controller
             ]);
         }
 
-        return response()->json($channel, 201);
+        return response()->json($this->channelArray($channel), 201);
     }
 
     /**
@@ -91,14 +91,7 @@ class PaymentChannelController extends Controller
             ->get();
 
         // 附加 driver 元信息(name 是否可实例化)
-        $channels->transform(function (PaymentChannel $channel) {
-            $driverClass = $channel->driver;
-            $channelArray = $channel->toArray();
-            $channelArray['driver_label'] = class_exists($driverClass)
-                ? (new \ReflectionClass($driverClass))->getShortName()
-                : null;
-            return $channelArray;
-        });
+        $channels->transform(fn (PaymentChannel $channel) => $this->channelArray($channel));
 
         return response()->json($channels);
     }
@@ -108,25 +101,29 @@ class PaymentChannelController extends Controller
         $channel = PaymentChannel::findOrFail($id);
 
         $data = $request->validate([
-            'config'  => 'sometimes|array',
+            'config' => 'sometimes|array',
             'enabled' => 'sometimes|boolean',
-            'name'    => 'sometimes|string|max:100',
-            'fee'     => 'sometimes|numeric|min:0',
+            'name' => 'sometimes|string|max:100',
+            'fee' => 'sometimes|numeric|min:0',
             'fee_type' => 'sometimes|string',
             'fee_bearer' => 'sometimes|string|in:merchant,customer',
-            'sort'    => 'sometimes|integer',
+            'sort' => 'sometimes|integer',
         ]);
 
         // config 合并保存(而非覆盖):前端对敏感字段留空时不传,
         // 这里与旧值合并,实现"留空=保留旧值"
         if (isset($data['config'])) {
             $oldConfig = $channel->config ?? [];
-            $data['config'] = array_merge($oldConfig, $data['config']);
+            $submitted = array_filter(
+                $data['config'],
+                fn ($value) => $value !== StorefrontConfig::SECRET_MASK,
+            );
+            $data['config'] = array_merge($oldConfig, $submitted);
         }
 
         $channel->update($data);
 
-        return response()->json($channel->fresh());
+        return response()->json($this->channelArray($channel->fresh()));
     }
 
     /**
@@ -143,13 +140,12 @@ class PaymentChannelController extends Controller
         if (! class_exists($driverClass)) {
             return response()->json([
                 'fields' => [],
-                'error'  => "支付 Driver 不存在: {$driverClass}",
+                'error' => "支付 Driver 不存在: {$driverClass}",
             ], 422);
         }
 
-        $driver = new $driverClass();
+        $driver = new $driverClass;
         /** @var PaymentDriver $driver */
-
         $rawFields = $driver->getConfigFields();
         $fields = [];
         foreach ($rawFields as $key => $field) {
@@ -168,13 +164,48 @@ class PaymentChannelController extends Controller
         }
 
         // 回调地址(异步通知),供后台参考
-        $callbackUrl = rtrim(config('app.url'), '/') . '/api/payments/callback/' . $channel->code;
+        $callbackUrl = rtrim(config('app.url'), '/').'/api/payments/callback/'.$channel->code;
 
         return response()->json([
-            'channel_id'   => $channel->id,
-            'driver'       => $channel->driver,
-            'fields'       => $fields,
+            'channel_id' => $channel->id,
+            'driver' => $channel->driver,
+            'fields' => $fields,
             'callback_url' => $callbackUrl,
         ]);
+    }
+
+    /** 后台仅返回“已配置”占位符，不回显支付密钥原文。 */
+    private function channelArray(PaymentChannel $channel): array
+    {
+        $driverClass = $channel->driver;
+        $array = $channel->toArray();
+        $config = $channel->config ?? [];
+
+        if (class_exists($driverClass)) {
+            try {
+                $fields = (new $driverClass)->getConfigFields();
+                foreach ($fields as $key => $field) {
+                    $sensitiveKey = (bool) preg_match(
+                        '/(?:^|_)(?:key|secret|token|password|private|cert)(?:_|$)/i',
+                        (string) $key,
+                    );
+                    if ((($field['type'] ?? null) === 'secret' || $sensitiveKey) && ! empty($config[$key])) {
+                        $config[$key] = StorefrontConfig::SECRET_MASK;
+                    }
+                }
+            } catch (\Throwable) {
+                // 驱动异常时宁可不返回配置，也不泄露未知字段。
+                $config = [];
+            }
+        } else {
+            $config = [];
+        }
+
+        $array['config'] = $config;
+        $array['driver_label'] = class_exists($driverClass)
+            ? (new \ReflectionClass($driverClass))->getShortName()
+            : null;
+
+        return $array;
     }
 }

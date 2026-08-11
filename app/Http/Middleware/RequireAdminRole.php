@@ -7,9 +7,10 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * 管理 API 权限守卫(P0 安全修复)。
- * 要求当前用户拥有 super_admin 或 merchant 角色,普通 user 角色拒绝(403)。
- * 这补上了 /api/admin/* 路由组仅有 auth:sanctum 而无角色检查的安全漏洞。
+ * 管理 API 权限守卫。
+ *
+ * merchant 目前没有完整的资源级数据隔离,不能访问全局后台 API；
+ * 分站主使用 /api/subsite-console/* 自助接口。
  */
 class RequireAdminRole
 {
@@ -21,7 +22,7 @@ class RequireAdminRole
             return response()->json(['message' => '未认证'], 401);
         }
 
-        if (! $user->hasRole(['super_admin', 'merchant'])) {
+        if ((int) $user->status !== 1 || ! $user->hasRole('super_admin')) {
             return response()->json(['message' => '无权限访问管理接口'], 403);
         }
 

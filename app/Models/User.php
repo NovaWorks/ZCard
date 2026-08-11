@@ -26,12 +26,11 @@ class User extends Authenticatable implements FilamentUser
     use HasApiTokens, HasFactory, HasRoles, Notifiable, SoftDeletes;
 
     /**
-     * 顾客（user 角色）不能进 /admin 后台；
-     * super_admin / merchant 可进（spec §7.4）。
+     * 仅超级管理员可进入全局后台；分站主使用独立自助控制台。
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->hasRole(['super_admin', 'merchant']);
+        return (int) $this->status === 1 && $this->hasRole('super_admin');
     }
 
     protected function casts(): array

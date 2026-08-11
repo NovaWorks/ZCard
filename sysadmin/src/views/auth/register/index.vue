@@ -100,7 +100,7 @@
 
   const USERNAME_MIN_LENGTH = 3
   const USERNAME_MAX_LENGTH = 20
-  const PASSWORD_MIN_LENGTH = 6
+  const PASSWORD_MIN_LENGTH = 8
   const REDIRECT_DELAY = 1000
 
   const { t, locale } = useI18n()

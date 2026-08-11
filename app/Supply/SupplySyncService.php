@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
  * 全量/增量同步上游商品进本地 products 表,含售价保护(再次同步不动 price)。
  *
  * 售价保护:运营在后台手动设置的 price 由运营所有;再次同步时仅更新上游拥有的字段
- * (factory_price / name / description / cover / 分类 / 上游同步时间 / hide),
+ * (factory_price / description / cover / 分类 / 上游同步时间 / hide),
  * 永不覆盖 price。首次同步 price 为空时按 default_pricing_mode 计算初始售价。
  */
 class SupplySyncService
@@ -60,7 +60,7 @@ class SupplySyncService
             // 例外1:price<=0 是导入定价失败的脏数据,重算。
             // 例外2:勾选导入显式传了 pricing → 按本次所选策略重新定价。
             $update = [
-                'name' => $this->truncate($dto->name, 'name'),
+                // 商品名称由本地运营所有，避免定时同步覆盖人工命名。
                 'description' => $this->normalizeDescription($source, $dto->description),
                 'cover' => $this->normalizeCover($source, $dto->cover),
                 'images' => $this->normalizeImages($source, $dto->images, $dto->cover),

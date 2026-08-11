@@ -23,6 +23,9 @@ class Card extends Model
         'price', 'number_hash', // 靓号自选:单价(分) / 靓号第一段 sha256(全局唯一)
     ];
 
+    /** 密文/明文卡密与去重哈希默认永不进入模型 JSON。 */
+    protected $hidden = ['content', 'content_hash'];
+
     protected function casts(): array
     {
         return [

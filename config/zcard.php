@@ -3,6 +3,8 @@
 // ZCard 应用配置。功能开关（Open Core）预留，Phase 0 不消费，后续 Phase 3+ 启用。
 
 return [
+    // 模拟支付必须在 local 环境且显式开启；生产环境始终不可用。
+    'allow_mock_payment' => (bool) env('ZCARD_ALLOW_MOCK_PAYMENT', false),
 
     // 功能开关：商业版功能默认 false（开源版）。
     'features' => [

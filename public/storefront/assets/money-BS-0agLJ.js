@@ -1,1 +1,0 @@
-function e(e,t){if(!t)return(e/100).toFixed(2);let n=10**t.decimal_places,r=e<0,i=(Math.abs(e)/n).toFixed(t.decimal_places),a=t.symbol_position===`before`?`${t.symbol}${i}`:`${i}${t.symbol}`;return r?`-${a}`:a}export{e as t};

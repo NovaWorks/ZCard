@@ -3,11 +3,12 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Support\AppHelper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
 
@@ -29,8 +30,8 @@ class UpdateController extends Controller
         $repo = config('zcard.update.repo', 'NovaWorks/ZCard');
         // 顶栏版本徽章依赖此接口,必须返回最新版本号:先清缓存再读,
         // 避免更新后 60 秒内仍显示旧版本(用户感知"更新了但版本号没变")。
-        \App\Support\AppHelper::clearVersionCache();
-        $currentVersion = \App\Support\AppHelper::version();
+        AppHelper::clearVersionCache();
+        $currentVersion = AppHelper::version();
 
         try {
             // 先尝试 /releases/latest(只返回正式版,不含 prerelease)
@@ -57,7 +58,7 @@ class UpdateController extends Controller
                     ]);
                 }
             } elseif (! $resp->successful()) {
-                return response()->json(['message' => '无法连接 GitHub(HTTP ' . $resp->status() . ')'], 502);
+                return response()->json(['message' => '无法连接 GitHub(HTTP '.$resp->status().')'], 502);
             } else {
                 $release = $resp->json();
             }
@@ -74,7 +75,7 @@ class UpdateController extends Controller
                 'published_at' => $release['published_at'] ?? '',
             ]);
         } catch (\Throwable $e) {
-            return response()->json(['message' => '检查更新失败: ' . $e->getMessage()], 500);
+            return response()->json(['message' => '检查更新失败: '.$e->getMessage()], 500);
         }
     }
 
@@ -110,21 +111,23 @@ class UpdateController extends Controller
      */
     public function update(Request $request): JsonResponse
     {
-        $currentVersion = \App\Support\AppHelper::version();
+        $currentVersion = AppHelper::version();
 
-        // 防止并发更新
-        $lockFile = storage_path('app/update.lock');
-        if (file_exists($lockFile) && (time() - filemtime($lockFile) < 600)) {
-            return response()->json(['message' => '已有更新正在进行中,请等待完成'], 409);
+        // 原子锁防止并发更新/回退；文件仅供前端展示运行状态。
+        $operationLock = Cache::lock('zcard:system-update', 600);
+        if (! $operationLock->get()) {
+            return response()->json(['message' => '已有更新或回退正在进行中,请等待完成'], 409);
         }
+
+        $lockFile = storage_path('app/update.lock');
         file_put_contents($lockFile, json_encode(['started_at' => now()->toIso8601String()]));
 
         // 记录日志
         $logFile = storage_path('app/update.log');
-        file_put_contents($logFile, "=== 更新开始 " . now() . " ===\n");
+        file_put_contents($logFile, '=== 更新开始 '.now()." ===\n");
 
         try {
-            $this->log($logFile, '当前版本: ' . $currentVersion);
+            $this->log($logFile, '当前版本: '.$currentVersion);
 
             // Step 1: 维护模式(不指定 render 视图,避免找不到组件)
             $this->log($logFile, '进入维护模式...');
@@ -140,7 +143,7 @@ class UpdateController extends Controller
             $this->ensureHttpsRemote();
             $this->preserveUserFiles();
             // fetch 远程 → reset --hard origin/main(工作区已被 preserveUserFiles 清理干净)
-            $output = $this->shell('cd ' . base_path() . ' && ' . $this->gitCmd('fetch origin main') . ' 2>&1 && ' . $this->gitCmd('reset --hard origin/main') . ' 2>&1');
+            $output = $this->shell('cd '.base_path().' && '.$this->gitCmd('fetch origin main').' 2>&1 && '.$this->gitCmd('reset --hard origin/main').' 2>&1');
             $this->log($logFile, $output);
 
             // 检测致命错误(网络问题、文件权限等),必须在 restoreUserFiles 之前:
@@ -148,18 +151,18 @@ class UpdateController extends Controller
             if (str_contains($output, 'insufficient permission') && str_contains($output, '.git/objects')) {
                 throw new \RuntimeException(
                     'Git 目录权限不足: PHP 进程无权写入 .git/objects(宝塔环境 .git 属主可能不是 www)。'
-                    . '请在服务器 SSH 执行(需 root): chown -R www:www ' . base_path()
-                    . ' 然后重新点击在线更新。'
+                    .'请在服务器 SSH 执行(需 root): chown -R www:www '.base_path()
+                    .' 然后重新点击在线更新。'
                 );
             }
             if (str_contains($output, 'fatal:') || str_contains($output, 'Could not resolve host') || str_contains($output, 'Permission denied')) {
-                throw new \RuntimeException('Git pull 失败: ' . $output);
+                throw new \RuntimeException('Git pull 失败: '.$output);
             }
             $this->restoreUserFiles();
 
             // Step 4: composer install(设置 COMPOSER_HOME 避免容器无 HOME)
             $this->log($logFile, '安装依赖...');
-            $output = $this->shell('cd ' . base_path() . ' && COMPOSER_HOME=/tmp/composer composer install --no-dev --optimize-autoloader --no-interaction 2>&1');
+            $output = $this->shell('cd '.base_path().' && COMPOSER_HOME=/tmp/composer composer install --no-dev --optimize-autoloader --no-interaction 2>&1');
             $this->log($logFile, $output);
 
             // Step 5: 数据库迁移
@@ -182,7 +185,7 @@ class UpdateController extends Controller
             try {
                 Artisan::call('route:cache');
             } catch (\Throwable $e) {
-                $this->log($logFile, 'route:cache 跳过(存在闭包路由,路由实时加载): ' . $e->getMessage());
+                $this->log($logFile, 'route:cache 跳过(存在闭包路由,路由实时加载): '.$e->getMessage());
             }
 
             // Step 7: 前端构建(有 pnpm 用 pnpm,否则跳过——编译产物已在仓库)
@@ -194,16 +197,13 @@ class UpdateController extends Controller
             $this->verifyFrontendAssets($logFile, 'storefront');
 
             // Step 8: 新版本号(清缓存确保读到 git pull 后的新 tag)
-            \App\Support\AppHelper::clearVersionCache();
-            $newVersion = \App\Support\AppHelper::version();
-            $this->log($logFile, '新版本: ' . $newVersion);
+            AppHelper::clearVersionCache();
+            $newVersion = AppHelper::version();
+            $this->log($logFile, '新版本: '.$newVersion);
 
             // Step 9: 退出维护模式
             Artisan::call('up');
             $this->log($logFile, '退出维护模式,更新完成!');
-
-            // 清理锁
-            @unlink($lockFile);
 
             return response()->json([
                 'message' => '更新成功',
@@ -214,18 +214,26 @@ class UpdateController extends Controller
 
         } catch (\Throwable $e) {
             // 失败:记录错误,退出维护模式,清缓存,保留日志
-            $this->log($logFile, '更新失败: ' . $e->getMessage());
+            $this->log($logFile, '更新失败: '.$e->getMessage());
             $this->log($logFile, '清理缓存 + 退出维护模式...');
             $this->clearBootstrapCache();
-            try { Artisan::call('package:discover'); } catch (\Throwable $ignore) {}
-            try { Artisan::call('up'); } catch (\Throwable $ignore) {}
-            @unlink($lockFile);
+            try {
+                Artisan::call('package:discover');
+            } catch (\Throwable $ignore) {
+            }
+            try {
+                Artisan::call('up');
+            } catch (\Throwable $ignore) {
+            }
 
             return response()->json([
-                'message' => '更新失败: ' . $e->getMessage(),
+                'message' => '更新失败: '.$e->getMessage(),
                 'log' => file_get_contents($logFile),
                 'can_rollback' => true,
             ], 500);
+        } finally {
+            @unlink($lockFile);
+            $operationLock->release();
         }
     }
 
@@ -235,13 +243,16 @@ class UpdateController extends Controller
      */
     public function rollback(): JsonResponse
     {
-        $lockFile = storage_path('app/update.lock');
-        if (file_exists($lockFile) && (time() - filemtime($lockFile) < 600)) {
-            return response()->json(['message' => '更新正在进行中,无法回退'], 409);
+        $operationLock = Cache::lock('zcard:system-update', 600);
+        if (! $operationLock->get()) {
+            return response()->json(['message' => '已有更新或回退正在进行中,无法回退'], 409);
         }
 
+        $lockFile = storage_path('app/update.lock');
+        file_put_contents($lockFile, json_encode(['started_at' => now()->toIso8601String(), 'operation' => 'rollback']));
+
         $logFile = storage_path('app/update.log');
-        file_put_contents($logFile, "=== 回退开始 " . now() . " ===\n");
+        file_put_contents($logFile, '=== 回退开始 '.now()." ===\n");
 
         try {
             // Step 1: 维护模式(不指定 render 视图)
@@ -253,18 +264,18 @@ class UpdateController extends Controller
             $this->ensureGitSafeDirectory();
             $this->ensureHttpsRemote();
             $this->preserveUserFiles();
-            $output = $this->shell('cd ' . base_path() . ' && ' . $this->gitCmd('reset --hard HEAD~1') . ' 2>&1');
+            $output = $this->shell('cd '.base_path().' && '.$this->gitCmd('reset --hard HEAD~1').' 2>&1');
             $this->log($logFile, $output);
 
             // reset 失败要在 restoreUserFiles 之前检测,避免恢复 .env 时的权限异常掩盖真正的失败原因
             if (str_contains($output, 'fatal:') || str_contains($output, 'Permission denied')) {
-                throw new \RuntimeException('Git 回退失败: ' . $output);
+                throw new \RuntimeException('Git 回退失败: '.$output);
             }
             $this->restoreUserFiles();
 
             // Step 3: 安装依赖(可能需要降级)
             $this->log($logFile, '安装依赖...');
-            $output = $this->shell('cd ' . base_path() . ' && COMPOSER_HOME=/tmp/composer composer install --no-dev --optimize-autoloader --no-interaction 2>&1');
+            $output = $this->shell('cd '.base_path().' && COMPOSER_HOME=/tmp/composer composer install --no-dev --optimize-autoloader --no-interaction 2>&1');
             $this->log($logFile, $output);
 
             // Step 4: 数据库回滚迁移
@@ -289,13 +300,13 @@ class UpdateController extends Controller
             try {
                 Artisan::call('route:cache');
             } catch (\Throwable $e) {
-                $this->log($logFile, 'route:cache 跳过(存在闭包路由,路由实时加载): ' . $e->getMessage());
+                $this->log($logFile, 'route:cache 跳过(存在闭包路由,路由实时加载): '.$e->getMessage());
             }
             Artisan::call('up');
 
             // 清版本缓存确保读到 git reset 后的 tag
-            \App\Support\AppHelper::clearVersionCache();
-            $version = \App\Support\AppHelper::version();
+            AppHelper::clearVersionCache();
+            $version = AppHelper::version();
             $this->log($logFile, "回退完成! 当前版本: {$version}");
 
             return response()->json([
@@ -305,15 +316,24 @@ class UpdateController extends Controller
             ]);
 
         } catch (\Throwable $e) {
-            $this->log($logFile, '回退失败: ' . $e->getMessage());
+            $this->log($logFile, '回退失败: '.$e->getMessage());
             $this->clearBootstrapCache();
-            try { Artisan::call('package:discover'); } catch (\Throwable $ignore) {}
-            try { Artisan::call('up'); } catch (\Throwable $ignore) {}
+            try {
+                Artisan::call('package:discover');
+            } catch (\Throwable $ignore) {
+            }
+            try {
+                Artisan::call('up');
+            } catch (\Throwable $ignore) {
+            }
 
             return response()->json([
-                'message' => '回退失败: ' . $e->getMessage(),
+                'message' => '回退失败: '.$e->getMessage(),
                 'log' => file_get_contents($logFile),
             ], 500);
+        } finally {
+            @unlink($lockFile);
+            $operationLock->release();
         }
     }
 
@@ -335,7 +355,7 @@ class UpdateController extends Controller
     {
         $message = trim($message);
         if ($message !== '') {
-            file_put_contents($file, '[' . now()->format('H:i:s') . '] ' . $message . "\n", FILE_APPEND);
+            file_put_contents($file, '['.now()->format('H:i:s').'] '.$message."\n", FILE_APPEND);
         }
     }
 
@@ -399,7 +419,7 @@ class UpdateController extends Controller
         // 2. 自动检测所有本地有改动的 git 跟踪文件,备份用户版本
         //    覆盖用户改过 config/app.php、config/cache.php 等任意配置的场景
         try {
-            $status = $this->shell('cd ' . base_path() . ' && ' . $this->gitCmd('status --porcelain') . ' 2>/dev/null');
+            $status = $this->shell('cd '.base_path().' && '.$this->gitCmd('status --porcelain').' 2>/dev/null');
             $dirtyFiles = $this->parseDirtyFiles($status);
             foreach ($dirtyFiles as $relativePath) {
                 $fullPath = base_path($relativePath);
@@ -413,7 +433,7 @@ class UpdateController extends Controller
             }
             // 3. 强制清理工作区:reset 已跟踪改动 + clean 未跟踪文件
             //    确保工作区与 HEAD 完全一致,后续 fetch+reset 不被任何本地状态阻塞
-            $this->shell('cd ' . base_path() . ' && ' . $this->gitCmd('reset --hard HEAD') . ' 2>/dev/null');
+            $this->shell('cd '.base_path().' && '.$this->gitCmd('reset --hard HEAD').' 2>/dev/null');
             $this->cleanUntracked();
         } catch (\Throwable) {
             // 无法检测本地改动(如 shell 被禁用),回退到仅保护固定清单
@@ -432,7 +452,7 @@ class UpdateController extends Controller
     {
         try {
             // -f 强制, -d 含目录; 不加 -x 以尊重 .gitignore
-            $this->shell('cd ' . base_path() . ' && ' . $this->gitCmd('clean -fd') . ' 2>&1');
+            $this->shell('cd '.base_path().' && '.$this->gitCmd('clean -fd').' 2>&1');
         } catch (\Throwable) {
             // 清理失败不中断
         }
@@ -476,7 +496,7 @@ class UpdateController extends Controller
     private function backupPath(string $relativePath): string
     {
         $dir = storage_path('app/update_backups');
-        $full = $dir . '/' . $relativePath;
+        $full = $dir.'/'.$relativePath;
         $parent = dirname($full);
         if (! is_dir($parent)) {
             @mkdir($parent, 0775, true);
@@ -502,7 +522,7 @@ class UpdateController extends Controller
                 continue;
             }
             // 备份内的相对路径 = 原始项目相对路径
-            $relativePath = substr($file->getPathname(), strlen($dir . '/'));
+            $relativePath = substr($file->getPathname(), strlen($dir.'/'));
             $fullPath = base_path($relativePath);
             // 确保目标目录存在(git pull 可能删除了旧的空目录)
             $parent = dirname($fullPath);
@@ -533,7 +553,7 @@ class UpdateController extends Controller
         if (! is_dir($dir)) {
             return;
         }
-        foreach (glob($dir . '/*') as $item) {
+        foreach (glob($dir.'/*') as $item) {
             if (is_dir($item)) {
                 $this->removeEmptyDirs($item);
             }
@@ -559,7 +579,7 @@ class UpdateController extends Controller
      */
     private function gitCmd(string $command): string
     {
-        return 'git -c safe.directory=' . escapeshellarg(base_path()) . ' ' . $command;
+        return 'git -c safe.directory='.escapeshellarg(base_path()).' '.$command;
     }
 
     /**
@@ -576,15 +596,15 @@ class UpdateController extends Controller
         try {
             $base = base_path();
             // 1. 加入 safe.directory(解决 dubious ownership;PHP-FPM HOME 不可写时静默失败,由内联 -c 兜底)
-            $this->shell('git config --global --add safe.directory ' . escapeshellarg($base) . ' 2>/dev/null');
+            $this->shell('git config --global --add safe.directory '.escapeshellarg($base).' 2>/dev/null');
 
             // 2. 修复 .git 目录权限(解决 insufficient permission)
             //    宝塔: .git 属主可能是 root, PHP-FPM 以 www 运行 → chmod 放开读写
-            $this->shell('chmod -R u+rwX,go+rwX ' . escapeshellarg($base . '/.git') . ' 2>/dev/null');
+            $this->shell('chmod -R u+rwX,go+rwX '.escapeshellarg($base.'/.git').' 2>/dev/null');
 
             // 3. 如果当前用户不是目录属主(如 www 运行但属主是 root),
             //    尝试 chown(可能需要 sudo/root,失败则跳过,chmod 通常已够用)
-            $this->shell('chown -R $(id -u):$(id -g) ' . escapeshellarg($base . '/.git') . ' 2>/dev/null');
+            $this->shell('chown -R $(id -u):$(id -g) '.escapeshellarg($base.'/.git').' 2>/dev/null');
         } catch (\Throwable $e) {
             // 函数被禁用或权限不足 → 忽略,git 操作会自行报错
         }
@@ -603,11 +623,11 @@ class UpdateController extends Controller
     private function ensureHttpsRemote(): void
     {
         try {
-            $remote = trim($this->shell($this->gitCmd('remote get-url origin') . ' 2>/dev/null'));
+            $remote = trim($this->shell($this->gitCmd('remote get-url origin').' 2>/dev/null'));
             // 如果是 SSH(git@github.com:owner/repo.git),转 HTTPS
             if (preg_match('#git@github\.com:(.+)/(.+)\.git#', $remote, $m)) {
                 $https = "https://github.com/{$m[1]}/{$m[2]}.git";
-                $this->shell($this->gitCmd('remote set-url origin ' . escapeshellarg($https)));
+                $this->shell($this->gitCmd('remote set-url origin '.escapeshellarg($https)));
             }
         } catch (\Throwable $e) {
             // 函数被禁用时无法检测 remote,不中断(后续 git pull 会自行报错)
@@ -623,7 +643,7 @@ class UpdateController extends Controller
     {
         $cacheDir = base_path('bootstrap/cache');
         foreach (['config.php', 'routes-v7.php', 'packages.php', 'services.php'] as $file) {
-            $path = $cacheDir . '/' . $file;
+            $path = $cacheDir.'/'.$file;
             if (file_exists($path)) {
                 @unlink($path);
             }
@@ -635,7 +655,7 @@ class UpdateController extends Controller
      */
     private function buildFrontend(string $logFile, string $dir): void
     {
-        $path = base_path() . '/' . $dir;
+        $path = base_path().'/'.$dir;
         $this->log($logFile, "构建前端({$dir})...");
 
         try {
@@ -644,7 +664,7 @@ class UpdateController extends Controller
             if ($pnpm !== '') {
                 $output = $this->shell("cd {$path} && pnpm install --frozen-lockfile 2>&1 && pnpm run build 2>&1");
                 if (str_contains($output, 'error') || str_contains($output, 'ERR')) {
-                    $this->log($logFile, "{$dir} 构建警告(使用仓库已有编译产物): " . substr($output, 0, 200));
+                    $this->log($logFile, "{$dir} 构建警告(使用仓库已有编译产物): ".substr($output, 0, 200));
                 } else {
                     $this->log($logFile, "{$dir} 构建完成");
                 }
@@ -681,6 +701,7 @@ class UpdateController extends Controller
 
         if (! file_exists($indexHtml)) {
             $this->log($logFile, "{$dir} 校验跳过(无 index.html)");
+
             return;
         }
 
@@ -695,7 +716,7 @@ class UpdateController extends Controller
             // assetUrl 可能是 /admin/assets/xxx.js 或 assets/xxx.js
             $relativePath = $assetUrl;
             // 去掉开头的 /{dir}/ 前缀,得到 public/{dir}/ 下的相对路径
-            $relativePath = preg_replace('#^/?' . preg_quote($dir, '#') . '/#', '', $relativePath);
+            $relativePath = preg_replace('#^/?'.preg_quote($dir, '#').'/#', '', $relativePath);
             $fullPath = "{$publicDir}/{$relativePath}";
 
             if (! file_exists($fullPath)) {
@@ -704,23 +725,24 @@ class UpdateController extends Controller
         }
 
         if (empty($missing)) {
-            $this->log($logFile, "{$dir} 产物校验通过(" . count($assetUrls) . ' 个文件)');
+            $this->log($logFile, "{$dir} 产物校验通过(".count($assetUrls).' 个文件)');
+
             return;
         }
 
         // 校验失败:index.html 引用的文件缺失,强制从 git 同步整个目录
-        $this->log($logFile, "{$dir} 产物校验失败! 缺失 " . count($missing) . ' 个文件: ' . implode(', ', array_slice($missing, 0, 5)));
+        $this->log($logFile, "{$dir} 产物校验失败! 缺失 ".count($missing).' 个文件: '.implode(', ', array_slice($missing, 0, 5)));
         $this->log($logFile, "{$dir} 强制从 git 同步 public/{$dir}/ ...");
 
         try {
             // git checkout HEAD -- public/{dir}/ 强制恢复整个目录
-            $output = $this->shell('cd ' . base_path() . ' && ' . $this->gitCmd('checkout HEAD -- public/' . escapeshellarg($dir) . '/') . ' 2>&1');
-            $this->log($logFile, "{$dir} git 同步完成: " . trim($output));
+            $output = $this->shell('cd '.base_path().' && '.$this->gitCmd('checkout HEAD -- public/'.escapeshellarg($dir).'/').' 2>&1');
+            $this->log($logFile, "{$dir} git 同步完成: ".trim($output));
 
             // 再次校验
             $stillMissing = [];
             foreach ($missing as $assetUrl) {
-                $relativePath = preg_replace('#^/?' . preg_quote($dir, '#') . '/#', '', $assetUrl);
+                $relativePath = preg_replace('#^/?'.preg_quote($dir, '#').'/#', '', $assetUrl);
                 if (! file_exists("{$publicDir}/{$relativePath}")) {
                     $stillMissing[] = $assetUrl;
                 }
@@ -729,10 +751,10 @@ class UpdateController extends Controller
             if (empty($stillMissing)) {
                 $this->log($logFile, "{$dir} 产物校验修复成功!");
             } else {
-                $this->log($logFile, "{$dir} 产物校验仍有缺失(可能 HEAD 版本本身缺文件): " . implode(', ', array_slice($stillMissing, 0, 3)));
+                $this->log($logFile, "{$dir} 产物校验仍有缺失(可能 HEAD 版本本身缺文件): ".implode(', ', array_slice($stillMissing, 0, 3)));
             }
         } catch (\Throwable $e) {
-            $this->log($logFile, "{$dir} git 同步失败: " . $e->getMessage());
+            $this->log($logFile, "{$dir} git 同步失败: ".$e->getMessage());
         }
     }
 }

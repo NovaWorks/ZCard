@@ -170,15 +170,16 @@ async function handleSavePassword() {
     errMsg.value = t('userCenter.confirmPassword') + ' ✗'
     return
   }
-  if (passwordForm.value.password.length < 6) {
-    errMsg.value = '≥ 6'
+  if (passwordForm.value.password.length < 8) {
+    errMsg.value = '≥ 8'
     return
   }
   savingPassword.value = true
   try {
     await updatePassword(passwordForm.value)
     passwordForm.value = { current_password: '', password: '', password_confirmation: '' }
-    okMsg.value = t('userCenter.passwordChanged')
+    auth.clearAuth()
+    await router.push('/login')
   } catch (e: any) {
     errMsg.value = e?.response?.data?.message || e?.message || 'Error'
   } finally {
