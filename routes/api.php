@@ -47,6 +47,7 @@ use App\Http\Controllers\Api\Supply\SupplyOrderController;
 use App\Http\Controllers\Api\Supply\SupplyProductController;
 use App\Http\Controllers\Api\WithdrawalController;
 use App\Http\Controllers\InstallController;
+use App\Support\CaptchaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -294,7 +295,7 @@ Route::get('/captcha/config', [CaptchaController::class, 'config'])->name('api.c
 Route::post('/coupons/validate', [CouponController::class, 'validateCode'])->name('api.coupons.validate');
 
 Route::get('/captcha/{scene?}', function (Request $request, $scene = 'default') {
-    return response()->json(['src' => captcha_src($scene)]);
+    return response()->json(CaptchaService::create($scene));
 })->name('api.captcha.src');
 
 // 卡密导入与库存(管理类,需 Sanctum token)— API-first:Filament 和 API 共用 Service 层

@@ -23,6 +23,7 @@ class OrderController extends Controller
             'contact' => 'required|string|max:150',
             'password' => 'nullable|string|max:50',
             'captcha' => 'nullable|string',
+            'captcha_key' => 'nullable|string|max:255',
             'coupon_code' => 'nullable|string|max:32',
             'extra' => 'nullable|array',
             'display_currency' => 'nullable|string|size:3',
@@ -40,7 +41,7 @@ class OrderController extends Controller
 
         // 下单验证码校验
         if (CaptchaService::isEnabled('trade')) {
-            if (! CaptchaService::verify('trade', $data['captcha'] ?? null)) {
+            if (! CaptchaService::verify('trade', $data['captcha'] ?? null, $data['captcha_key'] ?? null)) {
                 return response()->json(['message' => __('messages.captcha_error')], 422);
             }
         }
@@ -105,6 +106,7 @@ class OrderController extends Controller
             'contact' => 'required|string|max:150',
             'password' => 'nullable|string|max:50',
             'captcha' => 'nullable|string',
+            'captcha_key' => 'nullable|string|max:255',
             'coupon_code' => 'nullable|string|max:32',
             'extra' => 'nullable|array',
             'display_currency' => 'nullable|string|size:3',
@@ -117,7 +119,7 @@ class OrderController extends Controller
         }
 
         if (CaptchaService::isEnabled('trade')) {
-            if (! CaptchaService::verify('trade', $data['captcha'] ?? null)) {
+            if (! CaptchaService::verify('trade', $data['captcha'] ?? null, $data['captcha_key'] ?? null)) {
                 return response()->json(['message' => __('messages.captcha_error')], 422);
             }
         }

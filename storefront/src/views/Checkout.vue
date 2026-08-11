@@ -72,13 +72,22 @@ const submitting = ref(false)
 // 下单验证码
 const needCaptcha = computed(() => !!settings.config?.trade_captcha)
 const captchaSrc = ref('')
+const captchaKey = ref('')
+let captchaRequestId = 0
 const refreshCaptcha = async () => {
+  const requestId = ++captchaRequestId
+  captcha.value = ''
+  captchaKey.value = ''
   try {
     const res = await fetch(`/api/captcha/trade?${Date.now()}`)
     const data = await res.json()
+    if (requestId !== captchaRequestId) return
     captchaSrc.value = data.src || ''
+    captchaKey.value = data.key || ''
   } catch {
+    if (requestId !== captchaRequestId) return
     captchaSrc.value = ''
+    captchaKey.value = ''
   }
 }
 
@@ -102,21 +111,23 @@ onMounted(async () => {
   await settings.load()
   void prefs.load()
   await loadChannels()
-  loading.value = false
-  if (needCaptcha.value) refreshCaptcha()
 
   if (isCartMode.value) {
     if (!cart.items.length) {
       // 明确请求购物车模式但购物车为空 → 回退单品模式(URL 有 product)
       const slug = route.query.product as string
       if (slug) await loadSingle(slug)
-      return
+    } else {
+      items.value = cart.items.map((i) => ({ ...i }))
     }
-    items.value = cart.items.map((i) => ({ ...i }))
-    return
+  } else {
+    const slug = route.query.product as string
+    if (slug) await loadSingle(slug)
   }
-  const slug = route.query.product as string
-  if (slug) await loadSingle(slug)
+
+  // 验证码最后生成并等待完成,避免首屏其他 API 请求覆盖首次 Session。
+  if (needCaptcha.value) await refreshCaptcha()
+  loading.value = false
 })
 
 async function loadSingle(slug: string) {
@@ -335,6 +346,7 @@ async function doSubmit() {
         contact: contact.value,
         password: password.value || undefined,
         captcha: needCaptcha.value ? captcha.value : undefined,
+        captcha_key: needCaptcha.value ? captchaKey.value : undefined,
         coupon_code: couponCode.value.trim() || undefined,
         extra: undefined,
       })
@@ -357,6 +369,7 @@ async function doSubmit() {
         contact: contact.value,
         password: password.value || undefined,
         captcha: needCaptcha.value ? captcha.value : undefined,
+        captcha_key: needCaptcha.value ? captchaKey.value : undefined,
         coupon_code: couponCode.value.trim() || undefined,
         extra: { ...controlValues.value },
       } as any)

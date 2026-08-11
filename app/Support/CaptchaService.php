@@ -11,6 +11,21 @@ use Mews\Captcha\Facades\Captcha;
 class CaptchaService
 {
     /**
+     * 生成可用于 API 无状态校验的验证码。
+     *
+     * key 与答案按 mews/captcha 约定存入缓存,提交时无需依赖浏览器 Session。
+     */
+    public static function create(string $scene = 'default'): array
+    {
+        $captcha = Captcha::create($scene, true);
+
+        return [
+            'key' => (string) ($captcha['key'] ?? ''),
+            'src' => (string) ($captcha['img'] ?? ''),
+        ];
+    }
+
+    /**
      * 生成验证码图片(返回 base64 或直接输出)。
      * mews/captcha 的 captcha_src 生成 URL,captcha_img 生成 img 标签。
      */
@@ -23,14 +38,19 @@ class CaptchaService
      * 校验验证码。
      * mews/captcha 的校验通过 Request 自动完成,这里做手动校验。
      */
-    public static function verify(string $scene, ?string $code): bool
+    public static function verify(string $scene, ?string $code, ?string $key = null): bool
     {
         if (! $code) {
             return false;
         }
 
-        // mews/captcha 把验证码存入 session,key 格式 captcha.{scene}
-        return captcha_check($code, $scene);
+        // 新版前台使用一次性 key 做无状态校验,避免首屏并发请求覆盖 Session Cookie。
+        if ($key) {
+            return captcha_api_check($code, $key, $scene);
+        }
+
+        // 兼容尚未升级的客户端:旧版仍按 Session 校验。
+        return captcha_check($code);
     }
 
     /**
