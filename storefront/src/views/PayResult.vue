@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { queryOrders, getMyOrders, type OrderDetail } from '@/api/orders'
@@ -19,7 +19,7 @@ const loading = ref(true)
 const order = ref<OrderDetail | null>(null)
 const paid = ref(false)
 
-// 二维码渲染(canvas)
+// 二维码渲染(canvas):等 v-else-if 分支挂载完成(nextTick)后再绘制
 const qrCanvas = ref<HTMLCanvasElement | null>(null)
 async function renderQrcode() {
   if (!qrcodeContent.value || !qrCanvas.value) return
@@ -28,6 +28,12 @@ async function renderQrcode() {
     await QRCode.toCanvas(qrCanvas.value, qrcodeContent.value, { width: 240, margin: 2 })
   } catch { /* 二维码渲染失败不阻塞页面 */ }
 }
+watch(qrcodeContent, async (v) => {
+  if (v) {
+    await nextTick()
+    renderQrcode()
+  }
+}, { immediate: true })
 
 /**
  * 查询订单状态。
@@ -61,7 +67,6 @@ onMounted(async () => {
   // 二维码场景:渲染二维码(当面付扫码),同时有订单号则轮询支付状态
   if (qrcodeContent.value) {
     loading.value = false
-    renderQrcode()
   }
   // 没有订单号(部分第三方回跳不带),只能提示等待
   if (!orderNo.value) {
