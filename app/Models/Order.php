@@ -13,8 +13,8 @@ class Order extends Model implements Payable
         'order_no', 'merchant_id', 'user_id', 'product_id', 'quantity',
         'amount', 'base_currency', 'display_currency', 'exchange_rate', 'amount_display', 'coupon_code', 'discount_amount',
         'cost', 'sku_name', 'payment_channel',
-        'status', 'delivery_status', 'paid_at', 'closed_at',
-        'contact', 'create_device', 'create_ip', 'extra',
+        'status', 'delivery_status', 'fulfillment_type_snapshot', 'paid_at', 'closed_at',
+        'contact', 'create_device', 'create_ip', 'extra', 'instructions_snapshot', 'delivery_message_snapshot',
         'subsite_id', 'subsite_domain', 'subsite_profit',
         // 供货上游来源(Phase 1)
         'source', 'upstream_order_id', 'upstream_source_id',

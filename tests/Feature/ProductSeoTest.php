@@ -50,6 +50,7 @@ class ProductSeoTest extends TestCase
             'merchant_id' => $m->id, 'category_id' => $c->id, 'name' => '美区Gmail带2FA',
             'slug' => 'gmail-2fa-'.uniqid(), 'price' => 1000, 'factory_price' => 600,
             'description' => '<p>美区谷歌邮箱,带二次验证,稳定可靠。</p>',
+            'leave_message' => '<p>付款后才能看到的教程</p>',
             'stock_type' => 'card', 'delivery_mode' => 'status', 'status' => true, 'sort' => 0,
         ]);
     }
@@ -74,6 +75,24 @@ class ProductSeoTest extends TestCase
         $this->assertSame('美区谷歌邮箱账号,带二次验证。', $fresh->seo_description);
     }
 
+    public function test_admin_can_explicitly_clear_public_detail_and_paid_instructions(): void
+    {
+        $this->seedBase();
+        $product = $this->makeProduct();
+
+        $this->withHeaders($this->adminHeaders())
+            ->putJson('/api/admin/products/'.$product->id, [
+                'name' => $product->name,
+                'description' => '',
+                'leave_message' => '',
+            ])
+            ->assertOk();
+
+        $fresh = $product->fresh();
+        $this->assertSame('', $fresh->description);
+        $this->assertSame('', $fresh->leave_message);
+    }
+
     public function test_storefront_detail_returns_auto_composed_seo(): void
     {
         $this->seedBase();
@@ -89,6 +108,8 @@ class ProductSeoTest extends TestCase
         $this->assertStringContainsString($p->name, $seo['keywords']);
         // 描述自动取商品描述摘要(去 HTML)
         $this->assertStringContainsString('美区谷歌邮箱', $seo['description']);
+        $resp->assertJsonMissingPath('leave_message')
+            ->assertJsonMissingPath('instructions');
     }
 
     public function test_storefront_detail_uses_custom_seo_when_set(): void

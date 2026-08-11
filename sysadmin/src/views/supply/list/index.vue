@@ -208,6 +208,21 @@
               : t('zcard.supply.stockModeSyncedTip')
           }}</div>
         </ElFormItem>
+        <ElFormItem :label="t('zcard.supply.syncPublicDescription')">
+          <ElSwitch v-model="formData.settings.sync_public_description" />
+          <div class="field-help">{{ t('zcard.supply.syncPublicDescriptionTip') }}</div>
+        </ElFormItem>
+        <ElFormItem
+          v-if="formData.driver === 'dujiao_next'"
+          :label="t('zcard.supply.contentLocale')"
+        >
+          <ElSelect v-model="formData.settings.content_locale" style="width: 100%">
+            <ElOption label="简体中文 (zh-CN)" value="zh-CN" />
+            <ElOption label="繁體中文 (zh-TW)" value="zh-TW" />
+            <ElOption label="English (en-US)" value="en-US" />
+          </ElSelect>
+          <div class="field-help">{{ t('zcard.supply.contentLocaleTip') }}</div>
+        </ElFormItem>
         <ElFormItem :label="t('zcard.supply.fulfillmentMode')">
           <ElSelect v-model="formData.settings.fulfillment_mode" style="width: 100%">
             <ElOption :label="t('zcard.supply.fulfillmentSync')" value="sync" />
@@ -607,7 +622,9 @@
     default_pricing_mode: 'percent',
     default_markup_percent: 10,
     default_markup_amount: 0,
-    auto_list: true
+    auto_list: true,
+    sync_public_description: true,
+    content_locale: 'zh-CN'
   })
   const defaultForm = () => ({
     name: '',
@@ -694,7 +711,9 @@
       default_pricing_mode: rs.default_pricing_mode || 'percent',
       default_markup_percent: rs.default_markup_percent ?? 10,
       default_markup_amount: rs.default_markup_amount ?? 0,
-      auto_list: rs.auto_list ?? true
+      auto_list: rs.auto_list ?? true,
+      sync_public_description: rs.sync_public_description ?? true,
+      content_locale: rs.content_locale || 'zh-CN'
     }
     dialogVisible.value = true
     nextTick(() => formRef.value?.clearValidate())

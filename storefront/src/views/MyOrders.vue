@@ -7,6 +7,8 @@ import { createReview } from '@/api/reviews'
 import { useSettingsStore } from '@/stores/settings'
 import { formatMoney } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
+import OrderInstructions from '@/components/OrderInstructions.vue'
+import AppIcon from '@/components/AppIcon.vue'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -15,7 +17,7 @@ const settings = useSettingsStore()
 const list = ref<OrderDetail[]>([])
 const loading = ref(true)
 const err = ref('')
-// 已展开卡密的订单号集合
+// 已展开发货内容的订单号集合
 const expanded = ref<Set<string>>(new Set())
 
 const statusText = (s: string) => t(`common.orderStatus.${s}`)
@@ -26,6 +28,12 @@ const statusClass = (s: string) => ({
   closed: 'bg-gray-100 text-gray-600',
   refunded: 'bg-red-100 text-red-700',
 }[s] || 'bg-gray-100 text-gray-600')
+
+const deliveryPendingText = (o: OrderDetail) => {
+  if (o.fulfillment_type === 'manual') return t('order.deliveryPendingManual')
+  if (o.fulfillment_type === 'upstream') return t('order.deliveryPendingUpstream')
+  return t('order.deliveryPendingGeneric')
+}
 
 const fmtDate = (d?: string) => {
   if (!d) return ''
@@ -127,27 +135,39 @@ onMounted(async () => {
           </span>
         </div>
 
+        <div
+          v-if="o.status === 'paid' && o.delivery_status === 'pending'"
+          role="status"
+          aria-live="polite"
+          class="mt-3 flex items-start gap-2 rounded-field border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700"
+        >
+          <AppIcon name="ri:time-line" class="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{{ deliveryPendingText(o) }}</span>
+        </div>
+
         <!-- 订单号 + 时间 -->
         <div class="flex justify-between items-center mt-3 pt-2 border-t border-border">
           <span class="text-[11px] text-ink-muted">{{ o.order_no }}</span>
           <span class="text-[11px] text-ink-muted">{{ fmtDate(o.paid_at || o.created_at) }}</span>
         </div>
 
-        <!-- 卡密(已支付且有卡) -->
-        <div v-if="o.status === 'paid' && o.cards.length" class="mt-3">
-          <button @click="toggle(o.order_no)"
+        <!-- 已支付发货内容：卡密和付款后使用说明 -->
+        <div v-if="o.status === 'paid' && (o.cards.length || o.instructions)" class="mt-3">
+          <button type="button" :aria-expanded="expanded.has(o.order_no)" :aria-controls="`delivery-${o.order_no}`" @click="toggle(o.order_no)"
             class="text-xs text-primary hover:text-primary-hover flex items-center gap-1 transition">
-            {{ expanded.has(o.order_no) ? t('order.myOrders.cardExpanded') : t('order.myOrders.cardCollapsed', { n: o.cards.length }) }}
-            <span class="text-[10px]">{{ expanded.has(o.order_no) ? '▲' : '▼' }}</span>
+            {{ expanded.has(o.order_no) ? t('order.myOrders.deliveryContentExpanded') : t('order.myOrders.deliveryContentCollapsed') }}
+            <AppIcon name="ri:arrow-down-s-line" class="h-3.5 w-3.5 transition-transform"
+              :class="expanded.has(o.order_no) ? 'rotate-180' : ''" />
           </button>
 
-          <div v-if="expanded.has(o.order_no)" class="mt-2 space-y-2">
+          <div v-if="expanded.has(o.order_no)" :id="`delivery-${o.order_no}`" class="mt-2 space-y-2">
             <div v-for="(card, i) in o.cards" :key="i" class="flex items-center gap-2">
               <code class="flex-1 text-xs bg-surface-subtle p-2 rounded-field break-all">{{ card }}</code>
               <button @click="copy(card)" class="text-primary text-xs shrink-0 hover:text-primary-hover transition">{{ t('common.copy') }}</button>
             </div>
             <button v-if="o.cards.length > 1" @click="copyAll(o.cards)"
               class="text-xs text-ink-soft underline mt-1 hover:text-primary transition">{{ t('common.copyAll') }}</button>
+            <OrderInstructions v-if="o.instructions" :html="o.instructions" />
           </div>
         </div>
 
@@ -161,13 +181,13 @@ onMounted(async () => {
         </div>
 
         <!-- 评价入口:已支付 + 未评价 + 后台允许评价 -->
-        <div v-if="o.status === 'paid' && !o.reviewed && settings.config?.allow_post_review" class="mt-3 pt-3 border-t border-border flex justify-end">
+        <div v-if="o.status === 'paid' && o.delivery_status === 'delivered' && !o.reviewed && settings.config?.allow_post_review" class="mt-3 pt-3 border-t border-border flex justify-end">
           <button @click="openReview(o)"
             class="px-4 py-1.5 rounded-pill border border-primary text-primary text-xs font-medium hover:bg-primary-light transition">
             {{ t('order.myOrders.reviewBtn') }}
           </button>
         </div>
-        <div v-else-if="o.status === 'paid' && o.reviewed" class="mt-3 pt-3 border-t border-border flex justify-end">
+        <div v-else-if="o.status === 'paid' && o.delivery_status === 'delivered' && o.reviewed" class="mt-3 pt-3 border-t border-border flex justify-end">
           <span class="text-xs text-ink-muted">{{ t('order.myOrders.reviewedLabel') }}</span>
         </div>
       </div>

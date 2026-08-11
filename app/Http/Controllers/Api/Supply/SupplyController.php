@@ -3,6 +3,10 @@
 namespace App\Http\Controllers\Api\Supply;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Models\SupplySource;
+use App\Supply\SupplyManager;
+use App\Supply\UpstreamOrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -30,22 +34,26 @@ class SupplyController extends Controller
     {
         // 本站作为下游时,接收上游异步发货回调(spec §5.3)
         $orderNo = $request->input('downstream_order_no');
-        $order = $orderNo ? \App\Models\Order::where('order_no', $orderNo)->first() : null;
+        $order = $orderNo ? Order::where('order_no', $orderNo)->first() : null;
 
         if (! $order || ! $order->upstream_source_id) {
             return response()->json(['ok' => false, 'error' => 'order_not_found'], 404);
         }
 
-        $source = \App\Models\SupplySource::find($order->upstream_source_id);
-        $driver = app(\App\Supply\SupplyManager::class)->driver($source);
+        $source = SupplySource::find($order->upstream_source_id);
+        $driver = app(SupplyManager::class)->driver($source);
         $payload = $driver->verifyCallback($request);
 
         if (! $payload) {
             return response()->json(['ok' => false, 'error' => 'invalid_signature'], 401);
         }
 
-        if (! empty($payload['cards'])) {
-            app(\App\Supply\UpstreamOrderService::class)->writeCards($order, $payload['cards']);
+        if (($payload['status'] ?? '') === 'delivered' || ! empty($payload['cards'])) {
+            app(UpstreamOrderService::class)->writeFulfillment(
+                $order,
+                $payload['cards'] ?? [],
+                $payload['instructions'] ?? null,
+            );
         }
 
         return response()->json(['ok' => true]);

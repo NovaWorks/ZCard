@@ -20,7 +20,8 @@ class UpstreamOrderServiceTest extends TestCase
     private function makeMerchant(): Merchant
     {
         $user = User::factory()->create();
-        return Merchant::create(['name' => 'M', 'slug' => 'm' . uniqid(), 'user_id' => $user->id, 'settings' => []]);
+
+        return Merchant::create(['name' => 'M', 'slug' => 'm'.uniqid(), 'user_id' => $user->id, 'settings' => []]);
     }
 
     public function test_write_cards_marks_order_delivered(): void
@@ -39,7 +40,7 @@ class UpstreamOrderServiceTest extends TestCase
 
         $this->assertSame('delivered', $order->fresh()->delivery_status);
         // Card.content 加密存储(非明文),plainContent() 解密回原文
-        $cards = \App\Models\Card::where('order_id', $order->id)->get();
+        $cards = Card::where('order_id', $order->id)->get();
         $this->assertCount(2, $cards);
         $plainContents = $cards->map(fn ($c) => $c->plainContent())->toArray();
         $this->assertContains('CARD-A', $plainContents);
@@ -61,5 +62,29 @@ class UpstreamOrderServiceTest extends TestCase
         // 已 delivered,再写不应重复
         app(UpstreamOrderService::class)->writeCards($order, ['DUP']);
         $this->assertDatabaseMissing('cards', ['content' => 'DUP']);
+    }
+
+    public function test_write_fulfillment_stores_cards_and_instructions_atomically(): void
+    {
+        StorefrontConfig::setMany(['supply_enabled' => true]);
+        $merchant = $this->makeMerchant();
+        $source = SupplySource::create(['name' => 'S', 'driver' => 'zcard', 'base_url' => 'https://x.com', 'credentials' => [], 'status' => 'active']);
+        $product = Product::create([
+            'merchant_id' => $merchant->id, 'name' => 'P', 'slug' => 'p3', 'price' => 500,
+            'factory_price' => 400, 'stock_type' => 'card', 'fulfillment_type' => 'upstream',
+            'status' => 1, 'upstream_source_id' => $source->id, 'upstream_product_code' => 'UP3',
+        ]);
+        $order = Order::create([
+            'order_no' => 'O3', 'merchant_id' => $merchant->id, 'product_id' => $product->id,
+            'quantity' => 1, 'amount' => 500, 'status' => 'paid', 'delivery_status' => 'pending',
+            'fulfillment_type_snapshot' => 'upstream', 'paid_at' => now(),
+        ]);
+
+        app(UpstreamOrderService::class)->writeFulfillment($order, ['CARD-Z'], '<p>上游付款后教程</p>');
+
+        $fresh = $order->fresh();
+        $this->assertSame('delivered', $fresh->delivery_status);
+        $this->assertSame('<p>上游付款后教程</p>', $fresh->instructions_snapshot);
+        $this->assertDatabaseHas('order_deliveries', ['order_id' => $order->id, 'card_content' => 'CARD-Z']);
     }
 }

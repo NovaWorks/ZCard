@@ -6,6 +6,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { formatMoney } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
 import AppIcon from '@/components/AppIcon.vue'
+import OrderInstructions from '@/components/OrderInstructions.vue'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -46,6 +47,11 @@ const statusCls: Record<string, string> = {
 }
 const statusText = (s: string) => t(`common.orderStatus.${s}`)
 const statusClass = (s: string) => statusCls[s] || 'bg-gray-100 text-gray-500'
+const deliveryPendingText = (o: OrderDetail) => {
+  if (o.fulfillment_type === 'manual') return t('order.deliveryPendingManual')
+  if (o.fulfillment_type === 'upstream') return t('order.deliveryPendingUpstream')
+  return t('order.deliveryPendingGeneric')
+}
 
 const fmtDate = (d?: string) => (d ? String(d).slice(0, 16).replace('T', ' ') : '')
 
@@ -182,17 +188,27 @@ async function copyAll(cards: string[]) {
               <span class="whitespace-nowrap">{{ fmtDate(o.paid_at || o.created_at) }}</span>
             </div>
 
-            <!-- 卡密(已支付) -->
-            <div v-if="o.status === 'paid' && o.cards.length" class="p-4">
-              <button @click="toggle(o.order_no)"
+            <div
+              v-if="o.status === 'paid' && o.delivery_status === 'pending'"
+              role="status"
+              aria-live="polite"
+              class="mx-4 mt-3 flex items-start gap-2 rounded-field border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700"
+            >
+              <AppIcon name="ri:time-line" class="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{{ deliveryPendingText(o) }}</span>
+            </div>
+
+            <!-- 已支付发货内容：卡密和付款后使用说明 -->
+            <div v-if="o.status === 'paid' && (o.cards.length || o.instructions)" class="p-4">
+              <button type="button" :aria-expanded="expanded.has(o.order_no)" :aria-controls="`delivery-${o.order_no}`" @click="toggle(o.order_no)"
                 class="text-xs text-primary hover:text-primary-hover flex items-center gap-1.5 font-medium transition">
-                <span>{{ expanded.has(o.order_no) ? t('order.query.cardExpanded') : t('order.query.cardCollapsed', { n: o.cards.length }) }}</span>
+                <span>{{ expanded.has(o.order_no) ? t('order.query.deliveryContentExpanded') : t('order.query.deliveryContentCollapsed') }}</span>
                 <svg class="w-3 h-3 transition-transform" :class="expanded.has(o.order_no) ? 'rotate-180' : ''" viewBox="0 0 12 12" fill="none">
                   <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </button>
 
-              <div v-if="expanded.has(o.order_no)" class="mt-3 space-y-2">
+              <div v-if="expanded.has(o.order_no)" :id="`delivery-${o.order_no}`" class="mt-3 space-y-2">
                 <div v-for="(card, i) in o.cards" :key="i"
                   class="flex items-center gap-2 bg-surface-subtle rounded-field p-2.5 group">
                   <span class="text-[10px] text-ink-muted w-5 shrink-0">#{{ i + 1 }}</span>
@@ -206,6 +222,7 @@ async function copyAll(cards: string[]) {
                   class="text-xs text-ink-soft hover:text-primary transition mt-1 flex items-center gap-1">
                   {{ t('order.query.copyAllAll') }}
                 </button>
+                <OrderInstructions v-if="o.instructions" :html="o.instructions" />
               </div>
             </div>
 

@@ -11,6 +11,7 @@ use App\Support\SecurityAudit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
@@ -38,16 +39,39 @@ class ProductController extends Controller
         if ($stockType = $request->input('stock_type')) {
             $query->where('stock_type', $stockType);
         }
-        // 库存筛选:out=缺货(无未用卡),available=有货
+        // 库存筛选:固定/人工视为不限量，上游读缓存，自动卡密检查卡池。
         if ($stockStatus = $request->input('stock_status')) {
             if ($stockStatus === 'out') {
-                $query->whereDoesntHave('cards', fn ($q) => $q->where('status', 'unused'));
+                $query->where(function ($q) {
+                    $q->where(fn ($auto) => $auto
+                        ->whereNull('upstream_source_id')
+                        ->where('fulfillment_type', Product::FULFILLMENT_AUTO_CARD)
+                        ->whereDoesntHave('cards', fn ($cards) => $cards->where('status', 'unused')))
+                        ->orWhere(fn ($upstream) => $upstream
+                            ->where(fn ($source) => $source->whereNotNull('upstream_source_id')
+                                ->orWhere('fulfillment_type', Product::FULFILLMENT_UPSTREAM))
+                            ->where('stock_cache', 0));
+                });
             } elseif ($stockStatus === 'available') {
-                $query->whereHas('cards', fn ($q) => $q->where('status', 'unused'));
+                $query->where(function ($q) {
+                    $q->where(fn ($auto) => $auto
+                        ->whereNull('upstream_source_id')
+                        ->where('fulfillment_type', Product::FULFILLMENT_AUTO_CARD)
+                        ->whereHas('cards', fn ($cards) => $cards->where('status', 'unused')))
+                        ->orWhere(fn ($local) => $local->whereNull('upstream_source_id')
+                            ->whereIn('fulfillment_type', [Product::FULFILLMENT_FIXED, Product::FULFILLMENT_MANUAL]))
+                        ->orWhere(fn ($upstream) => $upstream
+                            ->where(fn ($source) => $source->whereNotNull('upstream_source_id')
+                                ->orWhere('fulfillment_type', Product::FULFILLMENT_UPSTREAM))
+                            ->where(fn ($stock) => $stock->where('stock_cache', '!=', 0)->orWhereNull('stock_cache')));
+                });
             }
         }
 
         $products = $query->orderByDesc('id')->paginate($request->input('pageSize', 15));
+        $products->getCollection()->each(function (Product $product) {
+            $product->setAttribute('stock', $product->availableStock());
+        });
 
         return response()->json($products);
     }
@@ -70,6 +94,7 @@ class ProductController extends Controller
             'draft_premium' => 'nullable|integer|min:0',
             'member_price' => 'nullable|array',
             'stock_type' => 'nullable|string|in:card,url,code',
+            'fulfillment_type' => 'nullable|string|in:auto_card,fixed,manual,upstream',
             'stock_visible' => 'boolean',
             'control_config' => 'nullable|array',
             'delivery_mode' => 'nullable|string|in:status,delete',
@@ -93,6 +118,7 @@ class ProductController extends Controller
         ]);
 
         $data['merchant_id'] = 1;
+        $this->normalizeFulfillmentData($data);
         if (empty($data['slug'])) {
             $data['slug'] = Str::slug($data['name']).'-'.Str::random(6);
         }
@@ -136,6 +162,7 @@ class ProductController extends Controller
             'draft_premium' => 'nullable|integer|min:0',
             'member_price' => 'nullable|array',
             'stock_type' => 'nullable|string|in:card,url,code',
+            'fulfillment_type' => 'nullable|string|in:auto_card,fixed,manual,upstream',
             'stock_visible' => 'boolean',
             'control_config' => 'nullable|array',
             'delivery_mode' => 'nullable|string|in:status,delete',
@@ -158,6 +185,7 @@ class ProductController extends Controller
             'status' => 'boolean',
         ]);
 
+        $this->normalizeFulfillmentData($data, $product);
         $product->update($data);
 
         $after = $product->fresh()->only(array_keys($before));
@@ -174,6 +202,37 @@ class ProductController extends Controller
         }
 
         return response()->json($product->fresh());
+    }
+
+    /** 保证履约方式与商品来源一致，并校验固定发货内容。 */
+    private function normalizeFulfillmentData(array &$data, ?Product $product = null): void
+    {
+        if ($product?->upstream_source_id) {
+            $data['fulfillment_type'] = Product::FULFILLMENT_UPSTREAM;
+        } else {
+            $type = $data['fulfillment_type'] ?? $product?->fulfillment_type ?? Product::FULFILLMENT_AUTO_CARD;
+            if ($type === Product::FULFILLMENT_UPSTREAM) {
+                throw ValidationException::withMessages([
+                    'fulfillment_type' => '上游履约仅适用于从货源同步的商品',
+                ]);
+            }
+            $data['fulfillment_type'] = $type;
+        }
+
+        if ($data['fulfillment_type'] === Product::FULFILLMENT_FIXED) {
+            $content = array_key_exists('delivery_message', $data)
+                ? trim((string) $data['delivery_message'])
+                : trim((string) ($product?->delivery_message ?? ''));
+            if ($content === '') {
+                throw ValidationException::withMessages([
+                    'delivery_message' => '固定内容发货必须填写固定发货内容',
+                ]);
+            }
+        }
+
+        if ($data['fulfillment_type'] !== Product::FULFILLMENT_AUTO_CARD) {
+            $data['pick_type'] = 'general';
+        }
     }
 
     public function destroy(int $id): JsonResponse

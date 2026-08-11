@@ -40,13 +40,16 @@ class ProductController extends Controller
             $query->whereIn('category_id', $ids);
         }
 
-        // 缺货商品过滤(后台「显示缺货商品」关闭时):
-        // 本地商品 = 无 unused 卡;上游商品 = stock_cache 为 0(-1 无限、null 未知均显示)
+        // 缺货商品过滤:自动卡密检查卡库存;固定/人工不限量;上游读取库存缓存。
         if (! StorefrontConfig::get('show_out_of_stock', true)) {
             $query->where(function ($q) {
                 $q->where(fn ($local) => $local->whereNull('upstream_source_id')
+                    ->where('fulfillment_type', Product::FULFILLMENT_AUTO_CARD)
                     ->whereHas('cards', fn ($c) => $c->where('status', 'unused')))
-                    ->orWhere(fn ($up) => $up->whereNotNull('upstream_source_id')
+                    ->orWhere(fn ($local) => $local->whereNull('upstream_source_id')
+                        ->whereIn('fulfillment_type', [Product::FULFILLMENT_FIXED, Product::FULFILLMENT_MANUAL]))
+                    ->orWhere(fn ($up) => $up->where(fn ($source) => $source->whereNotNull('upstream_source_id')
+                        ->orWhere('fulfillment_type', Product::FULFILLMENT_UPSTREAM))
                         ->where(fn ($s) => $s->where('stock_cache', '!=', 0)->orWhereNull('stock_cache')));
             });
         }
@@ -102,12 +105,16 @@ class ProductController extends Controller
         $count = (int) ($request->input('limit', StorefrontConfig::get('featured_count')));
         $query = Product::where('status', true)->where('is_featured', true);
 
-        // 缺货商品过滤(与 index 一致,后台「显示缺货商品」关闭时)
+        // 缺货商品过滤(与 index 一致)。
         if (! StorefrontConfig::get('show_out_of_stock', true)) {
             $query->where(function ($q) {
                 $q->where(fn ($local) => $local->whereNull('upstream_source_id')
+                    ->where('fulfillment_type', Product::FULFILLMENT_AUTO_CARD)
                     ->whereHas('cards', fn ($c) => $c->where('status', 'unused')))
-                    ->orWhere(fn ($up) => $up->whereNotNull('upstream_source_id')
+                    ->orWhere(fn ($local) => $local->whereNull('upstream_source_id')
+                        ->whereIn('fulfillment_type', [Product::FULFILLMENT_FIXED, Product::FULFILLMENT_MANUAL]))
+                    ->orWhere(fn ($up) => $up->where(fn ($source) => $source->whereNotNull('upstream_source_id')
+                        ->orWhere('fulfillment_type', Product::FULFILLMENT_UPSTREAM))
                         ->where(fn ($s) => $s->where('stock_cache', '!=', 0)->orWhereNull('stock_cache')));
             });
         }
@@ -200,6 +207,7 @@ class ProductController extends Controller
                 'virtual_reviews' => $p->virtual_reviews,
                 'min_order' => $p->min_order, 'max_order' => $p->max_order,
                 'stock_type' => $p->stock_type, 'delivery_mode' => $p->delivery_mode,
+                'fulfillment_type' => $p->resolvedFulfillmentType(),
                 'control_config' => $p->control_config ?? [],
                 'member_price' => is_array($p->member_price)
                     ? array_map(fn ($price) => $svc->convert((int) $price, $cur)['amount'], $p->member_price)
@@ -208,7 +216,6 @@ class ProductController extends Controller
                 'contact_type' => $p->contact_type ?? 'email',
                 'only_user' => (bool) $p->only_user,
                 'send_email' => (bool) $p->send_email,
-                'leave_message' => $p->leave_message,
                 'purchase_limit' => $p->purchase_limit ?? 0,
                 'pick_type' => $p->pick_type ?? 'general',
             ]);

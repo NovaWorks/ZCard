@@ -4,9 +4,13 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\Product;
+use App\Support\FulfillmentService;
 use App\Support\OrderService;
+use App\Support\StorefrontConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -28,8 +32,8 @@ class OrderController extends Controller
         if ($keyword = $request->input('keyword')) {
             $query->where(function ($q) use ($keyword) {
                 $q->where('order_no', 'like', "%{$keyword}%")
-                  ->orWhere('contact', 'like', "%{$keyword}%")
-                  ->orWhereHas('product', fn ($p) => $p->where('name', 'like', "%{$keyword}%"));
+                    ->orWhere('contact', 'like', "%{$keyword}%")
+                    ->orWhereHas('product', fn ($p) => $p->where('name', 'like', "%{$keyword}%"));
             });
         }
 
@@ -104,12 +108,12 @@ class OrderController extends Controller
         $baseQuery = $this->buildQuery($request);
 
         return response()->json([
-            'total_count'    => (clone $baseQuery)->count(),
+            'total_count' => (clone $baseQuery)->count(),
             'pending_amount' => (clone $baseQuery)->where('status', 'pending')->sum('amount'),
-            'total_amount'   => (clone $baseQuery)->sum('amount'),
-            'paid_amount'    => (clone $baseQuery)->where('status', 'paid')->sum('amount'),
-            'refunded_amount'=> (clone $baseQuery)->where('status', 'refunded')->sum('amount'),
-            'total_cost'     => (clone $baseQuery)->sum('cost'),
+            'total_amount' => (clone $baseQuery)->sum('amount'),
+            'paid_amount' => (clone $baseQuery)->where('status', 'paid')->sum('amount'),
+            'refunded_amount' => (clone $baseQuery)->where('status', 'refunded')->sum('amount'),
+            'total_cost' => (clone $baseQuery)->sum('cost'),
         ]);
     }
 
@@ -134,7 +138,37 @@ class OrderController extends Controller
     public function close(int $id): JsonResponse
     {
         $order = app(OrderService::class)->closeOrder($id);
+
         return response()->json($order);
+    }
+
+    /** 已付款的人工履约订单由管理员提交一次性发货内容。 */
+    public function fulfill(Request $request, int $id): JsonResponse
+    {
+        $data = $request->validate([
+            'content' => 'required|string|max:10000',
+        ]);
+        $order = Order::with('product')->findOrFail($id);
+
+        if ($order->status !== 'paid') {
+            throw ValidationException::withMessages([
+                'content' => '仅已支付订单可以人工发货',
+            ]);
+        }
+        if ($order->fulfillment_type_snapshot !== Product::FULFILLMENT_MANUAL) {
+            throw ValidationException::withMessages([
+                'content' => '该订单不是人工发货订单',
+            ]);
+        }
+        if ($order->delivery_status === 'delivered') {
+            return response()->json(['message' => '该订单已完成发货'], 409);
+        }
+
+        if (! app(FulfillmentService::class)->fulfill($order, [$data['content']], 'manual')) {
+            return response()->json(['message' => '该订单已完成发货'], 409);
+        }
+
+        return $this->show($order->id);
     }
 
     /**
@@ -147,7 +181,7 @@ class OrderController extends Controller
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="orders_' . date('Ymd_His') . '.csv"',
+            'Content-Disposition' => 'attachment; filename="orders_'.date('Ymd_His').'.csv"',
         ];
 
         return response()->stream(function () use ($orders) {
@@ -184,7 +218,7 @@ class OrderController extends Controller
      */
     public function clear(Request $request): JsonResponse
     {
-        $minutes = (int) (app(\App\Support\StorefrontConfig::class)::get('order_close_minutes') ?? 15);
+        $minutes = (int) (app(StorefrontConfig::class)::get('order_close_minutes') ?? 15);
         $cutoff = now()->subMinutes($minutes);
 
         $count = Order::where('status', 'pending')

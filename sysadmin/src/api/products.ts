@@ -17,6 +17,7 @@ export interface Product {
   factory_price?: number // 分
   draft_premium?: number // 分
   description?: string | null
+  leave_message?: string | null
   seo_title?: string | null
   seo_keywords?: string | null
   seo_description?: string | null
@@ -28,6 +29,8 @@ export interface Product {
   is_featured: boolean
   virtual_sales: number
   stock_type: string
+  fulfillment_type?: 'auto_card' | 'fixed' | 'manual' | 'upstream'
+  upstream_source_id?: number | null
   stock_visible?: boolean
   delivery_mode: string
   sort: number

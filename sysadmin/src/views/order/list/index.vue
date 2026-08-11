@@ -141,15 +141,29 @@
             <ElTag :type="statusTagType(row.status)" size="small">{{ statusLabel(row.status) }}</ElTag>
           </template>
         </ElTableColumn>
+        <ElTableColumn :label="t('zcard.order.deliveryStatus')" width="100" align="center">
+          <template #default="{ row }">
+            <ElTag :type="row.delivery_status === 'delivered' ? 'success' : 'warning'" size="small">
+              {{ row.delivery_status === 'delivered' ? t('zcard.order.deliveryDelivered') : t('zcard.order.deliveryPending') }}
+            </ElTag>
+          </template>
+        </ElTableColumn>
         <ElTableColumn :label="t('zcard.order.contact')" min-width="130" show-overflow-tooltip>
           <template #default="{ row }">{{ row.contact || '-' }}</template>
         </ElTableColumn>
         <ElTableColumn :label="t('zcard.order.createTime')" width="160" align="center">
           <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
         </ElTableColumn>
-        <ElTableColumn :label="t('zcard.common.actions')" width="120" fixed="right" align="center">
+        <ElTableColumn :label="t('zcard.common.actions')" width="190" fixed="right" align="center">
           <template #default="{ row }">
             <ElButton text type="primary" size="small" @click="showDetail(row)">{{ t('zcard.order.detail') }}</ElButton>
+            <ElButton
+              v-if="row.status === 'paid' && row.delivery_status === 'pending' && row.fulfillment_type_snapshot === 'manual'"
+              text
+              type="success"
+              size="small"
+              @click="openFulfill(row)"
+            >{{ t('zcard.order.manualFulfill') }}</ElButton>
             <ElButton v-if="row.status === 'pending'" text type="danger" size="small" @click="handleClose(row)">{{ t('zcard.order.close') }}</ElButton>
           </template>
         </ElTableColumn>
@@ -177,6 +191,12 @@
           <ElDescriptionsItem :label="t('zcard.order.status')">
             <ElTag :type="statusTagType(currentOrder.status)" size="small">{{ statusLabel(currentOrder.status) }}</ElTag>
           </ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('zcard.order.deliveryStatus')">
+            {{ currentOrder.delivery_status === 'delivered' ? t('zcard.order.deliveryDelivered') : t('zcard.order.deliveryPending') }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('zcard.order.fulfillmentType')">
+            {{ fulfillmentTypeLabel(currentOrder.fulfillment_type_snapshot) }}
+          </ElDescriptionsItem>
           <ElDescriptionsItem :label="t('zcard.order.product')">{{ currentOrder.product?.name || '-' }}</ElDescriptionsItem>
           <ElDescriptionsItem :label="t('zcard.order.sku')">{{ currentOrder.sku_name || '-' }}</ElDescriptionsItem>
           <ElDescriptionsItem :label="t('zcard.order.amount')">¥{{ formatAmount(currentOrder.amount) }}</ElDescriptionsItem>
@@ -191,7 +211,7 @@
 
         <!-- 卡密列表 -->
         <div v-if="currentOrder.deliveries && currentOrder.deliveries.length" class="cards-section">
-          <div class="cards-title">{{ t('zcard.order.cards') }}（{{ currentOrder.deliveries.length }}）</div>
+          <div class="cards-title">{{ t('zcard.order.deliveryContents') }}（{{ currentOrder.deliveries.length }}）</div>
           <div v-for="(d, i) in currentOrder.deliveries" :key="i" class="card-item">
             <div class="card-header">
               <span class="card-index">#{{ i + 1 }}</span>
@@ -202,6 +222,38 @@
           </div>
         </div>
       </div>
+    </ElDialog>
+
+    <ElDialog
+      v-model="fulfillVisible"
+      :title="t('zcard.order.manualFulfill')"
+      width="600px"
+      :close-on-click-modal="!fulfilling"
+      :close-on-press-escape="!fulfilling"
+    >
+      <template v-if="fulfillTarget">
+        <ElDescriptions :column="2" border class="mb-4">
+          <ElDescriptionsItem :label="t('zcard.order.orderNo')">{{ fulfillTarget.order_no }}</ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('zcard.order.product')">{{ fulfillTarget.product?.name || '-' }}</ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('zcard.order.quantity')">{{ fulfillTarget.quantity }}</ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('zcard.order.contact')">{{ fulfillTarget.contact || '-' }}</ElDescriptionsItem>
+        </ElDescriptions>
+        <ElAlert type="warning" :closable="false" :title="t('zcard.order.manualFulfillTip')" class="mb-4" />
+        <ElFormItem :label="t('zcard.order.deliveryContents')" required>
+          <ElInput
+            v-model="fulfillContent"
+            type="textarea"
+            :rows="8"
+            maxlength="10000"
+            show-word-limit
+            :placeholder="t('zcard.order.manualFulfillPlaceholder')"
+          />
+        </ElFormItem>
+      </template>
+      <template #footer>
+        <ElButton :disabled="fulfilling" @click="fulfillVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
+        <ElButton type="primary" :loading="fulfilling" @click="submitFulfill">{{ t('zcard.order.confirmFulfill') }}</ElButton>
+      </template>
     </ElDialog>
   </div>
 </template>
@@ -215,6 +267,7 @@
     getOrders,
     getOrder,
     closeOrder,
+    fulfillOrder,
     getStats,
     clearOrders,
     type Order,
@@ -290,6 +343,13 @@
     closed: 'info',
     refunded: 'danger',
   }[s] || 'info') as any
+
+  const fulfillmentTypeLabel = (type: Order['fulfillment_type_snapshot']) => ({
+    auto_card: t('zcard.order.fulfillmentAutoCard'),
+    fixed: t('zcard.order.fulfillmentFixed'),
+    manual: t('zcard.order.fulfillmentManual'),
+    upstream: t('zcard.order.fulfillmentUpstream'),
+  }[type] || type)
 
   const channelName = (code: string) => {
     // 余额支付:未在支付通道表中,单独映射
@@ -389,6 +449,35 @@
   const showCards = async (row: Order) => {
     // 复用详情弹窗
     await showDetail(row)
+  }
+
+  const fulfillVisible = ref(false)
+  const fulfilling = ref(false)
+  const fulfillTarget = ref<Order | null>(null)
+  const fulfillContent = ref('')
+
+  const openFulfill = (row: Order) => {
+    fulfillTarget.value = row
+    fulfillContent.value = ''
+    fulfillVisible.value = true
+  }
+
+  const submitFulfill = async () => {
+    if (!fulfillTarget.value) return
+    if (!fulfillContent.value.trim()) {
+      ElMessage.warning(t('zcard.order.manualFulfillRequired'))
+      return
+    }
+    fulfilling.value = true
+    try {
+      const detail = await fulfillOrder(fulfillTarget.value.id, fulfillContent.value)
+      ElMessage.success(t('zcard.order.fulfillSuccess'))
+      fulfillVisible.value = false
+      if (currentOrder.value?.id === detail.id) currentOrder.value = detail
+      fetchAll()
+    } finally {
+      fulfilling.value = false
+    }
   }
 
   const handleClose = async (row: Order) => {

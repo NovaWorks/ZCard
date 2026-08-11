@@ -6,6 +6,7 @@ use App\Models\Card;
 use App\Models\Category;
 use App\Models\Currency;
 use App\Models\Merchant;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
 use App\Support\CardCipher;
@@ -127,5 +128,39 @@ class OrderMyOrdersTest extends TestCase
             'order_no' => $resp->json('orders.0.order_no'),
             'user_id' => $user->id,
         ]);
+    }
+
+    public function test_instructions_are_snapshotted_hidden_before_payment_and_returned_after_payment(): void
+    {
+        $this->seedBase();
+        $p = $this->makeProduct('instructions', 10000);
+        $p->update(['leave_message' => '<p onclick="alert(1)">先登录，再修改密码</p><script>alert(1)</script>']);
+        $user = User::factory()->create();
+        $token = $user->createToken('test')->plainTextToken;
+
+        $created = $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->postJson('/api/orders', [
+                'product_id' => $p->id,
+                'qty' => 1,
+                'contact' => 'instructions@test.com',
+            ])->assertCreated();
+        $orderNo = $created->json('order_no');
+
+        $this->assertDatabaseHas('orders', ['order_no' => $orderNo]);
+        $snapshot = (string) Order::where('order_no', $orderNo)->value('instructions_snapshot');
+        $this->assertStringContainsString('先登录', $snapshot);
+        $this->assertStringNotContainsString('onclick', $snapshot);
+        $this->assertStringNotContainsString('<script', $snapshot);
+
+        $mine = $this->withHeaders(['Authorization' => 'Bearer '.$token])->getJson('/api/orders/mine')->assertOk();
+        $this->assertNull($mine->json('0.instructions'));
+
+        // 商品后续修改不能影响订单快照。
+        $p->update(['leave_message' => '<p>新教程</p>']);
+        $this->postJson("/api/orders/{$orderNo}/mock-pay")->assertOk();
+
+        $paid = $this->withHeaders(['Authorization' => 'Bearer '.$token])->getJson('/api/orders/mine')->assertOk();
+        $this->assertStringContainsString('先登录', $paid->json('0.instructions'));
+        $this->assertStringNotContainsString('新教程', $paid->json('0.instructions'));
     }
 }

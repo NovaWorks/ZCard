@@ -77,7 +77,7 @@ class DujiaoNextDriver implements SupplyDriver
         $data = $this->getJson($path, [], $this->signedHeaders('GET', $path));
 
         return collect($data['categories'] ?? [])->map(fn ($c) => new UpstreamCategory(
-            code: (string) $c['id'], name: $c['name'], parentCode: isset($c['parent_id']) ? (string) $c['parent_id'] : null,
+            code: (string) $c['id'], name: $this->localizedText($c['name'] ?? null) ?? (string) $c['id'], parentCode: isset($c['parent_id']) ? (string) $c['parent_id'] : null,
             icon: $c['icon'] ?? null, sort: $c['sort_order'] ?? 0,
         ))->all();
     }
@@ -228,9 +228,12 @@ class DujiaoNextDriver implements SupplyDriver
 
         $categoryCode = isset($p['category_id']) ? (string) $p['category_id'] : null;
 
+        $description = $this->localizedText($p['content'] ?? null)
+            ?? $this->localizedText($p['description'] ?? null);
+
         return new UpstreamProduct(
             code: (string) ($p['id'] ?? ''),
-            name: $p['title'] ?? '',
+            name: $this->localizedText($p['title'] ?? null) ?? '',
             price: isset($p['price_amount']) ? (int) round((float) $p['price_amount'] * 100) : 0,
             // wholesale_prices 是批发价阶梯 {min_quantity, unit_price},取第一档 unit_price 作为拿货价
             factoryPrice: isset($p['wholesale_prices'][0]['unit_price'])
@@ -238,12 +241,47 @@ class DujiaoNextDriver implements SupplyDriver
                 : (isset($p['price_amount']) ? (int) round((float) $p['price_amount'] * 100) : 0),
             categoryCode: $categoryCode,
             categoryName: $categoryCode !== null ? ($catNames[$categoryCode] ?? null) : null,
-            description: $p['description'] ?? null,
+            description: $description,
             cover: $p['images'][0] ?? null,
             images: $p['images'] ?? [],
             isActive: $p['is_active'] ?? true,
             skus: $skus,
             stockQuantity: ! empty($skus) ? $skus[0]['stock_quantity'] : -1,
         );
+    }
+
+    /**
+     * dujiao-next 的标题和公开详情是多语言 JSON，而不是普通字符串。
+     * 优先读取货源 content_locale，再按应用语言和常用语言回退。
+     */
+    private function localizedText(mixed $value): ?string
+    {
+        if (is_scalar($value)) {
+            $text = trim((string) $value);
+
+            return $text !== '' ? $text : null;
+        }
+        if (! is_array($value)) {
+            return null;
+        }
+
+        $configured = (string) ($this->source->settings['content_locale'] ?? config('app.locale', 'zh_CN'));
+        $configured = str_replace('_', '-', $configured);
+        $locales = array_values(array_unique([$configured, 'zh-CN', 'zh-TW', 'en-US']));
+        foreach ($locales as $locale) {
+            if (isset($value[$locale]) && is_scalar($value[$locale])) {
+                $text = trim((string) $value[$locale]);
+                if ($text !== '') {
+                    return $text;
+                }
+            }
+        }
+        foreach ($value as $text) {
+            if (is_scalar($text) && trim((string) $text) !== '') {
+                return trim((string) $text);
+            }
+        }
+
+        return null;
     }
 }

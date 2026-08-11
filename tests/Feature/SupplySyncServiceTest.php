@@ -111,6 +111,25 @@ class SupplySyncServiceTest extends TestCase
         $this->assertStringNotContainsString('data:image/png;base64,xxx', $desc); // data: 媒体协议被安全清理
     }
 
+    public function test_disabled_public_description_sync_keeps_local_content(): void
+    {
+        $source = $this->makeSource(['sync_public_description' => false]);
+        $service = app(SupplySyncService::class);
+        $product = $service->upsertProduct($source, new UpstreamProduct(
+            code: 'UP_DESCRIPTION_KEEP', name: 'A', price: 500, factoryPrice: 500,
+            description: '<p>首次公开详情</p>',
+        ));
+        $product->update(['description' => '<p>本地修改详情</p>', 'leave_message' => '<p>本地付款后教程</p>']);
+
+        $service->upsertProduct($source, new UpstreamProduct(
+            code: 'UP_DESCRIPTION_KEEP', name: 'A', price: 500, factoryPrice: 500,
+            description: '<p>上游新详情</p>',
+        ));
+
+        $this->assertStringContainsString('本地修改详情', $product->fresh()->description);
+        $this->assertStringContainsString('本地付款后教程', $product->fresh()->leave_message);
+    }
+
     public function test_sync_auto_creates_upstream_category(): void
     {
         $source = $this->makeSource([]);

@@ -149,6 +149,29 @@ class SupplyDriverSignatureTest extends TestCase
         $this->assertSame($expected, $sent->header('X-Supply-Signature')[0]);
     }
 
+    public function test_zcard_delivered_order_parses_paid_instructions_without_requiring_cards(): void
+    {
+        Http::fake(['*' => Http::response([
+            'supply_order_id' => 3,
+            'amount' => 300,
+            'fulfillment' => [
+                'status' => 'delivered',
+                'cards' => [],
+                'instructions' => '<p>付款后教程</p>',
+            ],
+        ], 200)]);
+
+        $order = (new ZCardDriver($this->source(SupplySource::DRIVER_ZCARD)))->createOrder([
+            'product_code' => '8',
+            'quantity' => 1,
+            'downstream_order_no' => 'ORD-INSTRUCTIONS',
+        ]);
+
+        $this->assertNotNull($order->fulfillment);
+        $this->assertSame([], $order->fulfillment->cards);
+        $this->assertSame('<p>付款后教程</p>', $order->fulfillment->instructions);
+    }
+
     public function test_dujiao_next_signature_is_over_the_exact_bytes_sent(): void
     {
         $driver = new DujiaoNextDriver($this->source(SupplySource::DRIVER_DUJIAO_NEXT));

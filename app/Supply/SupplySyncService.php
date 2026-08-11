@@ -61,7 +61,6 @@ class SupplySyncService
             // 例外2:勾选导入显式传了 pricing → 按本次所选策略重新定价。
             $update = [
                 // 商品名称由本地运营所有，避免定时同步覆盖人工命名。
-                'description' => $this->normalizeDescription($source, $dto->description),
                 'cover' => $this->normalizeCover($source, $dto->cover),
                 'images' => $this->normalizeImages($source, $dto->images, $dto->cover),
                 'factory_price' => $dto->factoryPrice,
@@ -70,6 +69,9 @@ class SupplySyncService
                 'upstream_synced_at' => now(),
                 'hide' => ! $dto->isActive ? true : $existing->hide, // 上游下架→标隐藏,不删
             ];
+            if ($this->shouldSyncPublicDescription($source)) {
+                $update['description'] = $this->normalizeDescription($source, $dto->description);
+            }
             if ($pricing !== null || (int) $existing->price <= 0) {
                 $newPrice = $this->computeInitialPrice($source, $dto->factoryPrice, $dto->price, $pricing);
                 $update['price'] = $newPrice ?? 0;
@@ -111,6 +113,7 @@ class SupplySyncService
             'price' => $price ?? 0,
             'factory_price' => $dto->factoryPrice,
             'stock_type' => 'card',
+            'fulfillment_type' => Product::FULFILLMENT_UPSTREAM,
             'status' => ($price === null || ! ($source->settings['auto_list'] ?? true)) ? 0 : 1,
             'hide' => ! $dto->isActive ? true : false,
             'category_id' => $this->resolveCategoryId($source, $dto->categoryCode, $dto->categoryName, $categoryMap),
@@ -119,6 +122,11 @@ class SupplySyncService
             'stock_cache' => $dto->stockQuantity, // 上游库存缓存(-1=无限)
             'upstream_synced_at' => now(),
         ]);
+    }
+
+    private function shouldSyncPublicDescription(SupplySource $source): bool
+    {
+        return (bool) ($source->settings['sync_public_description'] ?? true);
     }
 
     /**

@@ -12,6 +12,7 @@ class UpstreamFulfillment
         public readonly string $type = 'auto',     // auto|manual
         public readonly string $status = 'pending', // pending|delivered
         public readonly array $cards = [],
+        public readonly ?string $instructions = null,
         public readonly ?string $deliveredAt = null,
     ) {}
 

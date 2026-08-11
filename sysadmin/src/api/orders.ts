@@ -21,6 +21,8 @@ export interface Order {
   cost: number
   payment_channel: string | null
   status: OrderStatus
+  delivery_status: 'pending' | 'delivered' | 'failed'
+  fulfillment_type_snapshot: 'auto_card' | 'fixed' | 'manual' | 'upstream'
   contact: string | null
   paid_at: string | null
   closed_at: string | null
@@ -82,6 +84,10 @@ export const getOrder = (id: number) =>
 /** 关闭订单 */
 export const closeOrder = (id: number) =>
   http.post<Order>({ url: `/admin/orders/${id}/close` })
+
+/** 完成人工发货 */
+export const fulfillOrder = (id: number, content: string) =>
+  http.post<Order>({ url: `/admin/orders/${id}/fulfill`, data: { content } })
 
 /** 统计数据 */
 export const getStats = (params: OrderListParams) =>

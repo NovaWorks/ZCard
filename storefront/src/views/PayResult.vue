@@ -7,6 +7,7 @@ import { formatMoney } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useSettingsStore } from '@/stores/settings'
 import AppIcon from '@/components/AppIcon.vue'
+import OrderInstructions from '@/components/OrderInstructions.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,6 +20,12 @@ const isCancel = computed(() => route.query.status === 'cancel')
 const loading = ref(true)
 const order = ref<OrderDetail | null>(null)
 const paid = ref(false)
+const deliveryPendingText = computed(() => {
+  const type = order.value?.fulfillment_type
+  if (type === 'manual') return t('order.deliveryPendingManual')
+  if (type === 'upstream') return t('order.deliveryPendingUpstream')
+  return t('order.deliveryPendingGeneric')
+})
 
 // 二维码渲染(canvas):等 v-else-if 分支挂载完成(nextTick)后再绘制
 const qrCanvas = ref<HTMLCanvasElement | null>(null)
@@ -187,12 +194,22 @@ onMounted(async () => {
             <span class="text-price font-bold">{{ formatMoney(order.amount_display ?? order.amount, prefs.currencyOf(order.display_currency)) }}</span>
           </div>
         </div>
+        <div
+          v-if="order.delivery_status === 'pending'"
+          role="status"
+          aria-live="polite"
+          class="mb-5 flex items-start gap-2 rounded-field border border-amber-200 bg-amber-50 p-3 text-left text-xs text-amber-700"
+        >
+          <AppIcon name="ri:time-line" class="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{{ deliveryPendingText }}</span>
+        </div>
         <div v-if="order.cards.length" class="mb-5">
           <div class="text-xs font-semibold text-ink-soft mb-2">{{ t('order.payResult.cardsTitle', { n: order.cards.length }) }}</div>
           <div v-for="(c, i) in order.cards" :key="i" class="bg-surface-subtle rounded-field p-2 mb-1.5 text-left">
             <code class="text-xs text-ink break-all">{{ c }}</code>
           </div>
         </div>
+        <OrderInstructions v-if="order.instructions" :html="order.instructions" class="mb-5" />
         <button @click="router.push('/orders/query')" class="w-full bg-primary text-white text-sm font-semibold py-2.5 rounded-card hover:bg-primary-hover transition">{{ t('order.payResult.viewOrderDetail') }}</button>
       </template>
 

@@ -29,7 +29,9 @@ class OrderService
     public function createOrder(int $productId, ?int $skuId, int $qty, array $customer, ?string $displayCurrency = null): Order
     {
         $product = Product::with('skus')->findOrFail($productId);
-        $premium = ($product->pick_type ?? 'general') === 'premium';
+        $fulfillmentType = $product->resolvedFulfillmentType();
+        $premium = $fulfillmentType === Product::FULFILLMENT_AUTO_CARD
+            && ($product->pick_type ?? 'general') === 'premium';
         $cardId = $customer['card_id'] ?? null;
 
         // 靓号自选:单价来自所选卡密(第二段价格),qty 强制 1
@@ -99,12 +101,10 @@ class OrderService
             $amount = max(0, $amount - $discountAmount);
         }
 
-        return DB::transaction(function () use ($productId, $skuId, $qty, $customer, $product, $amount, $discountAmount, $couponCode, $coupon, $displayCurrency, $subsite, $subsiteId, $subsiteDomain, $baseUnitPrice, $unitPrice, $profitEligible, $profitBlockReason, $premium, $cardId) {
-            // 上游商品:跳过锁卡(无本地卡),付款后由 UpstreamOrderService 拿货
-            $isUpstream = ! empty($product->upstream_source_id);
+        return DB::transaction(function () use ($productId, $skuId, $qty, $customer, $product, $amount, $discountAmount, $couponCode, $coupon, $displayCurrency, $subsite, $subsiteId, $subsiteDomain, $baseUnitPrice, $unitPrice, $profitEligible, $profitBlockReason, $premium, $cardId, $fulfillmentType) {
             $cards = collect();
 
-            if (! $isUpstream) {
+            if ($fulfillmentType === Product::FULFILLMENT_AUTO_CARD) {
                 if ($premium) {
                     // 靓号自选:锁客户选定的那张卡(事务内再次校验未被占用)
                     $cards = Card::where('product_id', $productId)
@@ -170,7 +170,13 @@ class OrderService
                 'sku_name' => $skuName,
                 'status' => 'pending',
                 'delivery_status' => 'pending',
+                'fulfillment_type_snapshot' => $fulfillmentType,
                 'contact' => $customer['contact'] ?? null,
+                // 创建订单时锁定付款后说明，后续商品编辑不影响历史订单。
+                'instructions_snapshot' => $product->leave_message ?: null,
+                'delivery_message_snapshot' => $fulfillmentType === Product::FULFILLMENT_FIXED
+                    ? ($product->delivery_message ?: null)
+                    : null,
                 'create_ip' => $customer['create_ip'] ?? null,
                 'create_device' => $customer['create_device'] ?? null,
                 'extra' => $extra,
@@ -199,8 +205,8 @@ class OrderService
                 ]);
             }
 
-            // 锁定卡密(仅本地商品;上游商品付款后由 UpstreamOrderService 拿货)
-            if (! $isUpstream) {
+            // 仅自动卡密商品在下单时锁库存；其他类型在付款后按各自履约流程处理。
+            if ($fulfillmentType === Product::FULFILLMENT_AUTO_CARD) {
                 $cards->each->update([
                     'status' => Card::STATUS_LOCKED,
                     'locked_at' => now(),
@@ -421,11 +427,14 @@ class OrderService
             'display_currency' => $o->display_currency,
             'exchange_rate' => $o->exchange_rate,
             'status' => $o->status,
+            'delivery_status' => $o->delivery_status,
+            'fulfillment_type' => $o->fulfillment_type_snapshot,
             'created_at' => $o->created_at?->toIso8601String(),
             'paid_at' => $o->paid_at?->toIso8601String(),
             'cards' => $o->status === 'paid'
                 ? ($o->orderDeliveries?->map(fn ($d) => $d->card_content)->toArray() ?? [])
                 : [],
+            'instructions' => $o->status === 'paid' ? ($o->instructions_snapshot ?: null) : null,
         ])->toArray();
     }
 
@@ -441,6 +450,8 @@ class OrderService
         return [
             'order_no' => $order->order_no,
             'status' => $order->status,
+            'delivery_status' => $order->delivery_status,
+            'fulfillment_type' => $order->fulfillment_type_snapshot,
             'product_name' => $order->product?->name,
             'quantity' => $order->quantity,
             'amount' => $order->amount,
@@ -450,6 +461,7 @@ class OrderService
             'created_at' => $order->created_at,
             'paid_at' => $order->paid_at,
             'cards' => $cards,
+            'instructions' => $order->status === 'paid' ? ($order->instructions_snapshot ?: null) : null,
             'extra' => $order->extra,
         ];
     }
@@ -480,10 +492,15 @@ class OrderService
             'display_currency' => $o->display_currency,
             'exchange_rate' => $o->exchange_rate,
             'status' => $o->status,
+            'delivery_status' => $o->delivery_status,
+            'fulfillment_type' => $o->fulfillment_type_snapshot,
             'created_at' => $o->created_at?->toIso8601String(),
             'paid_at' => $o->paid_at?->toIso8601String(),
             'reviewed' => in_array($o->id, $reviewedOrderIds, true),
-            'cards' => $o->orderDeliveries?->map(fn ($d) => $d->card_content)->toArray() ?? [],
+            'cards' => $o->status === 'paid'
+                ? ($o->orderDeliveries?->map(fn ($d) => $d->card_content)->toArray() ?? [])
+                : [],
+            'instructions' => $o->status === 'paid' ? ($o->instructions_snapshot ?: null) : null,
         ])->toArray();
     }
 

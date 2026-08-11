@@ -442,7 +442,7 @@
               </ElSelect>
             </ElFormItem>
 
-            <ElFormItem :label="t('zcard.product.pickType')">
+            <ElFormItem v-if="formData.fulfillment_type === 'auto_card'" :label="t('zcard.product.pickType')">
               <ElRadioGroup v-model="formData.pick_type">
                 <ElRadio value="general">{{ t('zcard.product.pickGeneral') }}</ElRadio>
                 <ElRadio value="premium">{{ t('zcard.product.pickPremium') }}</ElRadio>
@@ -457,7 +457,7 @@
               <span class="ml-2">{{ formData.stock_visible ? t('zcard.product.show') : t('zcard.product.hide') }}</span>
             </ElFormItem>
 
-            <ElFormItem :label="t('zcard.product.actualStock')">
+            <ElFormItem v-if="formData.fulfillment_type === 'auto_card' || formData.fulfillment_type === 'upstream'" :label="t('zcard.product.actualStock')">
               <ElTag :type="actualStock > 0 ? 'success' : 'info'">{{ actualStock }}</ElTag>
               <span class="form-hint">{{ t('zcard.product.virtualStockHint') }}</span>
             </ElFormItem>
@@ -552,19 +552,57 @@
 
           <!-- Tab 4: 发货设置 -->
           <ElTabPane :label="t('zcard.product.deliverySettings')" name="delivery">
-            <ElFormItem :label="t('zcard.product.deliveryModeRadio')">
+            <ElFormItem :label="t('zcard.product.fulfillmentType')" required>
+              <ElRadioGroup
+                v-model="formData.fulfillment_type"
+                :disabled="isUpstreamProduct"
+                class="fulfillment-options"
+              >
+                <ElRadio value="auto_card" border>{{ t('zcard.product.fulfillmentAutoCard') }}</ElRadio>
+                <ElRadio value="fixed" border>{{ t('zcard.product.fulfillmentFixed') }}</ElRadio>
+                <ElRadio value="manual" border>{{ t('zcard.product.fulfillmentManual') }}</ElRadio>
+                <ElRadio v-if="isUpstreamProduct" value="upstream" border>
+                  {{ t('zcard.product.fulfillmentUpstream') }}
+                </ElRadio>
+              </ElRadioGroup>
+              <span class="form-hint">{{ fulfillmentTypeHint }}</span>
+            </ElFormItem>
+
+            <ElAlert
+              v-if="formData.fulfillment_type === 'manual'"
+              type="warning"
+              :closable="false"
+              :title="t('zcard.product.fulfillmentManualAlert')"
+              class="mb-4"
+            />
+            <ElAlert
+              v-else-if="formData.fulfillment_type === 'upstream'"
+              type="info"
+              :closable="false"
+              :title="t('zcard.product.fulfillmentUpstreamAlert')"
+              class="mb-4"
+            />
+
+            <ElFormItem
+              v-if="formData.fulfillment_type === 'auto_card'"
+              :label="t('zcard.product.deliveryModeRadio')"
+            >
               <ElRadioGroup v-model="formData.delivery_mode">
                 <ElRadio value="status">{{ t('zcard.product.deliveryStatus') }}</ElRadio>
                 <ElRadio value="delete">{{ t('zcard.product.deliveryDelete') }}</ElRadio>
               </ElRadioGroup>
             </ElFormItem>
 
-            <ElFormItem :label="t('zcard.product.dedup')">
+            <ElFormItem v-if="formData.fulfillment_type === 'auto_card'" :label="t('zcard.product.dedup')">
               <ElSwitch v-model="formData.dedup" />
               <span class="form-hint">{{ t('zcard.product.dedupHint') }}</span>
             </ElFormItem>
 
-            <ElFormItem :label="t('zcard.product.deliveryMessage')">
+            <ElFormItem
+              v-if="formData.fulfillment_type === 'fixed'"
+              :label="t('zcard.product.fixedDeliveryContent')"
+              required
+            >
               <ElInput
                 v-model="formData.delivery_message"
                 type="textarea"
@@ -575,10 +613,10 @@
             </ElFormItem>
 
             <ElFormItem :label="t('zcard.product.leaveMessage')">
-              <ElInput
+              <ArtWangEditor
                 v-model="formData.leave_message"
-                type="textarea"
-                :rows="4"
+                height="260px"
+                mode="default"
                 :placeholder="t('zcard.product.leaveMessageHint')"
               />
               <span class="form-hint">{{ t('zcard.product.leaveMessageHint') }}</span>
@@ -1211,6 +1249,7 @@
     factoryPriceYuan: number
     draftPremiumYuan: number
     stock_type: string
+    fulfillment_type: 'auto_card' | 'fixed' | 'manual' | 'upstream'
     stock_visible: boolean
     delivery_mode: string
     is_featured: boolean
@@ -1245,6 +1284,7 @@
     factoryPriceYuan: 0,
     draftPremiumYuan: 0,
     stock_type: 'card',
+    fulfillment_type: 'auto_card',
     stock_visible: true,
     delivery_mode: 'status',
     is_featured: false,
@@ -1266,6 +1306,15 @@
   })
 
   const formData = reactive<ProductForm>(createEmptyForm())
+  const isUpstreamProduct = ref(false)
+  const fulfillmentTypeHint = computed(() =>
+    t(`zcard.product.fulfillment${{
+      auto_card: 'AutoCard',
+      fixed: 'Fixed',
+      manual: 'Manual',
+      upstream: 'Upstream'
+    }[formData.fulfillment_type]}Hint`)
+  )
   const memberPriceText = ref('')
   /** 会员等级价格行:group_id 关联到 user_groups,label 为只读名称 */
   interface MemberLevel {
@@ -1618,6 +1667,7 @@
   /** 打开新增抽屉 */
   const openCreate = () => {
     drawerType.value = 'create'
+    isUpstreamProduct.value = false
     editId.value = null
     activeTab.value = 'basic'
     actualStock.value = 0
@@ -1638,6 +1688,7 @@
     drawerType.value = 'edit'
     editId.value = row.id
     activeTab.value = 'basic'
+    isUpstreamProduct.value = !!row.upstream_source_id || row.fulfillment_type === 'upstream'
     // 先用列表行预填,然后再拉详情补全
     Object.assign(formData, createEmptyForm(), {
       name: row.name,
@@ -1652,6 +1703,7 @@
       factoryPriceYuan: Number(((Number(row.factory_price) || 0) / 100).toFixed(2)),
       draftPremiumYuan: Number(((Number(row.draft_premium) || 0) / 100).toFixed(2)),
       stock_type: row.stock_type || 'card',
+      fulfillment_type: row.fulfillment_type || (row.upstream_source_id ? 'upstream' : 'auto_card'),
       stock_visible: row.stock_visible !== false,
       delivery_mode: row.delivery_mode || 'status',
       is_featured: !!row.is_featured,
@@ -1685,6 +1737,8 @@
         send_email: detail.send_email !== false,
         delivery_message: (detail.delivery_message as string) || '',
         leave_message: (detail.leave_message as string) || '',
+        fulfillment_type: (detail.fulfillment_type as ProductForm['fulfillment_type'])
+          || (detail.upstream_source_id ? 'upstream' : 'auto_card'),
         only_user: !!detail.only_user,
         purchase_limit: Number(detail.purchase_limit) || 0,
         hide: !!detail.hide,
@@ -1710,6 +1764,7 @@
       hydrateVirtualReviews(detail.virtual_reviews)
       // 实际库存(详情接口中的 cards count 通常不在 show,以列表 stock 兜底)
       if (typeof detail.stock === 'number') actualStock.value = detail.stock
+      isUpstreamProduct.value = !!detail.upstream_source_id || formData.fulfillment_type === 'upstream'
     } catch {
       // 错误消息由 http 拦截器统一提示
     }
@@ -1728,6 +1783,7 @@
     skuList.value = []
     editId.value = null
     actualStock.value = 0
+    isUpstreamProduct.value = false
   }
 
   /** 提交表单(新增/编辑) */
@@ -1736,6 +1792,11 @@
     try {
       await formRef.value.validate()
     } catch {
+      return
+    }
+    if (formData.fulfillment_type === 'fixed' && !formData.delivery_message.trim()) {
+      activeTab.value = 'delivery'
+      ElMessage.warning(t('zcard.product.fixedDeliveryRequired'))
       return
     }
 
@@ -1758,6 +1819,7 @@
       factory_price: Math.round(formData.factoryPriceYuan * 100),
       draft_premium: Math.round(formData.draftPremiumYuan * 100),
       stock_type: formData.stock_type,
+      fulfillment_type: formData.fulfillment_type,
       stock_visible: formData.stock_visible,
       delivery_mode: formData.delivery_mode,
       is_featured: formData.is_featured,
@@ -1768,8 +1830,9 @@
       status: formData.status,
       contact_type: formData.contact_type,
       send_email: formData.send_email,
-      delivery_message: formData.delivery_message || undefined,
-      leave_message: formData.leave_message || undefined,
+      delivery_message: formData.delivery_message,
+      // 保留空字符串，否则编辑时无法清空已保存的付款后说明。
+      leave_message: formData.leave_message,
       only_user: formData.only_user,
       purchase_limit: formData.purchase_limit,
       hide: formData.hide,

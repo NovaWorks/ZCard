@@ -272,7 +272,7 @@ class AcgFakaDriver implements SupplyDriver
             factoryPrice: isset($p['factory_price']) ? (int) round((float) $p['factory_price'] * 100) : 0,
             categoryCode: $categoryId !== null ? (string) $categoryId : ($p['category_id'] ?? null),
             categoryName: $categoryName,
-            description: $p['introduce'] ?? ($p['description'] ?? null),
+            description: $p['description'] ?? ($p['introduce'] ?? null),
             cover: $p['cover'] ?? null,
             isActive: true,
             // items 接口对「卡密自动发货」商品(delivery_way=0)会带 stock 字段,

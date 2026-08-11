@@ -64,7 +64,9 @@ class DujiaoNextDriverProtocolTest extends TestCase
                 'ok' => true,
                 'product' => [
                     'id' => 42,
-                    'title' => 'Gmail 账号',
+                    'title' => ['zh-CN' => 'Gmail 账号', 'en-US' => 'Gmail account'],
+                    'description' => ['zh-CN' => '商品简介'],
+                    'content' => ['zh-CN' => '<h2>完整教程</h2><p>登录后修改密码</p>'],
                     'price_amount' => '6.50',
                     'wholesale_prices' => [['min_quantity' => 1, 'unit_price' => '5.00']],
                     'category_id' => 3,
@@ -83,11 +85,32 @@ class DujiaoNextDriverProtocolTest extends TestCase
         $this->assertNotNull($p);
         $this->assertSame('42', $p->code);
         $this->assertSame('Gmail 账号', $p->name);
+        $this->assertStringContainsString('完整教程', $p->description);
         $this->assertSame(650, $p->price);          // 商品级 price_amount 元→分
         $this->assertSame(500, $p->factoryPrice);   // wholesale_prices[0]
         $this->assertCount(2, $p->skus);            // 只保留启用 SKU(1003 is_active=false 排除)
         $this->assertSame('1001', $p->skus[0]['code']);   // 第一个启用 SKU 的 id
         $this->assertSame(12, $p->stockQuantity);   // 库存来自第一个启用 SKU
+    }
+
+    public function test_list_categories_reads_localized_name(): void
+    {
+        Http::fake([
+            'dujiao.test/*' => Http::response([
+                'ok' => true,
+                'categories' => [[
+                    'id' => 3,
+                    'parent_id' => 0,
+                    'name' => ['zh-CN' => '账号专区', 'en-US' => 'Accounts'],
+                    'sort_order' => 10,
+                ]],
+            ]),
+        ]);
+
+        $categories = $this->driver()->listCategories();
+
+        $this->assertCount(1, $categories);
+        $this->assertSame('账号专区', $categories[0]->name);
     }
 
     public function test_create_order_uses_sku_id_of_first_active_sku(): void

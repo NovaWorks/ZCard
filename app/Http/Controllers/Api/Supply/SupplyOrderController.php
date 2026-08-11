@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\Supply;
 
 use App\Http\Controllers\Controller;
-use App\Models\Card;
 use App\Models\SupplyOrder;
 use App\Supply\CallbackUrlGuard;
 use App\Supply\Exceptions\SupplyApiException;
@@ -42,9 +41,10 @@ class SupplyOrderController extends Controller
                 'order_id' => $result['order_id'],
                 'amount' => $result['amount'],
                 'fulfillment' => [
-                    'type' => 'auto',
-                    'status' => 'delivered',
+                    'type' => $result['fulfillment_type'],
+                    'status' => $result['delivery_status'],
                     'cards' => $result['cards'],
+                    'instructions' => $result['instructions'],
                 ],
             ], 201);
         } catch (SupplyApiException $e) {
@@ -65,7 +65,7 @@ class SupplyOrderController extends Controller
         }
 
         $order = $supplyOrder->order;
-        $cards = Card::where('order_id', $order->id)->where('status', Card::STATUS_USED)->pluck('content')->all();
+        $cards = $order->orderDeliveries()->pluck('card_content')->all();
 
         return response()->json([
             'ok' => true,
@@ -73,7 +73,14 @@ class SupplyOrderController extends Controller
             'order_no' => $order->order_no,
             'status' => $order->status,
             'amount' => (int) $order->amount,
-            'fulfillment' => ['type' => 'auto', 'status' => $order->delivery_status, 'cards' => $cards],
+            'fulfillment' => [
+                'type' => $order->fulfillment_type_snapshot,
+                'status' => $order->delivery_status,
+                'cards' => $cards,
+                'instructions' => $order->delivery_status === 'delivered'
+                    ? ($order->instructions_snapshot ?: null)
+                    : null,
+            ],
         ]);
     }
 

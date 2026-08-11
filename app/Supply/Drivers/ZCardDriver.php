@@ -10,6 +10,7 @@ use App\Supply\Dto\UpstreamFulfillment;
 use App\Supply\Dto\UpstreamOrder;
 use App\Supply\Dto\UpstreamProduct;
 use App\Supply\HmacSigner;
+use App\Support\StorefrontConfig;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -89,14 +90,7 @@ class ZCardDriver implements SupplyDriver
         } catch (\Throwable $e) {
             // 分类接口失败不阻塞商品拉取
         }
-        $items = collect($data['items'] ?? [])->map(fn ($p) => new UpstreamProduct(
-            code: (string) $p['id'], name: $p['name'], price: $p['price'] ?? 0, factoryPrice: $p['price'] ?? 0,
-            categoryCode: isset($p['category_id']) ? (string) $p['category_id'] : null,
-            categoryName: isset($p['category_id']) ? ($catNames[(string) $p['category_id']] ?? null) : null,
-            description: $p['description'] ?? null, cover: $p['cover'] ?? null,
-            // ZCard 供货 API 不返回库存数,默认无限(下游同步时 stock_cache 写 -1)
-            stockQuantity: -1,
-        ))->all();
+        $items = collect($data['items'] ?? [])->map(fn ($p) => $this->mapProduct($p, $catNames))->all();
 
         // 分页:上游按 page_size(默认50)分页返回 total,必须推导 has_more,
         // 否则 listAllProducts 只取第 1 页,第 2 页起商品丢失(导入/同步漏商品)。
@@ -113,7 +107,7 @@ class ZCardDriver implements SupplyDriver
         $data = $this->getJson($path, [], $this->signedHeaders('GET', $path));
         $p = $data['product'] ?? null;
 
-        return $p ? new UpstreamProduct(code: (string) $p['id'], name: $p['name'], price: $p['price'] ?? 0, factoryPrice: $p['price'] ?? 0) : null;
+        return $p ? $this->mapProduct($p) : null;
     }
 
     public function getStock(string $code, ?string $skuCode = null): int
@@ -128,20 +122,39 @@ class ZCardDriver implements SupplyDriver
     {
         $path = '/api/supply/orders';
         // 签名与发送共用 $bodyStr,保证服务端 md5(原始 body) 与本地口径一致
-        $bodyStr = $this->encodeBody(['product_id' => (int) $params['product_code'], 'quantity' => $params['quantity'], 'downstream_order_no' => $params['downstream_order_no']]);
+        $bodyStr = $this->encodeBody([
+            'product_id' => (int) $params['product_code'],
+            'quantity' => $params['quantity'],
+            'downstream_order_no' => $params['downstream_order_no'],
+            'callback_url' => $params['callback_url'] ?? null,
+        ]);
         $data = $this->postRaw($path, $bodyStr, $this->signedHeaders('POST', $path, $bodyStr));
-        $cards = $data['fulfillment']['cards'] ?? [];
+        $payload = $data['fulfillment'] ?? [];
+        $fulfillment = ($payload['status'] ?? '') === 'delivered'
+            ? new UpstreamFulfillment(
+                status: 'delivered',
+                cards: $payload['cards'] ?? [],
+                instructions: $payload['instructions'] ?? null,
+            )
+            : null;
 
-        return new UpstreamOrder(id: (string) $data['supply_order_id'], status: $data['fulfillment']['status'] ?? 'pending', amount: $data['amount'] ?? 0, fulfillment: $cards ? new UpstreamFulfillment(status: 'delivered', cards: $cards) : null);
+        return new UpstreamOrder(id: (string) $data['supply_order_id'], status: $payload['status'] ?? 'pending', amount: $data['amount'] ?? 0, fulfillment: $fulfillment);
     }
 
     public function getOrder(string $upstreamOrderId): UpstreamOrder
     {
         $path = "/api/supply/orders/{$upstreamOrderId}";
         $data = $this->getJson($path, [], $this->signedHeaders('GET', $path));
-        $cards = $data['fulfillment']['cards'] ?? [];
+        $payload = $data['fulfillment'] ?? [];
+        $fulfillment = ($payload['status'] ?? '') === 'delivered'
+            ? new UpstreamFulfillment(
+                status: 'delivered',
+                cards: $payload['cards'] ?? [],
+                instructions: $payload['instructions'] ?? null,
+            )
+            : null;
 
-        return new UpstreamOrder(id: $upstreamOrderId, status: $data['fulfillment']['status'] ?? 'pending', amount: $data['amount'] ?? 0, fulfillment: $cards ? new UpstreamFulfillment(status: 'delivered', cards: $cards) : null);
+        return new UpstreamOrder(id: $upstreamOrderId, status: $payload['status'] ?? 'pending', amount: $data['amount'] ?? 0, fulfillment: $fulfillment);
     }
 
     public function cancelOrder(string $upstreamOrderId): bool
@@ -158,12 +171,43 @@ class ZCardDriver implements SupplyDriver
         $sig = $request->header('X-Supply-Signature');
         $ts = $request->header('X-Supply-Timestamp');
         $nonce = $request->header('X-Supply-Nonce');
+        if (! $sig || ! $ts || ! $nonce) {
+            return null;
+        }
+        $skew = (int) StorefrontConfig::get('supply_timestamp_skew', 300);
+        if (! HmacSigner::timestampValid((int) $ts, $skew)) {
+            return null;
+        }
         $ss = HmacSigner::buildSignString('POST', $request->getPathInfo(), $ts, $nonce, md5($request->getContent() ?: ''));
         if (! HmacSigner::verify($creds['api_secret'], $ss, $sig)) {
             return null;
         }
         $data = $request->json()->all();
 
-        return ['upstream_order_id' => (string) ($data['supply_order_id'] ?? ''), 'status' => $data['status'] ?? '', 'cards' => $data['fulfillment']['cards'] ?? [], 'downstream_order_no' => $data['downstream_order_no'] ?? null];
+        return [
+            'upstream_order_id' => (string) ($data['supply_order_id'] ?? ''),
+            'status' => $data['status'] ?? '',
+            'cards' => $data['fulfillment']['cards'] ?? [],
+            'instructions' => $data['fulfillment']['instructions'] ?? null,
+            'downstream_order_no' => $data['downstream_order_no'] ?? null,
+        ];
+    }
+
+    /** @param array<string, string> $categoryNames */
+    private function mapProduct(array $p, array $categoryNames = []): UpstreamProduct
+    {
+        $categoryCode = isset($p['category_id']) ? (string) $p['category_id'] : null;
+
+        return new UpstreamProduct(
+            code: (string) $p['id'],
+            name: $p['name'] ?? '',
+            price: $p['price'] ?? 0,
+            factoryPrice: $p['price'] ?? 0,
+            categoryCode: $categoryCode,
+            categoryName: $categoryCode !== null ? ($categoryNames[$categoryCode] ?? null) : null,
+            description: $p['description'] ?? null,
+            cover: $p['cover'] ?? null,
+            stockQuantity: -1,
+        );
     }
 }

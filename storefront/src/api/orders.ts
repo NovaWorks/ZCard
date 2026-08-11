@@ -8,6 +8,9 @@ export interface OrderDetail {
   id?: number
   order_no: string; status: string; product_name?: string; product_cover?: string | null
   product_id?: number; quantity: number; amount: number; cards: string[]
+  delivery_status?: 'pending' | 'delivered' | 'failed'
+  fulfillment_type?: 'auto_card' | 'fixed' | 'manual' | 'upstream'
+  instructions?: string | null
   created_at: string; paid_at?: string
   amount_base?: number; amount_display?: number; display_currency?: string; exchange_rate?: number
   /** 该订单是否已评价(供"评价"入口显示) */

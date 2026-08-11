@@ -5,21 +5,39 @@ namespace App\Support;
 use App\Events\OrderPaid;
 use App\Models\Card;
 use App\Models\Order;
-use App\Models\OrderDelivery;
+use App\Models\Product;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class DeliveryService
 {
+    public function __construct(private readonly FulfillmentService $fulfillment) {}
+
     /** 监听 OrderPaid 事件 */
     public function handle(OrderPaid $event): void
     {
-        // 上游商品订单:跳过本地发卡(由 UpstreamOrderService 负责拿货发货)
         $order = $event->order->loadMissing('product');
-        if ($order->product && $order->product->upstream_source_id) {
+        // 供货 API 在 SupplyOrderService 内完成履约，不重复消费站内支付事件。
+        if ($order->source === 'supply') {
             return;
         }
 
-        $this->deliver($event->order);
+        $type = $order->fulfillment_type_snapshot ?: $order->product?->resolvedFulfillmentType();
+        if (in_array($type, [Product::FULFILLMENT_UPSTREAM, Product::FULFILLMENT_MANUAL], true)) {
+            return;
+        }
+
+        if ($type === Product::FULFILLMENT_FIXED) {
+            $content = trim((string) $order->delivery_message_snapshot);
+            if ($content === '') {
+                throw new \RuntimeException('固定发货内容为空，无法完成发货');
+            }
+            $this->fulfillment->fulfill($order, [$content], 'fixed');
+
+            return;
+        }
+
+        $this->deliver($order);
     }
 
     /** 发货:按 delivery_mode 写快照 + 处理卡密 */
@@ -30,61 +48,31 @@ class DeliveryService
         $mode = $product->delivery_mode; // status | delete
 
         $cards = Card::where('order_id', $order->id)->get();
-
-        foreach ($cards as $card) {
-            // 写发货快照(明文)
-            OrderDelivery::create([
-                'order_id' => $order->id,
-                'product_id' => $order->product_id,
-                'card_content' => $card->plainContent(),
-                'delivered_mode' => $mode,
-                'delivered_at' => now(),
-            ]);
-
-            // 按模式处理
-            if ($mode === 'delete') {
-                $card->delete();
-            } else {
-                $card->update(['status' => Card::STATUS_USED, 'used_at' => now()]);
-            }
+        if ($cards->isEmpty()) {
+            throw new \RuntimeException('订单未找到已锁定卡密，无法完成自动发货');
         }
 
-        // 更新订单发货状态
-        if ($cards->count() > 0) {
-            $order->update(['delivery_status' => 'delivered']);
-        }
-
-        // 发送邮件通知(如果开启了邮件功能且联系邮箱有效)
-        if ($order->contact && filter_var($order->contact, FILTER_VALIDATE_EMAIL)) {
-            $cardContents = $cards->map(fn ($c) => $c->plainContent())->toArray();
-            // 如果卡密已删除(delete 模式),用发货快照
-            if (empty($cardContents)) {
-                $cardContents = OrderDelivery::where('order_id', $order->id)->pluck('card_content')->toArray();
+        $contents = $cards->map(fn ($card) => $card->plainContent())->all();
+        $delivered = DB::transaction(function () use ($order, $cards, $contents, $mode) {
+            $completed = $this->fulfillment->fulfill($order, $contents, $mode, notify: false);
+            if (! $completed) {
+                return false;
             }
-            try {
-                MailService::sendDeliveryNotification($order->contact, [
-                    'order_no' => $order->order_no,
-                    'product_name' => $product->name,
-                    'quantity' => $order->quantity,
-                    'cards' => $cardContents,
-                ]);
-            } catch (\Throwable $e) {
-                Log::warning("订单 {$order->order_no} 邮件通知失败: {$e->getMessage()}");
-            }
-        }
 
-        // 发送短信通知(#3:如果 contact 是手机号且开启了短信功能)
-        if ($order->contact && preg_match('/^1[3-9]\d{9}$/', $order->contact)) {
-            try {
-                \App\Support\SmsService::sendDeliverySms($order->contact, [
-                    'order_no' => $order->order_no,
-                    'product_name' => $product->name,
-                ]);
-            } catch (\Throwable $e) {
-                Log::warning("订单 {$order->order_no} 短信通知失败: {$e->getMessage()}");
+            foreach ($cards as $card) {
+                if ($mode === 'delete') {
+                    $card->delete();
+                } else {
+                    $card->update(['status' => Card::STATUS_USED, 'used_at' => now()]);
+                }
             }
-        }
 
-        Log::info("订单 {$order->order_no} 发货完成", ['cards' => $cards->count(), 'mode' => $mode]);
+            return true;
+        });
+
+        if ($delivered) {
+            $this->fulfillment->notify($order->fresh(['product', 'orderDeliveries']));
+            Log::info("订单 {$order->order_no} 发货完成", ['cards' => $cards->count(), 'mode' => $mode]);
+        }
     }
 }
