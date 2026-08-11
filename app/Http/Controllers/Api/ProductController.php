@@ -40,6 +40,17 @@ class ProductController extends Controller
             $query->whereIn('category_id', $ids);
         }
 
+        // 缺货商品过滤(后台「显示缺货商品」关闭时):
+        // 本地商品 = 无 unused 卡;上游商品 = stock_cache 为 0(-1 无限、null 未知均显示)
+        if (! StorefrontConfig::get('show_out_of_stock', true)) {
+            $query->where(function ($q) {
+                $q->where(fn ($local) => $local->whereNull('upstream_source_id')
+                    ->whereHas('cards', fn ($c) => $c->where('status', 'unused')))
+                    ->orWhere(fn ($up) => $up->whereNotNull('upstream_source_id')
+                        ->where(fn ($s) => $s->where('stock_cache', '!=', 0)->orWhereNull('stock_cache')));
+            });
+        }
+
         // 分站可见性过滤:排除分站显式下架(is_listed=false)的商品(spec §4)。
         $subsite = $request->attributes->get('subsite');
         if ($subsite) {
@@ -90,6 +101,16 @@ class ProductController extends Controller
     {
         $count = (int) ($request->input('limit', StorefrontConfig::get('featured_count')));
         $query = Product::where('status', true)->where('is_featured', true);
+
+        // 缺货商品过滤(与 index 一致,后台「显示缺货商品」关闭时)
+        if (! StorefrontConfig::get('show_out_of_stock', true)) {
+            $query->where(function ($q) {
+                $q->where(fn ($local) => $local->whereNull('upstream_source_id')
+                    ->whereHas('cards', fn ($c) => $c->where('status', 'unused')))
+                    ->orWhere(fn ($up) => $up->whereNotNull('upstream_source_id')
+                        ->where(fn ($s) => $s->where('stock_cache', '!=', 0)->orWhereNull('stock_cache')));
+            });
+        }
 
         // 分站可见性过滤(与 index 一致)
         $subsite = $request->attributes->get('subsite');

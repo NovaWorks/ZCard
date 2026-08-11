@@ -24,6 +24,8 @@ class StorefrontConfig
             'show_price' => true,
             'show_description' => true,
             'show_reviews' => false,
+            // 是否显示缺货商品:false 时前台列表/推荐不展示库存为 0 的商品
+            'show_out_of_stock' => true,
             'allow_post_review' => true,
             'review_need_audit' => true,
             'show_featured' => true,

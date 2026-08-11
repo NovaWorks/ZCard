@@ -119,6 +119,10 @@
             <ElFormItem :label="t('zcard.setting.showStock')">
               <ElSwitch v-model="form.show_stock" />
             </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.showOutOfStock')">
+              <ElSwitch v-model="form.show_out_of_stock" />
+              <span class="form-tip">{{ t('zcard.setting.showOutOfStockTip') }}</span>
+            </ElFormItem>
             <ElFormItem :label="t('zcard.setting.showSales')">
               <ElSwitch v-model="form.show_sales" />
             </ElFormItem>
@@ -512,6 +516,7 @@
     page_size: number
     default_order: string
     show_stock: boolean
+    show_out_of_stock: boolean
     show_sales: boolean
     show_price: boolean
     show_description: boolean
@@ -608,6 +613,7 @@
     page_size: 12,
     default_order: 'newest',
     show_stock: true,
+    show_out_of_stock: true,
     show_sales: true,
     show_price: true,
     show_description: true,
@@ -801,6 +807,7 @@
         page_size: Number(coerce(data.page_size, d.page_size)),
         default_order: coerce(data.default_order, d.default_order),
         show_stock: coerceBool(data.show_stock, d.show_stock),
+        show_out_of_stock: coerceBool(data.show_out_of_stock, d.show_out_of_stock),
         show_sales: coerceBool(data.show_sales, d.show_sales),
         show_price: coerceBool(data.show_price, d.show_price),
         show_description: coerceBool(data.show_description, d.show_description),

@@ -1313,7 +1313,9 @@
       "brandSecurePlaceholder": "e.g. Secure payment",
       "brandPrivacy": "Privacy (Chinese)",
       "brandPrivacyEn": "Privacy (English)",
-      "brandPrivacyPlaceholder": "e.g. Privacy protected"
+      "brandPrivacyPlaceholder": "e.g. Privacy protected",
+      "showOutOfStock": "Show Out-of-Stock",
+      "showOutOfStockTip": "When off, products with 0 stock are hidden in storefront lists/featured"
     },
     "common": {
       "id": "ID",

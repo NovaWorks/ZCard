@@ -1313,7 +1313,9 @@
       "brandSecurePlaceholder": "如:安全支付",
       "brandPrivacy": "隐私保护(中文)",
       "brandPrivacyEn": "隐私保护(English)",
-      "brandPrivacyPlaceholder": "如:隐私保护"
+      "brandPrivacyPlaceholder": "如:隐私保护",
+      "showOutOfStock": "显示缺货商品",
+      "showOutOfStockTip": "关闭后,前台商品列表/推荐不展示库存为 0 的商品"
     },
     "common": {
       "id": "ID",
