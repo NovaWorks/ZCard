@@ -89,11 +89,8 @@ class AuthController extends Controller
             'captcha' => 'nullable|string',
         ]);
 
-        // 登录验证码校验
-        // 管理端(sysadmin)登录页只有滑块验证、无图形验证码输入框:
-        // 带 X-Client: sysadmin 头时跳过图形验证码(防暴力由路由 throttle 限流承担)。
-        $isAdminClient = $request->header('X-Client') === 'sysadmin';
-        if (CaptchaService::isEnabled('login') && ! $isAdminClient) {
+        // 登录验证码校验(前台与后台共用;后台登录页在开启时同样显示并输入验证码)
+        if (CaptchaService::isEnabled('login')) {
             if (! CaptchaService::verify('login', $data['captcha'] ?? null)) {
                 throw ValidationException::withMessages([
                     'captcha' => [__('messages.captcha_error')],

@@ -7,10 +7,11 @@ use App\Models\User;
 use App\Support\StorefrontConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Mews\Captcha\Facades\Captcha;
 use Tests\TestCase;
 
 /**
- * 登录验证码:管理端(X-Client: sysadmin)跳过图形验证码,前台仍校验。
+ * 登录验证码:后台开启后,前台与后台(带 X-Client: sysadmin 头)都必须输入验证码。
  */
 class AdminLoginCaptchaTest extends TestCase
 {
@@ -23,21 +24,40 @@ class AdminLoginCaptchaTest extends TestCase
             'decimal_places' => 2, 'exchange_rate' => '1', 'is_base' => true,
             'is_enabled' => true, 'sort' => 0,
         ]);
-        // 开启登录验证码
         StorefrontConfig::setMany(['captcha_login' => true]);
         Cache::flush();
     }
 
-    public function test_sysadmin_login_skips_captcha(): void
+    public function test_sysadmin_login_requires_captcha_when_enabled(): void
     {
         $this->seedBase();
         $user = User::factory()->create(['password' => bcrypt('password123')]);
+
+        // 管理端不带 captcha → 同样报验证码错误
+        $resp = $this->withHeaders(['X-Client' => 'sysadmin'])
+            ->postJson('/api/auth/login', [
+                'email' => $user->email,
+                'password' => 'password123',
+            ]);
+
+        $resp->assertStatus(422);
+        $resp->assertJsonValidationErrors('captcha');
+    }
+
+    public function test_sysadmin_login_succeeds_with_valid_captcha(): void
+    {
+        $this->seedBase();
+        $user = User::factory()->create(['password' => bcrypt('password123')]);
+
+        // 预置验证码到 session(模拟用户输入正确验证码)
+        $this->withSession(['captcha.login' => ['key' => 'test-key', 'phrase' => '123456']]);
+        Captcha::shouldReceive('check')->andReturn(true);
 
         $resp = $this->withHeaders(['X-Client' => 'sysadmin'])
             ->postJson('/api/auth/login', [
                 'email' => $user->email,
                 'password' => 'password123',
-                // 不带 captcha —— 管理端滑块场景
+                'captcha' => '123456',
             ]);
 
         $resp->assertOk();
@@ -54,7 +74,6 @@ class AdminLoginCaptchaTest extends TestCase
             'password' => 'password123',
         ]);
 
-        // 前台无 X-Client 头 → 仍校验验证码 → 报验证码错误
         $resp->assertStatus(422);
         $resp->assertJsonValidationErrors('captcha');
     }

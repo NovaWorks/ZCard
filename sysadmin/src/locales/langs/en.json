@@ -164,7 +164,8 @@
       "email": "Please enter your email",
       "username": "Please enter your account",
       "password": "Please enter your password",
-      "slider": "Please slide to verify"
+      "slider": "Please slide to verify",
+      "captcha": "Enter captcha"
     },
     "sliderText": "Please slide to verify",
     "sliderSuccessText": "Verification successful",
@@ -176,7 +177,8 @@
     "success": {
       "title": "Login successful",
       "message": "Welcome back"
-    }
+    },
+    "captchaRefresh": "Click to refresh captcha"
   },
   "forgetPassword": {
     "title": "Forgot password?",

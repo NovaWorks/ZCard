@@ -139,8 +139,8 @@ export const useUserStore = defineStore(
      * @param email 邮箱
      * @param password 密码
      */
-    const login = async (email: string, password: string) => {
-      const { token, user } = await fetchLoginApi({ email, password })
+    const login = async (email: string, password: string, captcha?: string) => {
+      const { token, user } = await fetchLoginApi({ email, password, captcha })
       if (!token) throw new Error('Login failed - no token received')
       accessToken.value = token
       isLogin.value = true

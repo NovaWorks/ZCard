@@ -164,7 +164,8 @@
       "email": "请输入邮箱",
       "username": "请输入账号",
       "password": "请输入密码",
-      "slider": "请拖动滑块完成验证"
+      "slider": "请拖动滑块完成验证",
+      "captcha": "请输入验证码"
     },
     "sliderText": "按住滑块拖动",
     "sliderSuccessText": "验证成功",
@@ -176,7 +177,8 @@
     "success": {
       "title": "登录成功",
       "message": "欢迎回来"
-    }
+    },
+    "captchaRefresh": "点击刷新验证码"
   },
   "forgetPassword": {
     "title": "忘记密码？",

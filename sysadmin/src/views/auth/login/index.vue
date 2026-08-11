@@ -61,6 +61,26 @@
               </p>
             </div>
 
+            <!-- 图形验证码(后台开启登录验证码时显示) -->
+            <ElFormItem v-if="captchaEnabled" prop="captcha" class="login-captcha-item">
+              <div class="flex w-full items-center gap-2">
+                <ElInput
+                  v-model.trim="formData.captcha"
+                  :placeholder="$t('login.placeholder.captcha')"
+                  class="flex-1"
+                  maxlength="6"
+                />
+                <img
+                  v-if="captchaSrc"
+                  :src="captchaSrc"
+                  class="h-9 w-28 cursor-pointer rounded-md border border-gray-200 object-cover"
+                  :alt="$t('login.placeholder.captcha')"
+                  :title="$t('login.captchaRefresh')"
+                  @click="loadCaptcha"
+                />
+              </div>
+            </ElFormItem>
+
             <div class="flex-cb mt-2 text-sm">
               <ElCheckbox v-model="formData.rememberPassword">{{
                 $t('login.rememberPwd')
@@ -80,13 +100,6 @@
               >
                 {{ $t('login.btnText') }}
               </ElButton>
-            </div>
-
-            <div class="mt-5 text-sm text-gray-600">
-              <span>{{ $t('login.noAccount') }}</span>
-              <RouterLink class="text-theme" :to="{ name: 'Register' }">{{
-                $t('login.register')
-              }}</RouterLink>
             </div>
           </ElForm>
         </div>
@@ -129,7 +142,26 @@
   const formData = reactive({
     email: '',
     password: '',
-    rememberPassword: true
+    rememberPassword: true,
+    captcha: ''
+  })
+
+  // 图形验证码(后台开启登录验证码时显示并校验)
+  const captchaEnabled = ref(false)
+  const captchaSrc = ref('')
+  const loadCaptcha = async () => {
+    try {
+      const res = await fetch(`/api/captcha/config?scene=login&t=${Date.now()}`)
+      const data = await res.json()
+      captchaEnabled.value = !!data.enabled
+      captchaSrc.value = data.src || ''
+      if (!data.enabled) formData.captcha = ''
+    } catch {
+      captchaEnabled.value = false
+    }
+  }
+  onMounted(() => {
+    loadCaptcha()
   })
 
   const rules = computed<FormRules>(() => ({
@@ -159,9 +191,9 @@
 
       loading.value = true
 
-      // ZCard 登录（email + password），userStore.login 已存储 token 和用户信息
-      const { email, password } = formData
-      await userStore.login(email, password)
+      // ZCard 登录（email + password [+ captcha]），userStore.login 已存储 token 和用户信息
+      const { email, password, captcha } = formData
+      await userStore.login(email, password, captchaEnabled.value ? captcha : undefined)
 
       // 登录成功处理
       showLoginSuccessNotice()
@@ -175,6 +207,11 @@
         // HTTP 拦截器已展示错误消息
       } else {
         console.error('[Login] Unexpected error:', error)
+      }
+      // 登录失败刷新图形验证码
+      if (captchaEnabled.value) {
+        formData.captcha = ''
+        loadCaptcha()
       }
     } finally {
       loading.value = false
