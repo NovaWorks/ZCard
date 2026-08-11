@@ -162,7 +162,7 @@ class SupplySyncServiceTest extends TestCase
             code: 'UP_LONG_1', name: $longName, price: 800, factoryPrice: 500,
         ));
 
-        $this->assertLessThanOrEqual(500, mb_strlen($product->fresh()->name));
-        $this->assertLessThanOrEqual(250, mb_strlen($product->fresh()->slug));
+        $this->assertLessThanOrEqual(145, mb_strlen($product->fresh()->name));
+        $this->assertLessThanOrEqual(145, mb_strlen($product->fresh()->slug));
     }
 }

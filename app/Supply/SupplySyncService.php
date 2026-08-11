@@ -59,7 +59,7 @@ class SupplySyncService
             // 例外1:price<=0 是导入定价失败的脏数据,重算。
             // 例外2:勾选导入显式传了 pricing → 按本次所选策略重新定价。
             $update = [
-                'name' => $this->truncate($dto->name, 500),
+                'name' => $this->truncate($dto->name, 145),
                 'description' => $this->normalizeDescription($source, $dto->description),
                 'cover' => $this->normalizeCover($source, $dto->cover),
                 'images' => $this->normalizeImages($source, $dto->images, $dto->cover),
@@ -102,8 +102,8 @@ class SupplySyncService
     {
         return Product::create([
             'merchant_id' => self::MAIN_MERCHANT_ID,
-            'name' => $this->truncate($dto->name, 500),
-            'slug' => $this->truncate($this->uniqueSlug($dto->name, $dto->code, $unique), 250),
+            'name' => $this->truncate($dto->name, 145),
+            'slug' => $this->truncate($this->uniqueSlug($dto->name, $dto->code, $unique), 145),
             'description' => $this->normalizeDescription($source, $dto->description),
             'cover' => $this->normalizeCover($source, $dto->cover),
             'images' => $this->normalizeImages($source, $dto->images, $dto->cover),
