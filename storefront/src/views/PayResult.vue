@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { queryOrders, getMyOrders, type OrderDetail } from '@/api/orders'
 import { formatMoney } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
+import { useSettingsStore } from '@/stores/settings'
 import AppIcon from '@/components/AppIcon.vue'
 
 const route = useRoute()
@@ -34,6 +35,36 @@ watch(qrcodeContent, async (v) => {
     renderQrcode()
   }
 }, { immediate: true })
+
+// 订单金额 + 倒计时(后台「订单超时关闭(分钟)」,默认 15)
+const settings = useSettingsStore()
+const countdown = ref(0)
+let countdownTimer: ReturnType<typeof setInterval> | null = null
+const closeMinutes = computed(() => Number(settings.config?.order_close_minutes) || 15)
+const countdownText = computed(() => {
+  const s = Math.max(0, countdown.value)
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+})
+function startCountdown(createdAt?: string) {
+  if (!createdAt) return
+  stopCountdown()
+  const created = new Date(createdAt.replace(' ', 'T')).getTime()
+  if (Number.isNaN(created)) return
+  const deadline = created + closeMinutes.value * 60 * 1000
+  const tick = () => {
+    countdown.value = Math.round((deadline - Date.now()) / 1000)
+    if (countdown.value <= 0) stopCountdown()
+  }
+  tick()
+  countdownTimer = setInterval(tick, 1000)
+}
+function stopCountdown() {
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+}
+onUnmounted(stopCountdown)
 
 /**
  * 查询订单状态。
@@ -78,6 +109,7 @@ onMounted(async () => {
     const found = await fetchOrderStatus(orderNo.value)
     if (found) {
       order.value = found
+      if (!countdownTimer) startCountdown(found.created_at)
       if (found.status === 'paid') {
         paid.value = true
         break
@@ -117,6 +149,20 @@ onMounted(async () => {
         <p class="text-xs text-ink-muted mb-4">{{ t('order.payResult.scanHint') }}</p>
         <div class="flex justify-center mb-4">
           <canvas ref="qrCanvas" class="bg-white rounded-card border border-border p-2"></canvas>
+        </div>
+        <!-- 支付金额 -->
+        <div v-if="order" class="bg-surface-subtle rounded-field p-3 mb-2 text-left">
+          <div class="flex justify-between text-xs">
+            <span class="text-ink-muted">{{ t('order.payResult.amountLabel') }}</span>
+            <span class="text-price font-bold">{{ formatMoney(order.amount_display ?? order.amount, prefs.currencyOf(order.display_currency)) }}</span>
+          </div>
+        </div>
+        <!-- 订单倒计时 -->
+        <div v-if="order && countdown > 0" class="text-xs text-amber-600 mb-2">
+          {{ t('order.payResult.countdownLabel', { time: countdownText }) }}
+        </div>
+        <div v-if="order && countdown <= 0" class="text-xs text-ink-muted mb-2">
+          {{ t('order.payResult.countdownExpired') }}
         </div>
         <div v-if="orderNo" class="text-xs text-ink-muted mb-5">{{ t('order.payResult.processingWithNo', { no: orderNo }) }}</div>
         <div class="flex justify-center gap-2">

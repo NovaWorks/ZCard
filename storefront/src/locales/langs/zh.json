@@ -329,7 +329,9 @@
       "continueShopping": "继续购物",
       "backHome": "返回首页",
       "scanTitle": "扫码支付",
-      "scanHint": "请使用支付宝 App 扫描二维码完成支付,支付成功后自动刷新"
+      "scanHint": "请使用支付宝 App 扫描二维码完成支付,支付成功后自动刷新",
+      "countdownLabel": "订单将在 {time} 后自动关闭",
+      "countdownExpired": "订单已超时,请重新下单"
     }
   },
   "product": {

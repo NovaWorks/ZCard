@@ -329,7 +329,9 @@
       "continueShopping": "Continue Shopping",
       "backHome": "Back Home",
       "scanTitle": "Scan to Pay",
-      "scanHint": "Scan with Alipay App to complete payment, result refreshes automatically"
+      "scanHint": "Scan with Alipay App to complete payment, result refreshes automatically",
+      "countdownLabel": "Order expires in {time}",
+      "countdownExpired": "Order expired, please re-order"
     }
   },
   "product": {
