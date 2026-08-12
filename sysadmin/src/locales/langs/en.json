@@ -635,7 +635,8 @@
       "seoKeywordsTip": "Comma separated; empty = category + product name",
       "seoDescription": "SEO Description",
       "seoDescriptionPlaceholder": "Brief summary for search engines; empty = first 150 chars of description",
-      "supplierSource": "Supplier"
+      "supplierSource": "Supplier",
+      "stockUnlimited": "Unlimited"
     },
     "category": {
       "title": "Categories",

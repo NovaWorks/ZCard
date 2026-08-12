@@ -173,9 +173,11 @@
             </div>
           </template>
         </ElTableColumn>
-        <ElTableColumn :label="t('zcard.product.stock')" width="100" align="center">
+        <ElTableColumn :label="t('zcard.product.stock')" width="110" align="center">
           <template #default="{ row }">
-            {{ row.stock ?? 0 }}
+            <ElTag v-if="row.stock === -1" type="success" size="small">{{ t('zcard.product.stockUnlimited') }}</ElTag>
+            <ElTag v-else-if="row.stock === 0" type="danger" size="small">{{ t('zcard.product.stockOut') }}</ElTag>
+            <span v-else>{{ row.stock ?? 0 }}</span>
           </template>
         </ElTableColumn>
         <ElTableColumn :label="t('zcard.product.status')" width="150" align="center">

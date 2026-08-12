@@ -1,0 +1,1 @@
+function e(e,t){if(!t)return(e/100).toFixed(2);let n=10**t.decimal_places,r=e<0,i=(Math.abs(e)/n).toFixed(t.decimal_places),a=t.symbol_position===`before`?`${t.symbol}${i}`:`${i}${t.symbol}`;return r?`-${a}`:a}function t(e,t=`不限`){return e==null||e<0?t:String(e)}export{t as n,e as t};

@@ -20,11 +20,11 @@ export function formatMoney(minUnit: number, cur: CurrencyInfo | null | undefine
 }
 
 /**
- * 库存展示:上游商品库存可能为负数(-1 = 无限,其他负数为未知/充足)。
- * 负数统一显示 ∞,0/正数显示原数量。
+ * 库存展示:上游商品库存可能为负数(-1 = 不限/充足,其他负数为未知)。
+ * 负数统一显示「不限」,0/正数显示原数量。
  */
-export function stockText(stock: number | null | undefined): string {
-  if (stock === null || stock === undefined) return '∞'
-  if (stock < 0) return '∞'
+export function stockText(stock: number | null | undefined, unlimited = '不限'): string {
+  if (stock === null || stock === undefined) return unlimited
+  if (stock < 0) return unlimited
   return String(stock)
 }
