@@ -1347,7 +1347,19 @@
       "brandPrivacyEn": "Privacy (English)",
       "brandPrivacyPlaceholder": "e.g. Privacy protected",
       "showOutOfStock": "Show Out-of-Stock",
-      "showOutOfStockTip": "When off, products with 0 stock are hidden in storefront lists/featured"
+      "showOutOfStockTip": "When off, products with 0 stock are hidden in storefront lists/featured",
+      "tabService": "Online Service",
+      "serviceEnabled": "Enable service widget",
+      "serviceEnabledTip": "Shows a customer service entry at the bottom-right of the storefront (suggest enabling only one platform to avoid multiple bubbles)",
+      "serviceTitle": "Widget title (Chinese)",
+      "serviceTitlePlaceholder": "在线客服",
+      "serviceTitleEn": "Widget title (English)",
+      "serviceTitleEnPlaceholder": "Customer Service",
+      "serviceLinks": "Service links (JSON)",
+      "serviceLinksTip": "Format [{\"label\":\"Telegram\",\"url\":\"https://t.me/xxx\"}]. Supports http/https/mailto/tel, opens in a new tab",
+      "serviceScript": "Third-party service script (Chatwoot / Crisp, etc.)",
+      "serviceScriptPlaceholder": "Paste the Chatwoot / Crisp install script; it will be injected into the storefront",
+      "serviceScriptTip": "Chatwoot: Settings → Website → Code. Crisp: Settings → Websites → your website → Install code. Leave empty to skip"
     },
     "common": {
       "id": "ID",

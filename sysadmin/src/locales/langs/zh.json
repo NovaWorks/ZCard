@@ -1347,7 +1347,19 @@
       "brandPrivacyEn": "隐私保护(English)",
       "brandPrivacyPlaceholder": "如:隐私保护",
       "showOutOfStock": "显示缺货商品",
-      "showOutOfStockTip": "关闭后,前台商品列表/推荐不展示库存为 0 的商品"
+      "showOutOfStockTip": "关闭后,前台商品列表/推荐不展示库存为 0 的商品",
+      "tabService": "在线客服",
+      "serviceEnabled": "启用客服浮窗",
+      "serviceEnabledTip": "开启后前台右下角显示客服入口(建议仅配一个平台,避免出现多个气泡)",
+      "serviceTitle": "浮窗标题(中文)",
+      "serviceTitlePlaceholder": "在线客服",
+      "serviceTitleEn": "浮窗标题(英文)",
+      "serviceTitleEnPlaceholder": "Customer Service",
+      "serviceLinks": "客服链接(JSON)",
+      "serviceLinksTip": "格式 [{\"label\":\"Telegram\",\"url\":\"https://t.me/xxx\"}]。支持 http/https/mailto/tel,前台点击新窗口打开",
+      "serviceScript": "第三方客服代码(Chatwoot / Crisp 等)",
+      "serviceScriptPlaceholder": "粘贴 Chatwoot / Crisp 等平台的安装脚本,原样注入前台页面",
+      "serviceScriptTip": "Chatwoot 在 Settings → Website → Code 复制安装脚本;Crisp 在 Settings → Websites → 找到你的网站 → Install code。留空则不注入"
     },
     "common": {
       "id": "ID",

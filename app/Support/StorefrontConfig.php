@@ -34,6 +34,7 @@ class StorefrontConfig
         'brand_slogan', 'brand_slogan_en', 'brand_secure', 'brand_secure_en',
         'brand_privacy', 'brand_privacy_en', 'footer_about', 'footer_links',
         'footer_contact', 'footer_social', 'footer_help_links', 'footer_copyright',
+        'service_widget',
         'cash_min', 'cash_fee', 'cash_type_alipay', 'cash_type_wechat', 'cash_type_usdt',
         'base_currency', 'default_display_currency', 'enabled_languages', 'default_language',
         'distribution_enabled', 'subsite_enabled',
@@ -139,6 +140,20 @@ class StorefrontConfig
             // 第三方统计代码(百度统计/Google Analytics 等,原样注入到页面底部)
             'footer_analytics' => '',
 
+            // 右下角在线客服浮窗(issue #7)
+            // script:Chatwoot/Crisp 等第三方客服代码,原样注入;links:可跳转的客服链接列表
+            'service_widget' => [
+                'enabled' => false,
+                'title' => '在线客服',
+                'title_en' => 'Customer Service',
+                'links' => [
+                    ['label' => 'Telegram', 'url' => ''],
+                    ['label' => 'Discord', 'url' => ''],
+                    ['label' => '客服邮箱', 'url' => ''],
+                ],
+                'script' => '',
+            ],
+
             // 邮件设置(SMTP)
             'mail_enabled' => false,
             'mail_host' => '',
@@ -232,6 +247,19 @@ class StorefrontConfig
 
                 return $item;
             }, is_array($config[$key] ?? null) ? $config[$key] : []);
+        }
+
+        // 客服浮窗链接同样做安全 URL 清洗
+        $widget = $config['service_widget'] ?? null;
+        if (is_array($widget)) {
+            $widget['links'] = array_map(function ($item) {
+                if (is_array($item) && array_key_exists('url', $item)) {
+                    $item['url'] = self::safePublicUrl((string) $item['url']);
+                }
+
+                return $item;
+            }, is_array($widget['links'] ?? null) ? $widget['links'] : []);
+            $config['service_widget'] = $widget;
         }
 
         return $config;

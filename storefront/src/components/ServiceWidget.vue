@@ -1,0 +1,86 @@
+<script setup lang="ts">
+/**
+ * 右下角在线客服浮窗(issue #7)
+ * - links:后台配置的可跳转客服链接(TG/DC/邮箱等)
+ * - script:Chatwoot/Crisp 等第三方客服代码(原样注入 head,由其自带气泡渲染)
+ */
+import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useSettingsStore } from '@/stores/settings'
+import AppIcon from '@/components/AppIcon.vue'
+
+const { t } = useI18n()
+const settings = useSettingsStore()
+const open = ref(false)
+let scriptInjected = false
+
+const widget = computed(() => settings.config?.service_widget || { enabled: false, links: [], script: '' })
+const links = computed(() => (widget.value.links || []).filter((l: any) => l?.url))
+const title = computed(() => {
+  const w = widget.value
+  const isEn = (window as any).__zcardLocale === 'en' || document.documentElement.lang === 'en'
+  if (isEn && w.title_en) return w.title_en
+  return w.title || t('service.title')
+})
+
+/** 注入第三方客服脚本(仅一次) */
+onMounted(() => {
+  const script = widget.value.script
+  if (!script || scriptInjected) return
+  scriptInjected = true
+  const el = document.createElement('script')
+  el.textContent = script
+  el.async = true
+  document.head.appendChild(el)
+})
+</script>
+
+<template>
+  <div v-if="widget.enabled" class="fixed right-4 bottom-4 z-50 flex flex-col items-end">
+    <!-- 展开面板 -->
+    <Transition name="sw-pop">
+      <div v-if="open" class="sw-panel mb-2 w-64 rounded-card border border-border bg-surface shadow-card overflow-hidden">
+        <div class="px-4 py-3 bg-primary text-white text-sm font-bold flex items-center gap-2">
+          <AppIcon name="ri:customer-service-2-line" class="w-4 h-4" />
+          {{ title }}
+        </div>
+        <div class="py-1 max-h-72 overflow-y-auto">
+          <a
+            v-for="l in links"
+            :key="l.label"
+            :href="l.url"
+            target="_blank"
+            rel="noopener"
+            class="flex items-center justify-between px-4 py-2.5 text-sm text-ink hover:bg-surface-subtle transition"
+          >
+            <span>{{ l.label }}</span>
+            <span class="text-ink-muted">↗</span>
+          </a>
+          <p v-if="!links.length" class="px-4 py-3 text-xs text-ink-muted">{{ t('service.noLinks') }}</p>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- 气泡按钮 -->
+    <button
+      class="w-12 h-12 rounded-full bg-primary text-white shadow-card flex items-center justify-center hover:bg-primary-hover transition active:scale-95"
+      :aria-label="title"
+      @click="open = !open"
+    >
+      <AppIcon v-if="!open" name="ri:customer-service-2-line" class="w-6 h-6" />
+      <AppIcon v-else name="ri:close-line" class="w-6 h-6" />
+    </button>
+  </div>
+</template>
+
+<style scoped>
+.sw-pop-enter-active,
+.sw-pop-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.sw-pop-enter-from,
+.sw-pop-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+</style>

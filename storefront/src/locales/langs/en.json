@@ -553,5 +553,9 @@
     "regenerateConfirm": "Resetting App Key invalidates the old key immediately. Continue?",
     "regenerated": "App Key reset",
     "copied": "Copied"
+  },
+  "service": {
+    "title": "Customer Service",
+    "noLinks": "No contact info configured yet"
   }
 }

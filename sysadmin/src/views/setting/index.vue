@@ -86,6 +86,29 @@
           </ElForm>
         </ElTabPane>
 
+        <ElTabPane :label="t('zcard.setting.tabService')" name="service">
+          <ElForm :model="form" label-width="auto" class="setting-form">
+            <ElFormItem :label="t('zcard.setting.serviceEnabled')">
+              <ElSwitch v-model="form.serviceWidgetEnabled" />
+              <span class="form-tip">{{ t('zcard.setting.serviceEnabledTip') }}</span>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.serviceTitle')">
+              <ElInput v-model="form.serviceWidgetTitle" :placeholder="t('zcard.setting.serviceTitlePlaceholder')" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.serviceTitleEn')">
+              <ElInput v-model="form.serviceWidgetTitleEn" :placeholder="t('zcard.setting.serviceTitleEnPlaceholder')" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.serviceLinks')">
+              <ElInput v-model="form.serviceWidgetLinksJson" type="textarea" :rows="5" placeholder='[{"label":"Telegram","url":"https://t.me/xxx"}]' />
+              <span class="form-tip">{{ t('zcard.setting.serviceLinksTip') }}</span>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.serviceScript')">
+              <ElInput v-model="form.serviceWidgetScript" type="textarea" :rows="6" :placeholder="t('zcard.setting.serviceScriptPlaceholder')" />
+              <span class="form-tip">{{ t('zcard.setting.serviceScriptTip') }}</span>
+            </ElFormItem>
+          </ElForm>
+        </ElTabPane>
+
         <ElTabPane :label="t('zcard.setting.tabDisplay')" name="display">
           <ElForm :model="form" label-width="auto" class="setting-form">
             <ElFormItem :label="t('zcard.setting.categoryNavStyle')">
@@ -514,6 +537,11 @@
     footerSocialJson: string
     footerHelpLinksJson: string
     hotTagCategoriesJson: string
+    serviceWidgetEnabled: boolean
+    serviceWidgetTitle: string
+    serviceWidgetTitleEn: string
+    serviceWidgetLinksJson: string
+    serviceWidgetScript: string
     category_nav_style: string
     list_default_view: string
     grid_columns: number
@@ -612,6 +640,11 @@
     footerSocialJson: '[]',
     footerHelpLinksJson: '[]',
     hotTagCategoriesJson: '[]',
+    serviceWidgetEnabled: false,
+    serviceWidgetTitle: '',
+    serviceWidgetTitleEn: '',
+    serviceWidgetLinksJson: '[]',
+    serviceWidgetScript: '',
     category_nav_style: 'pills',
     list_default_view: 'grid',
     grid_columns: 4,
@@ -883,6 +916,12 @@
       form.footerSocialJson = toText(data.footer_social)
       form.footerHelpLinksJson = toText(data.footer_help_links)
       form.hotTagCategoriesJson = toText(data.hot_tag_categories)
+      const sw: any = data.service_widget || {}
+      form.serviceWidgetEnabled = !!sw.enabled
+      form.serviceWidgetTitle = sw.title || ''
+      form.serviceWidgetTitleEn = sw.title_en || ''
+      form.serviceWidgetLinksJson = toText(sw.links || [])
+      form.serviceWidgetScript = sw.script || ''
     } catch (e) {
       // 拦截器处理
     } finally {
@@ -904,7 +943,8 @@
     const social = parseArr(form.footerSocialJson)
     const helpLinks = parseArr(form.footerHelpLinksJson)
     const hotTags = parseArr(form.hotTagCategoriesJson)
-    if (links === null || contact === null || social === null || helpLinks === null || hotTags === null) {
+    const serviceLinks = parseArr(form.serviceWidgetLinksJson)
+    if (links === null || contact === null || social === null || helpLinks === null || hotTags === null || serviceLinks === null) {
       ElMessage.error(t('zcard.setting.jsonFormatError'))
       return
     }
@@ -918,12 +958,24 @@
         footer_social: social,
         footer_help_links: helpLinks,
         hot_tag_categories: hotTags,
+        service_widget: {
+          enabled: !!form.serviceWidgetEnabled,
+          title: form.serviceWidgetTitle,
+          title_en: form.serviceWidgetTitleEn,
+          links: serviceLinks,
+          script: form.serviceWidgetScript,
+        } as any,
       }
       delete (payload as any).footerLinksJson
       delete (payload as any).footerContactJson
       delete (payload as any).footerSocialJson
       delete (payload as any).footerHelpLinksJson
       delete (payload as any).hotTagCategoriesJson
+      delete (payload as any).serviceWidgetEnabled
+      delete (payload as any).serviceWidgetTitle
+      delete (payload as any).serviceWidgetTitleEn
+      delete (payload as any).serviceWidgetLinksJson
+      delete (payload as any).serviceWidgetScript
       // 卡密加密密钥:仅在填写时提交(留空=保持原值);回显值为脱敏占位,不得覆盖
       if (cardEncryptionKey.value.trim()) {
         payload.card_encryption_key = cardEncryptionKey.value.trim()

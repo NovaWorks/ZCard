@@ -553,5 +553,9 @@
     "regenerateConfirm": "重置 App Key 后旧密钥立即失效,确认重置?",
     "regenerated": "App Key 已重置",
     "copied": "已复制"
+  },
+  "service": {
+    "title": "在线客服",
+    "noLinks": "暂未配置客服联系方式"
   }
 }

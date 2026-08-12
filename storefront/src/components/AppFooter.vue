@@ -44,6 +44,11 @@ const visibleContacts = computed(() =>
 function isExternal(url: string) {
   return /^https?:\/\//i.test(url)
 }
+
+/** 客服联络值是否为可跳转链接(http/https/mailto/tel) */
+function isLinkValue(value?: string) {
+  return /^(https?:\/\/|mailto:|tel:)/i.test((value || '').trim())
+}
 </script>
 
 <template>
@@ -127,7 +132,14 @@ function isExternal(url: string) {
           <ul class="space-y-2.5">
             <li v-for="(c, i) in visibleContacts" :key="i" class="flex items-start gap-2">
               <span class="text-ink-muted text-xs shrink-0 w-16">{{ c.label }}</span>
-              <span class="text-xs text-ink-soft break-all">{{ c.value }}</span>
+              <a
+                v-if="isLinkValue(c.value)"
+                :href="c.value"
+                target="_blank"
+                rel="noopener"
+                class="text-xs text-ink-soft break-all hover:text-primary transition"
+              >{{ c.value }} ↗</a>
+              <span v-else class="text-xs text-ink-soft break-all">{{ c.value }}</span>
             </li>
           </ul>
         </div>

@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, computed, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
+import ServiceWidget from '@/components/ServiceWidget.vue'
 import NoticeModal from '@/components/NoticeModal.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { getStorefrontSettings } from '@/api/settings'
@@ -70,6 +71,7 @@ onMounted(async () => {
       <RouterView />
     </main>
     <AppFooter />
+    <ServiceWidget />
     <!-- 公告弹窗:首次访问弹出(有公告内容时);顶部公告入口可随时打开 -->
     <NoticeModal ref="noticeModalRef" />
   </div>
