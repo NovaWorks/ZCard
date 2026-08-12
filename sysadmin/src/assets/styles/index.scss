@@ -7,6 +7,9 @@
 // Element Plus 样式优化
 @use './core/el-ui.scss';
 
+// 移动端适配优化
+@use './core/mobile.scss';
+
 // Element Plus 暗黑主题
 @use './core/el-dark.scss';
 

@@ -1,0 +1,108 @@
+// ===== 移动端适配优化(≤768px) =====
+// 覆盖所有页面级元素:弹窗/表格卡片/工具栏/统计卡片/分页/表单
+@media only screen and (max-width: 768px) {
+  // 弹窗:近全屏,内容区可滚动(避免手机端弹窗超屏操作不了)
+  .el-dialog {
+    max-width: 94vw !important;
+    margin-top: 4vh !important;
+  }
+  .el-dialog__body {
+    max-height: 66vh;
+    overflow-y: auto;
+  }
+  // 消息/确认框
+  .el-message-box {
+    max-width: 92vw !important;
+  }
+  // 表格卡片:压缩内边距,留更多空间给表格
+  .art-table-card .el-card__body {
+    padding: 8px !important;
+  }
+  // 表格字号略小,减少挤压
+  .el-table {
+    font-size: 12px;
+  }
+  .el-table .cell {
+    padding: 0 6px;
+  }
+  // 工具栏:换行 + 间距
+  .toolbar,
+  .toolbar-left,
+  .toolbar-right {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  // 统计卡片:紧凑
+  .stats-grid {
+    gap: 8px;
+  }
+  .stat-card {
+    padding: 12px;
+  }
+  .stat-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+  .stat-value {
+    font-size: 16px;
+  }
+  // 分页:换行压缩
+  .pagination-wrap {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .pagination-wrap .el-pagination {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  // 搜索栏:表单项全宽排列
+  .search-bar .el-form-item {
+    margin-right: 0;
+    width: 100%;
+  }
+  .search-bar .el-input,
+  .search-bar .el-select,
+  .search-bar .el-date-editor,
+  .search-bar .el-tree-select {
+    width: 100% !important;
+  }
+  // 抽屉全屏
+  .el-drawer {
+    width: 100% !important;
+    max-width: 100vw !important;
+  }
+  // 按钮组紧凑
+  .el-button + .el-button {
+    margin-left: 0;
+  }
+  // 表格横向滚动
+  .el-table__body-wrapper {
+    overflow-x: auto;
+  }
+  // 设置页等多标签页:横向滚动
+  .el-tabs__nav-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .el-tabs__nav {
+    flex-wrap: nowrap;
+    min-width: max-content;
+  }
+  // 详情描述:单列
+  .el-descriptions__table {
+    display: block;
+  }
+  .el-descriptions__cell {
+    display: block;
+    width: 100% !important;
+  }
+  // 顶栏:头像区/搜索紧凑
+  #app-header .art-header-bar {
+    padding: 0 8px;
+  }
+  // 富文本/卡片内边距压缩
+  .detail-content {
+    padding: 4px;
+  }
+}
