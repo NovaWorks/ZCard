@@ -25,4 +25,10 @@ import { useAuthStore } from './stores/auth'
 const authStore = useAuthStore(pinia)
 authStore.fetchUser()
 
+// 全局错误处理器(生产也保留,便于诊断空白页/白屏):
+// 组件/路由/异步加载错误不再被静默吞掉
+app.config.errorHandler = (err, _instance, info) => {
+  console.error('[Vue error]', info, err)
+}
+
 app.mount('#app')

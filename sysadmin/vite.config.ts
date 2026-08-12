@@ -76,10 +76,14 @@ export default ({ mode }: { mode: string }) => {
         // 静态服务环境下 index.html 不经框架,必须靠产物自带防缓存标记)。
         name: 'inject-no-cache-meta',
         transformIndexHtml(html: string) {
-          return html.replace(
+          let out = html.replace(
             '<head>',
             '<head>\n    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />\n    <meta http-equiv="Pragma" content="no-cache" />\n    <meta http-equiv="Expires" content="0" />'
           )
+          // Cloudflare Rocket Loader 会重写 module script 导致 SPA 空白:
+          // 给所有 module 入口加 data-cfasync=false 跳过 Rocket Loader 处理
+          out = out.replace(/<script type="module"/g, '<script type="module" data-cfasync="false"')
+          return out
         }
       },
       // 自动按需导入 API
