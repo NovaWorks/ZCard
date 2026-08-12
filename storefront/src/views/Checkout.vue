@@ -13,6 +13,8 @@ import { usePreferencesStore } from '@/stores/preferences'
 import { useCartStore, type CartItem } from '@/stores/cart'
 import AppIcon from '@/components/AppIcon.vue'
 import PayBrandIcon from '@/components/PayBrandIcon.vue'
+import { orderAccessTokensById, storeOrderAccessToken } from '@/utils/orderAccess'
+import { navigateToPaymentUrl, submitPaymentForm } from '@/utils/paymentNavigation'
 
 interface ControlField {
   type: string; label: string; name: string; required: boolean; options?: string[]
@@ -278,8 +280,7 @@ async function loadChannels() {
 /** 支付结果:跳转链接 / 展示二维码 / 自动提交表单 */
 function handleResult(result: PaymentResult, orderNo = '') {
   if (result.type === 'redirect' && result.redirect_url) {
-    window.location.href = result.redirect_url
-    return
+    if (navigateToPaymentUrl(result.redirect_url)) return
   }
   if (result.type === 'qrcode' && result.qrcode_content) {
     // 二维码场景:跳结果页展示(带订单号供轮询;结果页渲染二维码)
@@ -287,12 +288,7 @@ function handleResult(result: PaymentResult, orderNo = '') {
     return
   }
   if (result.type === 'form' && result.form_html) {
-    const container = document.createElement('div')
-    container.innerHTML = result.form_html
-    document.body.appendChild(container)
-    const form = container.querySelector('form')
-    if (form) form.submit()
-    return
+    if (submitPaymentForm(result.form_html)) return
   }
   err.value = t('order.pay.payUnknown')
 }
@@ -353,13 +349,19 @@ async function doSubmit() {
         coupon_code: couponCode.value.trim() || undefined,
         extra: undefined,
       })
+      res.orders.forEach((order) => storeOrderAccessToken(order.order_no, order.access_token))
       if (isBalance) {
         await balanceBatchPay(res.order_ids)
         cart.clear()
         router.push({ path: '/pay/result', query: { order_no: res.orders[0]?.order_no || '' } })
         return
       }
-      const result = await createBatchPayment(res.order_ids, channelId, selectedPayType.value)
+      const result = await createBatchPayment(
+        res.order_ids,
+        channelId,
+        selectedPayType.value,
+        orderAccessTokensById(res.orders),
+      )
       cart.clear()
       handleResult(result, res.orders[0]?.order_no || '')
     } else {
@@ -376,12 +378,18 @@ async function doSubmit() {
         coupon_code: couponCode.value.trim() || undefined,
         extra: { ...controlValues.value },
       } as any)
+      storeOrderAccessToken(res.order_no, res.access_token)
       if (isBalance) {
         await balancePay(res.order_no)
         router.push({ path: '/pay/result', query: { order_no: res.order_no } })
         return
       }
-      const result = await createPayment(res.order_no, channelId, selectedPayType.value)
+      const result = await createPayment(
+        res.order_no,
+        channelId,
+        selectedPayType.value,
+        res.access_token,
+      )
       handleResult(result, res.order_no)
     }
   } catch (e: any) {

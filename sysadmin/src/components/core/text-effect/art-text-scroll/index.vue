@@ -20,13 +20,13 @@
       <!-- 原始内容 -->
       <span ref="textRef" class="inline-block">
         <slot>
-          <span v-html="text"></span>
+          <span v-html="sanitizedText"></span>
         </slot>
       </span>
       <!-- 克隆内容用于无缝循环 -->
       <span v-if="shouldClone" class="inline-block" :style="cloneSpacing">
         <slot>
-          <span v-html="text"></span>
+          <span v-html="sanitizedText"></span>
         </slot>
       </span>
     </div>
@@ -51,6 +51,7 @@
     useTimeoutFn
   } from '@vueuse/core'
   import { useSettingStore } from '@/store/modules/setting'
+  import DOMPurify from 'dompurify'
 
   type ThemeType =
     | 'theme'
@@ -97,6 +98,15 @@
     showClose: false,
     alwaysScroll: true
   })
+
+  const sanitizedText = computed(() =>
+    DOMPurify.sanitize(props.text, {
+      USE_PROFILES: { html: true },
+      ALLOWED_TAGS: ['a', 'strong', 'em', 'span', 'br'],
+      ALLOWED_ATTR: ['href', 'title', 'target', 'rel'],
+      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i
+    })
+  )
 
   const emit = defineEmits<{
     close: []

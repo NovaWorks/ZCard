@@ -47,7 +47,8 @@ class FulfillmentService
 
             $update = ['delivery_status' => 'delivered'];
             if ($instructions !== null) {
-                $update['instructions_snapshot'] = trim($instructions) !== '' ? $instructions : null;
+                $sanitizedInstructions = HtmlContentSanitizer::sanitize($instructions);
+                $update['instructions_snapshot'] = trim($sanitizedInstructions) !== '' ? $sanitizedInstructions : null;
             }
             $locked->update($update);
 

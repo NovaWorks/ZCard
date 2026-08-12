@@ -27,19 +27,26 @@ export interface PaymentResult {
 export const getChannels = () =>
   request.get<unknown, PaymentChannel[]>('/payments/channels')
 
-export const createPayment = (orderNo: string, channelId: number, payType?: string) =>
+export const createPayment = (orderNo: string, channelId: number, payType?: string, accessToken?: string) =>
   request.post<unknown, PaymentResult>('/payments/create', {
     order_no: orderNo,
     channel_id: channelId,
     pay_type: payType || undefined,
+    access_token: accessToken,
   })
 
 /** 购物车聚合支付:一次支付多个订单 */
-export const createBatchPayment = (orderIds: number[], channelId: number, payType?: string) =>
+export const createBatchPayment = (
+  orderIds: number[],
+  channelId: number,
+  payType?: string,
+  accessTokens?: Record<string, string>,
+) =>
   request.post<unknown, PaymentResult>('/payments/batch-create', {
     order_ids: orderIds,
     channel_id: channelId,
     pay_type: payType || undefined,
+    access_tokens: accessTokens,
   })
 
 /** 余额支付单个订单(需登录) */

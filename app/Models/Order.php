@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Order extends Model implements Payable
 {
+    /** 仅在创建请求生命周期内存在，绝不参与 Eloquent 持久化或序列化。 */
+    private ?string $accessTokenForResponse = null;
+
     protected $fillable = [
         'order_no', 'merchant_id', 'user_id', 'product_id', 'quantity',
         'amount', 'base_currency', 'display_currency', 'exchange_rate', 'amount_display', 'coupon_code', 'discount_amount',
@@ -38,6 +41,18 @@ class Order extends Model implements Payable
     public function orderDeliveries(): HasMany
     {
         return $this->hasMany(OrderDelivery::class);
+    }
+
+    public function setAccessTokenForResponse(string $token): self
+    {
+        $this->accessTokenForResponse = $token;
+
+        return $this;
+    }
+
+    public function accessTokenForResponse(): ?string
+    {
+        return $this->accessTokenForResponse;
     }
 
     public function reviews(): HasMany

@@ -7,6 +7,7 @@ use App\Models\CardImport;
 use App\Models\Merchant;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\CardCipher;
 use App\Support\CardImportService;
 use App\Support\OrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -126,6 +127,24 @@ class PremiumPickTest extends TestCase
         $pn = $resp->json('premium_numbers');
         $this->assertSame(1, $pn['total']);
         $this->assertSame($target->id, $pn['list'][0]['card_id']);
+    }
+
+    public function test_switching_plain_card_product_to_premium_never_exposes_full_secret(): void
+    {
+        $product = $this->makeProduct();
+        Card::create(array_merge([
+            'product_id' => $product->id,
+            'status' => Card::STATUS_UNUSED,
+        ], CardCipher::encryptWithHash('FULL-SECRET-WITHOUT-PREMIUM-DELIMITER')));
+
+        $response = $this->getJson("/api/products/{$product->slug}?display_currency=CNY")
+            ->assertOk();
+
+        $this->assertSame([], $response->json('premium_numbers.list'));
+        $this->assertStringNotContainsString(
+            'FULL-SECRET-WITHOUT-PREMIUM-DELIMITER',
+            $response->getContent(),
+        );
     }
 
     public function test_premium_import_rejects_duplicate_number_across_products(): void

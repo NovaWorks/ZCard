@@ -140,6 +140,11 @@ class OrderService
                 $extra['query_password'] = Hash::make($customer['password']);
             }
 
+            // 游客订单访问凭证：明文仅在创建响应中返回，数据库只保存 SHA-256。
+            // 订单号和联系方式都可能出现在邮件、日志或聊天记录中，不能作为卡密读取权限。
+            $accessToken = bin2hex(random_bytes(32));
+            $extra['access_token_hash'] = hash('sha256', $accessToken);
+
             // 创建订单(含成本/SKU 快照)
             $skuName = $skuId ? ($product->skus->firstWhere('id', $skuId)?->name) : null;
             $unitCost = (int) $product->factory_price;
@@ -213,6 +218,9 @@ class OrderService
                     'order_id' => $order->id,
                 ]);
             }
+
+            // 仅供本次 HTTP 响应读取，不会持久化明文访问凭证。
+            $order->setAccessTokenForResponse($accessToken);
 
             return $order;
         });
@@ -362,9 +370,14 @@ class OrderService
         return $order->fresh();
     }
 
-    /** 查询订单(凭 contact + orderNo,可选 password) */
-    public function queryOrder(string $contact, string $orderNo, ?string $password = null): ?Order
-    {
+    /** 查询单笔订单：联系方式和订单号只是定位条件，仍须通过对象级授权。 */
+    public function queryOrder(
+        string $contact,
+        string $orderNo,
+        ?string $password = null,
+        ?string $accessToken = null,
+        ?int $userId = null,
+    ): ?Order {
         $order = Order::where('order_no', $orderNo)
             ->where('contact', $contact)
             ->with('orderDeliveries')
@@ -374,13 +387,8 @@ class OrderService
             return null;
         }
 
-        // 若开启查询密码,且本订单有密码,才验证(订单无密码则跳过)
-        $needPassword = StorefrontConfig::get('order_query_password');
-        if ($needPassword) {
-            $storedHash = $order->extra['query_password'] ?? null;
-            if ($storedHash && ! Hash::check($password ?? '', $storedHash)) {
-                return null; // 密码错,视为查不到
-            }
+        if (! $this->canAccessOrder($order, $userId, $accessToken, $password)) {
+            return null;
         }
 
         return $order;
@@ -388,34 +396,31 @@ class OrderService
 
     /**
      * 搜索订单:单关键字智能匹配 order_no 或 contact,返回历史订单列表。
-     * 若开启查询密码,则 password 必填,仅返回密码匹配(或订单无密码)的记录。
+     * 每一笔结果都必须通过本人登录态、随机访问凭证或查询密码之一授权。
      *
      * @return array<int, array>
      */
-    public function searchOrders(string $keyword, ?string $password = null): array
-    {
+    public function searchOrders(
+        string $keyword,
+        ?string $password = null,
+        ?string $accessToken = null,
+        ?int $userId = null,
+    ): array {
         $kw = trim($keyword);
         $query = Order::with(['product:id,name,cover', 'orderDeliveries:id,order_id,card_content'])
             ->where(fn ($q) => $q->where('order_no', $kw)->orWhere('contact', $kw))
             ->orderByDesc('id')
             ->limit(50);
 
-        $needPassword = StorefrontConfig::get('order_query_password');
         $orders = $query->get();
 
-        // 密码过滤:仅保留"无密码"或"密码匹配"的订单
-        if ($needPassword) {
-            $orders = $orders->filter(function ($o) use ($password) {
-                $storedHash = $o->extra['query_password'] ?? null;
-                // 订单未设密码 → 放行
-                if (! $storedHash) {
-                    return true;
-                }
-
-                // 订单有密码 → 校验
-                return Hash::check($password ?? '', $storedHash);
-            })->values();
-        }
+        // 对每一张订单做对象级授权，不能把“知道订单号/联系方式”当作读取卡密的权限。
+        $orders = $orders->filter(fn (Order $order) => $this->canAccessOrder(
+            $order,
+            $userId,
+            $accessToken,
+            $password,
+        ))->values();
 
         return $orders->map(fn ($o) => [
             'order_no' => $o->order_no,
@@ -436,6 +441,34 @@ class OrderService
                 : [],
             'instructions' => $o->status === 'paid' ? ($o->instructions_snapshot ?: null) : null,
         ])->toArray();
+    }
+
+    /** 校验订单对象级访问权限：本人登录态、随机访问凭证或订单查询密码三选一。 */
+    public function canAccessOrder(
+        Order $order,
+        ?int $userId = null,
+        ?string $accessToken = null,
+        ?string $password = null,
+    ): bool {
+        if ($userId !== null && $order->user_id !== null && (int) $order->user_id === $userId) {
+            return true;
+        }
+
+        $extra = is_array($order->extra) ? $order->extra : [];
+        $storedTokenHash = (string) ($extra['access_token_hash'] ?? '');
+        if ($storedTokenHash !== '' && $accessToken !== null && $accessToken !== '') {
+            $providedTokenHash = hash('sha256', $accessToken);
+            if (hash_equals($storedTokenHash, $providedTokenHash)) {
+                return true;
+            }
+        }
+
+        $storedPasswordHash = (string) ($extra['query_password'] ?? '');
+
+        return $storedPasswordHash !== ''
+            && $password !== null
+            && $password !== ''
+            && Hash::check($password, $storedPasswordHash);
     }
 
     /** 订单详情(含发货卡密) */

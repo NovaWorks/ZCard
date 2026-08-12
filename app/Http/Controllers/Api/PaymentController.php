@@ -63,12 +63,13 @@ class PaymentController extends Controller
      * 创建支付:兼容发卡订单(ORD)与充值单(RCH)。
      * 两者都实现 Payable,交由 PaymentService::createPayment 统一处理。
      */
-    public function create(Request $request, PaymentService $service): JsonResponse
+    public function create(Request $request, PaymentService $service, OrderService $orderService): JsonResponse
     {
         $data = $request->validate([
             'order_no' => 'required|string',
             'channel_id' => 'required|integer|exists:payment_channels,id',
             'pay_type' => 'nullable|string|max:32',
+            'access_token' => 'nullable|string|size:64',
         ]);
 
         $bizNo = $data['order_no'];
@@ -91,6 +92,14 @@ class PaymentController extends Controller
             }
         } else {
             $payable = Order::where('order_no', $bizNo)->firstOrFail();
+            if (! $orderService->canAccessOrder(
+                $payable,
+                $this->activeUser($request)?->id,
+                $data['access_token'] ?? null,
+            )) {
+                // 与订单不存在使用同一响应，避免泄露有效订单号。
+                return response()->json(['message' => __('messages.payment.order_not_found')], 404);
+            }
             if ($payable->status !== 'pending') {
                 return response()->json(['message' => __('messages.order.status_abnormal')], 400);
             }
@@ -108,16 +117,33 @@ class PaymentController extends Controller
     /**
      * 购物车聚合支付:一次支付多个待支付订单(收银台场景)。
      */
-    public function batchCreate(Request $request, PaymentService $service): JsonResponse
+    public function batchCreate(Request $request, PaymentService $service, OrderService $orderService): JsonResponse
     {
         $data = $request->validate([
             'order_ids' => 'required|array|min:1',
             'order_ids.*' => 'integer',
             'channel_id' => 'required|integer|exists:payment_channels,id',
             'pay_type' => 'nullable|string|max:32',
+            'access_tokens' => 'nullable|array',
+            'access_tokens.*' => 'string|size:64',
         ]);
 
         try {
+            $orderIds = array_values(array_unique(array_map('intval', $data['order_ids'])));
+            $orders = Order::whereIn('id', $orderIds)->get();
+            if ($orders->count() !== count($orderIds)) {
+                return response()->json(['message' => __('messages.payment.order_not_found')], 404);
+            }
+
+            $userId = $this->activeUser($request)?->id;
+            $accessTokens = $data['access_tokens'] ?? [];
+            foreach ($orders as $order) {
+                $accessToken = $accessTokens[(string) $order->id] ?? $accessTokens[$order->id] ?? null;
+                if (! $orderService->canAccessOrder($order, $userId, $accessToken)) {
+                    return response()->json(['message' => __('messages.payment.order_not_found')], 404);
+                }
+            }
+
             $result = $service->createBatchPayment($data['order_ids'], $data['channel_id'], $data['pay_type'] ?? null);
 
             return response()->json($result);

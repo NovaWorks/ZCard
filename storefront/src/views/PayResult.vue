@@ -8,6 +8,7 @@ import { usePreferencesStore } from '@/stores/preferences'
 import { useSettingsStore } from '@/stores/settings'
 import AppIcon from '@/components/AppIcon.vue'
 import OrderInstructions from '@/components/OrderInstructions.vue'
+import { getOrderAccessToken } from '@/utils/orderAccess'
 
 const route = useRoute()
 const router = useRouter()
@@ -90,7 +91,7 @@ async function fetchOrderStatus(no: string): Promise<OrderDetail | null> {
     } catch { /* 回退订单查询 */ }
   }
   try {
-    const list = await queryOrders(no)
+    const list = await queryOrders(no, undefined, getOrderAccessToken(no))
     return Array.isArray(list) ? list.find(o => o.order_no === no) ?? null : null
   } catch {
     return null

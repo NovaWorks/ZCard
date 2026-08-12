@@ -68,6 +68,7 @@ class OrderController extends Controller
                 'order_no' => $order->order_no,
                 'amount' => $order->amount,
                 'status' => $order->status,
+                'access_token' => $order->accessTokenForResponse(),
             ], 201);
         } catch (InsufficientStockException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
@@ -147,6 +148,7 @@ class OrderController extends Controller
                     'amount' => $o->amount,
                     'discount_amount' => $o->discount_amount,
                     'status' => $o->status,
+                    'access_token' => $o->accessTokenForResponse(),
                 ]),
                 'total_amount' => (int) $orders->sum('amount'),
                 'order_ids' => $orders->pluck('id')->all(),
@@ -191,9 +193,15 @@ class OrderController extends Controller
         $data = $request->validate([
             'keyword' => 'required|string|max:150',
             'password' => 'nullable|string|max:50',
+            'access_token' => 'nullable|string|size:64',
         ]);
 
-        $orders = $service->searchOrders($data['keyword'], $data['password'] ?? null);
+        $orders = $service->searchOrders(
+            $data['keyword'],
+            $data['password'] ?? null,
+            $data['access_token'] ?? null,
+            $this->activeUser($request)?->id,
+        );
 
         // 未找到返回 200 + 空数组,让前端走空状态(而非把 404 当错误处理导致页面空白)
         return response()->json($orders ?? []);

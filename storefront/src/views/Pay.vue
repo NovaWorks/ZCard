@@ -8,6 +8,8 @@ import { usePreferencesStore } from '@/stores/preferences'
 import { formatMoney } from '@/utils/money'
 import AppIcon from '@/components/AppIcon.vue'
 import PayBrandIcon from '@/components/PayBrandIcon.vue'
+import { getOrderAccessToken } from '@/utils/orderAccess'
+import { navigateToPaymentUrl, submitPaymentForm } from '@/utils/paymentNavigation'
 
 const route = useRoute()
 const router = useRouter()
@@ -109,7 +111,7 @@ async function selectChannel(channel: PaymentChannel, payType: string | undefine
       router.push({ path: '/pay/result', query: { order_no: orderNo } })
       return
     }
-    const result = await createPayment(orderNo, channel.id, payType)
+    const result = await createPayment(orderNo, channel.id, payType, getOrderAccessToken(orderNo))
     handleResult(result)
   } catch (e: any) {
     err.value = e?.response?.data?.message || t('order.pay.payFailed')
@@ -120,8 +122,7 @@ async function selectChannel(channel: PaymentChannel, payType: string | undefine
 
 function handleResult(result: { type: string; redirect_url?: string; qrcode_content?: string; form_html?: string }) {
   if (result.type === 'redirect' && result.redirect_url) {
-    window.location.href = result.redirect_url
-    return
+    if (navigateToPaymentUrl(result.redirect_url)) return
   }
 
   if (result.type === 'qrcode' && result.qrcode_content) {
@@ -132,16 +133,7 @@ function handleResult(result: { type: string; redirect_url?: string; qrcode_cont
   }
 
   if (result.type === 'form' && result.form_html) {
-    const container = document.getElementById(formContainerId)
-    if (container) {
-      container.innerHTML = result.form_html
-      const form = container.querySelector('form')
-      if (form) {
-        // 真实第三方通常返回一段自动提交的表单
-        form.submit()
-      }
-    }
-    return
+    if (submitPaymentForm(result.form_html)) return
   }
 
   err.value = t('order.pay.payUnknown')
@@ -161,7 +153,7 @@ function startPolling() {
         found = Array.isArray(mine) ? mine.find(o => o.order_no === orderNo) ?? null : null
       }
       if (!found) {
-        const list = await queryOrders(orderNo)
+        const list = await queryOrders(orderNo, undefined, getOrderAccessToken(orderNo))
         found = Array.isArray(list) ? list.find(o => o.order_no === orderNo) ?? null : null
       }
       if (found?.status === 'paid') {

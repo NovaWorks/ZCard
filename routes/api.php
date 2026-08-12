@@ -313,7 +313,9 @@ Route::middleware(['auth:sanctum', 'active.user', 'admin.role'])->get('/cards', 
 Route::post('/orders', [OrderController::class, 'create'])->middleware(['display.currency', 'set.locale'])->name('api.orders.create');
 Route::post('/orders/batch', [OrderController::class, 'batch'])->middleware(['display.currency', 'set.locale'])->name('api.orders.batch');
 Route::post('/orders/{orderNo}/mock-pay', [OrderController::class, 'mockPay'])->middleware(['display.currency', 'set.locale'])->name('api.orders.mock-pay');
-Route::get('/orders/query', [OrderController::class, 'query'])->middleware(['display.currency', 'set.locale'])->name('api.orders.query');
+Route::match(['get', 'post'], '/orders/query', [OrderController::class, 'query'])
+    ->middleware(['display.currency', 'set.locale', 'throttle:10,1'])
+    ->name('api.orders.query');
 
 // 支付(游客 + 回调,不需 auth)
 Route::get('/payments/channels', [PaymentController::class, 'channels'])->name('api.payments.channels');

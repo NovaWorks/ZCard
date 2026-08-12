@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import {
   checkUpdate,
   getVersions,
@@ -11,12 +12,15 @@ import {
 } from '@/api/update'
 import type { UpdateCheck, VersionInfo, UpdateResult } from '@/api/update'
 
-/** Markdown → HTML(marked 已对 XSS 做基本转义;release notes 来自自己的 GitHub) */
+/** Markdown 只负责语法转换；输出必须再清理，Release 内容属于外部不可信输入。 */
 const renderMd = (md?: string): string => {
   if (!md) return ''
   // 兼容 GitHub Release body 中误存为字面量 "\n" 的换行(shell 创建 release 时未转义,常见问题)
   const normalized = md.replace(/\\n/g, '\n')
-  return marked.parse(normalized, { async: false }) as string
+  return DOMPurify.sanitize(marked.parse(normalized, { async: false }) as string, {
+    USE_PROFILES: { html: true },
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
+  })
 }
 
 defineOptions({ name: 'UpdateIndex' })
@@ -93,7 +97,10 @@ const handleCheck = async () => {
       `
       ElMessageBox({
         title: ` ${t('zcard.update.hasUpdate')}`,
-        message: msgHtml,
+        message: DOMPurify.sanitize(msgHtml, {
+          USE_PROFILES: { html: true },
+          ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
+        }),
         dangerouslyUseHTMLString: true,
         confirmButtonText: ` ${t('zcard.update.runUpdate')}`,
         cancelButtonText: t('zcard.common.cancel'),

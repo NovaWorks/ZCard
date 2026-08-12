@@ -9,6 +9,7 @@ import { calcChannelFee } from '@/utils/fee'
 import { usePreferencesStore } from '@/stores/preferences'
 import AppIcon from '@/components/AppIcon.vue'
 import PayBrandIcon from '@/components/PayBrandIcon.vue'
+import { navigateToPaymentUrl, submitPaymentForm } from '@/utils/paymentNavigation'
 
 const route = useRoute()
 const router = useRouter()
@@ -133,8 +134,7 @@ async function selectChannel(channel: PaymentChannel, payType: string | undefine
 
 function handleResult(result: { type: string; redirect_url?: string; qrcode_content?: string; form_html?: string }) {
   if (result.type === 'redirect' && result.redirect_url) {
-    window.location.href = result.redirect_url
-    return
+    if (navigateToPaymentUrl(result.redirect_url)) return
   }
   if (result.type === 'qrcode' && result.qrcode_content) {
     qrcodeContent.value = result.qrcode_content
@@ -142,13 +142,7 @@ function handleResult(result: { type: string; redirect_url?: string; qrcode_cont
     return
   }
   if (result.type === 'form' && result.form_html) {
-    const container = document.getElementById(formContainerId)
-    if (container) {
-      container.innerHTML = result.form_html
-      const form = container.querySelector('form')
-      if (form) form.submit()
-    }
-    return
+    if (submitPaymentForm(result.form_html)) return
   }
   err.value = t('order.pay.payUnknown')
 }

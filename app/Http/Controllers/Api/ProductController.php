@@ -236,7 +236,11 @@ class ProductController extends Controller
         $perPage = min(50, max(1, (int) request()->input('per_page', 20)));
         $cardId = request()->input('card_id');
 
-        $query = $p->cards()->where('status', 'unused');
+        // 只公开经靓号导入流程校验并生成 number_hash 的记录。
+        // 否则把普通卡密商品直接切换为 premium 时，无分隔符的整条卡密会被误当“号码”公开。
+        $query = $p->cards()
+            ->where('status', 'unused')
+            ->whereNotNull('number_hash');
         if ($cardId !== null && $cardId !== '') {
             $query->where('id', (int) $cardId);
         }
@@ -244,6 +248,9 @@ class ProductController extends Controller
         $list = [];
         foreach ($cards as $card) {
             $plain = $card->plainContent();
+            if (! str_contains($plain, '---')) {
+                continue;
+            }
             $parts = explode('---', $plain);
             $number = trim($parts[0] ?? '');
             if ($number === '' || ($keyword !== '' && ! str_contains($number, $keyword))) {

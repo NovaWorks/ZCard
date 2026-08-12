@@ -2,6 +2,7 @@ import request from './request'
 
 export interface CreatedOrder {
   order_no: string; amount: number; status: string
+  access_token: string
   amount_base?: number; amount_display?: number; display_currency?: string
 }
 export interface OrderDetail {
@@ -23,7 +24,7 @@ export const createOrder = (data: {
 }) => request.post<unknown, CreatedOrder>('/orders', data)
 
 export interface BatchOrderResult {
-  orders: { id: number; order_no: string; product_id: number; amount: number; discount_amount: number; status: string }[]
+  orders: { id: number; order_no: string; product_id: number; amount: number; discount_amount: number; status: string; access_token: string }[]
   total_amount: number
   order_ids: number[]
 }
@@ -37,7 +38,11 @@ export const mockPay = (orderNo: string) =>
   request.post<unknown, { order_no: string; status: string; delivered: boolean }>(`/orders/${orderNo}/mock-pay`)
 
 /** 单关键字智能查询历史订单(订单号 OR 联系方式) */
-export const queryOrders = (keyword: string, password?: string) =>
-  request.get<unknown, OrderDetail[]>('/orders/query', { params: { keyword, password } })
+export const queryOrders = (keyword: string, password?: string, accessToken?: string) =>
+  request.post<unknown, OrderDetail[]>('/orders/query', {
+    keyword,
+    password,
+    access_token: accessToken,
+  })
 
 export const getMyOrders = () => request.get<unknown, OrderDetail[]>('/orders/mine')
