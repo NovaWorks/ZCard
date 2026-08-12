@@ -150,12 +150,25 @@ class AcgFakaDriver implements SupplyDriver
 
             foreach ($chunk as $dto) {
                 if (isset($stockValues[$dto->code])) {
-                    // UpstreamProduct 为 readonly:PHP 8.3 允许 clone 时重新初始化
-                    $clone = clone $dto;
-                    $clone->stockQuantity = $stockValues[$dto->code];
+                    // UpstreamProduct 为 readonly,不能 clone 后赋值
+                    // (PHP 8.3 不允许,8.4+ 才支持)→ 重新构造 DTO 并替换,兼容 8.3/8.4/8.5
+                    $rebuilt = new UpstreamProduct(
+                        code: $dto->code,
+                        name: $dto->name,
+                        price: $dto->price,
+                        factoryPrice: $dto->factoryPrice,
+                        categoryCode: $dto->categoryCode,
+                        categoryName: $dto->categoryName,
+                        description: $dto->description,
+                        cover: $dto->cover,
+                        images: $dto->images,
+                        isActive: $dto->isActive,
+                        skus: $dto->skus,
+                        stockQuantity: $stockValues[$dto->code],
+                    );
                     foreach ($items as $i => $it) {
                         if ($it->code === $dto->code) {
-                            $items[$i] = $clone;
+                            $items[$i] = $rebuilt;
                             break;
                         }
                     }
