@@ -92,7 +92,7 @@ export interface SupplySyncTask {
   supply_source_id: number
   mode: 'full' | 'incremental'
   force_reprice: boolean
-  status: 'queued' | 'running' | 'success' | 'failed' | 'cancelled'
+  status: 'queued' | 'running' | 'cancelling' | 'success' | 'failed' | 'cancelled' | 'timed_out'
   total_products: number
   processed_products: number
   created_count: number
@@ -102,7 +102,16 @@ export interface SupplySyncTask {
   hidden_count: number
   deleted_count: number
   error: string | null
+  error_code: string | null
+  error_context: Record<string, unknown> | null
   started_at: string | null
+  heartbeat_at: string | null
+  current_stage: string | null
+  current_page: number
+  stage_current: number
+  stage_total: number
+  cancel_requested_at: string | null
+  worker_version: string | null
   finished_at: string | null
   created_at: string
 }
@@ -124,9 +133,10 @@ export const getSupplySyncTasks = (id: number) =>
   })
 
 /** 取消进行中的同步任务 */
-export const cancelSupplySync = (id: number) =>
+export const cancelSupplySync = (id: number, taskId?: number) =>
   request.post<{ ok: boolean; task: SupplySyncTask }>({
-    url: `/admin/supply-sources/${id}/sync-cancel`
+    url: `/admin/supply-sources/${id}/sync-cancel`,
+    data: taskId ? { task_id: taskId } : {}
   })
 
 export interface SupplySyncTaskWithSource extends SupplySyncTask {
@@ -145,8 +155,19 @@ export const probeSyncQueue = () =>
   request.post<{ ok: boolean }>({ url: '/admin/supply-sources/sync-queue-probe' })
 
 /** 队列心跳状态 */
+export interface SupplyQueueStatus {
+  ok: boolean
+  heartbeat_at: number | null
+  connection: string
+  healthy: boolean
+  app_version: string
+  worker_version: string | null
+  worker_started_at: number | null
+  version_match: boolean
+}
+
 export const getSyncQueueStatus = () =>
-  request.get<{ ok: boolean; heartbeat_at: number | null; connection: string; healthy: boolean }>({
+  request.get<SupplyQueueStatus>({
     url: '/admin/supply-sources/sync-queue-status'
   })
 

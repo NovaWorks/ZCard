@@ -8,6 +8,8 @@ use App\Supply\Drivers\Concerns\MakesHttpRequests;
 use App\Supply\Dto\UpstreamFulfillment;
 use App\Supply\Dto\UpstreamOrder;
 use App\Supply\Dto\UpstreamProduct;
+use App\Supply\Exceptions\UpstreamRequestException;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -67,24 +69,28 @@ class AcgFakaDriver implements SupplyDriver
         $params['app_id'] = $creds['app_id'];
         $params['app_key'] = $creds['app_key'];
         $params['sign'] = $this->sign($params);
-        $resp = Http::asForm()->timeout($this->requestTimeout())->post($this->baseUrl().$path, $params);
+        $url = $this->baseUrl().$path;
+        try {
+            $resp = Http::asForm()
+                ->connectTimeout($this->connectTimeout())
+                ->timeout($this->requestTimeout())
+                ->post($url, $params);
+        } catch (ConnectionException $e) {
+            throw UpstreamRequestException::fromConnection($url, $e);
+        }
 
         if (! $resp->successful()) {
-            $hint = $resp->status() === 404
-                ? '(可能是上游未配置伪静态/URL重写,请确认 acg-faka 站点地址正确且伪静态已启用)'
-                : '';
-            throw new \RuntimeException("上游请求失败: HTTP {$resp->status()} {$hint}");
+            throw UpstreamRequestException::fromHttp($url, $resp->status(), $resp->body());
         }
 
         $data = $resp->json();
         // acg-faka 业务错误:code != 200 时 msg 含具体原因(如"密钥错误""商户ID不存在")
         if (isset($data['code']) && (int) $data['code'] !== 200) {
-            throw new \RuntimeException('上游返回错误: '.($data['msg'] ?? '未知错误'));
+            throw UpstreamRequestException::business($url, (string) ($data['msg'] ?? '未知错误'));
         }
         // 响应不是预期 JSON 结构(可能是 WAF 拦截返回 HTML)
         if (! isset($data['code'])) {
-            $body = $resp->body();
-            throw new \RuntimeException('上游返回格式异常(可能被 WAF 拦截或 URL 错误): '.mb_substr($body, 0, 120));
+            throw UpstreamRequestException::invalidResponse($url, $resp->body());
         }
 
         return $data;
@@ -113,8 +119,12 @@ class AcgFakaDriver implements SupplyDriver
         return false;
     }
 
-    public function listProducts(?Carbon $updatedAfter, int $page, bool $fetchStock = false): array
-    {
+    public function listProducts(
+        ?Carbon $updatedAfter,
+        int $page,
+        bool $fetchStock = false,
+        ?callable $progress = null,
+    ): array {
         $data = $this->signedPost('/shared/commodity/items', []);
         $items = [];
         foreach (($data['data'] ?? []) as $cat) {
@@ -126,14 +136,14 @@ class AcgFakaDriver implements SupplyDriver
         // 同步模式:items 接口只对「卡密自动发货」商品返回 stock,
         // 手动发货商品(-1)需逐个调 /shared/commodity/stock 补查真实库存(并发 10)。
         if ($fetchStock) {
-            $this->fillMissingStocks($items);
+            $this->fillMissingStocks($items, $progress);
         }
 
         return ['items' => $items, 'total' => count($items), 'page' => 1, 'has_more' => false];
     }
 
     /** 并发补查缺失库存(仅同步 Job 调用;预览不查避免 4000+ 商品超时) */
-    private function fillMissingStocks(array &$items): void
+    private function fillMissingStocks(array &$items, ?callable $progress = null): void
     {
         $missing = [];
         foreach ($items as $dto) {
@@ -146,19 +156,34 @@ class AcgFakaDriver implements SupplyDriver
         }
 
         $chunks = array_chunk($missing, 10);
+        $completed = 0;
+        if ($progress !== null) {
+            $progress('fetching_stock', 0, count($missing));
+        }
         foreach ($chunks as $chunk) {
             $stockValues = [];
-            try {
-                $responses = Http::pool(fn ($pool) => collect($chunk)->map(
-                    fn ($dto) => $pool->as($dto->code)->asForm()->timeout($this->requestTimeout())
-                        ->post($this->baseUrl().'/shared/commodity/stock', $this->signedParams(['code' => $dto->code]))
-                ));
-                foreach ($responses as $code => $resp) {
-                    $data = $resp->json() ?? [];
-                    $stockValues[$code] = (int) ($data['data']['stock'] ?? -1);
+            $stockUrl = $this->baseUrl().'/shared/commodity/stock';
+            $responses = Http::pool(fn ($pool) => collect($chunk)->map(
+                fn ($dto) => $pool->as($dto->code)->asForm()
+                    ->connectTimeout($this->connectTimeout())
+                    ->timeout($this->requestTimeout())
+                    ->post($stockUrl, $this->signedParams(['code' => $dto->code]))
+            ));
+            foreach ($responses as $code => $resp) {
+                if ($resp instanceof ConnectionException) {
+                    throw UpstreamRequestException::fromConnection($stockUrl, $resp);
                 }
-            } catch (\Throwable $e) {
-                // 补查失败保持 -1(无限),不阻断同步
+                if (! $resp->successful()) {
+                    throw UpstreamRequestException::fromHttp($stockUrl, $resp->status(), $resp->body());
+                }
+                $data = $resp->json();
+                if (! is_array($data) || ! isset($data['code'])) {
+                    throw UpstreamRequestException::invalidResponse($stockUrl, $resp->body());
+                }
+                if ((int) $data['code'] !== 200) {
+                    throw UpstreamRequestException::business($stockUrl, (string) ($data['msg'] ?? '库存查询失败'));
+                }
+                $stockValues[$code] = (int) ($data['data']['stock'] ?? -1);
             }
 
             foreach ($chunk as $dto) {
@@ -178,7 +203,8 @@ class AcgFakaDriver implements SupplyDriver
                         isActive: $dto->isActive,
                         skus: $dto->skus,
                         stockQuantity: $stockValues[$dto->code],
-                        productUrl: $dto->productUrl,
+                        // 兼容在线更新前已驻留 worker 内存的旧 DTO 定义。
+                        productUrl: property_exists($dto, 'productUrl') ? $dto->productUrl : null,
                     );
                     foreach ($items as $i => $it) {
                         if ($it->code === $dto->code) {
@@ -187,6 +213,10 @@ class AcgFakaDriver implements SupplyDriver
                         }
                     }
                 }
+            }
+            $completed += count($chunk);
+            if ($progress !== null) {
+                $progress('fetching_stock', $completed, count($missing));
             }
         }
     }

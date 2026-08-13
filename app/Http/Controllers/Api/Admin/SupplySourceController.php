@@ -9,12 +9,17 @@ use App\Models\Product;
 use App\Models\SupplySource;
 use App\Models\SupplySyncTask;
 use App\Supply\SupplyManager;
+use App\Supply\SupplySyncError;
 use App\Supply\SupplySyncService;
+use App\Supply\SupplySyncTaskState;
+use App\Support\AppHelper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 /**
  * 货源对接设置(spec §6) —— admin.role 保护
@@ -24,7 +29,21 @@ class SupplySourceController extends Controller
     /** GET /api/admin/supply-sources/drivers 返回各驱动 label+configSchema */
     public function drivers(): JsonResponse
     {
-        return response()->json(['drivers' => SupplyManager::allDriversMeta()]);
+        try {
+            return response()->json(['drivers' => SupplyManager::allDriversMeta()]);
+        } catch (Throwable $e) {
+            // 在线更新后若 PHP-FPM/OPcache 仍混用新旧接口定义，给管理员可执行的诊断，
+            // 同时把原始异常写日志，不向接口暴露服务器路径和堆栈。
+            Log::error('货源驱动元数据加载失败，可能为 PHP-FPM/OPcache 版本残留', [
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => '货源驱动加载失败：PHP-FPM/OPcache 可能仍在使用更新前代码，请重启 PHP-FPM 后刷新页面',
+                'error_code' => 'PHP_RUNTIME_VERSION_MISMATCH',
+            ], 500);
+        }
     }
 
     /** GET /api/admin/supply-sources */
@@ -105,9 +124,15 @@ class SupplySourceController extends Controller
             return;
         }
 
-        // 防重:已有排队/运行中任务则跳过(定时/手动同步会覆盖)
+        app(SupplySyncTaskState::class)->reapStale($supplySource->id);
+
+        // 防重:已有排队/运行/取消中任务则跳过
         if (SupplySyncTask::where('supply_source_id', $supplySource->id)
-            ->whereIn('status', [SupplySyncTask::STATUS_QUEUED, SupplySyncTask::STATUS_RUNNING])
+            ->whereIn('status', [
+                SupplySyncTask::STATUS_QUEUED,
+                SupplySyncTask::STATUS_RUNNING,
+                SupplySyncTask::STATUS_CANCELLING,
+            ])
             ->exists()) {
             return;
         }
@@ -146,7 +171,7 @@ class SupplySourceController extends Controller
             }
 
             return response()->json($result);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $supplySource->update(['last_error' => $e->getMessage()]);
 
             return response()->json(['connected' => false, 'error' => $e->getMessage()]);
@@ -157,8 +182,11 @@ class SupplySourceController extends Controller
      * POST /api/admin/supply-sources/{source}/sync 触发商品同步(异步任务)。
      * 返回任务记录,前端轮询状态/进度;同货源有进行中任务时拒绝重复派发(409)。
      */
-    public function sync(Request $request, SupplySource $supplySource): JsonResponse
-    {
+    public function sync(
+        Request $request,
+        SupplySource $supplySource,
+        SupplySyncTaskState $states,
+    ): JsonResponse {
         $data = $request->validate([
             'mode' => 'sometimes|in:full,incremental',
             'force_reprice' => 'sometimes|boolean',
@@ -167,9 +195,16 @@ class SupplySourceController extends Controller
         // 覆盖手动价必须全量拉取，避免增量接口漏掉未发生上游变化的历史商品。
         $mode = $forceReprice ? 'full' : ($data['mode'] ?? 'incremental');
 
-        // 防重:同一货源已有排队/运行中任务时拒绝
+        // 先回收 worker 已退出的无心跳任务，避免永久占用防重锁。
+        $states->reapStale($supplySource->id);
+
+        // 防重:同一货源已有排队/运行/取消中任务时拒绝
         if (SupplySyncTask::where('supply_source_id', $supplySource->id)
-            ->whereIn('status', [SupplySyncTask::STATUS_QUEUED, SupplySyncTask::STATUS_RUNNING])
+            ->whereIn('status', [
+                SupplySyncTask::STATUS_QUEUED,
+                SupplySyncTask::STATUS_RUNNING,
+                SupplySyncTask::STATUS_CANCELLING,
+            ])
             ->exists()) {
             return response()->json([
                 'ok' => false,
@@ -192,8 +227,9 @@ class SupplySourceController extends Controller
     /**
      * GET /api/admin/supply-sources/{source}/sync-tasks 同步任务列表(最新优先,含进行中)。
      */
-    public function syncTasks(SupplySource $supplySource): JsonResponse
+    public function syncTasks(SupplySource $supplySource, SupplySyncTaskState $states): JsonResponse
     {
+        $states->reapStale($supplySource->id);
         $tasks = SupplySyncTask::where('supply_source_id', $supplySource->id)
             ->orderByDesc('id')
             ->limit(20)
@@ -206,18 +242,26 @@ class SupplySourceController extends Controller
      * POST /api/admin/supply-sources/{source}/sync-cancel 取消进行中的同步任务。
      * 置 cancelled 标记,Job 感知后立即停止(无需强杀进程)。
      */
-    public function syncCancel(Request $request, SupplySource $supplySource): JsonResponse
-    {
+    public function syncCancel(
+        Request $request,
+        SupplySource $supplySource,
+        SupplySyncTaskState $states,
+    ): JsonResponse {
+        $data = $request->validate(['task_id' => 'sometimes|integer|min:1']);
         $task = SupplySyncTask::where('supply_source_id', $supplySource->id)
-            ->whereIn('status', [SupplySyncTask::STATUS_QUEUED, SupplySyncTask::STATUS_RUNNING])
-            ->latest('id')
-            ->first();
+            ->when(isset($data['task_id']), fn ($query) => $query->whereKey($data['task_id']))
+            ->whereIn('status', [
+                SupplySyncTask::STATUS_QUEUED,
+                SupplySyncTask::STATUS_RUNNING,
+                SupplySyncTask::STATUS_CANCELLING,
+            ])
+            ->latest('id')->first();
 
         if (! $task) {
             return response()->json(['ok' => false, 'message' => '没有进行中的同步任务'], 404);
         }
 
-        $task->update(['status' => SupplySyncTask::STATUS_CANCELLED]);
+        $task = $states->requestCancel($task);
 
         return response()->json(['ok' => true, 'task' => $task]);
     }
@@ -225,8 +269,9 @@ class SupplySourceController extends Controller
     /**
      * GET /api/admin/supply-sources/sync-tasks 全部货源同步任务(含货源名,最新优先)。
      */
-    public function allSyncTasks(Request $request): JsonResponse
+    public function allSyncTasks(Request $request, SupplySyncTaskState $states): JsonResponse
     {
+        $states->reapStale();
         $limit = min(100, max(1, (int) $request->input('limit', 50)));
         $tasks = SupplySyncTask::with('source:id,name')
             ->orderByDesc('id')
@@ -258,12 +303,20 @@ class SupplySourceController extends Controller
     {
         $heartbeat = Cache::get('queue:heartbeat');
         $connection = config('queue.default');
+        $timestamp = is_array($heartbeat) ? ($heartbeat['timestamp'] ?? null) : $heartbeat;
+        $workerVersion = is_array($heartbeat) ? ($heartbeat['worker_version'] ?? null) : null;
+        $workerStartedAt = is_array($heartbeat) ? ($heartbeat['worker_started_at'] ?? null) : null;
+        $appVersion = AppHelper::version();
 
         return response()->json([
             'ok' => true,
-            'heartbeat_at' => $heartbeat !== null ? (int) $heartbeat : null,
+            'heartbeat_at' => $timestamp !== null ? (int) $timestamp : null,
             'connection' => $connection,
-            'healthy' => $heartbeat !== null && (now()->timestamp - (int) $heartbeat) <= 20,
+            'healthy' => $timestamp !== null && (now()->timestamp - (int) $timestamp) <= 20,
+            'app_version' => $appVersion,
+            'worker_version' => $workerVersion,
+            'worker_started_at' => $workerStartedAt,
+            'version_match' => is_string($workerVersion) && hash_equals($appVersion, $workerVersion),
         ]);
     }
 
@@ -304,7 +357,7 @@ class SupplySourceController extends Controller
                 foreach ($driver->listCategories() as $cat) {
                     $catNames[$cat->code] = $cat->name;
                 }
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 // 分类接口失败不阻塞商品预览,回退到"分类 #code"占位
             }
             foreach ($items as $p) {
@@ -357,7 +410,7 @@ class SupplySourceController extends Controller
             Cache::put($cacheKey, $data, 60);
 
             return response()->json($data);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return response()->json(['ok' => false, 'error' => $e->getMessage()], 500);
         }
     }
@@ -417,7 +470,7 @@ class SupplySourceController extends Controller
                 if (! $dto) {
                     try {
                         $dto = $driver->getProduct((string) $code);
-                    } catch (\Throwable $e) {
+                    } catch (Throwable $e) {
                         $dto = null;
                     }
                 }
@@ -445,7 +498,7 @@ class SupplySourceController extends Controller
                 'skipped' => $skipped,
                 'message' => "成功导入 {$imported} 个商品".($skipped > 0 ? "(跳过 {$skipped} 个)" : ''),
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $supplySource->update(['last_error' => $e->getMessage()]);
 
             return response()->json(['ok' => false, 'error' => $e->getMessage()], 500);
@@ -517,6 +570,7 @@ class SupplySourceController extends Controller
             }
         }
         $source->credentials = $creds;
+        $source->last_error = SupplySyncError::normalizeStoredMessage($source->last_error);
 
         return $source;
     }

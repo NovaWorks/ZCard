@@ -2,6 +2,8 @@
 
 namespace App\Supply\Drivers\Concerns;
 
+use App\Supply\Exceptions\UpstreamRequestException;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -13,7 +15,12 @@ trait MakesHttpRequests
 {
     protected function requestTimeout(): int
     {
-        return (int) ($this->source->settings['timeout'] ?? 30);
+        return min(60, max(5, (int) ($this->source->settings['timeout'] ?? 30)));
+    }
+
+    protected function connectTimeout(): int
+    {
+        return min(5, $this->requestTimeout());
     }
 
     protected function baseUrl(): string
@@ -48,24 +55,47 @@ trait MakesHttpRequests
      */
     protected function postRaw(string $path, string $rawBody, array $headers = []): array
     {
-        $url = $this->baseUrl() . $path;
-        $resp = Http::withHeaders($headers)->timeout($this->requestTimeout())
-            ->withBody($rawBody, 'application/json')->post($url);
-        if (! $resp->successful()) {
-            Log::warning('supply upstream http error', ['url' => $url, 'status' => $resp->status(), 'body' => $resp->body()]);
-            throw new \RuntimeException("上游请求失败: HTTP {$resp->status()}");
+        $url = $this->baseUrl().$path;
+        try {
+            $resp = Http::withHeaders($headers)
+                ->connectTimeout($this->connectTimeout())
+                ->timeout($this->requestTimeout())
+                ->withBody($rawBody, 'application/json')->post($url);
+        } catch (ConnectionException $e) {
+            throw UpstreamRequestException::fromConnection($url, $e);
         }
-        // 上游返回非 JSON(WAF 拦截页等)时 json() 为 null,归一成空数组交由调用方判定
-        return $resp->json() ?? [];
+        if (! $resp->successful()) {
+            $error = UpstreamRequestException::fromHttp($url, $resp->status(), $resp->body());
+            Log::warning('supply upstream http error', $error->context);
+            throw $error;
+        }
+        $json = $resp->json();
+        if (! is_array($json)) {
+            throw UpstreamRequestException::invalidResponse($url, $resp->body());
+        }
+
+        return $json;
     }
 
     protected function getJson(string $path, array $query = [], array $headers = []): array
     {
-        $url = $this->baseUrl() . $path;
-        $resp = Http::withHeaders($headers)->timeout($this->requestTimeout())->get($url, $query);
-        if (! $resp->successful()) {
-            throw new \RuntimeException("上游请求失败: HTTP {$resp->status()}");
+        $url = $this->baseUrl().$path;
+        try {
+            $resp = Http::withHeaders($headers)
+                ->connectTimeout($this->connectTimeout())
+                ->timeout($this->requestTimeout())
+                ->get($url, $query);
+        } catch (ConnectionException $e) {
+            throw UpstreamRequestException::fromConnection($url, $e);
         }
-        return $resp->json();
+        if (! $resp->successful()) {
+            throw UpstreamRequestException::fromHttp($url, $resp->status(), $resp->body());
+        }
+        $json = $resp->json();
+        if (! is_array($json)) {
+            throw UpstreamRequestException::invalidResponse($url, $resp->body());
+        }
+
+        return $json;
     }
 }

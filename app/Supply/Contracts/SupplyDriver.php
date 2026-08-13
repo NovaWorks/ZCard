@@ -45,7 +45,12 @@ interface SupplyDriver
      * @param  Carbon|null  $updatedAfter  增量同步时传,全量传 null
      * @return array{items:UpstreamProduct[], total:int, page:int, has_more:bool}
      */
-    public function listProducts(?Carbon $updatedAfter, int $page, bool $fetchStock = false): array;
+    public function listProducts(
+        ?Carbon $updatedAfter,
+        int $page,
+        bool $fetchStock = false,
+        ?callable $progress = null,
+    ): array;
 
     public function getProduct(string $code): ?UpstreamProduct;
 

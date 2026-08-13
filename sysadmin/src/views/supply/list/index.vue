@@ -307,16 +307,20 @@
       @closed="stopAllTasksPolling"
     >
       <!-- 队列状态横幅 -->
-      <div v-if="queueChecked" class="queue-banner" :class="queueHealthy ? 'queue-ok' : 'queue-down'">
-        <template v-if="queueHealthy">
+      <div v-if="queueChecked" class="queue-banner" :class="queueHealthy && queueVersionMatch ? 'queue-ok' : 'queue-down'">
+        <template v-if="queueHealthy && queueVersionMatch">
           <ArtSvgIcon icon="ri:checkbox-circle-line" class="queue-icon" />
           <span>{{ t('zcard.supply.queueOk', { conn: queueConnection }) }}</span>
         </template>
         <template v-else>
           <ArtSvgIcon icon="ri:alert-line" class="queue-icon" />
           <div class="queue-down-body">
-            <div class="queue-down-title">{{ t('zcard.supply.queueDown') }}</div>
-            <div class="queue-down-tip">{{ t('zcard.supply.queueDownTip') }}</div>
+            <div class="queue-down-title">
+              {{ queueHealthy ? t('zcard.supply.queueVersionMismatch') : t('zcard.supply.queueDown') }}
+            </div>
+            <div class="queue-down-tip">
+              {{ queueHealthy ? t('zcard.supply.queueVersionMismatchTip', { app: queueAppVersion || '—', worker: queueWorkerVersion || t('zcard.supply.queueWorkerUnknown') }) : t('zcard.supply.queueDownTip') }}
+            </div>
             <pre class="queue-cmd">php artisan queue:work</pre>
             <div class="queue-down-help">{{ t('zcard.supply.queueDownHelp') }}</div>
           </div>
@@ -335,6 +339,16 @@
             <ElTag :type="taskStatusTag(task.status)" size="small">{{ taskStatusText(task.status) }}</ElTag>
             <span class="task-mode">{{ task.mode === 'full' ? t('zcard.supply.taskModeFull') : t('zcard.supply.taskModeInc') }}</span>
             <ElTag v-if="task.force_reprice" type="warning" size="small">{{ t('zcard.supply.taskForceRepriceTag') }}</ElTag>
+            <ElButton
+              v-if="['queued', 'running'].includes(task.status)"
+              size="small"
+              type="danger"
+              plain
+              :loading="cancellingTaskId === task.id"
+              @click="handleCancelAllTask(task)"
+            >
+              {{ t('zcard.supply.taskCancel') }}
+            </ElButton>
           </div>
           <div class="all-task-progress" v-if="task.total_products > 0">
             <ElProgress :percentage="taskProgress(task)" :stroke-width="10" />
@@ -347,13 +361,21 @@
               <span :class="{ 'task-deleted': task.deleted_count > 0 }">{{ task.deleted_count }} {{ t('zcard.supply.taskDeleted') }}</span>
             </span>
           </div>
-          <div v-else-if="task.status === 'queued' || task.status === 'running'" class="all-task-waiting">
+          <div v-else-if="['queued', 'running', 'cancelling'].includes(task.status)" class="all-task-waiting">
             <span class="all-task-counts">{{ t('zcard.supply.taskProcessed', { n: task.processed_products, total: task.total_products }) }}</span>
           </div>
-          <div v-if="task.error" class="task-error">{{ task.error }}</div>
+          <div v-if="task.current_stage" class="task-runtime-meta">
+            <span>{{ t('zcard.supply.taskStage') }}: {{ taskStageText(task.current_stage) }}</span>
+            <span v-if="task.heartbeat_at">{{ t('zcard.supply.taskLastActivity') }}: {{ formatTime(task.heartbeat_at) }}</span>
+          </div>
+          <div v-if="task.error" class="task-error">
+            <ElTag v-if="task.error_code" type="danger" size="small">{{ task.error_code }}</ElTag>
+            <span>{{ task.error }}</span>
+            <span v-if="taskErrorDetails(task)" class="task-error-context">{{ taskErrorDetails(task) }}</span>
+          </div>
           <div class="all-task-meta">
             <span v-if="task.status === 'success'" class="task-done">{{ t('zcard.supply.taskDone', { t: formatTime(task.finished_at) }) }}</span>
-            <span v-else-if="['failed', 'cancelled'].includes(task.status)" class="task-history-time">{{ formatTime(task.finished_at) }}</span>
+            <span v-else-if="['failed', 'cancelled', 'timed_out'].includes(task.status)" class="task-history-time">{{ formatTime(task.finished_at) }}</span>
             <span v-else class="task-history-time">{{ formatTime(task.created_at) }}</span>
           </div>
         </div>
@@ -381,7 +403,7 @@
           </div>
 
           <!-- 进度条 -->
-          <div class="task-progress" v-if="activeTask.status === 'running' || activeTask.status === 'queued'">
+          <div class="task-progress" v-if="['queued', 'running', 'cancelling'].includes(activeTask.status)">
             <ElProgress
               :percentage="taskProgress(activeTask)"
               :indeterminate="activeTask.total_products === 0"
@@ -393,8 +415,17 @@
             </div>
           </div>
 
+          <div v-if="activeTask.current_stage" class="task-runtime-meta">
+            <span>{{ t('zcard.supply.taskStage') }}: {{ taskStageText(activeTask.current_stage) }}</span>
+            <span v-if="activeTask.stage_total > 0">
+              {{ activeTask.stage_current }}/{{ activeTask.stage_total }}
+            </span>
+            <span v-if="activeTask.heartbeat_at">{{ t('zcard.supply.taskLastActivity') }}: {{ formatTime(activeTask.heartbeat_at) }}</span>
+            <span v-if="activeTask.worker_version">worker v{{ activeTask.worker_version }}</span>
+          </div>
+
           <!-- 计数 -->
-          <div class="task-counts" v-if="activeTask.processed_products > 0 || ['success', 'failed', 'cancelled'].includes(activeTask.status)">
+          <div class="task-counts" v-if="activeTask.processed_products > 0 || ['success', 'failed', 'cancelled', 'timed_out'].includes(activeTask.status)">
             <span class="task-count created">+{{ activeTask.created_count }} {{ t('zcard.supply.taskCreated') }}</span>
             <span class="task-count updated">{{ activeTask.updated_count }} {{ t('zcard.supply.taskUpdated') }}</span>
             <span class="task-count price" v-if="activeTask.price_updated_count">{{ t('zcard.supply.taskPriceUpdated', { n: activeTask.price_updated_count }) }}</span>
@@ -403,15 +434,19 @@
             <span class="task-count hidden" v-if="activeTask.hidden_count">{{ activeTask.hidden_count }} {{ t('zcard.supply.taskHidden') }}</span>
           </div>
 
-          <div v-if="activeTask.error" class="task-error">{{ activeTask.error }}</div>
+          <div v-if="activeTask.error" class="task-error">
+            <ElTag v-if="activeTask.error_code" type="danger" size="small">{{ activeTask.error_code }}</ElTag>
+            <span>{{ activeTask.error }}</span>
+            <span v-if="taskErrorDetails(activeTask)" class="task-error-context">{{ taskErrorDetails(activeTask) }}</span>
+          </div>
           <div v-else-if="activeTask.status === 'success'" class="task-done">{{ t('zcard.supply.taskDone', { t: formatTime(activeTask.finished_at) }) }}</div>
 
           <!-- 操作按钮 -->
           <div class="task-actions">
-            <ElButton v-if="['queued', 'running'].includes(activeTask.status)" size="small" type="danger" plain :loading="cancelling" @click="handleCancelTask">
+            <ElButton v-if="['queued', 'running'].includes(activeTask.status)" size="small" type="danger" plain :loading="cancellingTaskId === activeTask.id" @click="handleCancelTask(activeTask)">
               {{ t('zcard.supply.taskCancel') }}
             </ElButton>
-            <ElButton v-if="['success', 'failed', 'cancelled'].includes(activeTask.status)" size="small" type="primary" :loading="syncingId === taskSource.id" @click="handleResync(taskSource)">
+            <ElButton v-if="['success', 'failed', 'cancelled', 'timed_out'].includes(activeTask.status)" size="small" type="primary" :loading="syncingId === taskSource.id" @click="handleResync(taskSource)">
               {{ t('zcard.supply.taskResync') }}
             </ElButton>
           </div>
@@ -1010,7 +1045,7 @@
   const taskDialogVisible = ref(false)
   const taskSource = ref<SupplySource | null>(null)
   const tasks = ref<SupplySyncTask[]>([])
-  const cancelling = ref(false)
+  const cancellingTaskId = ref<number | null>(null)
   let taskPollTimer: ReturnType<typeof setInterval> | null = null
 
   const activeTask = computed(() => tasks.value[0] || null)
@@ -1037,7 +1072,7 @@
     stopTaskPolling()
     taskPollTimer = setInterval(() => {
       const t = tasks.value[0]
-      if (t && ['queued', 'running'].includes(t.status)) {
+      if (t && ['queued', 'running', 'cancelling'].includes(t.status)) {
         loadTasks(id)
       } else if (taskPollTimer) {
         stopTaskPolling()
@@ -1052,18 +1087,31 @@
     }
   }
 
-  const handleCancelTask = async () => {
+  const handleCancelTask = async (task: SupplySyncTask) => {
     if (!taskSource.value) return
-    cancelling.value = true
+    cancellingTaskId.value = task.id
     try {
-      await cancelSupplySync(taskSource.value.id)
+      await cancelSupplySync(taskSource.value.id, task.id)
       await loadTasks(taskSource.value.id)
       startTaskPolling(taskSource.value.id)
       ElMessage.success(t('zcard.supply.taskCancelled'))
     } catch {
       // 拦截器已提示
     } finally {
-      cancelling.value = false
+      cancellingTaskId.value = null
+    }
+  }
+
+  const handleCancelAllTask = async (task: SupplySyncTaskWithSource) => {
+    cancellingTaskId.value = task.id
+    try {
+      await cancelSupplySync(task.supply_source_id, task.id)
+      await loadAllTasks()
+      ElMessage.success(t('zcard.supply.taskCancelled'))
+    } catch {
+      // 拦截器已提示
+    } finally {
+      cancellingTaskId.value = null
     }
   }
 
@@ -1078,7 +1126,10 @@
   const allTasks = ref<SupplySyncTaskWithSource[]>([])
   const queueChecked = ref(false)
   const queueHealthy = ref(false)
+  const queueVersionMatch = ref(false)
   const queueConnection = ref('')
+  const queueAppVersion = ref('')
+  const queueWorkerVersion = ref<string | null>(null)
   let allTasksTimer: ReturnType<typeof setInterval> | null = null
 
   const openAllTasks = () => {
@@ -1107,10 +1158,14 @@
       await probeSyncQueue()
       const st = await getSyncQueueStatus()
       queueHealthy.value = !!st.healthy
+      queueVersionMatch.value = !!st.version_match
       queueConnection.value = st.connection || ''
+      queueAppVersion.value = st.app_version || ''
+      queueWorkerVersion.value = st.worker_version || null
       queueChecked.value = true
     } catch {
       queueHealthy.value = false
+      queueVersionMatch.value = false
       queueChecked.value = true
     }
   }
@@ -1119,13 +1174,16 @@
     stopAllTasksPolling()
     allTasksTimer = setInterval(() => {
       loadAllTasks()
-      const running = allTasks.value.some((t) => ['queued', 'running'].includes(t.status))
+      const running = allTasks.value.some((t) => ['queued', 'running', 'cancelling'].includes(t.status))
       if (!running && queueChecked.value) {
         // 无进行中任务且已检测过队列 → 仍每 15 秒刷新队列状态,其余静默
       }
       // 队列心跳持续刷新(worker 正常时每次 probe 会更新)
       probeSyncQueue().then(() => getSyncQueueStatus()).then((st) => {
         queueHealthy.value = !!st.healthy
+        queueVersionMatch.value = !!st.version_match
+        queueAppVersion.value = st.app_version || ''
+        queueWorkerVersion.value = st.worker_version || null
         queueChecked.value = true
       }).catch(() => {})
     }, 5000)
@@ -1146,7 +1204,9 @@
   const taskStatusTag = (s: string): 'primary' | 'success' | 'danger' | 'warning' | 'info' => {
     if (s === 'success') return 'success'
     if (s === 'failed') return 'danger'
+    if (s === 'timed_out') return 'danger'
     if (s === 'running') return 'primary'
+    if (s === 'cancelling') return 'warning'
     if (s === 'cancelled') return 'warning'
     return 'info'
   }
@@ -1155,11 +1215,41 @@
     const map: Record<string, string> = {
       queued: t('zcard.supply.taskQueued'),
       running: t('zcard.supply.taskRunning'),
+      cancelling: t('zcard.supply.taskCancelling'),
       success: t('zcard.supply.taskSuccess'),
       failed: t('zcard.supply.taskFailed'),
       cancelled: t('zcard.supply.taskCancelledStatus'),
+      timed_out: t('zcard.supply.taskTimedOut'),
     }
     return map[s] || s
+  }
+
+  const taskStageText = (stage: string): string => {
+    const map: Record<string, string> = {
+      starting: t('zcard.supply.stageStarting'),
+      connecting: t('zcard.supply.stageConnecting'),
+      fetching_products: t('zcard.supply.stageFetchingProducts'),
+      fetching_stock: t('zcard.supply.stageFetchingStock'),
+      saving_products: t('zcard.supply.stageSavingProducts'),
+      reconciling_products: t('zcard.supply.stageReconcilingProducts'),
+      finalizing: t('zcard.supply.stageFinalizing'),
+      cancelling: t('zcard.supply.stageCancelling'),
+      cancelled: t('zcard.supply.taskCancelledStatus'),
+      completed: t('zcard.supply.taskSuccess'),
+      failed: t('zcard.supply.taskFailed'),
+      timed_out: t('zcard.supply.taskTimedOut')
+    }
+    return map[stage] || stage
+  }
+
+  /** 仅展示后端已脱敏的上游端点和 HTTP 状态，不在界面暴露签名/密钥。 */
+  const taskErrorDetails = (task: SupplySyncTask): string => {
+    const context = task.error_context
+    if (!context) return ''
+    const parts: string[] = []
+    if (typeof context.http_status === 'number') parts.push(`HTTP ${context.http_status}`)
+    if (typeof context.endpoint === 'string' && context.endpoint) parts.push(context.endpoint)
+    return parts.join(' · ')
   }
 
   /** ===== 拉取商品 + 勾选导入 ===== */
@@ -1810,12 +1900,28 @@
 .task-count.updated { color: var(--el-color-primary); }
 .task-count.hidden { color: var(--el-color-warning); }
 .task-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   margin: 6px 0;
   font-size: 12px;
   color: var(--el-color-danger);
   word-break: break-all;
   max-height: 80px;
   overflow-y: auto;
+}
+.task-error-context {
+  flex-basis: 100%;
+  color: var(--el-text-color-secondary);
+}
+.task-runtime-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 5px 0;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 .task-done {
   margin: 6px 0;

@@ -81,8 +81,12 @@ class ZCardDriver implements SupplyDriver
         return false;
     }
 
-    public function listProducts(?Carbon $updatedAfter, int $page, bool $fetchStock = false): array
-    {
+    public function listProducts(
+        ?Carbon $updatedAfter,
+        int $page,
+        bool $fetchStock = false,
+        ?callable $progress = null,
+    ): array {
         $path = '/api/supply/products';
         $query = ['page' => $page];
         $data = $this->getJson($path, $query, $this->signedHeaders('GET', $path));

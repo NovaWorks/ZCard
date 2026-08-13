@@ -12,6 +12,8 @@ use App\Supply\Contracts\SupplyDriver;
 use App\Supply\Dto\UpstreamProduct;
 use App\Supply\SupplyManager;
 use App\Supply\SupplySyncService;
+use App\Supply\SupplySyncTaskState;
+use App\Support\AppHelper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Spatie\Permission\Models\Role;
@@ -97,6 +99,9 @@ class SupplySyncTaskTest extends TestCase
         $this->assertSame(2, (int) $task->processed_products);
         $this->assertSame(2, (int) $task->created_count);
         $this->assertNotNull($task->finished_at);
+        $this->assertNotNull($task->heartbeat_at);
+        $this->assertSame('completed', $task->current_stage);
+        $this->assertSame(AppHelper::version(), $task->worker_version);
     }
 
     public function test_full_sync_soft_deletes_explicitly_inactive_and_missing_products(): void
@@ -246,7 +251,7 @@ class SupplySyncTaskTest extends TestCase
         $this->assertSame(SupplySyncTask::STATUS_CANCELLED, $task->status);
     }
 
-    public function test_sync_cancel_api_marks_task_cancelled(): void
+    public function test_sync_cancel_api_marks_running_task_cancelling_and_is_idempotent(): void
     {
         $source = $this->makeSource();
         SupplySyncTask::create([
@@ -258,12 +263,83 @@ class SupplySyncTaskTest extends TestCase
         $resp = $this->withHeaders($this->adminHeaders())
             ->postJson("/api/admin/supply-sources/{$source->id}/sync-cancel");
         $resp->assertOk();
-        $this->assertSame('cancelled', $resp->json('task.status'));
+        $this->assertSame('cancelling', $resp->json('task.status'));
+        $this->assertNotNull($resp->json('task.cancel_requested_at'));
 
-        // 无进行中任务 → 404
+        // 重复点击取消保持幂等，仍返回同一取消中任务。
         $again = $this->withHeaders($this->adminHeaders())
             ->postJson("/api/admin/supply-sources/{$source->id}/sync-cancel");
-        $again->assertStatus(404);
+        $again->assertOk()->assertJsonPath('task.status', 'cancelling');
+    }
+
+    public function test_sync_cancel_api_can_cancel_selected_queued_task_immediately(): void
+    {
+        $source = $this->makeSource();
+        $older = SupplySyncTask::create([
+            'supply_source_id' => $source->id,
+            'mode' => 'incremental',
+            'status' => SupplySyncTask::STATUS_RUNNING,
+        ]);
+        $queued = SupplySyncTask::create([
+            'supply_source_id' => $source->id,
+            'mode' => 'full',
+            'status' => SupplySyncTask::STATUS_QUEUED,
+        ]);
+
+        $resp = $this->withHeaders($this->adminHeaders())
+            ->postJson("/api/admin/supply-sources/{$source->id}/sync-cancel", ['task_id' => $queued->id]);
+
+        $resp->assertOk()->assertJsonPath('task.status', 'cancelled');
+        $this->assertSame(SupplySyncTask::STATUS_RUNNING, $older->fresh()->status);
+        $this->assertNotNull($queued->fresh()->finished_at);
+    }
+
+    public function test_stale_running_task_is_timed_out_and_no_longer_blocks_resync(): void
+    {
+        Queue::fake();
+        config()->set('zcard.supply.sync_stale_seconds', 90);
+        $source = $this->makeSource();
+        $task = SupplySyncTask::create([
+            'supply_source_id' => $source->id,
+            'mode' => 'incremental',
+            'status' => SupplySyncTask::STATUS_RUNNING,
+            'started_at' => now()->subMinutes(5),
+            'heartbeat_at' => now()->subMinutes(5),
+        ]);
+
+        $result = app(SupplySyncTaskState::class)->reapStale($source->id);
+
+        $this->assertSame(1, $result['timed_out']);
+        $this->assertDatabaseHas('supply_sync_tasks', [
+            'id' => $task->id,
+            'status' => SupplySyncTask::STATUS_TIMED_OUT,
+            'error_code' => 'TASK_STALLED',
+        ]);
+
+        $this->withHeaders($this->adminHeaders())
+            ->postJson("/api/admin/supply-sources/{$source->id}/sync")
+            ->assertOk()
+            ->assertJsonPath('task.status', SupplySyncTask::STATUS_QUEUED);
+    }
+
+    public function test_late_success_cannot_overwrite_a_cancelled_task(): void
+    {
+        $source = $this->makeSource();
+        $task = SupplySyncTask::create([
+            'supply_source_id' => $source->id,
+            'mode' => 'incremental',
+            'status' => SupplySyncTask::STATUS_RUNNING,
+            'started_at' => now(),
+            'heartbeat_at' => now(),
+        ]);
+        $states = app(SupplySyncTaskState::class);
+
+        $states->requestCancel($task);
+        $states->finishCancelled($task);
+
+        $this->assertFalse($states->succeed($task, ['processed_products' => 99]));
+        $this->assertSame(SupplySyncTask::STATUS_CANCELLED, $task->fresh()->status);
+        $this->assertSame(0, (int) $task->fresh()->processed_products);
     }
 
     public function test_all_tasks_endpoint_includes_source_name(): void
@@ -292,6 +368,8 @@ class SupplySyncTaskTest extends TestCase
         $resp->assertOk();
         $this->assertNotNull($resp->json('heartbeat_at'), '探针执行后应有心跳');
         $this->assertTrue($resp->json('healthy'));
+        $this->assertTrue($resp->json('version_match'));
+        $this->assertSame(AppHelper::version(), $resp->json('worker_version'));
     }
 
     public function test_updating_markup_percent_dispatches_full_sync(): void

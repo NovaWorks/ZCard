@@ -360,10 +360,15 @@ ZCard/
 > 启动方式（生产用 supervisor 托管，见《部署安装指南》第 4 步）：
 >
 > ```bash
-> php artisan queue:work --tries=3 --timeout=300
+> php artisan queue:work --tries=3 --timeout=900
 > ```
 >
-> 验证：`ps aux | grep queue:work` 应有进程；`php artisan queue:monitor` 可查看队列健康度。
+> `retry_after` 必须大于 `timeout`（默认 960 > 900）。在线更新会发送
+> `queue:restart` 信号并重置 PHP OPcache，生产环境必须由 Supervisor/systemd
+> 自动拉起退出后的 worker。若从旧版首次升级后仍出现旧类属性/接口错误，需手动
+> 重启一次 PHP-FPM 和 Supervisor。
+>
+> 验证：`ps aux | grep queue:work` 应有进程；后台「全部同步任务」会同时显示队列健康和 worker 版本。
 
 ---
 

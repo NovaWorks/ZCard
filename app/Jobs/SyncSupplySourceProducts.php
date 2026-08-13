@@ -5,8 +5,11 @@ namespace App\Jobs;
 use App\Models\Product;
 use App\Models\SupplySource;
 use App\Models\SupplySyncTask;
+use App\Supply\Exceptions\SyncTaskCancelledException;
 use App\Supply\SupplyManager;
+use App\Supply\SupplySyncError;
 use App\Supply\SupplySyncService;
+use App\Supply\SupplySyncTaskState;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -21,14 +24,19 @@ use Throwable;
  * 异步入库:由队列 worker 执行(生产环境必须跑 queue:work),后台任务表
  * (supply_sync_tasks)记录状态/进度,支持取消与重新同步。
  *
- * 状态流转:queued → running → success | failed | cancelled。
- * 取消:页面置 cancelled 标记,Job 每页拉取前检查,感知后立即中止。
+ * 状态流转:queued → running → success | failed | timed_out；
+ * 取消流转:queued → cancelled，running → cancelling → cancelled。
  */
 class SyncSupplySourceProducts implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $timeout = 3600;
+    // 必须小于 queue.php 的 retry_after(默认 960 秒)，避免超时前任务被重复领取。
+    public int $timeout = 900;
+
+    public int $tries = 1;
+
+    public bool $failOnTimeout = true;
 
     public function __construct(
         public readonly int $sourceId,
@@ -37,22 +45,21 @@ class SyncSupplySourceProducts implements ShouldQueue
         public readonly bool $forceReprice = false,
     ) {}
 
-    public function handle(SupplyManager $manager, SupplySyncService $sync): void
-    {
+    public function handle(
+        SupplyManager $manager,
+        SupplySyncService $sync,
+        ?SupplySyncTaskState $states = null,
+    ): void {
+        $states ??= app(SupplySyncTaskState::class);
+        $task = $this->task();
         $source = SupplySource::find($this->sourceId);
         if (! $source || ! $source->isActive()) {
-            $this->finish(SupplySyncTask::STATUS_FAILED, null, '货源不存在或已停用');
+            $states->fail($task, new \RuntimeException('货源不存在或已停用'));
 
             return;
         }
 
-        $task = $this->task();
-        $this->markRunning($task);
-
-        // 排队期间已被取消 → 直接中止(不再拉取)
-        if ($task->fresh()->status === SupplySyncTask::STATUS_CANCELLED) {
-            $this->finish(SupplySyncTask::STATUS_CANCELLED, $task);
-
+        if (! $states->start($task)) {
             return;
         }
 
@@ -62,6 +69,7 @@ class SyncSupplySourceProducts implements ShouldQueue
         $seenCodes = null;
 
         try {
+            $this->pulse($states, $task, 'connecting');
             $driver = $manager->driver($source);
             $updatedAfter = $this->mode === 'incremental' ? $source->last_synced_at : null;
             // 完整同步，或驱动本身不支持 updatedAfter（acg-faka/ZCard 每次均返回完整快照）时，
@@ -71,16 +79,23 @@ class SyncSupplySourceProducts implements ShouldQueue
                 : null;
 
             do {
-                // 取消检查:页面点取消后,立即停止拉取
-                if ($task->fresh()->status === SupplySyncTask::STATUS_CANCELLED) {
-                    $this->finish(SupplySyncTask::STATUS_CANCELLED, $task);
-
-                    return;
-                }
+                $this->pulse($states, $task, 'fetching_products', ['current_page' => $page]);
 
                 // 同步模式补查真实库存(fetchStock=true):上游 items 对手动发货商品
                 // 不返回 stock,逐个补查(并发10)让库存准确
-                $result = $driver->listProducts($updatedAfter, $page, fetchStock: true);
+                $result = $driver->listProducts(
+                    $updatedAfter,
+                    $page,
+                    fetchStock: true,
+                    progress: function (string $stage, int $current, int $stageTotal) use ($states, $task, $page): void {
+                        $this->pulse($states, $task, $stage, [
+                            'current_page' => $page,
+                            'stage_current' => $current,
+                            'stage_total' => $stageTotal,
+                        ]);
+                    },
+                );
+                $this->pulse($states, $task, 'saving_products', ['current_page' => $page]);
                 if (! array_key_exists('items', $result) || ! is_array($result['items'])) {
                     throw new \RuntimeException("上游第 {$page} 页商品数据格式异常,已停止同步以避免误删");
                 }
@@ -94,10 +109,11 @@ class SyncSupplySourceProducts implements ShouldQueue
                 }
 
                 foreach ($items as $dto) {
-                    if ($task->fresh()->status === SupplySyncTask::STATUS_CANCELLED) {
-                        $this->finish(SupplySyncTask::STATUS_CANCELLED, $task);
-
-                        return;
+                    if ($processed % 10 === 0) {
+                        $this->pulse($states, $task, 'saving_products', array_merge(
+                            $this->counts($total, $processed, $created, $updated, $priceUpdated, $manualPriceSkipped, $deleted),
+                            ['current_page' => $page],
+                        ));
                     }
 
                     if ($seenCodes !== null) {
@@ -137,18 +153,14 @@ class SyncSupplySourceProducts implements ShouldQueue
                     }
                     $processed++;
 
-                    // 每 50 个商品刷一次进度,避免频繁写库
-                    if ($processed % 50 === 0) {
-                        $task->update([
-                            'status' => SupplySyncTask::STATUS_RUNNING,
-                            'total_products' => $total,
-                            'processed_products' => $processed,
-                            'created_count' => $created,
-                            'updated_count' => $updated,
-                            'price_updated_count' => $priceUpdated,
-                            'manual_price_skipped_count' => $manualPriceSkipped,
-                            'deleted_count' => $deleted,
-                        ]);
+                    // 每 10 个商品刷新进度，同时把取消响应延迟限制在很小批次内。
+                    if ($processed % 10 === 0) {
+                        $this->pulse(
+                            $states,
+                            $task,
+                            'saving_products',
+                            $this->counts($total, $processed, $created, $updated, $priceUpdated, $manualPriceSkipped, $deleted),
+                        );
                     }
                 }
 
@@ -158,6 +170,12 @@ class SyncSupplySourceProducts implements ShouldQueue
             // 全量核对前先验证分页完整性。若上游声称的总数大于实际处理数，
             // 说明 has_more/分页响应不完整，此时宁可任务失败也不能批量误删。
             if ($seenCodes !== null) {
+                $this->pulse(
+                    $states,
+                    $task,
+                    'reconciling_products',
+                    $this->counts($total, $processed, $created, $updated, $priceUpdated, $manualPriceSkipped, $deleted),
+                );
                 if ($reportedTotal !== null && $processed < $reportedTotal) {
                     throw new \RuntimeException(
                         "上游商品分页不完整:应拉取 {$reportedTotal} 个,实际仅 {$processed} 个,已停止删除失效商品"
@@ -169,35 +187,56 @@ class SyncSupplySourceProducts implements ShouldQueue
                 $deleted += $sync->deleteMissingProducts($source, $seenCodes);
             }
 
+            // 避免取消请求恰好发生在核对阶段时，仍把货源标记为同步成功。
+            $this->pulse(
+                $states,
+                $task,
+                'finalizing',
+                $this->counts($total, $processed, $created, $updated, $priceUpdated, $manualPriceSkipped, $deleted),
+            );
             $source->update(['last_synced_at' => now(), 'last_error' => null]);
             Log::info("supply sync done source={$source->id} created={$created} updated={$updated} priceUpdated={$priceUpdated} manualPriceSkipped={$manualPriceSkipped} deleted={$deleted}");
 
-            $this->finish(SupplySyncTask::STATUS_SUCCESS, $task, null, [
-                'total_products' => $total,
-                'processed_products' => $processed,
-                'created_count' => $created,
-                'updated_count' => $updated,
-                'price_updated_count' => $priceUpdated,
-                'manual_price_skipped_count' => $manualPriceSkipped,
-                'deleted_count' => $deleted,
-            ]);
+            $states->succeed(
+                $task,
+                $this->counts($total, $processed, $created, $updated, $priceUpdated, $manualPriceSkipped, $deleted),
+            );
+        } catch (SyncTaskCancelledException) {
+            $states->finishCancelled($task);
+            Log::info("supply sync cancelled source={$source->id} task={$task->id}");
         } catch (Throwable $e) {
-            // last_error 截断(界面展示用,避免长 SQL/堆栈刷屏)
-            $msg = $e->getMessage();
+            $diagnostic = SupplySyncError::diagnose($e);
+            $msg = $diagnostic['message'];
             $source->update(['last_error' => mb_strlen($msg) > 500 ? mb_substr($msg, 0, 500).'…' : $msg]);
-            Log::error("supply sync failed source={$source->id}: {$e->getMessage()}");
+            Log::error("supply sync failed source={$source->id} code={$diagnostic['code']}: {$e->getMessage()}");
 
-            $this->finish(SupplySyncTask::STATUS_FAILED, $task, $msg, [
-                'total_products' => $total,
-                'processed_products' => $processed,
-                'created_count' => $created,
-                'updated_count' => $updated,
-                'price_updated_count' => $priceUpdated,
-                'manual_price_skipped_count' => $manualPriceSkipped,
-                'deleted_count' => $deleted,
-            ]);
+            $states->fail(
+                $task,
+                $e,
+                $this->counts($total, $processed, $created, $updated, $priceUpdated, $manualPriceSkipped, $deleted),
+            );
             throw $e;
         }
+    }
+
+    /** worker 超时或进程级失败时的最终兜底。 */
+    public function failed(?Throwable $e): void
+    {
+        if ($this->taskId === null) {
+            return;
+        }
+
+        $task = SupplySyncTask::find($this->taskId);
+        if (! $task) {
+            return;
+        }
+
+        $error = $e ?? new \RuntimeException('队列 worker 异常退出');
+        app(SupplySyncTaskState::class)->fail($task, $error);
+        $diagnostic = SupplySyncError::diagnose($error);
+        SupplySource::whereKey($this->sourceId)->update([
+            'last_error' => mb_substr($diagnostic['message'], 0, 500),
+        ]);
     }
 
     /** 取任务记录;定时调度未传 taskId 时自动创建(便于统一查看历史) */
@@ -215,31 +254,36 @@ class SyncSupplySourceProducts implements ShouldQueue
         ]);
     }
 
-    private function markRunning(SupplySyncTask $task): void
-    {
-        // 排队期间已被取消 → 保持 cancelled,不得覆盖为 running
-        if ($task->status === SupplySyncTask::STATUS_CANCELLED) {
-            return;
+    /** @param  array<string, mixed>  $progress */
+    private function pulse(
+        SupplySyncTaskState $states,
+        SupplySyncTask $task,
+        string $stage,
+        array $progress = [],
+    ): void {
+        if (! $states->heartbeat($task, $stage, $progress)) {
+            throw new SyncTaskCancelledException;
         }
-
-        $task->update([
-            'status' => SupplySyncTask::STATUS_RUNNING,
-            'started_at' => now(),
-            'error' => null,
-        ]);
     }
 
-    /** 结束任务:成功/失败/取消统一收口 */
-    private function finish(string $status, ?SupplySyncTask $task, ?string $error = null, array $counts = []): void
-    {
-        if (! $task) {
-            return;
-        }
-
-        $task->update(array_merge($counts, [
-            'status' => $status,
-            'error' => $error !== null ? mb_substr($error, 0, 2000) : null,
-            'finished_at' => now(),
-        ]));
+    /** @return array<string, int> */
+    private function counts(
+        int $total,
+        int $processed,
+        int $created,
+        int $updated,
+        int $priceUpdated,
+        int $manualPriceSkipped,
+        int $deleted,
+    ): array {
+        return [
+            'total_products' => $total,
+            'processed_products' => $processed,
+            'created_count' => $created,
+            'updated_count' => $updated,
+            'price_updated_count' => $priceUpdated,
+            'manual_price_skipped_count' => $manualPriceSkipped,
+            'deleted_count' => $deleted,
+        ];
     }
 }

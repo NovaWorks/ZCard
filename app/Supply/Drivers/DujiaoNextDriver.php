@@ -87,8 +87,12 @@ class DujiaoNextDriver implements SupplyDriver
         return true;
     }
 
-    public function listProducts(?Carbon $updatedAfter, int $page, bool $fetchStock = false): array
-    {
+    public function listProducts(
+        ?Carbon $updatedAfter,
+        int $page,
+        bool $fetchStock = false,
+        ?callable $progress = null,
+    ): array {
         $path = '/api/v1/upstream/products';
         $query = ['page' => $page, 'page_size' => 50];
         if ($updatedAfter) {

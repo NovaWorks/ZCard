@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\SupplySource;
 use App\Supply\Drivers\AcgFakaDriver;
+use App\Supply\Exceptions\UpstreamRequestException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -56,5 +57,31 @@ class AcgFakaStockFetchTest extends TestCase
         $this->assertSame(8, $byCode['C1']->stockQuantity);
         // 自动发货商品:items 自带 stock → 保持 5,不补查
         $this->assertSame(5, $byCode['C2']->stockQuantity);
+    }
+
+    public function test_stock_endpoint_block_is_not_silently_treated_as_unlimited_stock(): void
+    {
+        Http::fake([
+            'https://up.example.com/shared/commodity/items' => Http::response([
+                'code' => 200,
+                'data' => [[
+                    'id' => 1,
+                    'name' => '分类A',
+                    'children' => [
+                        ['id' => 11, 'code' => 'C1', 'name' => '手动发货商品', 'price' => '100.00', 'delivery_way' => 1],
+                    ],
+                ]],
+            ]),
+            'https://up.example.com/shared/commodity/stock' => Http::response('IP forbidden', 403),
+        ]);
+
+        try {
+            (new AcgFakaDriver($this->makeSource()))->listProducts(null, 1, fetchStock: true);
+            $this->fail('库存接口被屏蔽时必须让同步任务失败并显示原因');
+        } catch (UpstreamRequestException $e) {
+            $this->assertSame('UPSTREAM_FORBIDDEN', $e->errorCode);
+            $this->assertStringContainsString('IP 白名单', $e->getMessage());
+            $this->assertSame('https://up.example.com/shared/commodity/stock', $e->context['endpoint']);
+        }
     }
 }

@@ -38,5 +38,9 @@ return [
         'nonce_store' => env('ZCARD_SUPPLY_NONCE_STORE', 'cache'), // redis|cache|database
         'rate_limit' => env('ZCARD_SUPPLY_RATE_LIMIT', 60),        // 每分钟/账号
         'timestamp_skew' => env('ZCARD_SUPPLY_TS_SKEW', 300),      // 秒,签名时间窗口
+        // 同步任务连续无心跳超过该时间后由看门狗标记超时。
+        // 上游单次 HTTP 最长 60 秒，默认 120 秒留出调度/数据库抖动余量。
+        'sync_stale_seconds' => (int) env('ZCARD_SUPPLY_SYNC_STALE_SECONDS', 120),
+        'sync_cancel_grace_seconds' => (int) env('ZCARD_SUPPLY_SYNC_CANCEL_GRACE_SECONDS', 60),
     ],
 ];

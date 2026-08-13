@@ -207,7 +207,14 @@ class UpdateController extends Controller
             $newVersion = AppHelper::version();
             $this->log($logFile, '新版本: '.$newVersion);
 
-            // Step 9: 退出维护模式
+            // Step 9: 清除 PHP-FPM 共享的旧字节码，避免新旧类/接口混用。
+            $this->resetOpcodeCache($logFile);
+
+            // Step 10: 通知长驻队列进程在当前 Job 结束后退出。
+            // Supervisor/ systemd 应配置 autorestart，以新代码启动 worker。
+            $this->restartQueueWorkers($logFile);
+
+            // Step 11: 退出维护模式
             Artisan::call('up');
             $this->log($logFile, '退出维护模式,更新完成!');
 
@@ -308,7 +315,7 @@ class UpdateController extends Controller
             $this->verifyFrontendAssets($logFile, 'admin');
             $this->verifyFrontendAssets($logFile, 'storefront');
 
-            // Step 6: 清缓存 + 上线
+            // Step 6: 清缓存 + 重置 OPcache + 重启队列 + 上线
             Artisan::call('config:clear');
             Artisan::call('route:clear');
             Artisan::call('view:clear');
@@ -319,6 +326,8 @@ class UpdateController extends Controller
             } catch (\Throwable $e) {
                 $this->log($logFile, 'route:cache 跳过(存在闭包路由,路由实时加载): '.$e->getMessage());
             }
+            $this->resetOpcodeCache($logFile);
+            $this->restartQueueWorkers($logFile);
             Artisan::call('up');
 
             // 清版本缓存确保读到 git reset 后的 tag
@@ -377,6 +386,43 @@ class UpdateController extends Controller
         if ($message !== '') {
             file_put_contents($file, '['.now()->format('H:i:s').'] '.$message."\n", FILE_APPEND);
         }
+    }
+
+    /**
+     * 发布队列重启信号。更新已经完成时不因缓存异常回滚整个发布，
+     * 但必须把明确警告写入更新日志，便于管理员手动重启 Supervisor。
+     */
+    private function restartQueueWorkers(string $logFile): void
+    {
+        try {
+            Artisan::call('queue:restart');
+            $this->log($logFile, '已发送队列重启信号，请确认 Supervisor/systemd 已配置自动重启');
+        } catch (\Throwable $e) {
+            $this->log(
+                $logFile,
+                '警告：队列重启信号发送失败，请立即手动重启 queue:work / Supervisor。原因：'.$e->getMessage(),
+            );
+        }
+    }
+
+    /** 清除 PHP-FPM 共享 OPcache，使后续请求统一加载更新后的文件。 */
+    private function resetOpcodeCache(string $logFile): void
+    {
+        clearstatcache(true);
+        if (! function_exists('opcache_reset')) {
+            $this->log($logFile, 'OPcache 扩展未启用，无需重置');
+
+            return;
+        }
+
+        if (@opcache_reset()) {
+            $this->log($logFile, 'PHP OPcache 已重置，后续请求将加载新代码');
+
+            return;
+        }
+
+        // 某些主机禁止 Web 进程重置 OPcache；不让发布失败，但明确要求人工重启 FPM。
+        $this->log($logFile, '警告：PHP OPcache 重置失败，请手动重启 PHP-FPM');
     }
 
     /**

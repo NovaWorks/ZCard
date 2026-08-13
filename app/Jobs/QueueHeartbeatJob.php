@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Support\AppHelper;
+use App\Support\WorkerRuntime;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -22,6 +24,13 @@ class QueueHeartbeatJob implements ShouldQueue
 
     public function handle(): void
     {
-        Cache::put('queue:heartbeat', now()->timestamp, 60);
+        $runtime = WorkerRuntime::snapshot();
+        Cache::put('queue:heartbeat', [
+            'timestamp' => now()->timestamp,
+            // null 表示该进程在引入 WorkerRuntime 前已启动，应重启 worker。
+            'worker_version' => $runtime['version'] ?? null,
+            'worker_started_at' => $runtime['started_at'] ?? null,
+            'app_version' => AppHelper::version(),
+        ], 60);
     }
 }

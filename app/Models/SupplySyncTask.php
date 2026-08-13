@@ -16,23 +16,32 @@ class SupplySyncTask extends Model
 
     public const STATUS_RUNNING = 'running';
 
+    public const STATUS_CANCELLING = 'cancelling';
+
     public const STATUS_SUCCESS = 'success';
 
     public const STATUS_FAILED = 'failed';
 
     public const STATUS_CANCELLED = 'cancelled';
 
+    public const STATUS_TIMED_OUT = 'timed_out';
+
     protected $fillable = [
         'supply_source_id', 'mode', 'force_reprice', 'status', 'total_products', 'processed_products',
         'created_count', 'updated_count', 'price_updated_count', 'manual_price_skipped_count',
-        'hidden_count', 'deleted_count', 'error',
-        'started_at', 'finished_at',
+        'hidden_count', 'deleted_count', 'error', 'error_code', 'error_context',
+        'started_at', 'heartbeat_at', 'current_stage', 'current_page', 'stage_current', 'stage_total',
+        'cancel_requested_at',
+        'worker_version', 'finished_at',
     ];
 
     protected $casts = [
         'force_reprice' => 'boolean',
         'started_at' => 'datetime',
+        'heartbeat_at' => 'datetime',
+        'cancel_requested_at' => 'datetime',
         'finished_at' => 'datetime',
+        'error_context' => 'array',
     ];
 
     public function source(): BelongsTo
@@ -42,6 +51,6 @@ class SupplySyncTask extends Model
 
     public function isRunning(): bool
     {
-        return in_array($this->status, [self::STATUS_QUEUED, self::STATUS_RUNNING], true);
+        return in_array($this->status, [self::STATUS_QUEUED, self::STATUS_RUNNING, self::STATUS_CANCELLING], true);
     }
 }

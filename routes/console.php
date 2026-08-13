@@ -5,6 +5,7 @@ use App\Models\SubsiteLedgerEntry;
 use App\Models\SupplySource;
 use App\Models\SupplySyncTask;
 use App\Supply\NonceStore;
+use App\Supply\SupplySyncTaskState;
 use App\Support\StorefrontConfig;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -34,8 +35,9 @@ Schedule::call(function () {
         ->whereRaw("JSON_EXTRACT(settings, '$.auto_sync') = true")
         ->each(function ($s) {
             // 定时同步同样建任务记录(统一在后台任务弹窗查看);防重:进行中则跳过
+            app(SupplySyncTaskState::class)->reapStale($s->id);
             if (SupplySyncTask::where('supply_source_id', $s->id)
-                ->whereIn('status', ['queued', 'running'])
+                ->whereIn('status', ['queued', 'running', 'cancelling'])
                 ->exists()) {
                 return;
             }
@@ -47,6 +49,12 @@ Schedule::call(function () {
             SyncSupplySourceProducts::dispatch($s->id, 'incremental', $task->id);
         });
 })->hourly();
+
+// 同步任务看门狗：worker 异常退出时将无心跳任务收口为超时/已取消。
+Schedule::call(fn () => app(SupplySyncTaskState::class)->reapStale())
+    ->name('supply-sync-task-watchdog')
+    ->everyMinute()
+    ->withoutOverlapping();
 
 // nonce 清理(database 模式,spec §8.5):每天清掉过期记录
 Schedule::call(fn () => app(NonceStore::class)->pruneExpiredDatabase())->daily();

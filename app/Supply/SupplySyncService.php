@@ -87,8 +87,9 @@ class SupplySyncService
                 'hide' => $existing->hide,
             ];
             // 临时探测失败时保留上次已确认链接，不用 null 覆盖正确数据。
-            if ($dto->productUrl !== null) {
-                $update['upstream_product_url'] = $dto->productUrl;
+            $productUrl = $this->upstreamProductUrl($dto);
+            if ($productUrl !== null) {
+                $update['upstream_product_url'] = $productUrl;
             }
             if ($this->shouldSyncPublicDescription($source)) {
                 $update['description'] = $this->normalizeDescription($source, $dto->description);
@@ -183,7 +184,7 @@ class SupplySyncService
             'category_id' => $this->resolveCategoryId($source, $dto->categoryCode, $dto->categoryName, $categoryMap),
             'upstream_source_id' => $source->id,
             'upstream_product_code' => $dto->code,
-            'upstream_product_url' => $dto->productUrl,
+            'upstream_product_url' => $this->upstreamProductUrl($dto),
             'stock_cache' => $dto->stockQuantity, // 上游库存缓存(-1=无限)
             'upstream_synced_at' => now(),
         ]);
@@ -192,6 +193,17 @@ class SupplySyncService
     private function shouldSyncPublicDescription(SupplySource $source): bool
     {
         return (bool) ($source->settings['sync_public_description'] ?? true);
+    }
+
+    /**
+     * 兼容在线更新前已经驻留内存的旧 DTO 类。
+     *
+     * 老 queue:work 进程可能已加载尚无 productUrl 属性的 UpstreamProduct；
+     * 即使首次升级时尚未来得及重启 worker，也不能让整个同步任务因读属性而崩溃。
+     */
+    private function upstreamProductUrl(UpstreamProduct $dto): ?string
+    {
+        return property_exists($dto, 'productUrl') ? $dto->productUrl : null;
     }
 
     /**
