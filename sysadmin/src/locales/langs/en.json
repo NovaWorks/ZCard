@@ -1642,7 +1642,8 @@
       "queueOk": "Queue is running ({conn} connection), tasks will execute in the background",
       "queueDown": "Queue is not running: sync tasks will NOT execute",
       "queueDownTip": "Tasks are created but stay \"queued\" forever. Start the queue worker on your server (BT panel: process manager; or systemd), run:",
-      "queueDownHelp": "After starting, return to this page and the queue status will turn green; use \"Sync again\" to rerun past tasks"
+      "queueDownHelp": "After starting, return to this page and the queue status will turn green; use \"Sync again\" to rerun past tasks",
+      "taskPriceUpdated": "{n} price updated"
     },
     "supplierAccount": {
       "title": "Supplier Accounts",

@@ -332,6 +332,7 @@
             <span class="all-task-counts">
               {{ t('zcard.supply.taskProcessed', { n: task.processed_products, total: task.total_products }) }}
               · +{{ task.created_count }} {{ t('zcard.supply.taskCreated') }}
+              · <span v-if="task.price_updated_count" class="task-price-updated">💰 {{ t('zcard.supply.taskPriceUpdated', { n: task.price_updated_count }) }}</span>
             </span>
           </div>
           <div v-else-if="task.status === 'queued' || task.status === 'running'" class="all-task-waiting">
@@ -383,6 +384,7 @@
           <div class="task-counts" v-if="activeTask.processed_products > 0 || ['success', 'failed', 'cancelled'].includes(activeTask.status)">
             <span class="task-count created">+{{ activeTask.created_count }} {{ t('zcard.supply.taskCreated') }}</span>
             <span class="task-count updated">{{ activeTask.updated_count }} {{ t('zcard.supply.taskUpdated') }}</span>
+            <span class="task-count price" v-if="activeTask.price_updated_count">{{ t('zcard.supply.taskPriceUpdated', { n: activeTask.price_updated_count }) }}</span>
             <span class="task-count hidden" v-if="activeTask.hidden_count">{{ activeTask.hidden_count }} {{ t('zcard.supply.taskHidden') }}</span>
           </div>
 
@@ -1758,6 +1760,8 @@
   font-size: 13px;
 }
 .task-count.created { color: var(--el-color-success); }
+.task-count.price { color: var(--el-color-warning); font-weight: 600; }
+.task-price-updated { color: var(--el-color-warning); font-weight: 600; }
 .task-count.updated { color: var(--el-color-primary); }
 .task-count.hidden { color: var(--el-color-warning); }
 .task-error {

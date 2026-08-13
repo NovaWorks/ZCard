@@ -174,6 +174,51 @@ class SupplySyncTaskTest extends TestCase
         $this->assertTrue($resp->json('healthy'));
     }
 
+    public function test_updating_markup_percent_dispatches_full_sync(): void
+    {
+        Queue::fake();
+        $source = $this->makeSource(['default_pricing_mode' => 'percent', 'default_markup_percent' => 150]);
+
+        // 编辑货源:加价比例 150 → 600
+        $resp = $this->withHeaders($this->adminHeaders())
+            ->putJson("/api/admin/supply-sources/{$source->id}", [
+                'name' => $source->name,
+                'driver' => $source->driver,
+                'base_url' => $source->base_url,
+                'settings' => [
+                    'default_pricing_mode' => 'percent',
+                    'default_markup_percent' => 600,
+                ],
+            ]);
+        $resp->assertOk();
+
+        // 自动派发全量同步任务(价格重算)
+        Queue::assertPushed(SyncSupplySourceProducts::class, fn ($job) => $job->mode === 'full');
+        $this->assertDatabaseHas('supply_sync_tasks', [
+            'supply_source_id' => $source->id,
+            'mode' => 'full',
+            'status' => 'queued',
+        ]);
+    }
+
+    public function test_updating_unrelated_settings_does_not_dispatch_reprice(): void
+    {
+        Queue::fake();
+        $source = $this->makeSource(['default_pricing_mode' => 'percent', 'default_markup_percent' => 150]);
+
+        // 只改 auto_list,不动定价
+        $resp = $this->withHeaders($this->adminHeaders())
+            ->putJson("/api/admin/supply-sources/{$source->id}", [
+                'name' => $source->name,
+                'driver' => $source->driver,
+                'base_url' => $source->base_url,
+                'settings' => ['auto_list' => false, 'default_pricing_mode' => 'percent', 'default_markup_percent' => 150],
+            ]);
+        $resp->assertOk();
+
+        Queue::assertNotPushed(SyncSupplySourceProducts::class);
+    }
+
     public function test_sync_tasks_list_returns_latest_first(): void
     {
         $source = $this->makeSource();

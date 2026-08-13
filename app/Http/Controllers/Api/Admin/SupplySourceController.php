@@ -72,9 +72,52 @@ class SupplySourceController extends Controller
             $merged = array_merge($existing, array_filter($data['credentials'], fn ($v) => $v !== '' && $v !== null));
             $update['credentials'] = $merged;
         }
+        // 变更前的定价设置(update 后再读就是新值了)
+        $oldSettings = $supplySource->settings ?? [];
         $supplySource->update($update);
 
+        // 定价设置(加价比例/模式)变化 → 立即派发全量同步,让商品售价按新规则自动重算
+        // (客户反馈:改 600% 加价后价格仍是旧的,因为此前要等每小时定时同步才生效)
+        $this->maybeDispatchReprice($supplySource, $oldSettings);
+
         return response()->json($this->maskCredentials($supplySource));
+    }
+
+    /**
+     * 检测定价设置是否变化;变化时派发全量同步任务(异步,立即执行,防重)。
+     * 全量同步会按新加价规则重算所有未手动改价商品的售价,并统计价格更新数。
+     */
+    private function maybeDispatchReprice(SupplySource $supplySource, array $oldSettings): void
+    {
+        $pricingKeys = ['default_pricing_mode', 'default_markup_percent', 'default_markup_amount'];
+        $newSettings = $supplySource->settings ?? [];
+
+        $changed = false;
+        foreach ($pricingKeys as $key) {
+            $old = is_array($oldSettings) ? ($oldSettings[$key] ?? null) : null;
+            $new = $newSettings[$key] ?? null;
+            if ((string) $old !== (string) $new) {
+                $changed = true;
+                break;
+            }
+        }
+        if (! $changed) {
+            return;
+        }
+
+        // 防重:已有排队/运行中任务则跳过(定时/手动同步会覆盖)
+        if (SupplySyncTask::where('supply_source_id', $supplySource->id)
+            ->whereIn('status', [SupplySyncTask::STATUS_QUEUED, SupplySyncTask::STATUS_RUNNING])
+            ->exists()) {
+            return;
+        }
+
+        $task = SupplySyncTask::create([
+            'supply_source_id' => $supplySource->id,
+            'mode' => 'full',
+            'status' => SupplySyncTask::STATUS_QUEUED,
+        ]);
+        SyncSupplySourceProducts::dispatch($supplySource->id, 'full', $task->id);
     }
 
     /** DELETE /api/admin/supply-sources/{source} */

@@ -96,6 +96,7 @@ export interface SupplySyncTask {
   processed_products: number
   created_count: number
   updated_count: number
+  price_updated_count: number
   hidden_count: number
   error: string | null
   started_at: string | null
