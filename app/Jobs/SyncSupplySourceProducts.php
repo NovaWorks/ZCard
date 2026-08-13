@@ -57,13 +57,18 @@ class SyncSupplySourceProducts implements ShouldQueue
         }
 
         $page = 1;
-        $created = $updated = $priceUpdated = $manualPriceSkipped = $hidden = $processed = $total = 0;
-        // 全量同步:本次拉取到的全部商品 code,用于检测上游已删除/消失的商品 → 标隐藏
-        $seenCodes = $this->mode === 'full' ? [] : null;
+        $created = $updated = $priceUpdated = $manualPriceSkipped = $deleted = $processed = $total = 0;
+        $reportedTotal = null;
+        $seenCodes = null;
 
         try {
             $driver = $manager->driver($source);
             $updatedAfter = $this->mode === 'incremental' ? $source->last_synced_at : null;
+            // 完整同步，或驱动本身不支持 updatedAfter（acg-faka/ZCard 每次均返回完整快照）时，
+            // 本次集合具有权威性，可检测上游已删除/消失的商品并执行软删除。
+            $seenCodes = $this->mode === 'full' || ! $driver->supportsIncrementalProductSync()
+                ? []
+                : null;
 
             do {
                 // 取消检查:页面点取消后,立即停止拉取
@@ -76,8 +81,17 @@ class SyncSupplySourceProducts implements ShouldQueue
                 // 同步模式补查真实库存(fetchStock=true):上游 items 对手动发货商品
                 // 不返回 stock,逐个补查(并发10)让库存准确
                 $result = $driver->listProducts($updatedAfter, $page, fetchStock: true);
+                if (! array_key_exists('items', $result) || ! is_array($result['items'])) {
+                    throw new \RuntimeException("上游第 {$page} 页商品数据格式异常,已停止同步以避免误删");
+                }
+                if ($seenCodes !== null && ! array_key_exists('total', $result)) {
+                    throw new \RuntimeException("上游第 {$page} 页缺少商品总数,已停止完整同步以避免误删");
+                }
                 $items = $result['items'] ?? [];
                 $total += count($items);
+                if (array_key_exists('total', $result)) {
+                    $reportedTotal = max($reportedTotal ?? 0, (int) $result['total']);
+                }
 
                 foreach ($items as $dto) {
                     if ($task->fresh()->status === SupplySyncTask::STATUS_CANCELLED) {
@@ -102,7 +116,11 @@ class SyncSupplySourceProducts implements ShouldQueue
                         && (string) ($source->settings['default_pricing_mode'] ?? 'percent') !== 'pending';
 
                     $sync->upsertProduct($source, $dto, forcePrice: $this->forceReprice);
-                    if ($exists) {
+                    if (! $dto->isActive) {
+                        if ($exists) {
+                            $deleted++;
+                        }
+                    } elseif ($exists) {
                         $updated++;
                         if ($manualPriceProtected) {
                             $manualPriceSkipped++;
@@ -117,9 +135,6 @@ class SyncSupplySourceProducts implements ShouldQueue
                     } else {
                         $created++;
                     }
-                    if (! $dto->isActive) {
-                        $hidden++;
-                    }
                     $processed++;
 
                     // 每 50 个商品刷一次进度,避免频繁写库
@@ -132,7 +147,7 @@ class SyncSupplySourceProducts implements ShouldQueue
                             'updated_count' => $updated,
                             'price_updated_count' => $priceUpdated,
                             'manual_price_skipped_count' => $manualPriceSkipped,
-                            'hidden_count' => $hidden,
+                            'deleted_count' => $deleted,
                         ]);
                     }
                 }
@@ -140,23 +155,22 @@ class SyncSupplySourceProducts implements ShouldQueue
                 $page++;
             } while (! empty($result['has_more']));
 
-            // 全量核对:本次拉取未出现(上游已删除/彻底下架)的本地商品 → 标隐藏
+            // 全量核对前先验证分页完整性。若上游声称的总数大于实际处理数，
+            // 说明 has_more/分页响应不完整，此时宁可任务失败也不能批量误删。
             if ($seenCodes !== null) {
-                $gone = Product::where('upstream_source_id', $source->id)
-                    ->where('status', true)
-                    ->where('hide', false)
-                    ->whereNotIn('upstream_product_code', $seenCodes)
-                    ->whereNotNull('upstream_product_code')
-                    ->get(['id']);
-                if ($gone->isNotEmpty()) {
-                    Product::whereIn('id', $gone->pluck('id'))
-                        ->update(['hide' => true]);
-                    $hidden += $gone->count();
+                if ($reportedTotal !== null && $processed < $reportedTotal) {
+                    throw new \RuntimeException(
+                        "上游商品分页不完整:应拉取 {$reportedTotal} 个,实际仅 {$processed} 个,已停止删除失效商品"
+                    );
                 }
+
+                // 本次完整集合未出现的本地上游商品视为失效，使用软删除保留订单关联；
+                // 同一 code 后续重新出现时 SupplySyncService 会自动恢复原记录。
+                $deleted += $sync->deleteMissingProducts($source, $seenCodes);
             }
 
             $source->update(['last_synced_at' => now(), 'last_error' => null]);
-            Log::info("supply sync done source={$source->id} created={$created} updated={$updated} priceUpdated={$priceUpdated} manualPriceSkipped={$manualPriceSkipped} hidden={$hidden}");
+            Log::info("supply sync done source={$source->id} created={$created} updated={$updated} priceUpdated={$priceUpdated} manualPriceSkipped={$manualPriceSkipped} deleted={$deleted}");
 
             $this->finish(SupplySyncTask::STATUS_SUCCESS, $task, null, [
                 'total_products' => $total,
@@ -165,7 +179,7 @@ class SyncSupplySourceProducts implements ShouldQueue
                 'updated_count' => $updated,
                 'price_updated_count' => $priceUpdated,
                 'manual_price_skipped_count' => $manualPriceSkipped,
-                'hidden_count' => $hidden,
+                'deleted_count' => $deleted,
             ]);
         } catch (Throwable $e) {
             // last_error 截断(界面展示用,避免长 SQL/堆栈刷屏)
@@ -180,7 +194,7 @@ class SyncSupplySourceProducts implements ShouldQueue
                 'updated_count' => $updated,
                 'price_updated_count' => $priceUpdated,
                 'manual_price_skipped_count' => $manualPriceSkipped,
-                'hidden_count' => $hidden,
+                'deleted_count' => $deleted,
             ]);
             throw $e;
         }

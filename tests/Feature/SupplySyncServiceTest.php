@@ -133,15 +133,20 @@ class SupplySyncServiceTest extends TestCase
         $this->assertSame(600, (int) $product->fresh()->factory_price);
     }
 
-    public function test_inactive_upstream_product_gets_hidden(): void
+    public function test_inactive_upstream_product_gets_soft_deleted_and_can_restore(): void
     {
         $source = $this->makeSource([]);
         $service = app(SupplySyncService::class);
-        $p = $service->upsertProduct($source, new UpstreamProduct(code: 'UP3', name: 'A', price: 500, factoryPrice: 500, isActive: true));
+        $product = $service->upsertProduct($source, new UpstreamProduct(code: 'UP3', name: 'A', price: 500, factoryPrice: 500, isActive: true));
 
-        $service->upsertProduct($source, new UpstreamProduct(code: 'UP3', name: 'A', price: 500, factoryPrice: 500, isActive: false));
+        $deleted = $service->upsertProduct($source, new UpstreamProduct(code: 'UP3', name: 'A', price: 500, factoryPrice: 500, isActive: false));
 
-        $this->assertTrue((bool) $p->fresh()->hide); // 标记下架
+        $this->assertNull($deleted);
+        $this->assertSoftDeleted('products', ['id' => $product->id]);
+
+        $restored = $service->upsertProduct($source, new UpstreamProduct(code: 'UP3', name: 'A', price: 600, factoryPrice: 600, isActive: true));
+        $this->assertSame($product->id, $restored->id);
+        $this->assertNotSoftDeleted('products', ['id' => $product->id]);
     }
 
     public function test_description_relative_images_get_base_url_prefixed(): void

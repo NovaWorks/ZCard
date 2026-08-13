@@ -108,6 +108,11 @@ class AcgFakaDriver implements SupplyDriver
         return [];
     }
 
+    public function supportsIncrementalProductSync(): bool
+    {
+        return false;
+    }
+
     public function listProducts(?Carbon $updatedAfter, int $page, bool $fetchStock = false): array
     {
         $data = $this->signedPost('/shared/commodity/items', []);

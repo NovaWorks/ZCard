@@ -344,6 +344,7 @@
               <span>{{ task.updated_count }} {{ t('zcard.supply.taskUpdated') }}</span>
               <span :class="{ 'task-price-updated': task.price_updated_count > 0 }">{{ t('zcard.supply.taskPriceUpdated', { n: task.price_updated_count }) }}</span>
               <span :class="{ 'task-manual-skipped': task.manual_price_skipped_count > 0 }">{{ t('zcard.supply.taskManualPriceSkipped', { n: task.manual_price_skipped_count }) }}</span>
+              <span :class="{ 'task-deleted': task.deleted_count > 0 }">{{ task.deleted_count }} {{ t('zcard.supply.taskDeleted') }}</span>
             </span>
           </div>
           <div v-else-if="task.status === 'queued' || task.status === 'running'" class="all-task-waiting">
@@ -398,6 +399,7 @@
             <span class="task-count updated">{{ activeTask.updated_count }} {{ t('zcard.supply.taskUpdated') }}</span>
             <span class="task-count price" v-if="activeTask.price_updated_count">{{ t('zcard.supply.taskPriceUpdated', { n: activeTask.price_updated_count }) }}</span>
             <span class="task-count skipped" v-if="activeTask.manual_price_skipped_count">{{ t('zcard.supply.taskManualPriceSkipped', { n: activeTask.manual_price_skipped_count }) }}</span>
+            <span class="task-count deleted" v-if="activeTask.deleted_count">{{ activeTask.deleted_count }} {{ t('zcard.supply.taskDeleted') }}</span>
             <span class="task-count hidden" v-if="activeTask.hidden_count">{{ activeTask.hidden_count }} {{ t('zcard.supply.taskHidden') }}</span>
           </div>
 
@@ -1803,6 +1805,8 @@
 .task-price-updated { color: var(--el-color-warning); font-weight: 600; }
 .task-count.skipped,
 .task-manual-skipped { color: var(--el-color-danger); font-weight: 600; }
+.task-count.deleted,
+.task-deleted { color: var(--el-color-danger); font-weight: 600; }
 .task-count.updated { color: var(--el-color-primary); }
 .task-count.hidden { color: var(--el-color-warning); }
 .task-error {

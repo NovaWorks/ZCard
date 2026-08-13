@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Jobs\SyncSupplySourceProducts;
 use App\Models\Merchant;
+use App\Models\Product;
 use App\Models\SupplySource;
 use App\Models\SupplySyncTask;
 use App\Models\User;
@@ -96,6 +97,125 @@ class SupplySyncTaskTest extends TestCase
         $this->assertSame(2, (int) $task->processed_products);
         $this->assertSame(2, (int) $task->created_count);
         $this->assertNotNull($task->finished_at);
+    }
+
+    public function test_full_sync_soft_deletes_explicitly_inactive_and_missing_products(): void
+    {
+        $source = $this->makeSource();
+        $sync = app(SupplySyncService::class);
+        $keep = $sync->upsertProduct($source, new UpstreamProduct(code: 'KEEP', name: '保留', price: 100, factoryPrice: 100));
+        $inactive = $sync->upsertProduct($source, new UpstreamProduct(code: 'INACTIVE', name: '失效', price: 100, factoryPrice: 100));
+        $missing = $sync->upsertProduct($source, new UpstreamProduct(code: 'MISSING', name: '已删除', price: 100, factoryPrice: 100));
+        $task = SupplySyncTask::create([
+            'supply_source_id' => $source->id,
+            'mode' => 'full',
+            'status' => SupplySyncTask::STATUS_QUEUED,
+        ]);
+
+        $driver = $this->createMock(SupplyDriver::class);
+        $driver->method('listProducts')->willReturn([
+            'items' => [
+                new UpstreamProduct(code: 'KEEP', name: '保留', price: 100, factoryPrice: 100),
+                new UpstreamProduct(code: 'INACTIVE', name: '失效', price: 100, factoryPrice: 100, isActive: false),
+            ],
+            'total' => 2, 'page' => 1, 'has_more' => false,
+        ]);
+        $manager = $this->createMock(SupplyManager::class);
+        $manager->method('driver')->willReturn($driver);
+
+        (new SyncSupplySourceProducts($source->id, 'full', $task->id))->handle($manager, $sync);
+
+        $this->assertNotSoftDeleted('products', ['id' => $keep->id]);
+        $this->assertSoftDeleted('products', ['id' => $inactive->id]);
+        $this->assertSoftDeleted('products', ['id' => $missing->id]);
+        $this->assertDatabaseHas('supply_sync_tasks', [
+            'id' => $task->id,
+            'status' => SupplySyncTask::STATUS_SUCCESS,
+            'deleted_count' => 2,
+        ]);
+    }
+
+    public function test_incremental_sync_does_not_delete_products_missing_from_current_response(): void
+    {
+        $source = $this->makeSource();
+        $sync = app(SupplySyncService::class);
+        $existing = $sync->upsertProduct($source, new UpstreamProduct(code: 'UNCHANGED', name: '未变化', price: 100, factoryPrice: 100));
+        $task = SupplySyncTask::create([
+            'supply_source_id' => $source->id,
+            'mode' => 'incremental',
+            'status' => SupplySyncTask::STATUS_QUEUED,
+        ]);
+
+        $driver = $this->createMock(SupplyDriver::class);
+        $driver->method('supportsIncrementalProductSync')->willReturn(true);
+        $driver->method('listProducts')->willReturn([
+            'items' => [new UpstreamProduct(code: 'CHANGED', name: '已变化', price: 200, factoryPrice: 200)],
+            'total' => 1, 'page' => 1, 'has_more' => false,
+        ]);
+        $manager = $this->createMock(SupplyManager::class);
+        $manager->method('driver')->willReturn($driver);
+
+        (new SyncSupplySourceProducts($source->id, 'incremental', $task->id))->handle($manager, $sync);
+
+        $this->assertNotSoftDeleted('products', ['id' => $existing->id]);
+        $this->assertSame(0, (int) $task->fresh()->deleted_count);
+    }
+
+    public function test_incremental_mode_reconciles_missing_products_for_full_snapshot_driver(): void
+    {
+        $source = $this->makeSource();
+        $sync = app(SupplySyncService::class);
+        $existing = $sync->upsertProduct($source, new UpstreamProduct(code: 'REMOVED', name: '上游已删', price: 100, factoryPrice: 100));
+        $task = SupplySyncTask::create([
+            'supply_source_id' => $source->id,
+            'mode' => 'incremental',
+            'status' => SupplySyncTask::STATUS_QUEUED,
+        ]);
+
+        $driver = $this->createMock(SupplyDriver::class);
+        $driver->method('supportsIncrementalProductSync')->willReturn(false);
+        $driver->method('listProducts')->willReturn([
+            'items' => [], 'total' => 0, 'page' => 1, 'has_more' => false,
+        ]);
+        $manager = $this->createMock(SupplyManager::class);
+        $manager->method('driver')->willReturn($driver);
+
+        (new SyncSupplySourceProducts($source->id, 'incremental', $task->id))->handle($manager, $sync);
+
+        $this->assertSoftDeleted('products', ['id' => $existing->id]);
+        $this->assertSame(1, (int) $task->fresh()->deleted_count);
+    }
+
+    public function test_incomplete_full_sync_fails_without_deleting_missing_products(): void
+    {
+        $source = $this->makeSource();
+        $sync = app(SupplySyncService::class);
+        $existing = $sync->upsertProduct($source, new UpstreamProduct(code: 'MISSING', name: '不能误删', price: 100, factoryPrice: 100));
+        $task = SupplySyncTask::create([
+            'supply_source_id' => $source->id,
+            'mode' => 'full',
+            'status' => SupplySyncTask::STATUS_QUEUED,
+        ]);
+
+        $driver = $this->createMock(SupplyDriver::class);
+        $driver->method('listProducts')->willReturn([
+            'items' => [new UpstreamProduct(code: 'ONLY_ONE', name: '只返回一个', price: 100, factoryPrice: 100)],
+            'total' => 2, 'page' => 1, 'has_more' => false,
+        ]);
+        $manager = $this->createMock(SupplyManager::class);
+        $manager->method('driver')->willReturn($driver);
+
+        try {
+            (new SyncSupplySourceProducts($source->id, 'full', $task->id))->handle($manager, $sync);
+            $this->fail('分页不完整时必须终止任务');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('分页不完整', $e->getMessage());
+        }
+
+        $this->assertNotSoftDeleted('products', ['id' => $existing->id]);
+        $this->assertSame(SupplySyncTask::STATUS_FAILED, $task->fresh()->status);
+        $this->assertSame(0, (int) $task->fresh()->deleted_count);
+        $this->assertSame(1, Product::where('upstream_product_code', 'ONLY_ONE')->count());
     }
 
     public function test_cancelled_task_stops_early(): void

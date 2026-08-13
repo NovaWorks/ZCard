@@ -82,6 +82,11 @@ class DujiaoNextDriver implements SupplyDriver
         ))->all();
     }
 
+    public function supportsIncrementalProductSync(): bool
+    {
+        return true;
+    }
+
     public function listProducts(?Carbon $updatedAfter, int $page, bool $fetchStock = false): array
     {
         $path = '/api/v1/upstream/products';

@@ -100,6 +100,7 @@ export interface SupplySyncTask {
   price_updated_count: number
   manual_price_skipped_count: number
   hidden_count: number
+  deleted_count: number
   error: string | null
   started_at: string | null
   finished_at: string | null

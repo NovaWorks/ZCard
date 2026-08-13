@@ -1615,6 +1615,7 @@
       "taskCreated": "created",
       "taskUpdated": "updated",
       "taskHidden": "hidden",
+      "taskDeleted": "deleted",
       "taskDone": "Completed at {t}",
       "taskCancel": "Cancel task",
       "taskResync": "Sync again",

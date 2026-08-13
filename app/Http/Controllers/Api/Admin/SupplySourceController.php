@@ -426,8 +426,13 @@ class SupplySourceController extends Controller
 
                     continue;
                 }
-                $sync->upsertProduct($supplySource, $dto, $pricing, $data['category_map'] ?? null);
-                $imported++;
+                $product = $sync->upsertProduct($supplySource, $dto, $pricing, $data['category_map'] ?? null);
+                if ($product) {
+                    $imported++;
+                } else {
+                    // 上游已经明确标记失效的商品不应重新导入。
+                    $skipped++;
+                }
             }
 
             $supplySource->update(['last_synced_at' => now(), 'last_error' => null]);

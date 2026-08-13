@@ -94,6 +94,21 @@ class OrderUpstreamDetailTest extends TestCase
         $this->assertSame('https://up.example.com/?cid=5&mid=101', $data['upstream_product_url']);
     }
 
+    public function test_order_detail_keeps_product_information_after_sync_soft_delete(): void
+    {
+        $order = $this->makeUpstreamOrder();
+        $product = $order->product;
+        $product->delete();
+
+        $response = $this->withHeaders($this->adminHeaders())
+            ->getJson("/api/admin/orders/{$order->id}");
+
+        $response->assertOk();
+        $this->assertSame($product->name, $response->json('product.name'));
+        $this->assertSame('上游货源', $response->json('upstream_source_name'));
+        $this->assertSame('https://up.example.com/?cid=5&mid=101', $response->json('upstream_product_url'));
+    }
+
     public function test_upstream_order_can_be_fulfilled_manually(): void
     {
         $order = $this->makeUpstreamOrder();

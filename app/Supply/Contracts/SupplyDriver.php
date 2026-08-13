@@ -34,6 +34,12 @@ interface SupplyDriver
     public function listCategories(): array;
 
     /**
+     * 商品列表接口是否支持 updatedAfter 增量过滤。
+     * 不支持的驱动即使任务标为 incremental，返回的仍是完整快照，可安全做失效商品对账。
+     */
+    public function supportsIncrementalProductSync(): bool;
+
+    /**
      * 分页拉商品。
      *
      * @param  Carbon|null  $updatedAfter  增量同步时传,全量传 null

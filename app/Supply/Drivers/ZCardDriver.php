@@ -76,6 +76,11 @@ class ZCardDriver implements SupplyDriver
         return collect($data['categories'] ?? [])->map(fn ($c) => new UpstreamCategory(code: (string) $c['id'], name: $c['name'], parentCode: isset($c['parent_id']) ? (string) $c['parent_id'] : null))->all();
     }
 
+    public function supportsIncrementalProductSync(): bool
+    {
+        return false;
+    }
+
     public function listProducts(?Carbon $updatedAfter, int $page, bool $fetchStock = false): array
     {
         $path = '/api/supply/products';

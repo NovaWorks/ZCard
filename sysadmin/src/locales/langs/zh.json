@@ -1615,6 +1615,7 @@
       "taskCreated": "新增",
       "taskUpdated": "更新",
       "taskHidden": "隐藏",
+      "taskDeleted": "删除",
       "taskDone": "同步完成于 {t}",
       "taskCancel": "取消任务",
       "taskResync": "重新同步",

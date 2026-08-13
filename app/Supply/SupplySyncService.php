@@ -45,7 +45,7 @@ class SupplySyncService
         ?array $pricing = null,
         ?array $categoryMap = null,
         bool $forcePrice = false,
-    ): Product {
+    ): ?Product {
         // 含软删除查找:删除过的商品重新导入时恢复原记录。
         // ⚠️ 只用 upstream_product_code 精确匹配 —— 不能再用 slug 兜底:
         // 上游不同商品(如"美区Gemini"与"随机Gemini")的 Str::slug(name) 相同,
@@ -55,6 +55,16 @@ class SupplySyncService
             ->where('upstream_source_id', $source->id)
             ->where('upstream_product_code', $dto->code)
             ->first();
+
+        // 上游明确标记失效:不创建新商品;已有商品执行可恢复的软删除。
+        // 订单等关联记录仍保留，若同一 code 后续恢复有效，下面的正常分支会 restore 原记录。
+        if (! $dto->isActive) {
+            if ($existing && ! $existing->trashed()) {
+                $existing->delete();
+            }
+
+            return null;
+        }
 
         if ($existing) {
             // 软删除的记录先恢复(回到正常状态,slug 沿用原值)
@@ -74,7 +84,7 @@ class SupplySyncService
                 'stock_cache' => $dto->stockQuantity, // 上游库存缓存
                 'category_id' => $this->resolveCategoryId($source, $dto->categoryCode, $dto->categoryName, $categoryMap),
                 'upstream_synced_at' => now(),
-                'hide' => ! $dto->isActive ? true : $existing->hide, // 上游下架→标隐藏,不删
+                'hide' => $existing->hide,
             ];
             // 临时探测失败时保留上次已确认链接，不用 null 覆盖正确数据。
             if ($dto->productUrl !== null) {
@@ -128,6 +138,30 @@ class SupplySyncService
         }
 
         return $this->createProduct($source, $dto, $price, $pricing, $categoryMap, unique: true);
+    }
+
+    /**
+     * 完整同步对账:软删除本次完整商品集合中已不存在的上游商品。
+     *
+     * 调用方必须先确认所有分页已经完整拉取；增量同步不得调用本方法。
+     * 只处理当前货源且带上游 code 的未删除商品，不影响本地自营商品。
+     *
+     * @param  array<int, string>  $seenCodes
+     */
+    public function deleteMissingProducts(SupplySource $source, array $seenCodes): int
+    {
+        $query = Product::where('upstream_source_id', $source->id)
+            ->whereNotNull('upstream_product_code');
+
+        $seenCodes = array_values(array_unique(array_filter(
+            $seenCodes,
+            fn ($code) => is_string($code) && $code !== '',
+        )));
+        if ($seenCodes !== []) {
+            $query->whereNotIn('upstream_product_code', $seenCodes);
+        }
+
+        return $query->delete();
     }
 
     private function createProduct(SupplySource $source, UpstreamProduct $dto, ?int $price, ?array $pricing, ?array $categoryMap, bool $unique = false): Product

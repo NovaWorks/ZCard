@@ -30,7 +30,8 @@ class Order extends Model implements Payable
 
     public function product(): BelongsTo
     {
-        return $this->belongsTo(Product::class);
+        // 商品可能因上游失效被软删除；历史/待支付订单仍需读取原商品快照与上游信息。
+        return $this->belongsTo(Product::class)->withTrashed();
     }
 
     public function payments(): HasMany

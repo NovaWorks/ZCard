@@ -25,7 +25,7 @@ class SupplySyncTask extends Model
     protected $fillable = [
         'supply_source_id', 'mode', 'force_reprice', 'status', 'total_products', 'processed_products',
         'created_count', 'updated_count', 'price_updated_count', 'manual_price_skipped_count',
-        'hidden_count', 'error',
+        'hidden_count', 'deleted_count', 'error',
         'started_at', 'finished_at',
     ];
 
