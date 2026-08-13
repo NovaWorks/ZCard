@@ -146,6 +146,34 @@ class SupplySyncTaskTest extends TestCase
         $again->assertStatus(404);
     }
 
+    public function test_all_tasks_endpoint_includes_source_name(): void
+    {
+        $source = $this->makeSource();
+        SupplySyncTask::create(['supply_source_id' => $source->id, 'mode' => 'incremental', 'status' => 'running']);
+        SupplySyncTask::create(['supply_source_id' => $source->id, 'mode' => 'incremental', 'status' => 'success']);
+
+        $resp = $this->withHeaders($this->adminHeaders())
+            ->getJson('/api/admin/supply-sources/sync-tasks');
+        $resp->assertOk();
+        $tasks = $resp->json('tasks');
+        $this->assertCount(2, $tasks);
+        $this->assertSame('S', $tasks[0]['source_name']);
+    }
+
+    public function test_queue_probe_and_status(): void
+    {
+        // 探针 Job 派发(sync 队列下立即执行并写心跳)
+        $this->withHeaders($this->adminHeaders())
+            ->postJson('/api/admin/supply-sources/sync-queue-probe')
+            ->assertOk();
+
+        $resp = $this->withHeaders($this->adminHeaders())
+            ->getJson('/api/admin/supply-sources/sync-queue-status');
+        $resp->assertOk();
+        $this->assertNotNull($resp->json('heartbeat_at'), '探针执行后应有心跳');
+        $this->assertTrue($resp->json('healthy'));
+    }
+
     public function test_sync_tasks_list_returns_latest_first(): void
     {
         $source = $this->makeSource();

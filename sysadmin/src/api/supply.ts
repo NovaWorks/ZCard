@@ -114,6 +114,24 @@ export const getSupplySyncTasks = (id: number) =>
 export const cancelSupplySync = (id: number) =>
   request.post<{ ok: boolean; task: SupplySyncTask }>({ url: `/admin/supply-sources/${id}/sync-cancel` })
 
+export interface SupplySyncTaskWithSource extends SupplySyncTask {
+  source_name: string
+}
+
+/** 全部货源同步任务(含货源名) */
+export const getAllSyncTasks = (params?: any) =>
+  request.get<{ ok: boolean; tasks: SupplySyncTaskWithSource[] }>({ url: '/admin/supply-sources/sync-tasks', params })
+
+/** 派发队列探针(检测 queue:work 是否运行) */
+export const probeSyncQueue = () =>
+  request.post<{ ok: boolean }>({ url: '/admin/supply-sources/sync-queue-probe' })
+
+/** 队列心跳状态 */
+export const getSyncQueueStatus = () =>
+  request.get<{ ok: boolean; heartbeat_at: number | null; connection: string; healthy: boolean }>({
+    url: '/admin/supply-sources/sync-queue-status',
+  })
+
 /** 上游商品(预览拉取,供勾选导入) */
 export interface UpstreamProductItem {
   code: string

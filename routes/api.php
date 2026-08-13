@@ -259,6 +259,9 @@ Route::middleware(['auth:sanctum', 'active.user', 'admin.role', 'audit.admin'])-
     // 注意:静态 GET supply-sources/drivers 必须先于 apiResource 注册,
     // 否则会被 apiResource 的 show({supplySource}) 当作参数吃掉。
     Route::get('supply-sources/drivers', [SupplySourceController::class, 'drivers']);
+    Route::get('supply-sources/sync-tasks', [SupplySourceController::class, 'allSyncTasks']);
+    Route::post('supply-sources/sync-queue-probe', [SupplySourceController::class, 'probeQueue']);
+    Route::get('supply-sources/sync-queue-status', [SupplySourceController::class, 'queueStatus']);
     Route::apiResource('supply-sources', SupplySourceController::class)
         ->parameter('supply-sources', 'supplySource');
     Route::post('supply-sources/{supplySource}/test', [SupplySourceController::class, 'test']);

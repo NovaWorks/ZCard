@@ -17,6 +17,7 @@
           <ElButton @click="fetchData">{{ t('zcard.common.reset') }}</ElButton>
         </div>
         <div class="toolbar-right">
+          <ElButton :icon="List" @click="openAllTasks">{{ t('zcard.supply.viewTasks') }}</ElButton>
           <ElButton type="primary" :icon="Plus" @click="openAdd">{{
             t('zcard.supply.add')
           }}</ElButton>
@@ -286,6 +287,64 @@
           t('zcard.common.ok')
         }}</ElButton>
       </template>
+    </ElDialog>
+
+    <!-- 全部货源同步任务弹窗(含队列状态检测) -->
+    <ElDialog
+      v-model="allTasksVisible"
+      :title="t('zcard.supply.viewTasksTitle')"
+      width="720px"
+      top="6vh"
+      destroy-on-close
+      @closed="stopAllTasksPolling"
+    >
+      <!-- 队列状态横幅 -->
+      <div v-if="queueChecked" class="queue-banner" :class="queueHealthy ? 'queue-ok' : 'queue-down'">
+        <template v-if="queueHealthy">
+          <ArtSvgIcon icon="ri:checkbox-circle-line" class="queue-icon" />
+          <span>{{ t('zcard.supply.queueOk', { conn: queueConnection }) }}</span>
+        </template>
+        <template v-else>
+          <ArtSvgIcon icon="ri:alert-line" class="queue-icon" />
+          <div class="queue-down-body">
+            <div class="queue-down-title">{{ t('zcard.supply.queueDown') }}</div>
+            <div class="queue-down-tip">{{ t('zcard.supply.queueDownTip') }}</div>
+            <pre class="queue-cmd">php artisan queue:work</pre>
+            <div class="queue-down-help">{{ t('zcard.supply.queueDownHelp') }}</div>
+          </div>
+        </template>
+      </div>
+      <div v-else class="queue-banner queue-checking">
+        <span>{{ t('zcard.supply.queueChecking') }}</span>
+      </div>
+
+      <!-- 任务列表 -->
+      <div v-loading="allTasksLoading" class="all-tasks">
+        <div v-if="!allTasks.length" class="task-empty">{{ t('zcard.supply.taskEmpty') }}</div>
+        <div v-for="task in allTasks" :key="task.id" class="all-task-row">
+          <div class="all-task-main">
+            <div class="all-task-source">{{ task.source_name }}</div>
+            <ElTag :type="taskStatusTag(task.status)" size="small">{{ taskStatusText(task.status) }}</ElTag>
+            <span class="task-mode">{{ task.mode === 'full' ? t('zcard.supply.taskModeFull') : t('zcard.supply.taskModeInc') }}</span>
+          </div>
+          <div class="all-task-progress" v-if="task.total_products > 0">
+            <ElProgress :percentage="taskProgress(task)" :stroke-width="10" />
+            <span class="all-task-counts">
+              {{ t('zcard.supply.taskProcessed', { n: task.processed_products, total: task.total_products }) }}
+              · +{{ task.created_count }} {{ t('zcard.supply.taskCreated') }}
+            </span>
+          </div>
+          <div v-else-if="task.status === 'queued' || task.status === 'running'" class="all-task-waiting">
+            <span class="all-task-counts">{{ t('zcard.supply.taskProcessed', { n: task.processed_products, total: task.total_products }) }}</span>
+          </div>
+          <div v-if="task.error" class="task-error">{{ task.error }}</div>
+          <div class="all-task-meta">
+            <span v-if="task.status === 'success'" class="task-done">{{ t('zcard.supply.taskDone', { t: formatTime(task.finished_at) }) }}</span>
+            <span v-else-if="['failed', 'cancelled'].includes(task.status)" class="task-history-time">{{ formatTime(task.finished_at) }}</span>
+            <span v-else class="task-history-time">{{ formatTime(task.created_at) }}</span>
+          </div>
+        </div>
+      </div>
     </ElDialog>
 
     <!-- 同步任务弹窗(异步入库,轮询进度/支持取消/重新同步) -->
@@ -607,7 +666,8 @@
 </template>
 
 <script setup lang="ts">
-  import { Plus, ArrowDown } from '@element-plus/icons-vue'
+  import { Plus, List, ArrowDown } from '@element-plus/icons-vue'
+  import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
   import { useI18n } from 'vue-i18n'
   import { useListTableHeight } from '@/hooks'
@@ -622,6 +682,10 @@
     syncSupplySource,
     getSupplySyncTasks,
     cancelSupplySync,
+    getAllSyncTasks,
+    probeSyncQueue,
+    getSyncQueueStatus,
+    type SupplySyncTaskWithSource,
     type SupplySyncTask,
     previewSupplyProducts,
     importSupplyProducts,
@@ -963,6 +1027,72 @@
   /** 重新同步(结束后按钮):换新任务并打开弹窗轮询 */
   const handleResync = async (row: SupplySource) => {
     await handleSync(row)
+  }
+
+  /** ===== 全部货源任务弹窗 + 队列状态检测 ===== */
+  const allTasksVisible = ref(false)
+  const allTasksLoading = ref(false)
+  const allTasks = ref<SupplySyncTaskWithSource[]>([])
+  const queueChecked = ref(false)
+  const queueHealthy = ref(false)
+  const queueConnection = ref('')
+  let allTasksTimer: ReturnType<typeof setInterval> | null = null
+
+  const openAllTasks = () => {
+    allTasksVisible.value = true
+    queueChecked.value = false
+    loadAllTasks()
+    checkQueue()
+    startAllTasksPolling()
+  }
+
+  const loadAllTasks = async () => {
+    allTasksLoading.value = true
+    try {
+      const data = await getAllSyncTasks({ limit: 50 })
+      allTasks.value = data.tasks || []
+    } catch {
+      // 拦截器已提示
+    } finally {
+      allTasksLoading.value = false
+    }
+  }
+
+  /** 队列检测:派发探针 → 拉取心跳;worker 正常时心跳在 20 秒内 */
+  const checkQueue = async () => {
+    try {
+      await probeSyncQueue()
+      const st = await getSyncQueueStatus()
+      queueHealthy.value = !!st.healthy
+      queueConnection.value = st.connection || ''
+      queueChecked.value = true
+    } catch {
+      queueHealthy.value = false
+      queueChecked.value = true
+    }
+  }
+
+  const startAllTasksPolling = () => {
+    stopAllTasksPolling()
+    allTasksTimer = setInterval(() => {
+      loadAllTasks()
+      const running = allTasks.value.some((t) => ['queued', 'running'].includes(t.status))
+      if (!running && queueChecked.value) {
+        // 无进行中任务且已检测过队列 → 仍每 15 秒刷新队列状态,其余静默
+      }
+      // 队列心跳持续刷新(worker 正常时每次 probe 会更新)
+      probeSyncQueue().then(() => getSyncQueueStatus()).then((st) => {
+        queueHealthy.value = !!st.healthy
+        queueChecked.value = true
+      }).catch(() => {})
+    }, 5000)
+  }
+
+  const stopAllTasksPolling = () => {
+    if (allTasksTimer) {
+      clearInterval(allTasksTimer)
+      allTasksTimer = null
+    }
   }
 
   const taskProgress = (t: SupplySyncTask): number => {
@@ -1676,5 +1806,97 @@
 }
 .task-history-time {
   color: var(--el-text-color-secondary);
+}
+
+.queue-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+.queue-banner.queue-ok {
+  background: var(--el-color-success-light-9);
+  border: 1px solid var(--el-color-success-light-5);
+  color: var(--el-color-success);
+}
+.queue-banner.queue-down {
+  background: var(--el-color-danger-light-9);
+  border: 1px solid var(--el-color-danger-light-5);
+  color: var(--el-color-danger);
+}
+.queue-banner.queue-checking {
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-secondary);
+}
+.queue-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  font-size: 16px;
+}
+.queue-down-body {
+  flex: 1;
+}
+.queue-down-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.queue-down-tip {
+  color: var(--el-text-color-regular);
+  margin-bottom: 6px;
+}
+.queue-cmd {
+  background: var(--el-fill-color);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  margin-bottom: 6px;
+  overflow-x: auto;
+}
+.queue-down-help {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+.all-tasks {
+  max-height: 56vh;
+  overflow-y: auto;
+}
+.all-task-row {
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.all-task-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.all-task-source {
+  font-weight: 600;
+  font-size: 13px;
+}
+.all-task-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.all-task-progress .el-progress {
+  flex: 1;
+}
+.all-task-counts {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  white-space: nowrap;
+}
+.all-task-waiting {
+  margin: 4px 0;
+}
+.all-task-meta {
+  margin-top: 4px;
+  font-size: 12px;
 }
 </style>

@@ -1620,7 +1620,14 @@
       "taskResync": "重新同步",
       "taskCancelled": "已发送取消请求,任务将尽快停止",
       "taskEmpty": "暂无同步任务,点击「同步商品」开始",
-      "taskHistory": "历史任务"
+      "taskHistory": "历史任务",
+      "viewTasks": "查看任务",
+      "viewTasksTitle": "全部同步任务",
+      "queueChecking": "正在检测队列状态...",
+      "queueOk": "队列运行正常({conn} 连接),任务将自动后台执行",
+      "queueDown": "队列未开启:同步任务不会执行",
+      "queueDownTip": "任务已创建但会一直停留在「排队中」。请在服务器上启动队列常驻进程(宝塔:进程守护管理器;或 systemd 服务),执行:",
+      "queueDownHelp": "启动后回到本页面,队列状态会自动变为正常;历史任务可点「重新同步」再次执行"
     },
     "supplierAccount": {
       "title": "供货账号管理",

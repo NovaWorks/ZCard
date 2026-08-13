@@ -1620,7 +1620,14 @@
       "taskResync": "Sync again",
       "taskCancelled": "Cancel requested, the task will stop shortly",
       "taskEmpty": "No sync tasks yet. Click \"Sync products\" to start",
-      "taskHistory": "History"
+      "taskHistory": "History",
+      "viewTasks": "Tasks",
+      "viewTasksTitle": "All Sync Tasks",
+      "queueChecking": "Checking queue status...",
+      "queueOk": "Queue is running ({conn} connection), tasks will execute in the background",
+      "queueDown": "Queue is not running: sync tasks will NOT execute",
+      "queueDownTip": "Tasks are created but stay \"queued\" forever. Start the queue worker on your server (BT panel: process manager; or systemd), run:",
+      "queueDownHelp": "After starting, return to this page and the queue status will turn green; use \"Sync again\" to rerun past tasks"
     },
     "supplierAccount": {
       "title": "Supplier Accounts",

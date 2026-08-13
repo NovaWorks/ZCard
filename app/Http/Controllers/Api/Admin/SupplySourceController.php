@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\QueueHeartbeatJob;
 use App\Jobs\SyncSupplySourceProducts;
 use App\Models\Product;
 use App\Models\SupplySource;
@@ -168,6 +169,51 @@ class SupplySourceController extends Controller
         $task->update(['status' => SupplySyncTask::STATUS_CANCELLED]);
 
         return response()->json(['ok' => true, 'task' => $task]);
+    }
+
+    /**
+     * GET /api/admin/supply-sources/sync-tasks 全部货源同步任务(含货源名,最新优先)。
+     */
+    public function allSyncTasks(Request $request): JsonResponse
+    {
+        $limit = min(100, max(1, (int) $request->input('limit', 50)));
+        $tasks = SupplySyncTask::with('source:id,name')
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get()
+            ->map(fn ($t) => array_merge($t->toArray(), [
+                'source_name' => $t->source?->name ?? '已删除货源',
+            ]));
+
+        return response()->json(['ok' => true, 'tasks' => $tasks]);
+    }
+
+    /**
+     * POST /api/admin/supply-sources/sync-queue-probe 派发队列探针。
+     * worker 正常时心跳立即刷新;未运行则心跳停留在旧值。
+     */
+    public function probeQueue(): JsonResponse
+    {
+        QueueHeartbeatJob::dispatch();
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * GET /api/admin/supply-sources/sync-queue-status 队列心跳状态。
+     * heartbeat_at 为最近一次 worker 执行探针的时间戳(秒);null 表示从未执行过。
+     */
+    public function queueStatus(): JsonResponse
+    {
+        $heartbeat = Cache::get('queue:heartbeat');
+        $connection = config('queue.default');
+
+        return response()->json([
+            'ok' => true,
+            'heartbeat_at' => $heartbeat !== null ? (int) $heartbeat : null,
+            'connection' => $connection,
+            'healthy' => $heartbeat !== null && (now()->timestamp - (int) $heartbeat) <= 20,
+        ]);
     }
 
     /** GET /api/admin/supply-sources/{source}/sync-status */
