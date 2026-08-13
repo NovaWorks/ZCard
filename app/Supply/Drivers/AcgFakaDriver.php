@@ -287,7 +287,8 @@ class AcgFakaDriver implements SupplyDriver
             categoryName: $categoryName,
             description: $p['description'] ?? ($p['introduce'] ?? null),
             cover: $p['cover'] ?? null,
-            isActive: true,
+            // acg-faka 商品 status:1=上架/0=下架(下架商品同步后本地标隐藏)
+            isActive: (int) ($p['status'] ?? 1) === 1,
             // items 接口对「卡密自动发货」商品(delivery_way=0)会带 stock 字段,
             // 手动发货商品不带 → 按无限(-1)处理。不读的话预览面板会把所有商品显示成无限库存。
             stockQuantity: isset($p['stock']) ? (int) $p['stock'] : -1,

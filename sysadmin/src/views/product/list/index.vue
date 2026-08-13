@@ -402,6 +402,11 @@
               <span class="form-hint">{{ t('zcard.product.priceUnit') }}</span>
             </ElFormItem>
 
+            <ElFormItem v-if="isUpstreamProduct" :label="t('zcard.product.followUpstreamPrice')">
+              <ElSwitch v-model="formData.followUpstreamPrice" />
+              <span class="form-hint">{{ t('zcard.product.followUpstreamPriceTip') }}</span>
+            </ElFormItem>
+
             <ElFormItem :label="t('zcard.product.draftPremium')">
               <ElInputNumber
                 v-model="formData.draftPremiumYuan"
@@ -1249,6 +1254,8 @@
     cover: string
     priceYuan: number
     factoryPriceYuan: number
+    /** 上游商品:是否跟随上游调价(编辑时可见;关闭=保护手动价) */
+    followUpstreamPrice: boolean
     draftPremiumYuan: number
     stock_type: string
     fulfillment_type: 'auto_card' | 'fixed' | 'manual' | 'upstream'
@@ -1284,6 +1291,7 @@
     cover: '',
     priceYuan: 0,
     factoryPriceYuan: 0,
+    followUpstreamPrice: true,
     draftPremiumYuan: 0,
     stock_type: 'card',
     fulfillment_type: 'auto_card',
@@ -1703,6 +1711,7 @@
       cover: row.cover || '',
       priceYuan: Number(((Number(row.price) || 0) / 100).toFixed(2)),
       factoryPriceYuan: Number(((Number(row.factory_price) || 0) / 100).toFixed(2)),
+      followUpstreamPrice: !row.price_manual,
       draftPremiumYuan: Number(((Number(row.draft_premium) || 0) / 100).toFixed(2)),
       stock_type: row.stock_type || 'card',
       fulfillment_type: row.fulfillment_type || (row.upstream_source_id ? 'upstream' : 'auto_card'),
@@ -1819,6 +1828,8 @@
       images: galleryUrls.value.length ? galleryUrls.value : undefined,
       price: Math.round(formData.priceYuan * 100),
       factory_price: Math.round(formData.factoryPriceYuan * 100),
+      // 上游商品:跟随开关关闭 = 保护手动价;开启 = 恢复跟随上游调价
+      ...(isUpstreamProduct.value ? { price_manual: !formData.followUpstreamPrice } : {}),
       draft_premium: Math.round(formData.draftPremiumYuan * 100),
       stock_type: formData.stock_type,
       fulfillment_type: formData.fulfillment_type,

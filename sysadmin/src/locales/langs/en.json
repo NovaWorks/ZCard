@@ -636,7 +636,9 @@
       "seoDescription": "SEO Description",
       "seoDescriptionPlaceholder": "Brief summary for search engines; empty = first 150 chars of description",
       "supplierSource": "Supplier",
-      "stockUnlimited": "Unlimited"
+      "stockUnlimited": "Unlimited",
+      "followUpstreamPrice": "Follow upstream price",
+      "followUpstreamPriceTip": "On: selling price is recalculated on every sync so upstream changes apply; Off: protect the manually set price"
     },
     "category": {
       "title": "Categories",

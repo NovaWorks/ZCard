@@ -56,7 +56,9 @@ class SyncSupplySourceProducts implements ShouldQueue
         }
 
         $page = 1;
-        $created = $updated = $hidden = $processed = $total = 0;
+        $created = $updated = $priceUpdated = $hidden = $processed = $total = 0;
+        // 全量同步:本次拉取到的全部商品 code,用于检测上游已删除/消失的商品 → 标隐藏
+        $seenCodes = $this->mode === 'full' ? [] : null;
 
         try {
             $driver = $manager->driver($source);
@@ -83,11 +85,24 @@ class SyncSupplySourceProducts implements ShouldQueue
                         return;
                     }
 
-                    $exists = Product::where('upstream_source_id', $source->id)
-                        ->where('upstream_product_code', $dto->code)->exists();
+                    if ($seenCodes !== null) {
+                        $seenCodes[] = $dto->code;
+                    }
+
+                    $before = Product::where('upstream_source_id', $source->id)
+                        ->where('upstream_product_code', $dto->code)
+                        ->value('price');
+                    $exists = $before !== null;
                     $sync->upsertProduct($source, $dto);
                     if ($exists) {
                         $updated++;
+                        // 价格核对:同步后价格与同步前不一致 → 计数(上游调价跟随生效)
+                        $after = Product::where('upstream_source_id', $source->id)
+                            ->where('upstream_product_code', $dto->code)
+                            ->value('price');
+                        if ($after !== null && (int) $after !== (int) $before) {
+                            $priceUpdated++;
+                        }
                     } else {
                         $created++;
                     }
@@ -104,6 +119,7 @@ class SyncSupplySourceProducts implements ShouldQueue
                             'processed_products' => $processed,
                             'created_count' => $created,
                             'updated_count' => $updated,
+                            'price_updated_count' => $priceUpdated,
                             'hidden_count' => $hidden,
                         ]);
                     }
@@ -112,14 +128,30 @@ class SyncSupplySourceProducts implements ShouldQueue
                 $page++;
             } while (! empty($result['has_more']));
 
+            // 全量核对:本次拉取未出现(上游已删除/彻底下架)的本地商品 → 标隐藏
+            if ($seenCodes !== null) {
+                $gone = Product::where('upstream_source_id', $source->id)
+                    ->where('status', true)
+                    ->where('hide', false)
+                    ->whereNotIn('upstream_product_code', $seenCodes)
+                    ->whereNotNull('upstream_product_code')
+                    ->get(['id']);
+                if ($gone->isNotEmpty()) {
+                    Product::whereIn('id', $gone->pluck('id'))
+                        ->update(['hide' => true]);
+                    $hidden += $gone->count();
+                }
+            }
+
             $source->update(['last_synced_at' => now(), 'last_error' => null]);
-            Log::info("supply sync done source={$source->id} created={$created} updated={$updated} hidden={$hidden}");
+            Log::info("supply sync done source={$source->id} created={$created} updated={$updated} priceUpdated={$priceUpdated} hidden={$hidden}");
 
             $this->finish(SupplySyncTask::STATUS_SUCCESS, $task, null, [
                 'total_products' => $total,
                 'processed_products' => $processed,
                 'created_count' => $created,
                 'updated_count' => $updated,
+                'price_updated_count' => $priceUpdated,
                 'hidden_count' => $hidden,
             ]);
         } catch (Throwable $e) {
@@ -133,6 +165,7 @@ class SyncSupplySourceProducts implements ShouldQueue
                 'processed_products' => $processed,
                 'created_count' => $created,
                 'updated_count' => $updated,
+                'price_updated_count' => $priceUpdated,
                 'hidden_count' => $hidden,
             ]);
             throw $e;

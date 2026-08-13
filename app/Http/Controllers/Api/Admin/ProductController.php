@@ -158,6 +158,7 @@ class ProductController extends Controller
             'images' => 'nullable|array',
             'images.*' => 'nullable|string',
             'price' => 'sometimes|integer|min:0',
+            'price_manual' => 'nullable|boolean',
             'factory_price' => 'nullable|integer|min:0',
             'draft_premium' => 'nullable|integer|min:0',
             'member_price' => 'nullable|array',
@@ -187,10 +188,21 @@ class ProductController extends Controller
 
         $this->normalizeFulfillmentData($data, $product);
 
-        // 手动改过售价 → 置 price_manual 标记(后续货源同步保护该商品价格不被覆盖)
-        if (array_key_exists('price', $data)) {
+        // 手动改价保护标记(price_manual):
+        // 仅当**价格实际发生变化**时才置 true —— 前端编辑表单总是提交 price,
+        // 若无条件标记,运营改过任何字段(名称/描述等)的商品都会误标为"手动改价",
+        // 导致上游调价后这些商品不再跟随(历史加价不生效的根因)。
+        if (array_key_exists('price', $data) && (int) $data['price'] !== (int) $product->price) {
+            // 实际改价 → 标记保护(优先级最高)
             $data['price_manual'] = true;
+        } elseif (array_key_exists('price_manual', $data) && $data['price_manual'] === false) {
+            // 显式恢复自动定价:前端对上游商品提供「跟随上游调价」开关
+            $data['price_manual'] = false;
+        } else {
+            // 未改价也未显式操作 → 不触碰标记
+            unset($data['price_manual']);
         }
+
         $product->update($data);
 
         $after = $product->fresh()->only(array_keys($before));

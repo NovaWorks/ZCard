@@ -636,7 +636,9 @@
       "seoDescription": "SEO 描述",
       "seoDescriptionPlaceholder": "简要介绍商品,用于搜索引擎展示;留空自动取商品描述前150字",
       "supplierSource": "货源商",
-      "stockUnlimited": "不限"
+      "stockUnlimited": "不限",
+      "followUpstreamPrice": "跟随上游调价",
+      "followUpstreamPriceTip": "开启:每次同步按加价规则自动重算售价,上游调价自动生效;关闭:保护当前手动设置的价格"
     },
     "category": {
       "title": "分类管理",

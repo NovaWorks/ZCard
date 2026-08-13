@@ -14,6 +14,7 @@ export interface Product {
   category_id: number | null
   category?: { id: number; name: string }
   price: number // 分
+  price_manual?: boolean // 售价是否被手动修改(同步保护)
   factory_price?: number // 分
   draft_premium?: number // 分
   description?: string | null
