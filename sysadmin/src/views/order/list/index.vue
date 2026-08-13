@@ -268,6 +268,7 @@
     getOrder,
     closeOrder,
     fulfillOrder,
+    refetchUpstreamOrder,
     getStats,
     clearOrders,
     type Order,
@@ -690,4 +691,12 @@
     font-size: 11px;
     color: var(--el-text-color-placeholder);
   }
+
+.profit-negative {
+  color: var(--el-color-danger);
+}
+.upstream-link {
+  color: var(--el-color-primary);
+  word-break: break-all;
+}
 </style>

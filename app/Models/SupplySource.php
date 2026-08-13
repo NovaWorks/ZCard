@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Crypt;
 
 class SupplySource extends Model
 {
@@ -25,11 +26,36 @@ class SupplySource extends Model
     }
 
     /**
+     * 上游商品前台链接(订单详情贴链接用)。
+     * 优先取货源设置 product_url_template(模板支持 {base}/{code});
+     * 未配置时按驱动推断:acg_faka 商品页为 /buy/{id};其余返回 null(前端显示货源站点+商品代码)。
+     */
+    public function productUrlFor(?string $code): ?string
+    {
+        $code = (string) ($code ?? '');
+        $template = (string) ($this->settings['product_url_template'] ?? '');
+        if ($template !== '') {
+            return str_replace(
+                ['{base}', '{code}'],
+                [rtrim((string) $this->base_url, '/'), urlencode($code)],
+                $template
+            );
+        }
+
+        if ($this->driver === 'acg_faka' && $code !== '') {
+            return rtrim((string) $this->base_url, '/').'/buy/'.$code;
+        }
+
+        return null;
+    }
+
+    /**
      * credentials 手动加解密(容错):原用 encrypted:array cast,但 APP_KEY 变更后
      * 旧记录解密会抛 DecryptException 导致整个列表接口 500。改为手动 accessor,
      * 解密失败时返回空数组(该货源需重新配置凭证),不影响其他货源和列表加载。
      */
     private ?array $decodedCredentials = null;
+
     private bool $credentialsDecoded = false;
 
     public function getCredentialsAttribute($value): ?array
@@ -42,20 +68,21 @@ class SupplySource extends Model
             return $this->decodedCredentials = [];
         }
         try {
-            $decrypted = \Illuminate\Support\Facades\Crypt::decryptString($value);
+            $decrypted = Crypt::decryptString($value);
             $arr = json_decode($decrypted, true);
             $this->decodedCredentials = is_array($arr) ? $arr : [];
         } catch (\Throwable) {
             // 旧密钥加密的记录无法解密 → 视为空凭证(需重新配置)
             $this->decodedCredentials = [];
         }
+
         return $this->decodedCredentials;
     }
 
     public function setCredentialsAttribute($value): void
     {
         $this->attributes['credentials'] = is_array($value)
-            ? \Illuminate\Support\Facades\Crypt::encryptString(json_encode($value))
+            ? Crypt::encryptString(json_encode($value))
             : $value;
         // 失效内存缓存,避免 update 后读到的还是旧解密值
         $this->credentialsDecoded = false;
@@ -69,14 +96,18 @@ class SupplySource extends Model
         if (empty($raw)) {
             return false;
         }
+
         return empty($this->credentials);
     }
 
     public const DRIVER_DUJIAO_NEXT = 'dujiao_next';
+
     public const DRIVER_ACG_FAKA = 'acg_faka';
+
     public const DRIVER_ZCARD = 'zcard';
 
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_DISABLED = 'disabled';
 
     public function products(): HasMany

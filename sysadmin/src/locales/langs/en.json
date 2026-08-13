@@ -826,7 +826,17 @@
       "deviceOther": "Other",
       "createIp": "IP Address",
       "createIpPlaceholder": "Search IP",
-      "payBalance": "Balance"
+      "payBalance": "Balance",
+      "unitPrice": "Unit price",
+      "unitCost": "Unit cost",
+      "profit": "Profit",
+      "upstreamInfo": "Upstream Source",
+      "upstreamSource": "Source name",
+      "upstreamOrderId": "Upstream order #",
+      "upstreamLink": "Upstream product link",
+      "refetch": "Refetch",
+      "refetchDone": "Refetch request submitted to upstream",
+      "refetchFailed": "Refetch failed, you can fulfill manually"
     },
     "bill": {
       "title": "Bills",

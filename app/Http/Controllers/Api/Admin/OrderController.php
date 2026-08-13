@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\SupplySource;
+use App\Supply\UpstreamOrderService;
 use App\Support\FulfillmentService;
 use App\Support\OrderService;
 use App\Support\StorefrontConfig;
@@ -122,12 +124,33 @@ class OrderController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $order = Order::with(['product:id,name', 'orderDeliveries:id,order_id,card_content,delivered_mode,delivered_at'])
+        $order = Order::with(['product:id,name,upstream_source_id,upstream_product_code', 'orderDeliveries:id,order_id,card_content,delivered_mode,delivered_at'])
             ->findOrFail($id);
 
         // 把 orderDeliveries 映射成 deliveries(前端期望的字段名)
         $data = $order->toArray();
         $data['deliveries'] = $data['order_deliveries'] ?? [];
+
+        // 财务信息:单价/成本单价/利润/利润率(金额均为分)
+        $qty = max(1, (int) $order->quantity);
+        $data['unit_price'] = (int) $order->amount;
+        $data['unit_cost'] = (int) $order->cost;
+        $data['profit'] = (int) $order->amount - (int) $order->cost;
+        $data['profit_rate'] = $order->amount > 0
+            ? round(((int) $order->amount - (int) $order->cost) / (int) $order->amount * 100, 1) : 0;
+
+        // 货源信息:货源名/上游商品代码/上游商品链接/上游订单号(拿货记录)
+        $source = null;
+        if ($order->upstream_source_id) {
+            $source = SupplySource::find($order->upstream_source_id);
+        } elseif ($order->product && $order->product->upstream_source_id) {
+            $source = SupplySource::find($order->product->upstream_source_id);
+        }
+        if ($source) {
+            $data['upstream_source_name'] = $source->name;
+            $data['upstream_base_url'] = $source->base_url;
+            $data['upstream_product_url'] = $source->productUrlFor($order->product?->upstream_product_code);
+        }
 
         return response()->json($data);
     }
@@ -155,9 +178,13 @@ class OrderController extends Controller
                 'content' => '仅已支付订单可以人工发货',
             ]);
         }
-        if ($order->fulfillment_type_snapshot !== Product::FULFILLMENT_MANUAL) {
+        if (! in_array($order->fulfillment_type_snapshot, [
+            Product::FULFILLMENT_MANUAL,
+            // 上游商品拿货失败/上游人工发货时,允许本地手动兜底发货
+            Product::FULFILLMENT_UPSTREAM,
+        ], true)) {
             throw ValidationException::withMessages([
-                'content' => '该订单不是人工发货订单',
+                'content' => '该订单不支持手动发货',
             ]);
         }
         if ($order->delivery_status === 'delivered') {
@@ -169,6 +196,51 @@ class OrderController extends Controller
         }
 
         return $this->show($order->id);
+    }
+
+    /**
+     * POST /api/admin/orders/{id}/refetch-upstream 手动重新拿货(自动拿货失败的兜底)。
+     * 上游商品订单、已支付未发货时可用;成功/失败即时反馈(错误原因展示给管理员)。
+     */
+    public function refetchUpstream(int $id): JsonResponse
+    {
+        $order = Order::with('product')->findOrFail($id);
+
+        if ($order->status !== 'paid') {
+            return response()->json(['ok' => false, 'message' => '仅已支付订单可以拿货'], 422);
+        }
+        if ($order->delivery_status === 'delivered') {
+            return response()->json(['ok' => false, 'message' => '该订单已发货,无需重复拿货'], 409);
+        }
+        if (! $order->product || ! $order->product->upstream_source_id) {
+            return response()->json(['ok' => false, 'message' => '该订单不是上游货源商品'], 422);
+        }
+
+        $source = SupplySource::find($order->product->upstream_source_id);
+        if (! $source || ! $source->isActive()) {
+            return response()->json(['ok' => false, 'message' => '货源不存在或已停用,可改用手动发货'], 422);
+        }
+
+        try {
+            app(UpstreamOrderService::class)->fetchFromUpstream($order, $source);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'ok' => false,
+                'message' => '拿货失败: '.$e->getMessage().' (可改用手动发货兜底)',
+            ], 500);
+        }
+
+        $order->refresh();
+        if ($order->delivery_status === 'delivered') {
+            return response()->json(['ok' => true, 'message' => '拿货成功,已自动发货', 'order' => $order]);
+        }
+
+        // 上游已接单但尚未发卡:返回状态,由上游回调/重试完成
+        return response()->json([
+            'ok' => true,
+            'message' => '已向上游提交拿货请求,等待上游发货'.($order->upstream_order_id ? "(上游单号 {$order->upstream_order_id})" : ''),
+            'order' => $order,
+        ]);
     }
 
     /**

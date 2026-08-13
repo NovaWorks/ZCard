@@ -198,6 +198,7 @@ Route::middleware(['auth:sanctum', 'active.user', 'admin.role', 'audit.admin'])-
     Route::apiResource('orders', AdminOrderController::class)->only(['index', 'show']);
     Route::post('orders/{id}/close', [AdminOrderController::class, 'close']);
     Route::post('orders/{id}/fulfill', [AdminOrderController::class, 'fulfill']);
+    Route::post('orders/{id}/refetch-upstream', [AdminOrderController::class, 'refetchUpstream']);
 
     // 充值单管理(列表/详情/统计)
     // 注意:stats 必须先于 apiResource 注册,否则会被 GET /recharges/{recharge} 当作参数吃掉。

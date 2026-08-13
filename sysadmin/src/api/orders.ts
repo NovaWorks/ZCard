@@ -36,6 +36,16 @@ export interface Order {
     delivered_mode: string
     delivered_at: string
   }>
+  // 财务(详情接口):单价/成本单价/利润/利润率
+  unit_price?: number
+  unit_cost?: number
+  profit?: number
+  profit_rate?: number
+  // 货源(详情接口):货源名/上游商品链接/上游单号
+  upstream_source_name?: string
+  upstream_base_url?: string
+  upstream_product_url?: string | null
+  upstream_order_id?: string | null
 }
 
 /** Laravel paginate 返回结构 */
@@ -85,9 +95,13 @@ export const getOrder = (id: number) =>
 export const closeOrder = (id: number) =>
   http.post<Order>({ url: `/admin/orders/${id}/close` })
 
-/** 完成人工发货 */
+/** 完成人工发货(manual 与 upstream 订单均可,upstream 为拿货失败兜底) */
 export const fulfillOrder = (id: number, content: string) =>
   http.post<Order>({ url: `/admin/orders/${id}/fulfill`, data: { content } })
+
+/** 手动重新拿货(自动拿货失败兜底) */
+export const refetchUpstreamOrder = (id: number) =>
+  http.post<{ ok: boolean; message: string; order?: Order }>({ url: `/admin/orders/${id}/refetch-upstream` })
 
 /** 统计数据 */
 export const getStats = (params: OrderListParams) =>

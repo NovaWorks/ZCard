@@ -826,7 +826,17 @@
       "deviceOther": "其他",
       "createIp": "IP地址",
       "createIpPlaceholder": "搜索IP",
-      "payBalance": "余额支付"
+      "payBalance": "余额支付",
+      "unitPrice": "单价",
+      "unitCost": "成本单价",
+      "profit": "利润",
+      "upstreamInfo": "上游货源信息",
+      "upstreamSource": "货源名称",
+      "upstreamOrderId": "上游单号",
+      "upstreamLink": "上游商品链接",
+      "refetch": "重新拿货",
+      "refetchDone": "已向上游提交拿货请求",
+      "refetchFailed": "拿货失败,可尝试手动发货"
     },
     "bill": {
       "title": "账单管理",
