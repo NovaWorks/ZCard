@@ -337,17 +337,28 @@ class OrderService
 
         $count = 0;
         foreach ($expired as $order) {
-            DB::transaction(function () use ($order) {
-                $order->update(['status' => 'closed', 'closed_at' => now()]);
-                Card::where('order_id', $order->id)
+            $closed = DB::transaction(function () use ($order) {
+                // 安全(M-7):行锁后复检状态——支付回调可能在关单瞬间把订单置为 paid,
+                // 未复检会导致"已付款订单被翻成 closed、付款不发卡"。
+                $locked = Order::whereKey($order->id)->lockForUpdate()->first();
+                if (! $locked || $locked->status !== 'pending') {
+                    return false;
+                }
+                $locked->update(['status' => 'closed', 'closed_at' => now()]);
+                Card::where('order_id', $locked->id)
                     ->where('status', Card::STATUS_LOCKED)
                     ->update([
                         'status' => Card::STATUS_UNUSED,
                         'locked_at' => null,
                         'order_id' => null,
                     ]);
+
+                return true;
             });
-            $count++;
+
+            if ($closed) {
+                $count++;
+            }
         }
 
         return $count;
@@ -356,11 +367,13 @@ class OrderService
     /** 后台手动关闭 */
     public function closeOrder(int $orderId): Order
     {
-        $order = Order::findOrFail($orderId);
-        if ($order->status !== 'pending') {
-            throw new \RuntimeException('仅待支付订单可关闭');
-        }
-        DB::transaction(function () use ($order) {
+        $order = null;
+        DB::transaction(function () use ($orderId, &$order) {
+            // 安全(M-7):行锁 + 事务内复检状态,防止与支付回调竞态翻转已支付订单。
+            $order = Order::whereKey($orderId)->lockForUpdate()->firstOrFail();
+            if ($order->status !== 'pending') {
+                throw new \RuntimeException('仅待支付订单可关闭');
+            }
             $order->update(['status' => 'closed', 'closed_at' => now()]);
             Card::where('order_id', $order->id)
                 ->where('status', Card::STATUS_LOCKED)
@@ -398,7 +411,7 @@ class OrderService
      * 搜索订单:单关键字智能匹配 order_no 或 contact,返回历史订单列表。
      * 每一笔结果都必须通过本人登录态、随机访问凭证或查询密码之一授权。
      *
-     * @return array<int, array>
+     * @return array{orders: array<int, array>, matched: int} orders=已授权订单;matched=关键字命中的订单总数(含未授权,供上层做爆破计数)
      */
     public function searchOrders(
         string $keyword,
@@ -413,6 +426,7 @@ class OrderService
             ->limit(50);
 
         $orders = $query->get();
+        $matched = $orders->count();
 
         // 对每一张订单做对象级授权，不能把“知道订单号/联系方式”当作读取卡密的权限。
         $orders = $orders->filter(fn (Order $order) => $this->canAccessOrder(
@@ -422,7 +436,7 @@ class OrderService
             $password,
         ))->values();
 
-        return $orders->map(fn ($o) => [
+        $mapped = $orders->map(fn ($o) => [
             'order_no' => $o->order_no,
             'product_name' => $o->product?->name,
             'product_cover' => $o->product?->cover,
@@ -441,6 +455,8 @@ class OrderService
                 : [],
             'instructions' => $o->status === 'paid' ? ($o->instructions_snapshot ?: null) : null,
         ])->toArray();
+
+        return ['orders' => $mapped, 'matched' => $matched];
     }
 
     /** 校验订单对象级访问权限：本人登录态、随机访问凭证或订单查询密码三选一。 */

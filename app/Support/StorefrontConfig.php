@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Setting;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Validation\ValidationException;
 
 /**
  * 店铺外观配置辅助(spec §3.3, group=storefront)。
@@ -19,6 +20,8 @@ class StorefrontConfig
         'mail_password',
         'sms_access_key',
         'sms_access_secret',
+        'admin_alert_tg_token',
+        'admin_alert_wecom_webhook',
     ];
 
     /** 前台确实需要的公开配置白名单。 */
@@ -81,8 +84,8 @@ class StorefrontConfig
             // 安全与注册设置
             'register_open' => true,
             'register_type' => 'email',
-            'captcha_register' => false,
-            'captcha_login' => false,
+            'captcha_register' => true,
+            'captcha_login' => true,
             'username_min_length' => 3,
             'forget_type' => 'email',
 
@@ -155,6 +158,8 @@ class StorefrontConfig
                 ],
                 'script' => '',
             ],
+            // 客服脚本受信域名白名单(安全审计 M2):脚本内引用的外部主机必须在此列表。
+            'service_widget_allowed_hosts' => ServiceWidgetScript::DEFAULT_ALLOWED_HOSTS,
 
             // 管理员登录安全告警(issue #6):渠道配置非空即启用;总开关 admin_alert_enabled
             'admin_alert_enabled' => false,
@@ -299,6 +304,23 @@ class StorefrontConfig
         return $value;
     }
 
+    /**
+     * 数值边界(安全审计 M-5):防止越界配置破坏资金/安全逻辑。
+     * 格式: key => [min, max],null 表示不设该侧边界。
+     */
+    private const NUMERIC_BOUNDS = [
+        'cash_fee' => [0, null],
+        'cash_min' => [0, null],
+        'distribution_rate_l1' => [0, 100],
+        'distribution_rate_l2' => [0, 100],
+        'distribution_rate_l3' => [0, 100],
+        'supply_rate_limit' => [1, 60000],
+        'supply_timestamp_skew' => [30, 86400],
+        'order_close_minutes' => [1, 1440],
+        'recharge_max_amount' => [0.01, null],
+        'username_min_length' => [1, 30],
+    ];
+
     /** 批量保存 */
     public static function setMany(array $kv): void
     {
@@ -317,6 +339,18 @@ class StorefrontConfig
 
             if ($key === 'site_notice') {
                 $value = HtmlContentSanitizer::sanitize((string) $value);
+            }
+
+            // 数值边界校验:越界直接 422,不落库。
+            if (array_key_exists($key, self::NUMERIC_BOUNDS) && is_numeric($value)) {
+                [$min, $max] = self::NUMERIC_BOUNDS[$key];
+                $num = (float) $value;
+                if (($min !== null && $num < $min) || ($max !== null && $num > $max)) {
+                    $range = ($min !== null ? "不小于 {$min}" : '').($max !== null ? ($min !== null ? ' 且 ' : '')."不大于 {$max}" : '');
+                    throw ValidationException::withMessages([
+                        $key => ["配置项 {$key} 取值越界:{$range}"],
+                    ]);
+                }
             }
 
             Setting::updateOrCreate(

@@ -28,12 +28,15 @@ class SupplyProductController extends Controller
         $account = $request->attributes->get('supplier_account');
         $pricing = app(SupplyPricingService::class);
 
+        // 安全(L-5):page_size 上限 100,防止超大分页拖垮 DB。
+        $pageSize = min(100, max(1, $request->integer('page_size', 50)));
+
         $products = Product::query()
             ->where('status', 1)
             ->where('hide', false)
             ->with(['skus' => fn ($q) => $q->where('status', 1)])
             ->orderByDesc('id')
-            ->paginate($request->integer('page_size', 50));
+            ->paginate($pageSize);
 
         return response()->json([
             'ok' => true,
@@ -69,7 +72,7 @@ class SupplyProductController extends Controller
     public function stock(Request $request, int $id): JsonResponse
     {
         $product = Product::find($id);
-        if (! $product) {
+        if (! $product || $product->status != 1) {
             return response()->json([
                 'ok' => false,
                 'error_code' => 'product_unavailable',

@@ -6,6 +6,7 @@ import { getProduct, type Product } from '@/api/products'
 import { getProductReviews, getReviewEligibility, createReview, type ReviewItem } from '@/api/reviews'
 import { setSeo } from '@/utils/seo'
 import { useSettingsStore } from '@/stores/settings'
+import { useAuthStore } from '@/stores/auth'
 import { formatMoney } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
 import AppIcon from '@/components/AppIcon.vue'
@@ -120,7 +121,7 @@ onMounted(async () => {
   } catch (e) { /* 评价加载失败不阻塞页面 */ }
 
   // 登录用户:查询可评价状态(购买过该商品且未评价)
-  if (localStorage.getItem('zcard_token') && product.value?.id) {
+  if (useAuthStore().isLoggedIn && product.value?.id) {
     try {
       const el = await getReviewEligibility(product.value.id)
       canReview.value = el.can_review

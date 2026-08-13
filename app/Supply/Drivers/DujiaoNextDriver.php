@@ -9,6 +9,7 @@ use App\Supply\Dto\UpstreamCategory;
 use App\Supply\Dto\UpstreamFulfillment;
 use App\Supply\Dto\UpstreamOrder;
 use App\Supply\Dto\UpstreamProduct;
+use App\Support\StorefrontConfig;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -193,6 +194,14 @@ class DujiaoNextDriver implements SupplyDriver
         $creds = $this->credentials();
         $sig = $request->header('Dujiao-Next-Signature');
         $ts = $request->header('Dujiao-Next-Timestamp');
+
+        // 防重放:与本站供货 API 对齐,校验时间戳在 ±skew 窗口内。
+        $skew = (int) StorefrontConfig::get('supply_timestamp_skew');
+        if (! is_string($ts) || ! preg_match('/^\d{1,13}$/', $ts)
+            || abs(time() - (int) $ts) > $skew) {
+            return null;
+        }
+
         // 上游(dujiao-next)发回调时签名 path 固定为 /api/v1/upstream/callback,
         // 不是我们接收回调的实际路径,否则签名校验恒失败。
         $path = '/api/v1/upstream/callback';

@@ -1,0 +1,1 @@
+import{t as e}from"./request-Blf49zc7.js";var t=t=>e.post(`/auth/register`,t),n=t=>e.post(`/auth/login`,t),r=()=>e.post(`/auth/logout`),i=()=>e.get(`/auth/me`),a=t=>e.post(`/auth/send-reset-code`,t),o=t=>e.post(`/auth/reset-password`,t),s=t=>e.put(`/auth/password`,t),c=t=>e.put(`/auth/profile`,t);export{o as a,c,t as i,n,a as o,r,s,i as t};

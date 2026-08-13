@@ -16,6 +16,9 @@ class SupplySource extends Model
         'last_synced_at', 'last_error', 'balance_cache', 'sort',
     ];
 
+    /** 安全(M-15):上游凭据解密后不得因模型序列化意外进入接口响应。 */
+    protected $hidden = ['credentials'];
+
     protected function casts(): array
     {
         return [

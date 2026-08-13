@@ -12,6 +12,9 @@ class Payment extends Model
         'charged_currency', 'charged_amount', 'channel_exchange_rate',
     ];
 
+    /** 安全(M-15):回调原始报文可能含网关敏感字段,不得因序列化意外外泄。 */
+    protected $hidden = ['raw'];
+
     protected function casts(): array
     {
         return [

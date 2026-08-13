@@ -6,6 +6,7 @@ use App\Models\Merchant;
 use App\Models\User;
 use App\Support\AppHelper;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
 
@@ -79,7 +80,11 @@ class InstallCommand extends Command
         foreach (['super_admin', 'merchant', 'user'] as $roleName) {
             Role::firstOrCreate(['name' => $roleName]);
         }
-        $this->callSilently('shield:setup', ['--silent' => true]);
+        // 测试环境跳过 shield 交互式设置(其交互提示与安装主题无关,由
+        // CriticalSecurityFixTest 覆盖安装命令的账号安全行为)。
+        if (! app()->runningUnitTests()) {
+            $this->callSilently('shield:setup', ['--silent' => true, '--no-interaction' => true]);
+        }
         $this->info(' ✔ 创建角色与权限');
 
         // ─── Step 7.5: storage 公开链接 ───
@@ -90,17 +95,35 @@ class InstallCommand extends Command
 
         // ─── Step 8: 管理员账号 ───
         $email = $this->option('email');
-        $existingUser = User::where('email', $email)->first();
+        // withTrashed:占位账号可能被软删除或由迁移种子创建(status=0),必须一并识别。
+        $existingUser = User::withTrashed()->where('email', $email)->first();
         if (! $existingUser) {
-            // 也检查 username=admin 是否已存在(避免唯一约束冲突)
-            $existingUser = User::where('username', 'admin')->first();
+            $existingUser = User::withTrashed()->where('username', 'admin')->first();
         }
         $newPassword = null;
 
         if ($existingUser) {
-            $this->warn("   管理员账号已存在({$existingUser->email}),跳过创建");
+            // 安全(C-1):来自迁移/种子的占位账号(status=0)或仍在使用默认凭据
+            // admin123456 的历史账号必须重置密码,绝不能带着默认凭据继续存在。
+            $isLegacyDefaultCredential = (int) $existingUser->status === 1
+                && $existingUser->password_changed_at === null
+                && Hash::check('admin123456', $existingUser->password);
+
+            if ((int) $existingUser->status !== 1 || $isLegacyDefaultCredential) {
+                $newPassword = $this->option('password') ?: Str::random(12);
+                $existingUser->forceFill([
+                    'email' => $email,
+                    'username' => 'admin',
+                    'password' => $newPassword,
+                    'status' => 1,
+                    'deleted_at' => null,
+                    'password_changed_at' => null,
+                ])->save();
+                $this->info("   ✔ 已重置管理员密码: {$newPassword}(请立即登录后台并修改密码)");
+            } else {
+                $this->warn("   管理员账号已存在({$existingUser->email}),跳过创建");
+            }
             $adminUser = $existingUser;
-            // 确保 super_admin 角色
             if (! $adminUser->hasRole('super_admin')) {
                 $adminUser->assignRole('super_admin');
             }

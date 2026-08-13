@@ -21,6 +21,8 @@ return [
     'auth.password_changed' => '密码修改成功',
 
     'order.status_abnormal' => '订单状态异常',
+    'order.create_failed' => '下单失败,请稍后重试',
+    'order.query_locked' => '查询尝试次数过多,请 15 分钟后再试',
 
     'review.order_not_found' => '订单不存在或未支付',
     'review.already_reviewed' => '该订单已评价',
@@ -43,6 +45,7 @@ return [
     'payment.order_ids_required' => '请选择待支付的订单',
     'payment.order_not_found' => '存在无效的订单',
     'payment.order_not_pending' => '存在已支付或已关闭的订单',
+    'payment.create_failed' => '支付创建失败,请稍后重试',
 
     // ===== 余额充值 =====
     'recharge.amount_invalid' => '充值金额必须大于 0',
@@ -81,6 +84,7 @@ return [
     'supply_api.insufficient_balance' => '余额不足',
     'supply_api.insufficient_stock' => '库存不足',
     'supply_api.product_unavailable' => '商品不可用',
+    'supply_api.price_not_configured' => '商品供货价未配置,请联系上游管理员',
     'supply_api.order_not_found' => '订单不存在',
     'supply_api.order_not_cancelable' => '订单不可取消',
     'supply_api.bad_request' => '请求参数错误',

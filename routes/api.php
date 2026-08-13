@@ -53,8 +53,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class)->name('api.health');
 
-// 安装向导(无需认证,安装前可用)
-Route::prefix('install')->group(function () {
+// 安装向导(无需认证,安装前可用)— 限流防滥用
+Route::prefix('install')->middleware('throttle:5,1')->group(function () {
     Route::get('/status', [InstallController::class, 'status'])->name('api.install.status');
     Route::post('/test-db', [InstallController::class, 'testDb'])->name('api.install.test-db');
     Route::post('/run', [InstallController::class, 'run'])->name('api.install.run');
@@ -317,18 +317,19 @@ Route::middleware(['auth:sanctum', 'active.user', 'admin.role', 'audit.admin'])-
 Route::middleware(['auth:sanctum', 'active.user', 'admin.role'])->get('/products/{id}/stock', [CardController::class, 'stock'])->name('api.products.stock');
 Route::middleware(['auth:sanctum', 'active.user', 'admin.role'])->get('/cards', [CardController::class, 'index'])->name('api.cards.index');
 
-// 订单(游客,不需 auth)— API-first:前台和后台都调 OrderService
-Route::post('/orders', [OrderController::class, 'create'])->middleware(['display.currency', 'set.locale'])->name('api.orders.create');
-Route::post('/orders/batch', [OrderController::class, 'batch'])->middleware(['display.currency', 'set.locale'])->name('api.orders.batch');
+// 订单(游客,不需 auth)— API-first:前台和后台都调 OrderService。
+// throttle:防脚本化下单锁卡造成库存 DoS(每单最多锁 100 张卡 15 分钟)。
+Route::post('/orders', [OrderController::class, 'create'])->middleware(['display.currency', 'set.locale', 'throttle:20,1'])->name('api.orders.create');
+Route::post('/orders/batch', [OrderController::class, 'batch'])->middleware(['display.currency', 'set.locale', 'throttle:20,1'])->name('api.orders.batch');
 Route::post('/orders/{orderNo}/mock-pay', [OrderController::class, 'mockPay'])->middleware(['display.currency', 'set.locale'])->name('api.orders.mock-pay');
 Route::match(['get', 'post'], '/orders/query', [OrderController::class, 'query'])
     ->middleware(['display.currency', 'set.locale', 'throttle:10,1'])
     ->name('api.orders.query');
 
-// 支付(游客 + 回调,不需 auth)
+// 支付(游客 + 回调,不需 auth)— 创建类接口限流防灌水
 Route::get('/payments/channels', [PaymentController::class, 'channels'])->name('api.payments.channels');
-Route::post('/payments/create', [PaymentController::class, 'create'])->name('api.payments.create');
-Route::post('/payments/batch-create', [PaymentController::class, 'batchCreate'])->name('api.payments.batch-create');
+Route::post('/payments/create', [PaymentController::class, 'create'])->middleware('throttle:20,1')->name('api.payments.create');
+Route::post('/payments/batch-create', [PaymentController::class, 'batchCreate'])->middleware('throttle:20,1')->name('api.payments.batch-create');
 // 余额支付(需登录,校验订单归属;订单管理可见 payment_channel=balance)
 Route::post('/payments/balance', [PaymentController::class, 'balancePay'])->middleware(['display.currency', 'set.locale'])->name('api.payments.balance');
 Route::post('/payments/balance-batch', [PaymentController::class, 'balanceBatchPay'])->middleware(['display.currency', 'set.locale'])->name('api.payments.balance-batch');
@@ -392,5 +393,8 @@ Route::prefix('supply')->middleware(['supply.auth', 'supply.rate'])
         Route::post('orders/{id}/cancel', [SupplyOrderController::class, 'cancel'])->name('api.supply.orders.cancel')
             ->whereNumber('id');
     });
-// 回调端点不经过 supply.auth(上游用各自协议签名,由驱动 verifyCallback 处理)
-Route::post('supply/callback', [SupplyController::class, 'callback'])->name('api.supply.callback');
+// 回调端点不经过 supply.auth(上游用各自协议签名,由驱动 verifyCallback 处理);
+// throttle 防未授权请求无差别打 DB/HMAC 计算(安全审计 L-4)。
+Route::post('supply/callback', [SupplyController::class, 'callback'])
+    ->middleware('throttle:60,1')
+    ->name('api.supply.callback');

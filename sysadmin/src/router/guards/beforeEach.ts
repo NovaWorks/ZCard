@@ -152,7 +152,7 @@ async function handleRouteGuard(
   }
 
   // 1. 检查登录状态
-  if (!handleLoginStatus(to, userStore, next)) {
+  if (!(await handleLoginStatus(to, userStore, next))) {
     return
   }
 
@@ -201,14 +201,25 @@ async function handleRouteGuard(
  * 处理登录状态
  * @returns true 表示可以继续，false 表示已处理跳转
  */
-function handleLoginStatus(
+async function handleLoginStatus(
   to: RouteLocationNormalized,
   userStore: ReturnType<typeof useUserStore>,
   next: NavigationGuardNext
-): boolean {
+): Promise<boolean> {
   // 已登录或访问登录页或静态路由，直接放行
   if (userStore.isLogin || to.path === RoutesAlias.Login || isStaticRoute(to.path)) {
     return true
+  }
+
+  // 页面刷新后内存 token 已丢:尝试用 HttpOnly Cookie 会话恢复登录态(幂等,失败返回 null)。
+  if (!userStore.isLogin && to.path !== RoutesAlias.Login) {
+    try {
+      if (await userStore.trySessionRestore()) {
+        return true
+      }
+    } catch {
+      // 会话恢复失败按未登录处理
+    }
   }
 
   // 未登录且访问需要权限的页面，跳转到登录页并携带 redirect 参数

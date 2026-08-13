@@ -61,6 +61,7 @@ class SupplierAccountController extends Controller
     public function show(SupplierAccount $supplierAccount): JsonResponse
     {
         $supplierAccount->api_secret = $this->maskSecret($supplierAccount);
+
         return response()->json($supplierAccount->makeVisible(['api_secret']));
     }
 
@@ -74,6 +75,7 @@ class SupplierAccountController extends Controller
             'remark' => 'sometimes|nullable|string|max:500',
         ]);
         $supplierAccount->update($data);
+
         return response()->json($supplierAccount);
     }
 
@@ -81,6 +83,7 @@ class SupplierAccountController extends Controller
     public function destroy(SupplierAccount $supplierAccount): JsonResponse
     {
         $supplierAccount->delete();
+
         return response()->json(null, 204);
     }
 
@@ -106,7 +109,7 @@ class SupplierAccountController extends Controller
             'remark' => 'nullable|string|max:200',
         ]);
 
-        $key = 'recharge_' . $supplierAccount->id . '_' . time() . '_' . bin2hex(random_bytes(8));
+        $key = 'recharge_'.$supplierAccount->id.'_'.time().'_'.bin2hex(random_bytes(8));
         DB::transaction(function () use ($supplierAccount, $data, $key) {
             $locked = SupplierAccount::where('id', $supplierAccount->id)->lockForUpdate()->firstOrFail();
             $locked->increment('balance', $data['amount']);
@@ -131,19 +134,27 @@ class SupplierAccountController extends Controller
             'remark' => 'nullable|string|max:200',
         ]);
 
-        $key = 'adjust_' . $supplierAccount->id . '_' . time() . '_' . bin2hex(random_bytes(8));
-        DB::transaction(function () use ($supplierAccount, $data, $key) {
-            $locked = SupplierAccount::where('id', $supplierAccount->id)->lockForUpdate()->firstOrFail();
-            $locked->increment('balance', $data['amount']);
-            SupplierLedgerEntry::create([
-                'supplier_account_id' => $locked->id,
-                'type' => SupplierLedgerEntry::TYPE_ADJUST,
-                'amount' => $data['amount'],
-                'balance_after' => $locked->fresh()->balance,
-                'idempotency_key' => $key,
-                'remark' => $data['remark'] ?? '管理员调整',
-            ]);
-        });
+        try {
+            $key = 'adjust_'.$supplierAccount->id.'_'.time().'_'.bin2hex(random_bytes(8));
+            DB::transaction(function () use ($supplierAccount, $data, $key) {
+                $locked = SupplierAccount::where('id', $supplierAccount->id)->lockForUpdate()->firstOrFail();
+                // 安全:负数调整后余额不得小于 0,与用户余额(BillService)口径一致。
+                if ($data['amount'] < 0 && $locked->balance + $data['amount'] < 0) {
+                    throw new \RuntimeException('调整后余额不能为负数');
+                }
+                $locked->increment('balance', $data['amount']);
+                SupplierLedgerEntry::create([
+                    'supplier_account_id' => $locked->id,
+                    'type' => SupplierLedgerEntry::TYPE_ADJUST,
+                    'amount' => $data['amount'],
+                    'balance_after' => $locked->fresh()->balance,
+                    'idempotency_key' => $key,
+                    'remark' => $data['remark'] ?? '管理员调整',
+                ]);
+            });
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 400);
+        }
 
         return response()->json(['balance' => (int) $supplierAccount->fresh()->balance]);
     }
@@ -152,6 +163,7 @@ class SupplierAccountController extends Controller
     public function ledger(Request $request, SupplierAccount $supplierAccount): JsonResponse
     {
         $entries = $supplierAccount->ledgerEntries()->orderByDesc('id')->paginate($request->integer('per_page', 20));
+
         return response()->json($entries);
     }
 
@@ -162,6 +174,7 @@ class SupplierAccountController extends Controller
         } catch (\Throwable) {
             $plain = $account->getRawOriginal('api_secret');
         }
-        return '••••••••' . substr($plain, -4);
+
+        return '••••••••'.substr($plain, -4);
     }
 }

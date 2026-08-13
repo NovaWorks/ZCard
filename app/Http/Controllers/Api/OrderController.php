@@ -10,6 +10,7 @@ use App\Support\OrderService;
 use App\Support\StorefrontConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class OrderController extends Controller
 {
@@ -21,7 +22,7 @@ class OrderController extends Controller
             'qty' => 'required|integer|min:1|max:100',
             'card_id' => 'nullable|integer', // 靓号自选:客户选定的具体卡密
             'contact' => 'required|string|max:150',
-            'password' => 'nullable|string|max:50',
+            'password' => 'nullable|string|min:6|max:50',
             'captcha' => 'nullable|string',
             'captcha_key' => 'nullable|string|max:255',
             'coupon_code' => 'nullable|string|max:32',
@@ -105,7 +106,7 @@ class OrderController extends Controller
             'items.*.qty' => 'required|integer|min:1|max:100',
             'items.*.card_id' => 'nullable|integer', // 靓号自选:该商品项选定的卡密
             'contact' => 'required|string|max:150',
-            'password' => 'nullable|string|max:50',
+            'password' => 'nullable|string|min:6|max:50',
             'captcha' => 'nullable|string',
             'captcha_key' => 'nullable|string|max:255',
             'coupon_code' => 'nullable|string|max:32',
@@ -156,15 +157,18 @@ class OrderController extends Controller
         } catch (InsufficientStockException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         } catch (\Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
+            // 安全(M-16):不向客户端回显内部异常细节,统一文案 + 服务端日志。
+            Log::error('批量下单失败', ['exception' => $e]);
+
+            return response()->json(['message' => __('messages.order.create_failed')], 422);
         }
     }
 
     public function mockPay(string $orderNo, OrderService $service): JsonResponse
     {
-        // 安全:模拟支付仅限开发/测试环境,生产环境禁用(否则任何人可白嫖订单+触发佣金)
-        if (! app()->environment('testing')
-            && (! app()->environment('local') || ! config('zcard.allow_mock_payment', false))) {
+        // 安全:模拟支付必须显式开启(ZCARD_ALLOW_MOCK_PAYMENT=true)且绝不允许在生产环境生效
+        // (否则任何人可白嫖订单+触发佣金)。不依赖 APP_ENV=testing 这类易误配的判断。
+        if (app()->environment('production') || ! config('zcard.allow_mock_payment', false)) {
             return response()->json(['message' => 'Not available'], 404);
         }
 
@@ -196,15 +200,30 @@ class OrderController extends Controller
             'access_token' => 'nullable|string|size:64',
         ]);
 
-        $orders = $service->searchOrders(
+        // 安全(M-9):按 IP+关键字计数,同关键字 5 次"命中但未授权"后锁定 15 分钟,
+        // 阻止对查单密码的在线爆破(查询密码一旦猜中即可读取卡密明文)。
+        $failKey = 'order_query_fail:'.hash('sha256', $request->ip().':'.trim($data['keyword']));
+        if ((int) cache()->get($failKey, 0) >= 5) {
+            return response()->json(['message' => __('messages.order.query_locked')], 429);
+        }
+
+        $result = $service->searchOrders(
             $data['keyword'],
             $data['password'] ?? null,
             $data['access_token'] ?? null,
             $this->activeUser($request)?->id,
         );
 
+        $orders = $result['orders'];
+        if ($orders === [] && $result['matched'] > 0) {
+            // 命中订单但全部未通过授权 = 疑似爆破尝试。
+            cache()->put($failKey, (int) cache()->get($failKey, 0) + 1, 900);
+        } elseif ($orders !== []) {
+            cache()->forget($failKey);
+        }
+
         // 未找到返回 200 + 空数组,让前端走空状态(而非把 404 当错误处理导致页面空白)
-        return response()->json($orders ?? []);
+        return response()->json($orders);
     }
 
     public function myOrders(Request $request, OrderService $service): JsonResponse

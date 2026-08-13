@@ -64,11 +64,32 @@ class UsdtDriver implements PaymentDriver
 
     public function verifyCallback(Request $request, array $config): ?array
     {
-        $apiKey = $config['api_key'] ?? '';
-        $provided = $request->header('X-API-Key') ?: $request->input('api_key');
+        // 安全(M-14):配置了 secret_key 时回调必须携带 HMAC-SHA256 签名(字段排序拼接);
+        // 未配置时回退到旧版静态 API Key 比较(兼容存量链上监听器)。
+        $secret = (string) ($config['secret_key'] ?? '');
+        if ($secret !== '') {
+            $data = $request->all();
+            $provided = strtolower(trim((string) ($request->header('X-Signature') ?: ($data['signature'] ?? ''))));
+            unset($data['signature'], $data['sign']);
+            ksort($data);
+            $parts = [];
+            foreach ($data as $k => $v) {
+                if ($v === '' || $v === null || is_array($v)) {
+                    continue;
+                }
+                $parts[] = $k.'='.$v;
+            }
+            $canonical = implode('&', $parts);
+            if ($provided === '' || ! hash_equals(hash_hmac('sha256', $canonical, $secret), $provided)) {
+                return null;
+            }
+        } else {
+            $apiKey = $config['api_key'] ?? '';
+            $provided = $request->header('X-API-Key') ?: $request->input('api_key');
 
-        if (! hash_equals((string) $apiKey, (string) $provided)) {
-            return null;
+            if (! hash_equals((string) $apiKey, (string) $provided)) {
+                return null;
+            }
         }
 
         $data = $request->all();
@@ -121,6 +142,12 @@ class UsdtDriver implements PaymentDriver
                 'label' => '回调签名密钥(API Key)',
                 'type' => 'text',
                 'required' => true,
+            ],
+            'secret_key' => [
+                'label' => '回调 HMAC 密钥(可选,推荐)',
+                'type' => 'text',
+                'required' => false,
+                'help' => '配置后回调必须携带 X-Signature(HMAC-SHA256,按字段名排序拼接后以本密钥签名),比静态 API Key 更安全;留空则回退 API Key 校验(兼容旧监听器)',
             ],
             'rate' => [
                 'label' => '法币兑 USDT 汇率(1 USDT = ? 法币)',

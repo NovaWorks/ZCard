@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\HtmlContentSanitizer;
 use App\Support\ServiceWidgetScript;
 use App\Support\StorefrontConfig;
 use Illuminate\Http\JsonResponse;
@@ -19,7 +20,10 @@ class StorefrontSettingsController extends Controller
         if ($subsite && ($subsite->settings['is_subsite'] ?? false)) {
             $config['site_name'] = $subsite->settings['site_name'] ?? ($config['site_name'] ?? 'ZCard');
             $config['site_logo'] = $subsite->settings['logo'] ?? ($config['site_logo'] ?? '');
-            $config['site_notice'] = $subsite->settings['announcement'] ?? ($config['site_notice'] ?? '');
+            // 安全(L-10):分站公告覆盖路径同样必须过 HTML 清洗,不能绕过主站清洗逻辑。
+            $config['site_notice'] = HtmlContentSanitizer::sanitize(
+                (string) ($subsite->settings['announcement'] ?? ($config['site_notice'] ?? '')),
+            );
         }
 
         return response()->json($config);
@@ -28,7 +32,8 @@ class StorefrontSettingsController extends Controller
     /** 返回同源客服脚本，兼容 Chatwoot/Crisp 官方完整安装代码。 */
     public function serviceWidgetScript(): Response
     {
-        $script = ServiceWidgetScript::compile(StorefrontConfig::get('service_widget'));
+        $allowedHosts = StorefrontConfig::get('service_widget_allowed_hosts');
+        $script = ServiceWidgetScript::compile(StorefrontConfig::get('service_widget'), $allowedHosts);
 
         return response($script, 200, [
             'Content-Type' => 'application/javascript; charset=UTF-8',

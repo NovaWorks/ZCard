@@ -44,6 +44,7 @@ class Category extends Model
             $depth++;
             $p = $p->parent;
         }
-        return str_repeat('— ', $depth) . $this->name;
+
+        return str_repeat('— ', $depth).$this->name;
     }
 }

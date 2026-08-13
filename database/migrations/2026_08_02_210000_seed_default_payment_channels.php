@@ -1,17 +1,17 @@
 <?php
 
+use App\Payment\Drivers\AlipayDriver;
+use App\Payment\Drivers\BEpusdtDriver;
+use App\Payment\Drivers\CodePayDriver;
+use App\Payment\Drivers\EpayDriver;
+use App\Payment\Drivers\EpuSdtDriver;
+use App\Payment\Drivers\PaypalDriver;
+use App\Payment\Drivers\StripeDriver;
+use App\Payment\Drivers\UsdtDriver;
+use App\Payment\Drivers\WechatPayDriver;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use App\Payment\Drivers\AlipayDriver;
-use App\Payment\Drivers\WechatPayDriver;
-use App\Payment\Drivers\EpayDriver;
-use App\Payment\Drivers\UsdtDriver;
-use App\Payment\Drivers\CodePayDriver;
-use App\Payment\Drivers\PaypalDriver;
-use App\Payment\Drivers\StripeDriver;
-use App\Payment\Drivers\EpuSdtDriver;
-use App\Payment\Drivers\BEpusdtDriver;
 
 /**
  * 预置默认支付渠道(系统基础数据,非演示数据)。
@@ -30,7 +30,8 @@ use App\Payment\Drivers\BEpusdtDriver;
  * 注意:用 DB 门面而非 Eloquent,因为 users 表用了软删除,User::firstOrCreate
  * 会漏掉已软删除的同名记录 → 撞 unique 约束(1062)。DB 层查询包含软删除记录。
  */
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         // 1. 幂等确保默认商户(id=1)存在(避免外键约束 1452)。
@@ -41,12 +42,14 @@ return new class extends Migration {
             // 用 withTrashed 语义(DB 层查全部含软删除),避免撞 username unique 约束。
             $adminId = DB::table('users')->where('username', 'admin')->value('id');
             if (! $adminId) {
+                // 安全(C-1):占位管理员必须不可登录——随机密码 + status=0(禁用)。
+                // 账号激活与密码设置只由安装向导(Web/CLI)完成。
                 $adminId = DB::table('users')->insertGetId([
                     'username' => 'admin',
                     'name' => 'Super Admin',
                     'email' => 'admin@example.com',
-                    'password' => Hash::make('admin123456'),
-                    'status' => 1,
+                    'password' => Hash::make(bin2hex(random_bytes(32))),
+                    'status' => 0,
                     'password_changed_at' => null,
                     'created_at' => now(),
                     'updated_at' => now(),

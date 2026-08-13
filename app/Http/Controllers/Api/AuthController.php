@@ -12,6 +12,7 @@ use App\Support\StorefrontConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -43,16 +44,16 @@ class AuthController extends Controller
             $rules['email'] = 'nullable|email|max:255|unique:users,email';
         }
 
-        $data = $request->validate($rules);
-
-        // 注册验证码校验
+        // 安全(M-12):验证码校验先于唯一性校验——否则未过验证码即可枚举账号/邮箱。
         if (CaptchaService::isEnabled('register')) {
-            if (! CaptchaService::verify('register', $data['captcha'] ?? null)) {
+            if (! CaptchaService::verify('register', $request->input('captcha') ?? null)) {
                 throw ValidationException::withMessages([
                     'captcha' => [__('messages.captcha_error')],
                 ]);
             }
         }
+
+        $data = $request->validate($rules);
 
         // 推广人绑定:referrer=用户名 → pid(trim 防首尾空格失配)
         $pid = 0;
@@ -74,7 +75,10 @@ class AuthController extends Controller
         ]);
         $user->assignRole('user');
 
+        // 双模式认证:Bearer token 供 API 客户端;同时写入会话(web guard),
+        // 前端 SPA 通过 HttpOnly Cookie 维持登录态(见 config/sanctum.php stateful)。
         $token = $user->createToken('storefront')->plainTextToken;
+        auth()->login($user);
 
         return response()->json([
             'token' => $token,
@@ -102,6 +106,19 @@ class AuthController extends Controller
 
         // 邮箱或用户名匹配(field 参数兼容前端传 email/username/account)
         $identifier = trim((string) ($data['email'] ?? $data['account'] ?? ''));
+
+        // 安全(M-13):账号级失败锁定——同账号连续失败 5 次锁 15 分钟(与 IP 限流互补)。
+        $failKey = 'login_fail:'.hash('sha256', strtolower($identifier));
+        $lockKey = 'login_lock:'.hash('sha256', strtolower($identifier));
+        if (cache()->get($lockKey)) {
+            SecurityAudit::record($request, 'login.locked', User::class, null, [
+                'identifier' => mb_substr($identifier, 0, 100),
+            ]);
+            throw ValidationException::withMessages([
+                'email' => [__('messages.auth.invalid_credentials')],
+            ]);
+        }
+
         $user = User::query()
             ->where(fn ($q) => $q->where('email', $identifier)->orWhere('username', $identifier))
             ->first();
@@ -110,10 +127,19 @@ class AuthController extends Controller
             SecurityAudit::record($request, 'login.failed', User::class, $user?->id, [
                 'identifier' => mb_substr($identifier, 0, 100),
             ]);
+            $fails = (int) cache()->get($failKey, 0) + 1;
+            cache()->put($failKey, $fails, 900);
+            if ($fails >= 5) {
+                cache()->put($lockKey, true, 900);
+                cache()->forget($failKey);
+            }
             throw ValidationException::withMessages([
                 'email' => [__('messages.auth.invalid_credentials')],
             ]);
         }
+
+        cache()->forget($failKey);
+        cache()->forget($lockKey);
 
         if ($user->status !== 1) {
             throw ValidationException::withMessages([
@@ -123,6 +149,8 @@ class AuthController extends Controller
 
         $user->update(['last_login_at' => now()]);
         $token = $user->createToken('storefront')->plainTextToken;
+        // 同时写入会话(web guard),SPA 通过 HttpOnly Cookie 保持登录态。
+        auth()->login($user);
 
         // 超级管理员:陌生 IP/设备登录告警(邮件/Telegram/企业微信,异步)。
         // 必须在登录审计**之前**执行:history 不含本次登录,陌生判定才准确
@@ -146,7 +174,17 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        // 双模式登出:Bearer 令牌删除当前访问令牌;Cookie 会话直接失效(SPA 登录态)。
+        if ($request->bearerToken()) {
+            $token = $request->user()?->currentAccessToken();
+            if ($token && method_exists($token, 'delete')) {
+                $token->delete();
+            }
+        }
+        if ($request->hasSession()) {
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
 
         return response()->json(['message' => __('messages.auth.logout_done')]);
     }
@@ -179,6 +217,11 @@ class AuthController extends Controller
             'password_changed_at' => now(),
         ]);
         $user->tokens()->delete();
+        // Cookie 会话同样失效,要求改密后重新登录。
+        if ($request->hasSession()) {
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
 
         return response()->json(['message' => __('messages.auth.password_changed')]);
     }
@@ -240,9 +283,12 @@ class AuthController extends Controller
         try {
             MailService::sendCaptchaEmail($email, $code);
         } catch (\Throwable $e) {
-            throw ValidationException::withMessages([
-                'email' => [__('messages.auth.mail_send_failed')],
-            ]);
+            // 安全(M-11):邮件发送失败也返回与成功一致的响应,避免"已注册才 422"
+            // 的邮箱枚举;失败细节只记服务日志。
+            Log::error('找回密码邮件发送失败: '.$e->getMessage());
+            cache()->put("reset_code_sent:{$emailKey}", true, 60);
+
+            return response()->json(['message' => __('messages.auth.reset_code_sent')]);
         }
 
         // 邮件成功后才保存验证码，避免把已发送验证码覆盖为用户收不到的新值。

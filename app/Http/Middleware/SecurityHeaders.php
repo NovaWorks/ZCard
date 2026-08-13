@@ -25,7 +25,11 @@ class SecurityHeaders
             $widgetOrigins = [];
             if (! $request->is('api/*', 'admin', 'admin/*', 'install', 'install/*')) {
                 try {
-                    $widgetOrigins = ServiceWidgetScript::allowedOrigins(StorefrontConfig::get('service_widget'));
+                    $allowedHosts = StorefrontConfig::get('service_widget_allowed_hosts');
+                    $widgetOrigins = ServiceWidgetScript::allowedOrigins(
+                        StorefrontConfig::get('service_widget'),
+                        $allowedHosts,
+                    );
                 } catch (\Throwable) {
                     // 安装前或数据库暂不可用时保持最严格 CSP，不能影响错误页正常返回。
                 }
@@ -36,7 +40,8 @@ class SecurityHeaders
                 'Content-Security-Policy',
                 "default-src 'self'; script-src 'self'{$externalSources}; style-src 'self' 'unsafe-inline'{$externalSources}; "
                 ."img-src 'self' data: blob: https:; font-src 'self' data:{$externalSources}; "
-                ."connect-src 'self' https: wss:; frame-src 'self'{$externalSources}; "
+                // 安全审计 M2:连接源从任意 https 收紧为本站 + 客服脚本白名单来源(WebSocket 保留 wss: 兼容 Chatwoot)。
+                ."connect-src 'self'{$externalSources} wss:; frame-src 'self'{$externalSources}; "
                 ."object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
             );
         }

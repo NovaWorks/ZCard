@@ -110,6 +110,10 @@
               <ElInput v-model="form.serviceWidgetScript" type="textarea" :rows="6" :placeholder="t('zcard.setting.serviceScriptPlaceholder')" />
               <span class="form-tip">{{ t('zcard.setting.serviceScriptTip') }}</span>
             </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.serviceAllowedHosts')">
+              <ElInput v-model="form.serviceWidgetAllowedHosts" :placeholder="t('zcard.setting.serviceAllowedHostsPlaceholder')" />
+              <span class="form-tip">{{ t('zcard.setting.serviceAllowedHostsTip') }}</span>
+            </ElFormItem>
           </ElForm>
         </ElTabPane>
 
@@ -568,6 +572,7 @@
     serviceWidgetTitleEn: string
     serviceWidgetLinksJson: string
     serviceWidgetScript: string
+    serviceWidgetAllowedHosts: string
     admin_alert_enabled: boolean
     admin_alert_email: string
     admin_alert_tg_token: string
@@ -677,6 +682,7 @@
     serviceWidgetTitleEn: '',
     serviceWidgetLinksJson: '[]',
     serviceWidgetScript: '',
+    serviceWidgetAllowedHosts: '',
     admin_alert_enabled: false,
     admin_alert_email: '',
     admin_alert_tg_token: '',
@@ -960,6 +966,9 @@
       form.serviceWidgetTitleEn = sw.title_en || ''
       form.serviceWidgetLinksJson = toText(sw.links || [])
       form.serviceWidgetScript = sw.script || ''
+      form.serviceWidgetAllowedHosts = Array.isArray(data.service_widget_allowed_hosts)
+        ? data.service_widget_allowed_hosts.join(',')
+        : (typeof data.service_widget_allowed_hosts === 'string' ? data.service_widget_allowed_hosts : '')
       form.admin_alert_enabled = coerceBool(data.admin_alert_enabled, d.admin_alert_enabled)
       form.admin_alert_email = coerce(data.admin_alert_email, d.admin_alert_email)
       form.admin_alert_tg_token = coerce(data.admin_alert_tg_token, d.admin_alert_tg_token)
@@ -1008,6 +1017,10 @@
           links: serviceLinks,
           script: form.serviceWidgetScript,
         } as any,
+        service_widget_allowed_hosts: form.serviceWidgetAllowedHosts
+          .split(',')
+          .map((h) => h.trim().toLowerCase())
+          .filter(Boolean),
       }
       delete (payload as any).footerLinksJson
       delete (payload as any).footerContactJson
@@ -1019,6 +1032,7 @@
       delete (payload as any).serviceWidgetTitleEn
       delete (payload as any).serviceWidgetLinksJson
       delete (payload as any).serviceWidgetScript
+      delete (payload as any).serviceWidgetAllowedHosts
       // 卡密加密密钥:仅在填写时提交(留空=保持原值);回显值为脱敏占位,不得覆盖
       if (cardEncryptionKey.value.trim()) {
         payload.card_encryption_key = cardEncryptionKey.value.trim()

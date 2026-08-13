@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\SupplySource;
 use App\Supply\UpstreamOrderService;
+use App\Support\CsvSafe;
 use App\Support\FulfillmentService;
 use App\Support\OrderService;
 use App\Support\StorefrontConfig;
@@ -268,7 +269,7 @@ class OrderController extends Controller
                 '支付方式', '支付状态', '联系方式', '卡密数量', '下单时间', '支付时间',
             ]);
             foreach ($orders as $o) {
-                fputcsv($fh, [
+                fputcsv($fh, CsvSafe::row([
                     $o->order_no,
                     $o->product?->name ?? '-',
                     $o->sku_name ?? '-',
@@ -282,7 +283,7 @@ class OrderController extends Controller
                     $o->order_deliveries_count ?? 0,
                     $o->created_at,
                     $o->paid_at,
-                ]);
+                ]));
             }
             fclose($fh);
         }, 200, $headers);

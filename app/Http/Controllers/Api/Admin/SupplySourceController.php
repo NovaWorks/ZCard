@@ -53,7 +53,7 @@ class SupplySourceController extends Controller
             ->when($request->input('status'), fn ($q, $s) => $q->where('status', $s))
             ->orderByDesc('id')->paginate($request->integer('per_page', 20));
 
-        $sources->getCollection()->transform(fn ($s) => $this->maskCredentials($s));
+        $sources->getCollection()->transform(fn ($s) => $this->serializeMasked($s));
 
         return response()->json($sources);
     }
@@ -71,13 +71,13 @@ class SupplySourceController extends Controller
             'settings' => $data['settings'] ?? null,
         ]);
 
-        return response()->json($this->maskCredentials($source), 201);
+        return response()->json($this->serializeMasked($source), 201);
     }
 
     /** GET /api/admin/supply-sources/{source} */
     public function show(SupplySource $supplySource): JsonResponse
     {
-        return response()->json($this->maskCredentials($supplySource));
+        return response()->json($this->serializeMasked($supplySource));
     }
 
     /** PUT /api/admin/supply-sources/{source} */
@@ -99,7 +99,7 @@ class SupplySourceController extends Controller
         // (客户反馈:改 600% 加价后价格仍是旧的,因为此前要等每小时定时同步才生效)
         $this->maybeDispatchReprice($supplySource, $oldSettings);
 
-        return response()->json($this->maskCredentials($supplySource));
+        return response()->json($this->serializeMasked($supplySource));
     }
 
     /**
@@ -560,12 +560,14 @@ class SupplySourceController extends Controller
         ]);
     }
 
-    /** 凭证脱敏:secret 类字段只留末4位 */
+    /** 凭证脱敏(安全审计 M-4):除明确非敏感键外一律掩码,防止新驱动敏感字段漏掩 */
     private function maskCredentials(SupplySource $source): SupplySource
     {
         $creds = $source->credentials ?? [];
+        $nonSensitiveKeys = ['app_id', 'merchant_id', 'pid'];
         foreach ($creds as $key => $val) {
-            if (is_string($val) && strlen($val) > 4 && (str_contains(strtolower($key), 'secret') || strtolower($key) === 'app_key')) {
+            if (is_string($val) && strlen($val) > 4
+                && ! in_array(strtolower((string) $key), $nonSensitiveKeys, true)) {
                 $creds[$key] = '••••••••'.substr($val, -4);
             }
         }
@@ -573,6 +575,20 @@ class SupplySourceController extends Controller
         $source->last_error = SupplySyncError::normalizeStoredMessage($source->last_error);
 
         return $source;
+    }
+
+    /**
+     * 序列化脱敏后的货源(模型 $hidden 会隐藏 credentials,这里显式把脱敏值放回响应,
+     * 兼顾"不回显密钥"与"后台需要看到键名/掩码"两个诉求)。
+     */
+    private function serializeMasked(SupplySource $source): array
+    {
+        $this->maskCredentials($source);
+
+        $data = $source->toArray();
+        $data['credentials'] = $source->credentials;
+
+        return $data;
     }
 
     /** 拉取上游全部商品(循环分页;上限 20 页防上游异常死循环) */

@@ -20,6 +20,7 @@ class Recharge extends Model implements Payable
 
     /** 充值目标: balance=个人余额(默认), supply=供货余额 */
     public const TARGET_BALANCE = 'balance';
+
     public const TARGET_SUPPLY = 'supply';
 
     protected function casts(): array
@@ -31,7 +32,9 @@ class Recharge extends Model implements Payable
     }
 
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_PAID = 'paid';
+
     public const STATUS_CLOSED = 'closed';
 
     public function user(): BelongsTo
@@ -44,12 +47,13 @@ class Recharge extends Model implements Payable
      * 与 OrderService::closeExpired 配合,由 orders:close-expired 命令统一调度,
      * 避免 pending 充值单无限堆积(延迟回调也无法再入账)。
      *
-     * @param int $expireMinutes 超时分钟数,默认与订单关单一致(后台 order_close_minutes)
+     * @param  int  $expireMinutes  超时分钟数,默认与订单关单一致(后台 order_close_minutes)
      * @return int 关闭数量
      */
     public static function closeExpired(int $expireMinutes = 30): int
     {
         $cutoff = now()->subMinutes($expireMinutes);
+
         return static::where('status', self::STATUS_PENDING)
             ->where('created_at', '<', $cutoff)
             ->update(['status' => self::STATUS_CLOSED]);

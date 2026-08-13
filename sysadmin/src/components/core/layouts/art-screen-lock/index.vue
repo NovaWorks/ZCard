@@ -1,22 +1,6 @@
 <!-- 锁屏 -->
 <template>
   <div class="layout-lock-screen">
-    <!-- 开发者工具警告覆盖层 -->
-    <div
-      v-if="showDevToolsWarning"
-      class="fixed top-0 left-0 z-[999999] flex-cc w-full h-full text-white bg-gradient-to-br from-[#1e1e1e] to-black animate-fade-in"
-    >
-      <div class="p-5 text-center select-none">
-        <div class="mb-7.5 text-5xl"><ArtSvgIcon icon="ri:lock-line" /></div>
-        <h1 class="m-0 mb-5 text-3xl font-semibold text-danger">系统已锁定</h1>
-        <p class="max-w-125 m-0 text-lg leading-relaxed text-white">
-          检测到开发者工具已打开<br />
-          为了系统安全，请关闭开发者工具后继续使用
-        </p>
-        <div class="mt-7.5 text-sm text-gray-400">Security Lock Activated</div>
-      </div>
-    </div>
-
     <!-- 锁屏弹窗 -->
     <div v-if="!isLock">
       <ElDialog v-model="visible" :width="370" :show-close="false" @open="handleDialogOpen">
@@ -110,15 +94,11 @@
   import { Lock, Unlock } from '@element-plus/icons-vue'
   import type { FormInstance, FormRules } from 'element-plus'
   import { useI18n } from 'vue-i18n'
-  import CryptoJS from 'crypto-js'
   import { useUserStore } from '@/store/modules/user'
   import { mittBus } from '@/utils/sys'
 
   // 国际化
   const { t } = useI18n()
-
-  // 环境变量
-  const ENCRYPT_KEY = import.meta.env.VITE_LOCK_ENCRYPT_KEY
 
   // Store
   const userStore = useUserStore()
@@ -128,7 +108,6 @@
   const visible = ref<boolean>(false)
   const lockInputRef = ref<any>(null)
   const unlockInputRef = ref<any>(null)
-  const showDevToolsWarning = ref<boolean>(false)
 
   // 表单相关
   const formRef = ref<FormInstance>()
@@ -153,185 +132,14 @@
     ]
   }))
 
-  // 检测是否为移动设备
-  const isMobile = () => {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-      navigator.userAgent
-    )
-  }
-
-  // 添加禁用控制台的函数
-  const disableDevTools = () => {
-    // 禁用右键菜单
-    const handleContextMenu = (e: Event) => {
-      if (isLock.value) {
-        e.preventDefault()
-        e.stopPropagation()
-        return false
-      }
-    }
-    document.addEventListener('contextmenu', handleContextMenu, true)
-
-    // 禁用开发者工具相关快捷键
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isLock.value) return
-
-      // 禁用 F12
-      if (e.key === 'F12') {
-        e.preventDefault()
-        e.stopPropagation()
-        return false
-      }
-
-      // 禁用 Ctrl+Shift+I/J/C/K (开发者工具)
-      if (e.ctrlKey && e.shiftKey) {
-        const key = e.key.toLowerCase()
-        if (['i', 'j', 'c', 'k'].includes(key)) {
-          e.preventDefault()
-          e.stopPropagation()
-          return false
-        }
-      }
-
-      // 禁用 Ctrl+U (查看源代码)
-      if (e.ctrlKey && e.key.toLowerCase() === 'u') {
-        e.preventDefault()
-        e.stopPropagation()
-        return false
-      }
-
-      // 禁用 Ctrl+S (保存页面)
-      if (e.ctrlKey && e.key.toLowerCase() === 's') {
-        e.preventDefault()
-        e.stopPropagation()
-        return false
-      }
-
-      // 禁用 Ctrl+A (全选)
-      if (e.ctrlKey && e.key.toLowerCase() === 'a') {
-        e.preventDefault()
-        e.stopPropagation()
-        return false
-      }
-
-      // 禁用 Ctrl+P (打印)
-      if (e.ctrlKey && e.key.toLowerCase() === 'p') {
-        e.preventDefault()
-        e.stopPropagation()
-        return false
-      }
-
-      // 禁用 Ctrl+F (查找)
-      if (e.ctrlKey && e.key.toLowerCase() === 'f') {
-        e.preventDefault()
-        e.stopPropagation()
-        return false
-      }
-
-      // 禁用 Alt+Tab (切换窗口)
-      if (e.altKey && e.key === 'Tab') {
-        e.preventDefault()
-        e.stopPropagation()
-        return false
-      }
-
-      // 禁用 Ctrl+Tab (切换标签页)
-      if (e.ctrlKey && e.key === 'Tab') {
-        e.preventDefault()
-        e.stopPropagation()
-        return false
-      }
-
-      // 禁用 Ctrl+W (关闭标签页)
-      if (e.ctrlKey && e.key.toLowerCase() === 'w') {
-        e.preventDefault()
-        e.stopPropagation()
-        return false
-      }
-
-      // 禁用 Ctrl+R 和 F5 (刷新页面)
-      if ((e.ctrlKey && e.key.toLowerCase() === 'r') || e.key === 'F5') {
-        e.preventDefault()
-        e.stopPropagation()
-        return false
-      }
-
-      // 禁用 Ctrl+Shift+R (强制刷新)
-      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'r') {
-        e.preventDefault()
-        e.stopPropagation()
-        return false
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown, true)
-
-    // 禁用选择文本
-    const handleSelectStart = (e: Event) => {
-      if (isLock.value) {
-        e.preventDefault()
-        return false
-      }
-    }
-    document.addEventListener('selectstart', handleSelectStart, true)
-
-    // 禁用拖拽
-    const handleDragStart = (e: Event) => {
-      if (isLock.value) {
-        e.preventDefault()
-        return false
-      }
-    }
-    document.addEventListener('dragstart', handleDragStart, true)
-
-    // 监听开发者工具打开状态（仅在桌面端启用）
-    let devtools = { open: false }
-    const threshold = 160
-    let devToolsInterval: ReturnType<typeof setInterval> | null = null
-
-    const checkDevTools = () => {
-      if (!isLock.value || isMobile()) return
-
-      const isDevToolsOpen =
-        window.outerHeight - window.innerHeight > threshold ||
-        window.outerWidth - window.innerWidth > threshold
-
-      if (isDevToolsOpen && !devtools.open) {
-        devtools.open = true
-        showDevToolsWarning.value = true
-      } else if (!isDevToolsOpen && devtools.open) {
-        devtools.open = false
-        showDevToolsWarning.value = false
-      }
-    }
-
-    // 仅在桌面端启用开发者工具检测
-    if (!isMobile()) {
-      devToolsInterval = setInterval(checkDevTools, 500)
-    }
-
-    // 返回清理函数
-    return () => {
-      document.removeEventListener('contextmenu', handleContextMenu, true)
-      document.removeEventListener('keydown', handleKeyDown, true)
-      document.removeEventListener('selectstart', handleSelectStart, true)
-      document.removeEventListener('dragstart', handleDragStart, true)
-      if (devToolsInterval) {
-        clearInterval(devToolsInterval)
-      }
-    }
-  }
-
-  // 工具函数
+  /**
+   * 校验锁屏密码。
+   * 注意:锁屏仅是防"旁边的人顺手操作"的 UX 层,客户端无法提供真实机密性,
+   * 因此密码只保存在内存(不落 localStorage、不做伪加密),真正的安全边界
+   * 是后端会话(操作接口全部经 HttpOnly Cookie/Bearer 鉴权)。
+   */
   const verifyPassword = (inputPassword: string, storedPassword: string): boolean => {
-    try {
-      const decryptedPassword = CryptoJS.AES.decrypt(storedPassword, ENCRYPT_KEY).toString(
-        CryptoJS.enc.Utf8
-      )
-      return inputPassword === decryptedPassword
-    } catch (error) {
-      console.error('密码解密失败:', error)
-      return false
-    }
+    return inputPassword === storedPassword
   }
 
   // 事件处理函数
@@ -353,9 +161,8 @@
 
     await formRef.value.validate((valid, fields) => {
       if (valid) {
-        const encryptedPassword = CryptoJS.AES.encrypt(formData.password, ENCRYPT_KEY).toString()
         userStore.setLockStatus(true)
-        userStore.setLockPassword(encryptedPassword)
+        userStore.setLockPassword(formData.password)
         visible.value = false
         formData.password = ''
       } else {
@@ -377,7 +184,6 @@
             userStore.setLockPassword('')
             unlockForm.password = ''
             visible.value = false
-            showDevToolsWarning.value = false
           } catch (error) {
             console.error('更新store失败:', error)
           }
@@ -416,12 +222,8 @@
       }, 100)
     } else {
       document.body.style.overflow = 'auto'
-      showDevToolsWarning.value = false
     }
   })
-
-  // 存储清理函数
-  let cleanupDevTools: (() => void) | null = null
 
   // 生命周期钩子
   onMounted(() => {
@@ -434,19 +236,11 @@
         unlockInputRef.value?.input?.focus()
       }, 100)
     }
-
-    // 初始化禁用开发者工具功能
-    cleanupDevTools = disableDevTools()
   })
 
   onUnmounted(() => {
     document.removeEventListener('keydown', handleKeydown)
     document.body.style.overflow = 'auto'
-    // 清理禁用开发者工具的事件监听器
-    if (cleanupDevTools) {
-      cleanupDevTools()
-      cleanupDevTools = null
-    }
   })
 </script>
 
@@ -475,22 +269,6 @@
     }
   }
 
-  @keyframes fade-in {
-    from {
-      opacity: 0;
-      transform: scale(0.9);
-    }
-
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-
-  .animate-fade-in {
-    animation: fade-in 0.3s ease-in-out;
-  }
-
   @keyframes shake {
     0%,
     100% {
@@ -508,7 +286,8 @@
     20%,
     40%,
     60%,
-    80% {
+    80%,
+    90% {
       transform: translateX(10px);
     }
   }

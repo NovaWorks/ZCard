@@ -7,6 +7,7 @@ use App\Models\Card;
 use App\Models\CardImport;
 use App\Support\CardImportService;
 use App\Support\CardService;
+use App\Support\CsvSafe;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -44,8 +45,9 @@ class CardController extends Controller
         $cards->getCollection()->transform(function ($card) {
             $plain = $card->plainContent();
             $card->content_preview = mb_strlen($plain) > 30
-                ? mb_substr($plain, 0, 30) . '...'
+                ? mb_substr($plain, 0, 30).'...'
                 : $plain;
+
             return $card;
         });
 
@@ -66,48 +68,54 @@ class CardController extends Controller
     {
         $data = $request->validate([
             'product_id' => 'required|integer|exists:products,id',
-            'content'    => 'required|string',
-            'format'     => 'nullable|string|in:single,multi',
-            'delimiter'  => 'nullable|string',
-            'note'       => 'nullable|string|max:255',
-            'card_type'  => 'nullable|string|max:20',
-            'dedup'      => 'nullable|boolean',
+            'content' => 'required|string',
+            'format' => 'nullable|string|in:single,multi',
+            'delimiter' => 'nullable|string',
+            'note' => 'nullable|string|max:255',
+            'card_type' => 'nullable|string|max:20',
+            'dedup' => 'nullable|boolean',
         ]);
+
+        // 安全(L-1):仅在请求显式携带 dedup 时才覆盖商品级去重设置。
+        $importOptions = [
+            'format' => $data['format'] ?? 'single',
+            'delimiter' => $data['delimiter'] ?? null,
+            'source' => 'admin_api',
+            'note' => $data['note'] ?? null,
+            'card_type' => $data['card_type'] ?? null,
+        ];
+        if ($request->has('dedup')) {
+            $importOptions['dedup'] = $request->boolean('dedup');
+        }
 
         $import = app(CardImportService::class)->import(
             $data['product_id'],
             $request->user()->id,
             $data['content'],
-            [
-                'format'    => $data['format'] ?? 'single',
-                'delimiter' => $data['delimiter'] ?? null,
-                'source'    => 'admin_api',
-                'note'      => $data['note'] ?? null,
-                'card_type' => $data['card_type'] ?? null,
-                'dedup'     => $request->boolean('dedup'),
-            ]
+            $importOptions
         );
 
         $fresh = $import->fresh();
 
         return response()->json([
-            'import_id'     => $import->id,
-            'status'        => $fresh->status,
+            'import_id' => $import->id,
+            'status' => $fresh->status,
             'success_count' => $fresh->success_count,
             'skipped_count' => $fresh->skipped_count,
-            'failed_count'  => $fresh->failed_count,
-            'total'         => $import->total,
+            'failed_count' => $fresh->failed_count,
+            'total' => $import->total,
         ], 201);
     }
 
     public function disable(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'ids'    => 'required|array|min:1',
-            'ids.*'  => 'integer|exists:cards,id',
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer|exists:cards,id',
         ]);
 
         $count = app(CardService::class)->disable($data['ids']);
+
         return response()->json(['disabled' => $count]);
     }
 
@@ -115,6 +123,7 @@ class CardController extends Controller
     {
         $data = $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer|exists:cards,id']);
         $count = app(CardService::class)->enable($data['ids']);
+
         return response()->json(['enabled' => $count]);
     }
 
@@ -122,6 +131,7 @@ class CardController extends Controller
     {
         $data = $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer|exists:cards,id']);
         $count = app(CardService::class)->lock($data['ids']);
+
         return response()->json(['locked' => $count]);
     }
 
@@ -129,6 +139,7 @@ class CardController extends Controller
     {
         $data = $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer|exists:cards,id']);
         $count = app(CardService::class)->unlock($data['ids']);
+
         return response()->json(['unlocked' => $count]);
     }
 
@@ -137,6 +148,7 @@ class CardController extends Controller
     {
         $data = $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer|exists:cards,id']);
         $count = app(CardService::class)->markAsSold($data['ids']);
+
         return response()->json(['sold' => $count]);
     }
 
@@ -144,8 +156,8 @@ class CardController extends Controller
     public function destroy(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'ids'    => 'required|array|min:1',
-            'ids.*'  => 'integer|exists:cards,id',
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer|exists:cards,id',
         ]);
 
         $count = app(CardService::class)->delete($data['ids']);
@@ -163,9 +175,9 @@ class CardController extends Controller
         $limit = (int) ($request->integer('limit') ?: 50000);
 
         $headers = [
-            'Content-Type'        => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="cards-export-' . date('Ymd-His') . '.csv"',
-            'X-Accel-Buffering'   => 'no',
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="cards-export-'.date('Ymd-His').'.csv"',
+            'X-Accel-Buffering' => 'no',
         ];
 
         return response()->stream(function () use ($filters, $limit) {
@@ -177,7 +189,7 @@ class CardController extends Controller
 
             [$rows] = app(CardService::class)->exportFiltered($filters, $limit);
             foreach ($rows as $row) {
-                fputcsv($out, [
+                fputcsv($out, CsvSafe::row([
                     $row['id'],
                     $row['product_name'],
                     $row['content'],
@@ -186,7 +198,7 @@ class CardController extends Controller
                     $row['note'],
                     $row['created_at'],
                     $row['used_at'],
-                ]);
+                ]));
             }
             fclose($out);
         }, 200, $headers);
@@ -209,13 +221,13 @@ class CardController extends Controller
     {
         return [
             'product_id' => $request->input('product_id'),
-            'status'     => $request->input('status'),
-            'card_type'  => $request->input('card_type'),
-            'note'       => $request->input('note'),
-            'owner_id'   => $request->input('owner_id'),
-            'keyword'    => $request->input('keyword'),
-            'date_from'  => $request->input('date_from'),
-            'date_to'    => $request->input('date_to'),
+            'status' => $request->input('status'),
+            'card_type' => $request->input('card_type'),
+            'note' => $request->input('note'),
+            'owner_id' => $request->input('owner_id'),
+            'keyword' => $request->input('keyword'),
+            'date_from' => $request->input('date_from'),
+            'date_to' => $request->input('date_to'),
         ];
     }
 
@@ -225,6 +237,7 @@ class CardController extends Controller
     public function reveal(int $id): JsonResponse
     {
         $card = Card::with(['product:id,name', 'order:id,order_no'])->findOrFail($id);
+
         return response()->json([
             'id' => $card->id,
             'content' => $card->plainContent(),
@@ -252,6 +265,12 @@ class CardController extends Controller
             'draft_cost' => 'nullable|numeric|min:0',
             'status' => 'nullable|string|in:unused,locked,used,disabled',
         ]);
+        // 安全：已售出(used)的卡不允许回退为未用/锁定/禁用，防止一卡多卖。
+        if (array_key_exists('status', $data)
+            && $data['status'] !== $card->status
+            && $card->status === Card::STATUS_USED) {
+            return response()->json(['message' => '已出售的卡密不允许修改状态'], 422);
+        }
         // draft_premium/cost 前端传元,存库转分(*100)
         if (isset($data['draft_premium'])) {
             $data['draft_premium'] = (int) round($data['draft_premium'] * 100);
@@ -260,6 +279,7 @@ class CardController extends Controller
             $data['draft_cost'] = (int) round($data['draft_cost'] * 100);
         }
         $card->update($data);
+
         return response()->json($card->fresh());
     }
 }

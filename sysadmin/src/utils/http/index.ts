@@ -44,7 +44,9 @@ const { VITE_API_URL, VITE_WITH_CREDENTIALS } = import.meta.env
 const axiosInstance = axios.create({
   timeout: REQUEST_TIMEOUT,
   baseURL: VITE_API_URL,
-  withCredentials: VITE_WITH_CREDENTIALS === 'true',
+  // 安全审计 M3:默认携带 Cookie(Sanctum SPA 会话认证);
+  // 仅在显式配置 VITE_WITH_CREDENTIALS=false 时关闭(向后兼容旧部署)。
+  withCredentials: VITE_WITH_CREDENTIALS !== 'false',
   validateStatus: (status) => status >= 200 && status < 300,
   transformResponse: [
     (data, headers) => {

@@ -19,23 +19,36 @@ class WechatPayDriver implements PaymentDriver
             ? Pay::MODE_SANDBOX
             : Pay::MODE_NORMAL;
 
+        $wechat = [
+            'mch_id' => $config['mch_id'] ?? '',
+            'mch_secret_key' => $config['mch_secret_key'] ?? '',
+            'mch_secret_cert' => $config['mch_secret_cert'] ?? '',
+            'mch_public_cert_path' => $config['mch_public_cert_path'] ?? '',
+            'app_id' => $config['app_id'] ?? '',
+            'mode' => $mode,
+        ];
+
+        // 回调验签需要「平台证书序列号 → 证书路径」映射;未配置时 SDK 会尝试
+        // 通过 API 自动下载平台证书(需要 apiv3 密钥与商户证书)。
+        if (! empty($config['wechat_platform_serial']) && ! empty($config['mch_public_cert_path'])) {
+            $wechat['wechat_public_cert_path'] = [
+                (string) $config['wechat_platform_serial'] => (string) $config['mch_public_cert_path'],
+            ];
+        }
+
         return [
             'wechat' => [
-                'default' => [
-                    'mch_id' => $config['mch_id'] ?? '',
-                    'mch_secret_key' => $config['mch_secret_key'] ?? '',
-                    'mch_secret_cert' => $config['mch_secret_cert'] ?? '',
-                    'mch_public_cert_path' => $config['mch_public_cert_path'] ?? '',
-                    'app_id' => $config['app_id'] ?? '',
-                    'mode' => $mode,
-                ],
+                'default' => $wechat,
             ],
         ];
     }
 
     public function pay(Payable $order, array $config): PaymentResult
     {
-        Pay::config($this->buildConfig($config));
+        // _force:yansongda/pay 的 Artful 容器由 Laravel PayServiceProvider 在启动时
+        // 以空配置初始化,此后 Pay::config() 会静默失效;必须强制重建容器,
+        // 否则通道配置(商户号/密钥)永远不会传给 SDK。
+        Pay::config($this->buildConfig($config) + ['_force' => true]);
 
         $result = Pay::wechat()->scan([
             'out_trade_no' => $order->getPayableKey(),
@@ -54,28 +67,41 @@ class WechatPayDriver implements PaymentDriver
 
     public function verifyCallback(Request $request, array $config): ?array
     {
-        Pay::config($this->buildConfig($config));
-
+        // _force:同上,确保通道配置真正注入 SDK(否则验签/解密用的是空配置)。
+        Pay::config($this->buildConfig($config) + ['_force' => true]);
         try {
-            $result = Pay::wechat()->callback($request->all());
+            // 安全关键:必须携带【原始 body + 全部请求头】给 SDK 验签
+            // (Wechatpay-Signature / -Timestamp / -Nonce / -Serial)。
+            // 直接传参数数组会丢掉 headers → 验签恒失败(支付永不确认)。
+            $result = Pay::wechat()->callback([
+                'body' => $request->getContent(),
+                'headers' => $request->headers->all(),
+            ]);
         } catch (\Throwable $e) {
             return null;
         }
 
         $data = method_exists($result, 'all') ? $result->all() : (array) $result;
 
-        $tradeState = $data['trade_state'] ?? ($data['event_type'] ?? null);
-        $success = in_array($tradeState, ['SUCCESS', 'TRANSACTION.SUCCESS'], true);
+        // V3 通知结构:外层 {event_type, resource:{...}};SDK 解密后把明文放回
+        // resource.ciphertext(保留 algorithm/nonce/associated_data 等元数据)。
+        $resource = is_array($data['resource'] ?? null) ? $data['resource'] : $data;
+        if (is_array($resource) && is_array($resource['ciphertext'] ?? null)) {
+            $resource = $resource['ciphertext'];
+        }
+
+        $tradeState = $data['event_type'] ?? ($resource['trade_state'] ?? null);
+        $success = in_array($tradeState, ['TRANSACTION.SUCCESS', 'SUCCESS'], true);
 
         if (! $success) {
             return null;
         }
 
-        $amount = $data['amount']['total'] ?? ($data['amount']['payer_total'] ?? null); // 微信已是分
+        $amount = $resource['amount']['total'] ?? ($resource['amount']['payer_total'] ?? null); // 微信已是分
 
         return [
-            'channel_order_no' => $data['transaction_id'] ?? null,
-            'out_trade_no' => $data['out_trade_no'] ?? null,
+            'channel_order_no' => $resource['transaction_id'] ?? null,
+            'out_trade_no' => $resource['out_trade_no'] ?? null,
             'amount' => $amount !== null ? (int) $amount : null,
             'raw' => $data,
         ];
@@ -108,6 +134,12 @@ class WechatPayDriver implements PaymentDriver
                 'label' => '商户证书路径(apiclient_cert.pem)',
                 'type' => 'text',
                 'required' => true,
+            ],
+            'wechat_platform_serial' => [
+                'label' => '微信支付平台证书序列号(可选)',
+                'type' => 'text',
+                'required' => false,
+                'help' => '用于回调验签的平台证书序列号(与 apiclient_cert.pem 配套)。留空时由 SDK 自动下载平台证书。',
             ],
             'mode' => [
                 'label' => '运行模式',

@@ -1,28 +1,29 @@
 import { defineStore } from 'pinia'
 import { getMe, logout as apiLogout, type AuthUser } from '@/api/auth'
-import request from '@/api/request'
+import { sessionToken } from '@/utils/sessionToken'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    token: localStorage.getItem('zcard_token') || '',
+    // token 仅存内存(见 utils/sessionToken.ts),不落 localStorage。
+    token: sessionToken.get(),
     user: null as AuthUser | null,
   }),
   getters: {
-    isLoggedIn: (state) => !!state.token,
+    // 内存 token 或已加载的用户(Cookie 会话)任一存在即视为已登录
+    isLoggedIn: (state) => !!state.token || !!state.user,
   },
   actions: {
     setAuth(token: string, user: AuthUser) {
+      sessionToken.set(token)
       this.token = token
       this.user = user
-      localStorage.setItem('zcard_token', token)
     },
     async fetchUser() {
-      if (!this.token) return
-      try { this.user = await getMe() }
-      catch (e: any) {
-        // 仅当 token 被后端明确拒绝(401)时才清除登录态;
-        // 网络错误/服务器 5xx/超时等瞬时故障保留 token,避免已登录用户被误登出后
-        // 点击充值/验证码等入口被路由守卫拦回登录页(老客户反馈"我已登录却提示先登录")。
+      // 内存 token 或 HttpOnly Cookie 会话都可能有效:始终探测一次;
+      // 401 时若内存无 token(匿名/Cookie 失效)拦截器不会跳登录,这里静默清理。
+      try {
+        this.user = await getMe()
+      } catch (e: any) {
         if (e?.response?.status === 401) this.clearAuth()
       }
     },
@@ -31,9 +32,9 @@ export const useAuthStore = defineStore('auth', {
       this.clearAuth()
     },
     clearAuth() {
+      sessionToken.clear()
       this.token = ''
       this.user = null
-      localStorage.removeItem('zcard_token')
     },
   },
 })

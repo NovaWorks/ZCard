@@ -13,6 +13,7 @@ use App\Supply\HmacSigner;
 use App\Support\StorefrontConfig;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class ZCardDriver implements SupplyDriver
 {
@@ -189,6 +190,11 @@ class ZCardDriver implements SupplyDriver
         }
         $ss = HmacSigner::buildSignString('POST', $request->getPathInfo(), $ts, $nonce, md5($request->getContent() ?: ''));
         if (! HmacSigner::verify($creds['api_secret'], $ss, $sig)) {
+            return null;
+        }
+        // 防重放(安全审计 M-6):验签通过后再写 nonce(只允许使用一次,按货源隔离),
+        // 避免未验签请求污染 nonce 缓存。
+        if (! Cache::add('upstream_cb:'.$this->source->id.':'.$nonce, 1, $skew)) {
             return null;
         }
         $data = $request->json()->all();

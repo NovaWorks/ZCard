@@ -21,6 +21,7 @@ class Bill extends Model
     }
 
     public const TYPE_EXPENSE = 0; // 支出
+
     public const TYPE_INCOME = 1;  // 收入
 
     public function user(): BelongsTo

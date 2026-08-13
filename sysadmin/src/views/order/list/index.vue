@@ -324,6 +324,7 @@
     type OrderStatus,
   } from '@/api/orders'
   import { getChannels, type PaymentChannel } from '@/api/payment'
+  import http from '@/utils/http'
 
   defineOptions({ name: 'OrderList' })
 
@@ -570,12 +571,12 @@
       Object.entries(buildParams()).forEach(([k, v]) => {
         if (v !== undefined && v !== null && v !== '') params.append(k, String(v))
       })
-      const token = localStorage.getItem('token') || ''
-      const resp = await fetch(`/api/admin/orders/export?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      // 统一走 http 封装:自动携带 userStore.accessToken(内存)与 Cookie 会话,带 401 处理;
+      // 不再从 localStorage 读取错误键值。
+      const blob = await http.get<Blob>({
+        url: `/admin/orders/export?${params.toString()}`,
+        responseType: 'blob'
       })
-      if (!resp.ok) throw new Error('export failed')
-      const blob = await resp.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url

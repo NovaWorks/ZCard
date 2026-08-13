@@ -31,6 +31,26 @@ class SupplyCallbackService
             return;
         }
 
+        // 安全审计 M5:卡密明文只允许经 HTTPS 回传;钉死已校验的公网 IP(CURLOPT_RESOLVE)
+        // 并禁止重定向,消除 DNS rebinding / 内网重定向的 SSRF 窗口。
+        if (strtolower((string) parse_url($supplyOrder->callback_url, PHP_URL_SCHEME)) !== 'https') {
+            $supplyOrder->update(['callback_status' => SupplyOrder::CALLBACK_FAILED]);
+            Log::warning('供货订单异步回调被拒绝:callback_url 必须为 HTTPS', [
+                'supply_order_id' => $supplyOrder->id,
+            ]);
+
+            return;
+        }
+        $pin = $this->guard->resolvePin($supplyOrder->callback_url);
+        if ($pin === null) {
+            $supplyOrder->update(['callback_status' => SupplyOrder::CALLBACK_FAILED]);
+            Log::warning('供货订单异步回调被拒绝:域名无法解析到公网 IP', [
+                'supply_order_id' => $supplyOrder->id,
+            ]);
+
+            return;
+        }
+
         $payload = [
             'supply_order_id' => $supplyOrder->id,
             'downstream_order_no' => $supplyOrder->downstream_order_no,
@@ -55,7 +75,11 @@ class SupplyCallbackService
                 'X-Supply-Timestamp' => $timestamp,
                 'X-Supply-Nonce' => $nonce,
                 'X-Supply-Signature' => HmacSigner::sign($secret, $signString),
-            ])->timeout(15)->withBody($body, 'application/json')->post($supplyOrder->callback_url);
+            ])->timeout(15)
+                ->withoutRedirecting()
+                ->withOptions(['curl' => [CURLOPT_RESOLVE => [$pin['curl_entry']]]])
+                ->withBody($body, 'application/json')
+                ->post($supplyOrder->callback_url);
 
             $supplyOrder->update([
                 'callback_status' => $response->successful()

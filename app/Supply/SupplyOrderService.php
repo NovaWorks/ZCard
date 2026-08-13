@@ -54,6 +54,11 @@ class SupplyOrderService
                 ->first();
         }
         $unitPrice = $this->pricing->resolvePrice($account, $product, $sku);
+        // 安全(H-4):供货价必须 > 0。未配置专属价且 factory_price=0 时,此前会以 0 元
+        // 发货清空库存;现在直接拒绝,要求管理员先配置供货价。
+        if ($unitPrice < 1) {
+            throw SupplyApiException::priceNotConfigured();
+        }
         $amount = $unitPrice * $qty;
         $fulfillmentType = $product->resolvedFulfillmentType();
 

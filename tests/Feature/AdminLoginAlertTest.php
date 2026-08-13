@@ -18,6 +18,13 @@ class AdminLoginAlertTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // 本套件验证告警逻辑;登录/注册验证码默认已开启(安全审计 L6),此处显式关闭。
+        StorefrontConfig::setMany(['captcha_login' => false, 'captcha_register' => false]);
+    }
+
     private function makeAdmin(): User
     {
         foreach (['super_admin', 'merchant', 'user'] as $r) {

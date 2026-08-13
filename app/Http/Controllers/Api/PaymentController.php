@@ -110,7 +110,10 @@ class PaymentController extends Controller
 
             return response()->json($result);
         } catch (\Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 500);
+            // 不向客户端回显内部异常细节(可能泄露驱动类名/路径),仅记日志。
+            Log::error('创建支付失败', ['biz_no' => $bizNo, 'exception' => $e]);
+
+            return response()->json(['message' => __('messages.payment.create_failed')], 500);
         }
     }
 
@@ -148,7 +151,9 @@ class PaymentController extends Controller
 
             return response()->json($result);
         } catch (\Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 400);
+            Log::error('批量创建支付失败', ['exception' => $e]);
+
+            return response()->json(['message' => __('messages.payment.create_failed')], 400);
         }
     }
 

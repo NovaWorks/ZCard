@@ -21,8 +21,11 @@ class SupplierLedgerEntry extends Model
     }
 
     public const TYPE_RECHARGE = 'recharge';
+
     public const TYPE_ORDER = 'order';
+
     public const TYPE_REFUND = 'refund';
+
     public const TYPE_ADJUST = 'adjust';
 
     public function supplierAccount(): BelongsTo

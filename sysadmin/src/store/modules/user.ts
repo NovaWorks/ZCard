@@ -158,6 +158,21 @@ export const useUserStore = defineStore(
     }
 
     /**
+     * 尝试通过 HttpOnly Cookie 会话恢复登录态(页面刷新后内存 token 丢失时)。
+     * GET /auth/me 成功即恢复;失败(无会话)返回 null。
+     */
+    const trySessionRestore = async () => {
+      try {
+        const data = await fetchGetUserInfo()
+        info.value = data
+        isLogin.value = true
+        return data
+      } catch {
+        return null
+      }
+    }
+
+    /**
      * 退出登录
      * 调用 ZCard 注销接口，清空所有用户相关状态并跳转到登录页
      * 如果是同一账号重新登录，保留工作台标签页
@@ -258,14 +273,18 @@ export const useUserStore = defineStore(
       setToken,
       login,
       fetchUserInfo,
+      trySessionRestore,
       logOut,
       checkAndClearWorktabs
     }
   },
   {
+    // 安全:token/用户信息/锁屏密码只存内存,不落 localStorage(XSS 窃取面)。
+    // 仅持久化语言偏好;登录态靠 HttpOnly Cookie 会话恢复(见 trySessionRestore)。
     persist: {
       key: 'user',
-      storage: localStorage
+      storage: localStorage,
+      pick: ['language']
     }
   }
 )

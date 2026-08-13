@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { mockPay } from '@/api/orders'
 import { getChannels, createPayment, balancePay, type PaymentChannel } from '@/api/payments'
 import { usePreferencesStore } from '@/stores/preferences'
+import { useAuthStore } from '@/stores/auth'
 import { formatMoney } from '@/utils/money'
 import AppIcon from '@/components/AppIcon.vue'
 import PayBrandIcon from '@/components/PayBrandIcon.vue'
@@ -148,7 +149,7 @@ function startPolling() {
       // 登录用户优先走 /orders/mine(不受「查询密码」过滤,否则设了密码的订单永远查不到)
       const { queryOrders, getMyOrders } = await import('@/api/orders')
       let found: { order_no: string; status: string } | null = null
-      if (localStorage.getItem('zcard_token')) {
+      if (useAuthStore().isLoggedIn) {
         const mine = await getMyOrders()
         found = Array.isArray(mine) ? mine.find(o => o.order_no === orderNo) ?? null : null
       }

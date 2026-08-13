@@ -24,6 +24,13 @@ class DistributionEndToEndTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // 本套件验证分销链路;注册验证码默认已开启(安全审计 L6),此处显式关闭。
+        StorefrontConfig::setMany(['captcha_register' => false, 'captcha_login' => false]);
+    }
+
     private function setupContext(): array
     {
         Currency::firstOrCreate(['code' => 'CNY'], ['name' => '人民币', 'symbol' => '¥', 'symbol_position' => 'before', 'decimal_places' => 2, 'exchange_rate' => '1', 'is_base' => true, 'is_enabled' => true, 'sort' => 0]);

@@ -12,6 +12,9 @@ class SubsiteDomain extends Model
         'verification_status', 'status', 'is_primary', 'verified_at',
     ];
 
+    /** 安全(M-15):验证 token 是域名归属凭证,不得经序列化外泄。 */
+    protected $hidden = ['verification_token'];
+
     protected function casts(): array
     {
         return ['is_primary' => 'boolean', 'verified_at' => 'datetime'];

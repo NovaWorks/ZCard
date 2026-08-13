@@ -33,7 +33,9 @@ class SubsiteWithdrawalService
                 ->lockForUpdate()->get();
 
             foreach ($entries as $entry) {
-                if ($remaining <= 0) break;
+                if ($remaining <= 0) {
+                    break;
+                }
                 if ($entry->amount <= $remaining) {
                     $entry->update(['status' => 'locked']);
                     $lockedIds[] = $entry->id;
@@ -43,7 +45,7 @@ class SubsiteWithdrawalService
                     SubsiteLedgerEntry::create([
                         'merchant_id' => $merchantId, 'order_id' => $entry->order_id,
                         'type' => $entry->type, 'amount' => $leftover, 'status' => 'available',
-                        'available_at' => $entry->available_at, 'idempotency_key' => 'split:' . $entry->id . ':' . uniqid(),
+                        'available_at' => $entry->available_at, 'idempotency_key' => 'split:'.$entry->id.':'.uniqid(),
                     ]);
                     $entry->update(['amount' => $remaining, 'status' => 'locked']);
                     $lockedIds[] = $entry->id;
@@ -57,6 +59,7 @@ class SubsiteWithdrawalService
                 'status' => Withdrawal::STATUS_PENDING,
             ]);
             SubsiteLedgerEntry::whereIn('id', $lockedIds)->update(['withdraw_request_id' => $withdrawal->id]);
+
             return $withdrawal;
         });
     }
@@ -64,7 +67,10 @@ class SubsiteWithdrawalService
     public static function approve(int $withdrawalId): void
     {
         DB::transaction(function () use ($withdrawalId) {
-            $w = Withdrawal::findOrFail($withdrawalId);
+            $w = Withdrawal::where('id', $withdrawalId)->lockForUpdate()->firstOrFail();
+            if ($w->status !== Withdrawal::STATUS_PENDING) {
+                throw new \RuntimeException('该记录无法操作');
+            }
             $w->update(['status' => Withdrawal::STATUS_APPROVED]);
             SubsiteLedgerEntry::where('withdraw_request_id', $withdrawalId)->update(['status' => 'withdrawn']);
         });
@@ -73,7 +79,10 @@ class SubsiteWithdrawalService
     public static function reject(int $withdrawalId, string $reason): void
     {
         DB::transaction(function () use ($withdrawalId, $reason) {
-            $w = Withdrawal::findOrFail($withdrawalId);
+            $w = Withdrawal::where('id', $withdrawalId)->lockForUpdate()->firstOrFail();
+            if ($w->status !== Withdrawal::STATUS_PENDING) {
+                throw new \RuntimeException('该记录无法操作');
+            }
             $w->update(['status' => Withdrawal::STATUS_REJECTED, 'reject_reason' => $reason]);
             SubsiteLedgerEntry::where('withdraw_request_id', $withdrawalId)
                 ->update(['status' => 'available', 'withdraw_request_id' => null]);

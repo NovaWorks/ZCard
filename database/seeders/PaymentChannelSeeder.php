@@ -2,6 +2,15 @@
 
 namespace Database\Seeders;
 
+use App\Payment\Drivers\AlipayDriver;
+use App\Payment\Drivers\BEpusdtDriver;
+use App\Payment\Drivers\CodePayDriver;
+use App\Payment\Drivers\EpayDriver;
+use App\Payment\Drivers\EpuSdtDriver;
+use App\Payment\Drivers\PaypalDriver;
+use App\Payment\Drivers\StripeDriver;
+use App\Payment\Drivers\UsdtDriver;
+use App\Payment\Drivers\WechatPayDriver;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -20,12 +29,14 @@ class PaymentChannelSeeder extends Seeder
         if (! DB::table('merchants')->where('id', 1)->exists()) {
             $adminId = DB::table('users')->where('username', 'admin')->value('id');
             if (! $adminId) {
+                // 安全(C-1):占位管理员必须不可登录——随机密码 + status=0(禁用)。
+                // 账号激活与密码设置只由安装向导(Web/CLI)完成。
                 $adminId = DB::table('users')->insertGetId([
                     'username' => 'admin',
                     'name' => 'Super Admin',
                     'email' => 'admin@example.com',
-                    'password' => Hash::make('admin123456'),
-                    'status' => 1,
+                    'password' => Hash::make(bin2hex(random_bytes(32))),
+                    'status' => 0,
                     'password_changed_at' => null,
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -44,15 +55,15 @@ class PaymentChannelSeeder extends Seeder
         }
 
         $channels = [
-            ['code' => 'alipay',    'name' => '支付宝',       'driver' => \App\Payment\Drivers\AlipayDriver::class],
-            ['code' => 'wechatpay', 'name' => '微信支付',     'driver' => \App\Payment\Drivers\WechatPayDriver::class],
-            ['code' => 'epay',      'name' => '易支付',       'driver' => \App\Payment\Drivers\EpayDriver::class],
-            ['code' => 'usdt',      'name' => 'USDT',         'driver' => \App\Payment\Drivers\UsdtDriver::class],
-            ['code' => 'codepay',   'name' => '码支付',       'driver' => \App\Payment\Drivers\CodePayDriver::class],
-            ['code' => 'paypal',    'name' => 'PayPal',       'driver' => \App\Payment\Drivers\PaypalDriver::class],
-            ['code' => 'stripe',    'name' => 'Stripe',       'driver' => \App\Payment\Drivers\StripeDriver::class],
-            ['code' => 'epusdt',    'name' => 'EpuSdt(USDT)', 'driver' => \App\Payment\Drivers\EpuSdtDriver::class],
-            ['code' => 'bepusdt',   'name' => 'BEpusdt',       'driver' => \App\Payment\Drivers\BEpusdtDriver::class],
+            ['code' => 'alipay',    'name' => '支付宝',       'driver' => AlipayDriver::class],
+            ['code' => 'wechatpay', 'name' => '微信支付',     'driver' => WechatPayDriver::class],
+            ['code' => 'epay',      'name' => '易支付',       'driver' => EpayDriver::class],
+            ['code' => 'usdt',      'name' => 'USDT',         'driver' => UsdtDriver::class],
+            ['code' => 'codepay',   'name' => '码支付',       'driver' => CodePayDriver::class],
+            ['code' => 'paypal',    'name' => 'PayPal',       'driver' => PaypalDriver::class],
+            ['code' => 'stripe',    'name' => 'Stripe',       'driver' => StripeDriver::class],
+            ['code' => 'epusdt',    'name' => 'EpuSdt(USDT)', 'driver' => EpuSdtDriver::class],
+            ['code' => 'bepusdt',   'name' => 'BEpusdt',       'driver' => BEpusdtDriver::class],
         ];
 
         foreach ($channels as $index => $channel) {

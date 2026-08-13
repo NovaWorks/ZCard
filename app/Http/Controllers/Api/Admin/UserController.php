@@ -117,7 +117,8 @@ class UserController extends Controller
             'points' => 'nullable|integer|min:0',
             'pid' => 'nullable|integer|min:0',
             'group_id' => 'nullable|integer|min:0',
-            'balance' => 'nullable|integer',
+            // 安全：余额不允许在此直写（会绕过 BillService、不产生流水）。
+            // 调账请使用 POST /api/admin/bills/adjust（走 BillService + 流水 + 禁自调）。
             'roles' => 'nullable|array',
             'roles.*' => 'string|exists:roles,name',
         ]);
@@ -134,7 +135,6 @@ class UserController extends Controller
             'points' => array_key_exists('points', $data) ? (int) $data['points'] : $user->points,
             'pid' => array_key_exists('pid', $data) ? (int) $data['pid'] : $user->pid,
             'group_id' => array_key_exists('group_id', $data) ? (int) $data['group_id'] : $user->group_id,
-            'balance' => array_key_exists('balance', $data) ? (int) $data['balance'] : $user->balance,
         ]);
 
         if (array_key_exists('roles', $data)) {

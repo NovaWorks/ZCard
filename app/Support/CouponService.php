@@ -37,9 +37,9 @@ class CouponService
     /**
      * 校验优惠券是否可用,返回折扣信息或抛异常。
      *
-     * @param string $code 券码
-     * @param int $productId 商品ID
-     * @param int $amountFen 订单金额(分)
+     * @param  string  $code  券码
+     * @param  int  $productId  商品ID
+     * @param  int  $amountFen  订单金额(分)
      * @return array{discount: int, coupon: Coupon}
      */
     public static function validate(string $code, int $productId, int $amountFen): array
@@ -92,21 +92,29 @@ class CouponService
         if ($coupon->type === Coupon::TYPE_FIXED) {
             return $coupon->value; // 固定金额(分)
         }
+
         // percent: value=10 表示减 10%
         return (int) floor($amountFen * $coupon->value / 100);
     }
 
     /**
      * 核销优惠券(使用后标记)。
+     * 条件原子更新:仅当券仍为 active 时才核销,并发双花时影响行数为 0 → 抛异常回滚订单。
      */
     public static function apply(Coupon $coupon, int $orderId, ?int $userId = null): void
     {
-        $coupon->update([
-            'status' => Coupon::STATUS_USED,
-            'used_at' => now(),
-            'used_by' => $userId,
-            'order_id' => $orderId,
-        ]);
+        $updated = Coupon::whereKey($coupon->id)
+            ->where('status', Coupon::STATUS_ACTIVE)
+            ->update([
+                'status' => Coupon::STATUS_USED,
+                'used_at' => now(),
+                'used_by' => $userId,
+                'order_id' => $orderId,
+            ]);
+
+        if ($updated === 0) {
+            throw new \RuntimeException(__('messages.coupon.invalid'));
+        }
     }
 
     /**
@@ -123,6 +131,7 @@ class CouponService
                 ? Coupon::STATUS_DISABLED
                 : Coupon::STATUS_ACTIVE,
         ]);
+
         return $coupon->fresh();
     }
 }

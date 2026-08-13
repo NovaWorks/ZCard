@@ -53,7 +53,9 @@ async function submit() {
       captcha: needCaptcha.value ? captcha.value : undefined,
     } as any)
     authStore.setAuth(res.token, res.user)
-    const redirect = typeof route.query.redirect === 'string' && route.query.redirect ? route.query.redirect : '/'
+    // 安全:redirect 只接受站内相对路径(以单个 / 开头、不含 // 与 :),防开放重定向。
+    const raw = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+    const redirect = /^\/(?!\/)[^:]*$/.test(raw) ? raw : '/'
     router.push(redirect)
   } catch (e: any) {
     err.value = e?.response?.data?.message || t('auth.login.loginFailed')

@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Supply\NonceStore;
 use App\Support\StorefrontConfig;
-use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class NonceStoreTest extends TestCase
 {
@@ -15,20 +15,31 @@ class NonceStoreTest extends TestCase
     {
         StorefrontConfig::setMany(['supply_nonce_store' => 'cache']);
         $store = app(NonceStore::class);
-        $nonce = 'test_nonce_' . uniqid();
+        $nonce = 'test_nonce_'.uniqid();
 
-        $this->assertTrue($store->remember($nonce, 300));
-        $this->assertFalse($store->remember($nonce, 300)); // 重复
+        $this->assertTrue($store->remember('ns-a', $nonce, 300));
+        $this->assertFalse($store->remember('ns-a', $nonce, 300)); // 重复
     }
 
     public function test_database_store_persists(): void
     {
         StorefrontConfig::setMany(['supply_nonce_store' => 'database']);
         $store = app(NonceStore::class);
-        $nonce = 'db_nonce_' . uniqid();
+        $nonce = 'db_nonce_'.uniqid();
 
-        $this->assertTrue($store->remember($nonce, 300));
-        $this->assertDatabaseHas('supply_nonces', ['nonce' => $nonce]);
-        $this->assertFalse($store->remember($nonce, 300));
+        $this->assertTrue($store->remember('ns-b', $nonce, 300));
+        $this->assertDatabaseHas('supply_nonces', ['nonce' => 'ns-b|'.$nonce]);
+        $this->assertFalse($store->remember('ns-b', $nonce, 300));
+    }
+
+    public function test_namespace_isolates_nonces(): void
+    {
+        StorefrontConfig::setMany(['supply_nonce_store' => 'cache']);
+        $store = app(NonceStore::class);
+        $nonce = 'shared_nonce_'.uniqid();
+
+        // 同一 nonce 在不同命名空间(账号)下互不影响。
+        $this->assertTrue($store->remember('ns-1', $nonce, 300));
+        $this->assertTrue($store->remember('ns-2', $nonce, 300));
     }
 }

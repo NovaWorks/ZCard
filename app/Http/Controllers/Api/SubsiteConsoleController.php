@@ -9,6 +9,7 @@ use App\Models\SubsiteDomain;
 use App\Models\SubsiteLedgerEntry;
 use App\Models\SubsiteProductSetting;
 use App\Support\DomainVerificationService;
+use App\Support\StorefrontConfig;
 use App\Support\SubsiteWithdrawalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -70,26 +71,64 @@ class SubsiteConsoleController extends Controller
             'domain' => [
                 'required', 'string', 'max:253',
                 function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (! DomainVerificationService::isSafePublicDomain((string) $value)) {
+                    $domain = strtolower(rtrim(trim((string) $value), '.'));
+                    if (! DomainVerificationService::isSafePublicDomain($domain)) {
                         $fail('请输入可解析的公网域名，不要包含协议、端口或路径');
+
+                        return;
+                    }
+
+                    // 安全(H-1):禁止绑定主站自身域名(劫持主站流量/品牌/利润归属)。
+                    $mainHosts = array_filter([
+                        strtolower((string) parse_url((string) config('app.url'), PHP_URL_HOST)),
+                        strtolower((string) parse_url((string) StorefrontConfig::get('site_url'), PHP_URL_HOST)),
+                        strtolower((string) $this->normalizeHost((string) request()->getHost())),
+                    ]);
+                    if (in_array($domain, $mainHosts, true)) {
+                        $fail('不允许绑定主站域名');
                     }
                 },
             ],
             'type' => 'required|in:subdomain,custom',
         ]);
         $domain = strtolower(rtrim(trim($data['domain']), '.'));
+
+        // 安全(H-1):subdomain 类型同样必须完成归属验证(DNS TXT / HTTP well-known),
+        // 不再免验证直写 verified/active;平台通配符场景校验子域后缀。
+        $subdomainBase = strtolower(trim((string) StorefrontConfig::get('subsite_subdomain_base')));
+        if ($data['type'] === 'subdomain' && $subdomainBase !== '') {
+            $base = ltrim($subdomainBase, '.');
+            if ($domain === $base || ! str_ends_with($domain, '.'.$base)) {
+                return response()->json(['message' => '子域名必须属于平台域名: .'.$base], 422);
+            }
+        }
+
         $row = SubsiteDomain::create([
             'merchant_id' => $merchant->id,
             'domain' => $domain,
             'type' => $data['type'],
-            'verification_token' => $data['type'] === 'custom' ? Str::random(32) : null,
-            'verification_status' => $data['type'] === 'subdomain' ? 'verified' : 'pending',
-            'status' => $data['type'] === 'subdomain' ? 'active' : 'pending_review',
-            'verified_at' => $data['type'] === 'subdomain' ? now() : null,
+            'verification_token' => Str::random(32),
+            'verification_status' => 'pending',
+            'status' => 'pending_review',
+            'verified_at' => null,
             'is_primary' => ! SubsiteDomain::where('merchant_id', $merchant->id)->exists(),
         ]);
 
-        return response()->json($row, 201);
+        // verification_token 仅在本绑定响应中一次性返回(模型已 $hidden,防列表接口外泄);
+        // 后续可通过 /domains/{id}/instructions 再次获取验证指引。
+        $response = $row->toArray();
+        $response['verification_token'] = $row->verification_token;
+
+        return response()->json($response, 201);
+    }
+
+    /** Host 归一化(与 ResolveSubsite 一致,用于主站域名比对) */
+    private function normalizeHost(string $host): string
+    {
+        $host = strtolower(trim($host));
+        $host = preg_replace('/:\d+$/', '', $host) ?? $host;
+
+        return rtrim((string) preg_replace('/^www\./', '', $host), '.');
     }
 
     /** 触发域名验证(DNS TXT + HTTP well-known 双查) */

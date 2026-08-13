@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Support\AppHelper;
+use App\Support\SecurityAudit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Role;
 
 /**
@@ -23,6 +25,112 @@ class InstallController extends Controller
     private function isInstalled(): bool
     {
         return file_exists(storage_path('app/installed'));
+    }
+
+    /**
+     * 有效安装判定(安全审计 H-2):锁文件缺失时,若数据库中已存在启用的管理员账号,
+     * 同样视为已安装——防止"锁文件丢失后匿名重跑安装、覆盖 admin 密码接管整站"。
+     */
+    private function isEffectivelyInstalled(): bool
+    {
+        if ($this->isInstalled()) {
+            return true;
+        }
+
+        try {
+            if (! Schema::hasTable('users')) {
+                return false;
+            }
+
+            return User::query()->where('status', 1)->exists();
+        } catch (\Throwable) {
+            // 数据库不可用时按未安装处理(与 EnsureInstalled 的降级行为一致)。
+            return false;
+        }
+    }
+
+    /**
+     * 安装来源防护(安全审计 M7)。
+     * 安装向导可创建超级管理员并重写 .env,未安装期间暴露公网 = 可被外部抢先接管。
+     * 部署者在 .env 配置 ZCARD_INSTALL_ALLOWED_IPS(逗号分隔,支持 IP 或 CIDR)后,
+     * 只有来自白名单 IP 的请求才能调用安装接口;未配置时保持默认行为(不阻断),
+     * 但每次安装尝试都会写入安全审计日志。
+     */
+    private function assertInstallAllowed(Request $request): void
+    {
+        $allowed = trim((string) env('ZCARD_INSTALL_ALLOWED_IPS', ''));
+        if ($allowed === '') {
+            return;
+        }
+
+        $ip = (string) $request->ip();
+        foreach (array_map('trim', explode(',', $allowed)) as $entry) {
+            if ($entry === '' || str_contains($entry, '/') === false) {
+                if ($entry === $ip) {
+                    return;
+                }
+
+                continue;
+            }
+            if ($this->ipInCidr($ip, $entry)) {
+                return;
+            }
+        }
+
+        abort(403, '安装向导已限制为特定来源 IP');
+    }
+
+    /** CIDR 匹配(IPv4)。 */
+    private function ipInCidr(string $ip, string $cidr): bool
+    {
+        [$subnet, $bits] = explode('/', $cidr);
+        $bits = (int) $bits;
+        $ipLong = ip2long($ip);
+        $subnetLong = ip2long($subnet);
+        if ($ipLong === false || $subnetLong === false || $bits <= 0) {
+            return false;
+        }
+        $mask = -1 << (32 - $bits);
+
+        return ($ipLong & $mask) === ($subnetLong & $mask);
+    }
+
+    /** 数据库主机必须解析为公网地址(安全审计 L-6,防安装向导 SSRF 盲探测内网 MySQL) */
+    private function isPublicDbHost(string $host): bool
+    {
+        $check = trim($host, '[]');
+
+        if (filter_var($check, FILTER_VALIDATE_IP)) {
+            $ips = [$check];
+        } else {
+            $ips = [];
+            foreach (@dns_get_record($check, DNS_A) ?: [] as $record) {
+                if (is_string($record['ip'] ?? null)) {
+                    $ips[] = $record['ip'];
+                }
+            }
+            foreach (@gethostbynamel($check) ?: [] as $ip) {
+                $ips[] = $ip;
+            }
+            $ips = array_values(array_unique($ips));
+        }
+
+        if ($ips === []) {
+            // 无法解析的域名直接拒绝(安装场景 DB 主机必须可解析)。
+            return false;
+        }
+
+        foreach ($ips as $ip) {
+            // 允许本机回环(最常见的"MySQL 与站点同机"部署),其余必须是公网地址。
+            if ($this->ipInCidr($ip, '127.0.0.0/8') || $ip === '::1') {
+                continue;
+            }
+            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -76,9 +184,11 @@ class InstallController extends Controller
      */
     public function testDb(Request $request): JsonResponse
     {
-        if ($this->isInstalled()) {
+        if ($this->isEffectivelyInstalled()) {
             return response()->json(['message' => '系统已安装'], 403);
         }
+        $this->assertInstallAllowed($request);
+        SecurityAudit::record($request, 'install.test_db', InstallController::class);
 
         $data = $request->validate([
             'host' => ['required', 'string', 'regex:/^[a-zA-Z0-9._\-.:]+$/'],
@@ -87,6 +197,14 @@ class InstallController extends Controller
             'username' => 'required|string|max:100',
             'password' => 'nullable|string',
         ]);
+
+        // 安全(L-6):拒绝指向内网/回环地址的数据库地址,防安装向导被用作内网盲探测。
+        if (! $this->isPublicDbHost((string) $data['host'])) {
+            return response()->json([
+                'success' => false,
+                'message' => '数据库地址不允许为内网/回环地址',
+            ], 422);
+        }
 
         try {
             $dsn = "mysql:host={$data['host']};port={$data['port']};dbname={$data['database']};charset=utf8mb4";
@@ -113,9 +231,11 @@ class InstallController extends Controller
      */
     public function run(Request $request): JsonResponse
     {
-        if ($this->isInstalled()) {
+        if ($this->isEffectivelyInstalled()) {
             return response()->json(['message' => '系统已安装,如需重新安装请删除 storage/app/installed 文件'], 403);
         }
+        $this->assertInstallAllowed($request);
+        SecurityAudit::record($request, 'install.run', InstallController::class);
 
         $data = $request->validate([
             'db_host' => ['required', 'string', 'regex:/^[a-zA-Z0-9._\-.:]+$/'],

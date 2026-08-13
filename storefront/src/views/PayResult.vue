@@ -6,6 +6,7 @@ import { queryOrders, getMyOrders, type OrderDetail } from '@/api/orders'
 import { formatMoney } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useSettingsStore } from '@/stores/settings'
+import { useAuthStore } from '@/stores/auth'
 import AppIcon from '@/components/AppIcon.vue'
 import OrderInstructions from '@/components/OrderInstructions.vue'
 import { getOrderAccessToken } from '@/utils/orderAccess'
@@ -83,7 +84,7 @@ onUnmounted(stopCountdown)
  * 游客回退订单查询(无密码订单可查)。
  */
 async function fetchOrderStatus(no: string): Promise<OrderDetail | null> {
-  if (localStorage.getItem('zcard_token')) {
+  if (useAuthStore().isLoggedIn) {
     try {
       const mine = await getMyOrders()
       const found = Array.isArray(mine) ? mine.find(o => o.order_no === no) : null

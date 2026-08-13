@@ -25,6 +25,7 @@ class SupplierAccount extends Model
     }
 
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_DISABLED = 'disabled';
 
     public function productPrices(): HasMany

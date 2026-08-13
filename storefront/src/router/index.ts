@@ -35,13 +35,21 @@ const router = createRouter({
 })
 
 // 捕获 ?ref= 邀请码 → localStorage(用于注册时带上 referrer);并对受限路由做登录守卫
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const ref = to.query.ref
   if (typeof ref === 'string' && ref) {
     localStorage.setItem('zcard_ref', ref)
   }
-  if (to.meta.requiresAuth && !localStorage.getItem('zcard_token')) {
-    return { name: 'login', query: { redirect: to.fullPath } }
+  if (to.meta.requiresAuth) {
+    const { useAuthStore } = await import('@/stores/auth')
+    const auth = useAuthStore()
+    if (!auth.isLoggedIn) {
+      // 内存 token 已丢但 HttpOnly Cookie 会话可能仍有效:探测一次再决定
+      try { await auth.fetchUser() } catch {}
+    }
+    if (!auth.isLoggedIn) {
+      return { name: 'login', query: { redirect: to.fullPath } }
+    }
   }
 })
 

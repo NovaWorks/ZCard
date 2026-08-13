@@ -24,10 +24,13 @@ class Coupon extends Model
     }
 
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_USED = 'used';
+
     public const STATUS_DISABLED = 'disabled';
 
     public const TYPE_FIXED = 'fixed';
+
     public const TYPE_PERCENT = 'percent';
 
     public function product(): BelongsTo

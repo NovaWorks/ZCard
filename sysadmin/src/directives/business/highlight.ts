@@ -43,6 +43,7 @@
 
 import { App, Directive } from 'vue'
 import hljs from 'highlight.js'
+import DOMPurify from 'dompurify'
 
 export type HighlightDirective = Directive<HTMLElement>
 
@@ -53,7 +54,10 @@ function highlightCode(block: HTMLElement) {
 
 // 插入行号
 function insertLineNumbers(block: HTMLElement) {
-  const lines = block.innerHTML.split('\n')
+  // 安全:重写 innerHTML 前先 DOMPurify 清洗,防止未过滤内容(未来接入的
+  // 用户可控富文本/评论等)经由本指令形成存储型 XSS 注入点。
+  const sanitized = DOMPurify.sanitize(block.innerHTML, { USE_PROFILES: { html: true } })
+  const lines = sanitized.split('\n')
   const numberedLines = lines
     .map((line, index) => {
       return `<span class="line-number">${index + 1}</span> ${line}`

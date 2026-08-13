@@ -21,6 +21,8 @@ return [
     'auth.password_changed' => 'Password changed successfully.',
 
     'order.status_abnormal' => 'Order status is abnormal.',
+    'order.create_failed' => 'Failed to create order, please try again later.',
+    'order.query_locked' => 'Too many lookup attempts, please try again in 15 minutes.',
 
     'review.order_not_found' => 'Order does not exist or is unpaid.',
     'review.already_reviewed' => 'This order has already been reviewed.',
@@ -43,6 +45,7 @@ return [
     'payment.order_ids_required' => 'Please select orders to pay.',
     'payment.order_not_found' => 'Some orders are invalid.',
     'payment.order_not_pending' => 'Some orders are already paid or closed.',
+    'payment.create_failed' => 'Failed to create payment, please try again later.',
 
     // ===== Balance recharge =====
     'recharge.amount_invalid' => 'Recharge amount must be greater than 0',
@@ -80,6 +83,7 @@ return [
     'supply_api.insufficient_balance' => 'Insufficient balance',
     'supply_api.insufficient_stock' => 'Insufficient stock',
     'supply_api.product_unavailable' => 'Product unavailable',
+    'supply_api.price_not_configured' => 'Product supply price is not configured, please contact the upstream admin',
     'supply_api.order_not_found' => 'Order not found',
     'supply_api.order_not_cancelable' => 'Order cannot be canceled',
     'supply_api.bad_request' => 'Bad request',

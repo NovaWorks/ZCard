@@ -13,10 +13,13 @@ class SupplyOrder extends Model
     ];
 
     public const MODE_SYNC = 'sync';
+
     public const MODE_ASYNC = 'async';
 
     public const CALLBACK_PENDING = 'pending';
+
     public const CALLBACK_SENT = 'sent';
+
     public const CALLBACK_FAILED = 'failed';
 
     public function supplierAccount(): BelongsTo

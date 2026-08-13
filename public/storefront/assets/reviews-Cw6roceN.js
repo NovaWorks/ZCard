@@ -1,0 +1,1 @@
+import{t as e}from"./request-Blf49zc7.js";var t=t=>e.get(`/products/${t}/reviews`),n=t=>e.post(`/reviews`,t),r=t=>e.get(`/reviews/eligibility/${t}`);export{t as n,r,n as t};

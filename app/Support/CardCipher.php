@@ -2,7 +2,10 @@
 
 namespace App\Support;
 
+use App\Models\Setting;
 use Illuminate\Encryption\Encrypter;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
 
 /**
  * 卡密加解密工具（spec §6.1 决策3）。
@@ -21,7 +24,7 @@ class CardCipher
      */
     public static function isEnabled(): bool
     {
-        return (bool) \App\Support\StorefrontConfig::get('card_encryption_enabled');
+        return (bool) StorefrontConfig::get('card_encryption_enabled');
     }
 
     private static function encrypter(): Encrypter
@@ -46,10 +49,10 @@ class CardCipher
      */
     private static function resolveKey(): string
     {
-        $cfgKey = \App\Models\Setting::where('key', 'card_encryption_key')->value('value');
+        $cfgKey = Setting::where('key', 'card_encryption_key')->value('value');
         if ($cfgKey) {
             try {
-                return (string) \Illuminate\Support\Facades\Crypt::decryptString((string) $cfgKey);
+                return (string) Crypt::decryptString((string) $cfgKey);
             } catch (\Throwable) {
                 // 兼容历史明文存储
                 return (string) $cfgKey;
@@ -87,7 +90,15 @@ class CardCipher
 
             // 未开启:若是历史密文则尝试解密(有 key 才可能成功),否则按明文返回
             return self::encrypter()->decryptString($cipher);
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            // 开启加密时解密失败 = 历史明文或密钥变更,debug 级记录便于排查
+            // (不抛异常:避免发货链路 500,保持降级返回原值)。
+            if (self::isEnabled()) {
+                Log::debug('卡密解密失败,按原值返回(可能为历史明文或密钥变更)', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             return $cipher;
         }
     }

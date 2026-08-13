@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Bill;
-use App\Models\User;
 use App\Support\BillService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,7 +22,7 @@ class BillController extends Controller
         if ($keyword = $request->input('keyword')) {
             $query->where(function ($q) use ($keyword) {
                 $q->where('log', 'like', "%{$keyword}%")
-                  ->orWhereHas('user', fn ($u) => $u->where('username', 'like', "%{$keyword}%"));
+                    ->orWhereHas('user', fn ($u) => $u->where('username', 'like', "%{$keyword}%"));
             });
         }
         // 类型筛选
@@ -93,15 +92,21 @@ class BillController extends Controller
         $amountFen = (int) round($data['amount'] * 100);
         $adminId = $request->user()->id;
 
+        // 安全：禁止给自己调账（防自肥无流水对账），余额调整只能作用于他人账户。
+        if ((int) $data['user_id'] === $adminId) {
+            return response()->json(['message' => '不允许对本人账户进行调账操作'], 422);
+        }
+
         try {
             $bill = BillService::record(
                 $data['user_id'],
                 $amountFen,
                 $data['type'],
-                $data['log'] . '(管理员调账)',
+                $data['log'].'(管理员调账)',
                 null,
                 $adminId,
             );
+
             return response()->json($bill, 201);
         } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 400);

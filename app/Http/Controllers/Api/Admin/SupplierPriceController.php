@@ -21,6 +21,7 @@ class SupplierPriceController extends Controller
             ->when($request->input('product_id'), fn ($q, $pid) => $q->where('product_id', $pid))
             ->with(['product:id,name,slug', 'sku:id,name'])
             ->orderByDesc('id')->paginate($request->integer('per_page', 50));
+
         return response()->json($prices);
     }
 
@@ -31,7 +32,7 @@ class SupplierPriceController extends Controller
             'prices' => 'required|array',
             'prices.*.product_id' => 'required|exists:products,id',
             'prices.*.sku_id' => 'nullable|exists:product_skus,id',
-            'prices.*.price' => 'required|integer|min:0',
+            'prices.*.price' => 'required|integer|min:1',
         ]);
 
         foreach ($data['prices'] as $item) {
@@ -44,6 +45,7 @@ class SupplierPriceController extends Controller
                 ['price' => $item['price']]
             );
         }
+
         return response()->json(['ok' => true, 'count' => count($data['prices'])]);
     }
 
@@ -51,6 +53,7 @@ class SupplierPriceController extends Controller
     public function destroyForAccount(SupplierAccount $account, int $priceId): JsonResponse
     {
         SupplierProductPrice::where('supplier_account_id', $account->id)->where('id', $priceId)->delete();
+
         return response()->json(null, 204);
     }
 
@@ -60,6 +63,7 @@ class SupplierPriceController extends Controller
         $prices = SupplierProductPrice::where('product_id', $product->id)
             ->with(['supplierAccount:id,name', 'sku:id,name'])
             ->orderByDesc('id')->get();
+
         return response()->json(['prices' => $prices]);
     }
 
@@ -70,7 +74,7 @@ class SupplierPriceController extends Controller
             'prices' => 'required|array',
             'prices.*.supplier_account_id' => 'required|exists:supplier_accounts,id',
             'prices.*.sku_id' => 'nullable|exists:product_skus,id',
-            'prices.*.price' => 'required|integer|min:0',
+            'prices.*.price' => 'required|integer|min:1',
         ]);
 
         foreach ($data['prices'] as $item) {
@@ -83,6 +87,7 @@ class SupplierPriceController extends Controller
                 ['price' => $item['price']]
             );
         }
+
         return response()->json(['ok' => true, 'count' => count($data['prices'])]);
     }
 }

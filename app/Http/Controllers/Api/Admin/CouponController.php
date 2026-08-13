@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Coupon;
 use App\Support\CouponService;
+use App\Support\CsvSafe;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -14,6 +15,7 @@ class CouponController extends Controller
     public function index(Request $request): JsonResponse
     {
         $coupons = $this->baseQuery($request)->orderByDesc('id')->paginate($request->integer('pageSize', 15));
+
         return response()->json($coupons);
     }
 
@@ -27,9 +29,9 @@ class CouponController extends Controller
         $coupons = $this->baseQuery($request)->orderByDesc('id')->limit($limit)->get();
 
         $headers = [
-            'Content-Type'        => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="coupons-export-' . date('Ymd-His') . '.csv"',
-            'X-Accel-Buffering'   => 'no',
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="coupons-export-'.date('Ymd-His').'.csv"',
+            'X-Accel-Buffering' => 'no',
         ];
 
         return response()->stream(function () use ($coupons) {
@@ -40,17 +42,20 @@ class CouponController extends Controller
             foreach ($coupons as $c) {
                 // 面值:fixed=分→元; percent=百分比原值
                 $valueText = $c->type === Coupon::TYPE_PERCENT
-                    ? $c->value . '%'
-                    : '¥' . number_format($c->value / 100, 2);
+                    ? $c->value.'%'
+                    : '¥'.number_format($c->value / 100, 2);
                 // 适用范围
                 $scope = '全场';
-                if ($c->product) $scope = '商品:' . $c->product->name;
-                elseif ($c->category) $scope = '分类:' . $c->category->name;
+                if ($c->product) {
+                    $scope = '商品:'.$c->product->name;
+                } elseif ($c->category) {
+                    $scope = '分类:'.$c->category->name;
+                }
                 // 状态中文化
                 $statusMap = ['active' => '可用', 'used' => '已使用', 'disabled' => '已禁用'];
                 $statusText = $statusMap[$c->status] ?? $c->status;
 
-                fputcsv($out, [
+                fputcsv($out, CsvSafe::row([
                     $c->id,
                     $c->code,
                     $c->type === Coupon::TYPE_PERCENT ? '百分比' : '固定金额',
@@ -64,7 +69,7 @@ class CouponController extends Controller
                     $c->order_id ?? '',
                     $c->note,
                     $c->created_at,
-                ]);
+                ]));
             }
             fclose($out);
         }, 200, $headers);
@@ -133,6 +138,7 @@ class CouponController extends Controller
 
         try {
             $coupons = CouponService::generate($data['count'], $couponData);
+
             return response()->json(['count' => count($coupons), 'codes' => array_map(fn ($c) => $c->code, $coupons)], 201);
         } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 400);
@@ -155,6 +161,7 @@ class CouponController extends Controller
             return response()->json(['message' => '已使用的优惠券不能删除'], 422);
         }
         $coupon->delete();
+
         return response()->json(null, 204);
     }
 
@@ -171,6 +178,7 @@ class CouponController extends Controller
         foreach ($coupons as $coupon) {
             if ($coupon->status === Coupon::STATUS_USED) {
                 $skipped++;
+
                 continue;
             }
             $coupon->delete();

@@ -31,4 +31,9 @@ class SupplyApiException extends RuntimeException
     {
         return new self('product_unavailable', __('messages.supply_api.product_unavailable'), 404);
     }
+
+    public static function priceNotConfigured(): self
+    {
+        return new self('price_not_configured', __('messages.supply_api.price_not_configured'), 400);
+    }
 }
