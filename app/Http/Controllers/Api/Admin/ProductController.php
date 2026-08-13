@@ -72,7 +72,11 @@ class ProductController extends Controller
         $products->getCollection()->each(function (Product $product) {
             $product->setAttribute('stock', $product->availableStock());
             // 上游商品链接(订单/列表核对用;本地商品为 null)
-            $product->setAttribute('upstream_product_url', $product->upstreamSource?->productUrlFor($product->upstream_product_code));
+            $syncedUrl = $product->getRawOriginal('upstream_product_url');
+            $product->setAttribute(
+                'upstream_product_url',
+                $product->upstreamSource?->productUrlFor($product->upstream_product_code, $syncedUrl),
+            );
         });
 
         return response()->json($products);

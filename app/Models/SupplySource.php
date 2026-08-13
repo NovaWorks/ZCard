@@ -28,9 +28,12 @@ class SupplySource extends Model
     /**
      * 上游商品前台链接(订单详情贴链接用)。
      * 优先取货源设置 product_url_template(模板支持 {base}/{code});
-     * 未配置时按驱动推断:acg_faka 商品页为 /buy/{id};其余返回 null(前端显示货源站点+商品代码)。
+     * 未配置模板时使用同步阶段由驱动确认并保存的真实链接。
+     *
+     * 不再按驱动猜测路径。acg-faka 的对接 CODE 不是公开商品 ID，且不同版本/主题的
+     * 分享链接可能是 /item/{id} 或 ?cid={categoryId}&mid={id}。
      */
-    public function productUrlFor(?string $code): ?string
+    public function productUrlFor(?string $code, ?string $syncedUrl = null): ?string
     {
         $code = (string) ($code ?? '');
         $template = (string) ($this->settings['product_url_template'] ?? '');
@@ -42,11 +45,7 @@ class SupplySource extends Model
             );
         }
 
-        if ($this->driver === 'acg_faka' && $code !== '') {
-            return rtrim((string) $this->base_url, '/').'/buy/'.$code;
-        }
-
-        return null;
+        return $syncedUrl ?: null;
     }
 
     /**

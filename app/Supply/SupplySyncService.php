@@ -76,6 +76,10 @@ class SupplySyncService
                 'upstream_synced_at' => now(),
                 'hide' => ! $dto->isActive ? true : $existing->hide, // 上游下架→标隐藏,不删
             ];
+            // 临时探测失败时保留上次已确认链接，不用 null 覆盖正确数据。
+            if ($dto->productUrl !== null) {
+                $update['upstream_product_url'] = $dto->productUrl;
+            }
             if ($this->shouldSyncPublicDescription($source)) {
                 $update['description'] = $this->normalizeDescription($source, $dto->description);
             }
@@ -145,6 +149,7 @@ class SupplySyncService
             'category_id' => $this->resolveCategoryId($source, $dto->categoryCode, $dto->categoryName, $categoryMap),
             'upstream_source_id' => $source->id,
             'upstream_product_code' => $dto->code,
+            'upstream_product_url' => $dto->productUrl,
             'stock_cache' => $dto->stockQuantity, // 上游库存缓存(-1=无限)
             'upstream_synced_at' => now(),
         ]);

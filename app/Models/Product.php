@@ -16,7 +16,7 @@ class Product extends Model
     protected $fillable = [
         'merchant_id',
         // 供货上游来源(Phase 1)
-        'upstream_source_id', 'upstream_product_code', 'upstream_synced_at', 'stock_cache',
+        'upstream_source_id', 'upstream_product_code', 'upstream_product_url', 'upstream_synced_at', 'stock_cache',
         'category_id', 'name', 'slug', 'description', 'price',
         // SEO(自定义标题/关键词/描述,留空前端自动组合)
         'seo_title', 'seo_keywords', 'seo_description',

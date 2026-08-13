@@ -48,6 +48,7 @@ class OrderUpstreamDetailTest extends TestCase
             'merchant_id' => 1, 'category_id' => $category->id, 'name' => 'P', 'slug' => 'p-'.uniqid(),
             'price' => 1000, 'factory_price' => 600, 'stock_type' => 'card', 'status' => true, 'sort' => 0,
             'upstream_source_id' => $source->id, 'upstream_product_code' => 'UP123',
+            'upstream_product_url' => 'https://up.example.com/?cid=5&mid=101',
         ]);
 
         return Order::create([
@@ -74,7 +75,7 @@ class OrderUpstreamDetailTest extends TestCase
             ->getJson('/api/admin/products?pageSize=15');
         $row = collect($resp->json('data'))->firstWhere('id', $product->id);
         $this->assertSame(750, (int) $row['upstream_price']);
-        $this->assertSame('https://up.example.com/buy/UP123', $row['upstream_product_url']);
+        $this->assertSame('https://up.example.com/?cid=5&mid=101', $row['upstream_product_url']);
     }
 
     public function test_order_detail_includes_finance_and_upstream_info(): void
@@ -90,7 +91,7 @@ class OrderUpstreamDetailTest extends TestCase
         $this->assertSame(800, $data['profit']); // 2000 - 1200
         $this->assertSame(40.0, (float) $data['profit_rate']);
         $this->assertSame('上游货源', $data['upstream_source_name']);
-        $this->assertSame('https://up.example.com/buy/UP123', $data['upstream_product_url']);
+        $this->assertSame('https://up.example.com/?cid=5&mid=101', $data['upstream_product_url']);
     }
 
     public function test_upstream_order_can_be_fulfilled_manually(): void

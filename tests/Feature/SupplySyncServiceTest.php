@@ -36,13 +36,21 @@ class SupplySyncServiceTest extends TestCase
         $source = $this->makeSource(['default_pricing_mode' => 'percent', 'default_markup_percent' => 10, 'auto_list' => true]);
         $service = app(SupplySyncService::class);
 
-        $dto = new UpstreamProduct(code: 'UP1', name: '上游商品', price: 800, factoryPrice: 500, categoryCode: null);
+        $dto = new UpstreamProduct(
+            code: 'UP1',
+            name: '上游商品',
+            price: 800,
+            factoryPrice: 500,
+            categoryCode: null,
+            productUrl: 'https://up.example.com/item/101',
+        );
         $product = $service->upsertProduct($source, $dto);
 
         $this->assertSame('UP1', $product->upstream_product_code);
         $this->assertSame($source->id, $product->upstream_source_id);
         $this->assertSame(500, (int) $product->factory_price);
         $this->assertSame(880, (int) $product->price); // 800(上游售价) × 110% = 880
+        $this->assertSame('https://up.example.com/item/101', $product->upstream_product_url);
     }
 
     public function test_resync_follows_upstream_price_change_by_default(): void

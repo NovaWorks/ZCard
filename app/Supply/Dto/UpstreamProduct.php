@@ -21,5 +21,6 @@ class UpstreamProduct
         public readonly bool $isActive = true,
         public readonly array $skus = [],        // 见 @param
         public readonly int $stockQuantity = -1, // -1=无限
+        public readonly ?string $productUrl = null, // 上游公开商品页(驱动确认后的真实链接)
     ) {}
 }

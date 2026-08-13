@@ -144,4 +144,60 @@ class AcgFakaDriverProtocolTest extends TestCase
         $this->assertSame(1000, $items[0]->price);
         $this->assertSame(800, $items[0]->factoryPrice);
     }
+
+    public function test_list_products_uses_real_public_share_url_instead_of_api_code(): void
+    {
+        Http::fake([
+            'https://acg.test/shared/commodity/items' => Http::response([
+                'code' => 200,
+                'data' => [
+                    [
+                        'id' => 5, 'name' => '分类一', 'children' => [
+                            ['id' => 101, 'code' => 'RANDOM-CODE-A', 'name' => '商品A', 'price' => '10.00'],
+                        ],
+                    ],
+                    [
+                        'id' => 9, 'name' => '分类二', 'children' => [
+                            ['id' => 202, 'code' => 'RANDOM-CODE-B', 'name' => '商品B', 'price' => '20.00'],
+                        ],
+                    ],
+                ],
+            ]),
+            'https://acg.test/user/api/index/commodityDetail*' => Http::response([
+                'code' => 200,
+                'data' => ['share_url' => 'https://acg.test?cid=5&mid=101'],
+            ]),
+        ]);
+
+        $items = $this->driver()->listProducts(null, 1)['items'];
+
+        $this->assertSame('RANDOM-CODE-A', $items[0]->code, '对接仍必须使用 API code');
+        $this->assertSame('https://acg.test/?cid=5&mid=101', $items[0]->productUrl);
+        $this->assertSame('https://acg.test/?cid=9&mid=202', $items[1]->productUrl);
+        Http::assertSentCount(2); // 商品列表接口 + 一次分享链接规则探测，不得逐商品请求。
+    }
+
+    public function test_list_products_supports_new_item_share_url(): void
+    {
+        Http::fake([
+            'https://acg.test/shared/commodity/items' => Http::response([
+                'code' => 200,
+                'data' => [[
+                    'id' => 5, 'name' => '分类', 'children' => [
+                        ['id' => 101, 'code' => 'CODE-A', 'name' => '商品A', 'price' => '10.00'],
+                        ['id' => 102, 'code' => 'CODE-B', 'name' => '商品B', 'price' => '20.00'],
+                    ],
+                ]],
+            ]),
+            'https://acg.test/user/api/index/commodityDetail*' => Http::response([
+                'code' => 200,
+                'data' => ['share_url' => 'https://acg.test/item/101'],
+            ]),
+        ]);
+
+        $items = $this->driver()->listProducts(null, 1)['items'];
+
+        $this->assertSame('https://acg.test/item/101', $items[0]->productUrl);
+        $this->assertSame('https://acg.test/item/102', $items[1]->productUrl);
+    }
 }

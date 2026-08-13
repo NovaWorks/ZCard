@@ -301,7 +301,7 @@
     <ElDialog
       v-model="allTasksVisible"
       :title="t('zcard.supply.viewTasksTitle')"
-      width="720px"
+      width="min(1100px, 94vw)"
       top="6vh"
       destroy-on-close
       @closed="stopAllTasksPolling"
@@ -339,10 +339,11 @@
           <div class="all-task-progress" v-if="task.total_products > 0">
             <ElProgress :percentage="taskProgress(task)" :stroke-width="10" />
             <span class="all-task-counts">
-              {{ t('zcard.supply.taskProcessed', { n: task.processed_products, total: task.total_products }) }}
-              · +{{ task.created_count }} {{ t('zcard.supply.taskCreated') }}
-              · <span v-if="task.price_updated_count" class="task-price-updated">💰 {{ t('zcard.supply.taskPriceUpdated', { n: task.price_updated_count }) }}</span>
-              · <span v-if="task.manual_price_skipped_count" class="task-manual-skipped">{{ t('zcard.supply.taskManualPriceSkipped', { n: task.manual_price_skipped_count }) }}</span>
+              <span>{{ t('zcard.supply.taskProcessed', { n: task.processed_products, total: task.total_products }) }}</span>
+              <span>+{{ task.created_count }} {{ t('zcard.supply.taskCreated') }}</span>
+              <span>{{ task.updated_count }} {{ t('zcard.supply.taskUpdated') }}</span>
+              <span :class="{ 'task-price-updated': task.price_updated_count > 0 }">{{ t('zcard.supply.taskPriceUpdated', { n: task.price_updated_count }) }}</span>
+              <span :class="{ 'task-manual-skipped': task.manual_price_skipped_count > 0 }">{{ t('zcard.supply.taskManualPriceSkipped', { n: task.manual_price_skipped_count }) }}</span>
             </span>
           </div>
           <div v-else-if="task.status === 'queued' || task.status === 'running'" class="all-task-waiting">
@@ -1925,16 +1926,29 @@
 }
 .all-task-progress {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
   gap: 10px;
 }
 .all-task-progress .el-progress {
-  flex: 1;
+  flex: 1 1 420px;
+  min-width: 260px;
 }
 .all-task-counts {
+  flex: 1 1 420px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 0;
   font-size: 12px;
   color: var(--el-text-color-secondary);
-  white-space: nowrap;
+  line-height: 20px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.all-task-counts > span + span::before {
+  content: '·';
+  margin: 0 7px;
+  color: var(--el-text-color-placeholder);
 }
 .all-task-waiting {
   margin: 4px 0;

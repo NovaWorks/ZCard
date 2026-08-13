@@ -16,6 +16,14 @@ class AcgFakaDriver implements SupplyDriver
 {
     use MakesHttpRequests;
 
+    private const PRODUCT_ID_TOKEN = '__UPSTREAM_PRODUCT_ID__';
+
+    private const CATEGORY_ID_TOKEN = '__UPSTREAM_CATEGORY_ID__';
+
+    private bool $productUrlTemplateResolved = false;
+
+    private ?string $productUrlTemplate = null;
+
     public function __construct(public readonly SupplySource $source) {}
 
     public static function configSchema(): array
@@ -165,6 +173,7 @@ class AcgFakaDriver implements SupplyDriver
                         isActive: $dto->isActive,
                         skus: $dto->skus,
                         stockQuantity: $stockValues[$dto->code],
+                        productUrl: $dto->productUrl,
                     );
                     foreach ($items as $i => $it) {
                         if ($it->code === $dto->code) {
@@ -292,6 +301,95 @@ class AcgFakaDriver implements SupplyDriver
             // items 接口对「卡密自动发货」商品(delivery_way=0)会带 stock 字段,
             // 手动发货商品不带 → 按无限(-1)处理。不读的话预览面板会把所有商品显示成无限库存。
             stockQuantity: isset($p['stock']) ? (int) $p['stock'] : -1,
+            productUrl: $this->productUrl($p, $categoryId),
         );
+    }
+
+    /**
+     * 获取 acg-faka 真实公开商品链接。
+     *
+     * 对接 API 用的是随机 code，公开页面用的是数值 id，两者不能混用。不同版本/主题
+     * 返回的分享链接也不同：新版通常为 /item/{id}，旧版 Toka 为 ?cid=...&mid=...。
+     * 每个驱动实例仅请求一次公开详情接口取得 share_url 规则，再套用到本批商品。
+     */
+    private function productUrl(array $product, mixed $categoryId): ?string
+    {
+        $productId = (int) ($product['id'] ?? 0);
+        if ($productId <= 0) {
+            return null;
+        }
+
+        if (! $this->productUrlTemplateResolved) {
+            $this->productUrlTemplateResolved = true;
+            $shareUrl = is_string($product['share_url'] ?? null) ? $product['share_url'] : null;
+
+            if (! $shareUrl) {
+                try {
+                    $response = Http::acceptJson()->timeout($this->requestTimeout())
+                        ->get($this->baseUrl().'/user/api/index/commodityDetail', [
+                            'commodityId' => $productId,
+                        ]);
+                    $shareUrl = $response->successful()
+                        ? data_get($response->json(), 'data.share_url')
+                        : null;
+                } catch (\Throwable) {
+                    $shareUrl = null;
+                }
+            }
+
+            if (is_string($shareUrl) && $shareUrl !== '') {
+                $this->productUrlTemplate = $this->inferProductUrlTemplate(
+                    $shareUrl,
+                    $productId,
+                    $categoryId,
+                );
+            }
+        }
+
+        if ($this->productUrlTemplate === null) {
+            return null;
+        }
+
+        return str_replace(
+            [self::PRODUCT_ID_TOKEN, self::CATEGORY_ID_TOKEN],
+            [(string) $productId, rawurlencode((string) ($categoryId ?? $product['category_id'] ?? ''))],
+            $this->productUrlTemplate,
+        );
+    }
+
+    /** 只接受同一上游域名的已知分享链接形态，避免把异常响应写成后台外链。 */
+    private function inferProductUrlTemplate(string $shareUrl, int $productId, mixed $categoryId): ?string
+    {
+        $parts = parse_url($shareUrl);
+        $sourceHost = parse_url($this->baseUrl(), PHP_URL_HOST);
+        if (! is_array($parts)
+            || ! in_array($parts['scheme'] ?? '', ['http', 'https'], true)
+            || strcasecmp((string) ($parts['host'] ?? ''), (string) $sourceHost) !== 0) {
+            return null;
+        }
+
+        $origin = $parts['scheme'].'://'.$parts['host']
+            .(isset($parts['port']) ? ':'.$parts['port'] : '');
+        $path = $parts['path'] ?? '';
+
+        // 新版 acg-faka 的标准分享链接：/item/{数值商品ID}
+        $quotedId = preg_quote(rawurlencode((string) $productId), '#');
+        if (preg_match("#/item/{$quotedId}/?$#", $path) === 1) {
+            $path = preg_replace("#/item/{$quotedId}(/?)$#", '/item/'.self::PRODUCT_ID_TOKEN.'$1', $path);
+
+            return $origin.$path;
+        }
+
+        // 旧版主题分享链接：/?cid={分类ID}&mid={数值商品ID}
+        parse_str($parts['query'] ?? '', $query);
+        if ((string) ($query['mid'] ?? '') !== (string) $productId) {
+            return null;
+        }
+        $query['mid'] = self::PRODUCT_ID_TOKEN;
+        if (isset($query['cid']) && (string) $query['cid'] === (string) $categoryId) {
+            $query['cid'] = self::CATEGORY_ID_TOKEN;
+        }
+
+        return $origin.($path !== '' ? $path : '/').'?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986);
     }
 }

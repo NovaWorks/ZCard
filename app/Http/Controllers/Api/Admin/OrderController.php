@@ -124,7 +124,7 @@ class OrderController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $order = Order::with(['product:id,name,upstream_source_id,upstream_product_code', 'orderDeliveries:id,order_id,card_content,delivered_mode,delivered_at'])
+        $order = Order::with(['product:id,name,upstream_source_id,upstream_product_code,upstream_product_url', 'orderDeliveries:id,order_id,card_content,delivered_mode,delivered_at'])
             ->findOrFail($id);
 
         // 把 orderDeliveries 映射成 deliveries(前端期望的字段名)
@@ -149,7 +149,10 @@ class OrderController extends Controller
         if ($source) {
             $data['upstream_source_name'] = $source->name;
             $data['upstream_base_url'] = $source->base_url;
-            $data['upstream_product_url'] = $source->productUrlFor($order->product?->upstream_product_code);
+            $data['upstream_product_url'] = $source->productUrlFor(
+                $order->product?->upstream_product_code,
+                $order->product?->upstream_product_url,
+            );
         }
 
         return response()->json($data);
