@@ -91,12 +91,14 @@ export interface SupplySyncTask {
   id: number
   supply_source_id: number
   mode: 'full' | 'incremental'
+  force_reprice: boolean
   status: 'queued' | 'running' | 'success' | 'failed' | 'cancelled'
   total_products: number
   processed_products: number
   created_count: number
   updated_count: number
   price_updated_count: number
+  manual_price_skipped_count: number
   hidden_count: number
   error: string | null
   started_at: string | null
@@ -104,16 +106,27 @@ export interface SupplySyncTask {
   created_at: string
 }
 
-export const syncSupplySource = (id: number, mode: 'full' | 'incremental' = 'incremental') =>
-  request.post<{ ok: boolean; task: SupplySyncTask }>({ url: `/admin/supply-sources/${id}/sync`, data: { mode } })
+export const syncSupplySource = (
+  id: number,
+  mode: 'full' | 'incremental' = 'incremental',
+  forceReprice = false
+) =>
+  request.post<{ ok: boolean; task: SupplySyncTask }>({
+    url: `/admin/supply-sources/${id}/sync`,
+    data: { mode, force_reprice: forceReprice }
+  })
 
 /** 同步任务列表(最新优先) */
 export const getSupplySyncTasks = (id: number) =>
-  request.get<{ ok: boolean; tasks: SupplySyncTask[] }>({ url: `/admin/supply-sources/${id}/sync-tasks` })
+  request.get<{ ok: boolean; tasks: SupplySyncTask[] }>({
+    url: `/admin/supply-sources/${id}/sync-tasks`
+  })
 
 /** 取消进行中的同步任务 */
 export const cancelSupplySync = (id: number) =>
-  request.post<{ ok: boolean; task: SupplySyncTask }>({ url: `/admin/supply-sources/${id}/sync-cancel` })
+  request.post<{ ok: boolean; task: SupplySyncTask }>({
+    url: `/admin/supply-sources/${id}/sync-cancel`
+  })
 
 export interface SupplySyncTaskWithSource extends SupplySyncTask {
   source_name: string
@@ -121,7 +134,10 @@ export interface SupplySyncTaskWithSource extends SupplySyncTask {
 
 /** 全部货源同步任务(含货源名) */
 export const getAllSyncTasks = (params?: any) =>
-  request.get<{ ok: boolean; tasks: SupplySyncTaskWithSource[] }>({ url: '/admin/supply-sources/sync-tasks', params })
+  request.get<{ ok: boolean; tasks: SupplySyncTaskWithSource[] }>({
+    url: '/admin/supply-sources/sync-tasks',
+    params
+  })
 
 /** 派发队列探针(检测 queue:work 是否运行) */
 export const probeSyncQueue = () =>
@@ -130,15 +146,15 @@ export const probeSyncQueue = () =>
 /** 队列心跳状态 */
 export const getSyncQueueStatus = () =>
   request.get<{ ok: boolean; heartbeat_at: number | null; connection: string; healthy: boolean }>({
-    url: '/admin/supply-sources/sync-queue-status',
+    url: '/admin/supply-sources/sync-queue-status'
   })
 
 /** 上游商品(预览拉取,供勾选导入) */
 export interface UpstreamProductItem {
   code: string
   name: string
-  price: number          // 分
-  factory_price: number  // 分
+  price: number // 分
+  factory_price: number // 分
   cover: string | null
   stock: number
   already_imported: boolean
@@ -158,7 +174,10 @@ export interface SupplyPreviewResult {
 /** 实时拉取上游商品(按分类树,供勾选导入)。
  * 上游商品多时耗时可能超过默认 15s,单独放宽到 120s。 */
 export const previewSupplyProducts = (id: number) =>
-  request.get<SupplyPreviewResult>({ url: `/admin/supply-sources/${id}/products/preview`, timeout: 120000 })
+  request.get<SupplyPreviewResult>({
+    url: `/admin/supply-sources/${id}/products/preview`,
+    timeout: 120000
+  })
 
 /** 勾选导入商品到本地 */
 export const importSupplyProducts = (
@@ -170,7 +189,9 @@ export const importSupplyProducts = (
     category_map?: Record<string, number | null>
   }
 ) =>
-  request.post<{ ok: boolean; imported: number; skipped: number; message: string; error?: string }>({
-    url: `/admin/supply-sources/${id}/products/import`,
-    data: { codes, ...options }
-  })
+  request.post<{ ok: boolean; imported: number; skipped: number; message: string; error?: string }>(
+    {
+      url: `/admin/supply-sources/${id}/products/import`,
+      data: { codes, ...options }
+    }
+  )

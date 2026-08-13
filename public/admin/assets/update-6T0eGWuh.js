@@ -1,0 +1,1 @@
+import{b1 as t}from"./index-CHQ5iEwu.js";const e=()=>t.get({url:"/admin/update/check"}),u=()=>t.get({url:"/admin/update/versions"}),a=()=>t.post({url:"/admin/update/run",timeout:18e4}),o=()=>t.post({url:"/admin/update/rollback",timeout:18e4});export{e as checkUpdate,u as getVersions,o as rollbackUpdate,a as runUpdate};

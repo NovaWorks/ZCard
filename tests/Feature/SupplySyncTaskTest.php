@@ -178,6 +178,11 @@ class SupplySyncTaskTest extends TestCase
     {
         Queue::fake();
         $source = $this->makeSource(['default_pricing_mode' => 'percent', 'default_markup_percent' => 150]);
+        $product = app(SupplySyncService::class)->upsertProduct(
+            $source,
+            new UpstreamProduct(code: 'REPRICE', name: '待重算商品', price: 100, factoryPrice: 80),
+        );
+        $this->assertSame(250, (int) $product->price);
 
         // 编辑货源:加价比例 150 → 600
         $resp = $this->withHeaders($this->adminHeaders())
@@ -198,6 +203,102 @@ class SupplySyncTaskTest extends TestCase
             'supply_source_id' => $source->id,
             'mode' => 'full',
             'status' => 'queued',
+        ]);
+
+        // 执行已派发任务:不仅验证“有任务”，还验证商品售价与任务统计真正更新。
+        $driver = $this->createMock(SupplyDriver::class);
+        $driver->method('listProducts')->willReturn([
+            'items' => [new UpstreamProduct(code: 'REPRICE', name: '待重算商品', price: 100, factoryPrice: 80)],
+            'total' => 1, 'page' => 1, 'has_more' => false,
+        ]);
+        $manager = $this->createMock(SupplyManager::class);
+        $manager->method('driver')->willReturn($driver);
+        /** @var SyncSupplySourceProducts $job */
+        $job = Queue::pushed(SyncSupplySourceProducts::class)->first();
+        $job->handle($manager, app(SupplySyncService::class));
+
+        $this->assertSame(700, (int) $product->fresh()->price, '100 分上游售价 + 600% 应重算为 700 分');
+        $this->assertDatabaseHas('supply_sync_tasks', [
+            'id' => $job->taskId,
+            'status' => SupplySyncTask::STATUS_SUCCESS,
+            'price_updated_count' => 1,
+        ]);
+    }
+
+    public function test_normal_sync_reports_products_skipped_by_manual_price_protection(): void
+    {
+        $source = $this->makeSource(['default_pricing_mode' => 'percent', 'default_markup_percent' => 10]);
+        $product = app(SupplySyncService::class)->upsertProduct(
+            $source,
+            new UpstreamProduct(code: 'MANUAL', name: '手动价商品', price: 100, factoryPrice: 80),
+        );
+        $product->update(['price' => 999, 'price_manual' => true]);
+        $task = SupplySyncTask::create([
+            'supply_source_id' => $source->id,
+            'mode' => 'full',
+            'status' => SupplySyncTask::STATUS_QUEUED,
+        ]);
+
+        $driver = $this->createMock(SupplyDriver::class);
+        $driver->method('listProducts')->willReturn([
+            'items' => [new UpstreamProduct(code: 'MANUAL', name: '手动价商品', price: 100, factoryPrice: 80)],
+            'total' => 1, 'page' => 1, 'has_more' => false,
+        ]);
+        $manager = $this->createMock(SupplyManager::class);
+        $manager->method('driver')->willReturn($driver);
+
+        (new SyncSupplySourceProducts($source->id, 'full', $task->id))
+            ->handle($manager, app(SupplySyncService::class));
+
+        $this->assertSame(999, (int) $product->fresh()->price);
+        $this->assertTrue((bool) $product->fresh()->price_manual);
+        $this->assertDatabaseHas('supply_sync_tasks', [
+            'id' => $task->id,
+            'price_updated_count' => 0,
+            'manual_price_skipped_count' => 1,
+        ]);
+    }
+
+    public function test_force_reprice_overrides_manual_price_and_restores_auto_pricing(): void
+    {
+        Queue::fake();
+        $source = $this->makeSource(['default_pricing_mode' => 'percent', 'default_markup_percent' => 10]);
+        $product = app(SupplySyncService::class)->upsertProduct(
+            $source,
+            new UpstreamProduct(code: 'FORCE', name: '强制重算商品', price: 100, factoryPrice: 80),
+        );
+        $product->update(['price' => 999, 'price_manual' => true]);
+
+        $response = $this->withHeaders($this->adminHeaders())
+            ->postJson("/api/admin/supply-sources/{$source->id}/sync", [
+                'mode' => 'incremental',
+                'force_reprice' => true,
+            ]);
+        $response->assertOk()
+            ->assertJsonPath('task.mode', 'full')
+            ->assertJsonPath('task.force_reprice', true);
+
+        /** @var SyncSupplySourceProducts $job */
+        $job = Queue::pushed(SyncSupplySourceProducts::class)->first();
+        $this->assertTrue($job->forceReprice);
+
+        $driver = $this->createMock(SupplyDriver::class);
+        $driver->method('listProducts')->willReturn([
+            'items' => [new UpstreamProduct(code: 'FORCE', name: '强制重算商品', price: 100, factoryPrice: 80)],
+            'total' => 1, 'page' => 1, 'has_more' => false,
+        ]);
+        $manager = $this->createMock(SupplyManager::class);
+        $manager->method('driver')->willReturn($driver);
+        $job->handle($manager, app(SupplySyncService::class));
+
+        $product->refresh();
+        $this->assertSame(110, (int) $product->price);
+        $this->assertFalse((bool) $product->price_manual);
+        $this->assertDatabaseHas('supply_sync_tasks', [
+            'id' => $job->taskId,
+            'force_reprice' => true,
+            'price_updated_count' => 1,
+            'manual_price_skipped_count' => 0,
         ]);
     }
 

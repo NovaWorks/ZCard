@@ -48,20 +48,11 @@
   "setting": {
     "menuType": {
       "title": "菜单布局",
-      "list": [
-        "垂直",
-        "水平",
-        "混合",
-        "双列"
-      ]
+      "list": ["垂直", "水平", "混合", "双列"]
     },
     "theme": {
       "title": "主题风格",
-      "list": [
-        "浅色",
-        "深色",
-        "系统"
-      ]
+      "list": ["浅色", "深色", "系统"]
     },
     "menu": {
       "title": "菜单风格"
@@ -71,17 +62,11 @@
     },
     "box": {
       "title": "盒子样式",
-      "list": [
-        "边框",
-        "阴影"
-      ]
+      "list": ["边框", "阴影"]
     },
     "container": {
       "title": "容器宽度",
-      "list": [
-        "铺满",
-        "定宽"
-      ]
+      "list": ["铺满", "定宽"]
     },
     "basics": {
       "title": "基础配置",
@@ -127,14 +112,8 @@
   "notice": {
     "title": "通知",
     "btnRead": "标为已读",
-    "bar": [
-      "通知",
-      "消息",
-      "代办"
-    ],
-    "text": [
-      "暂无"
-    ],
+    "bar": ["通知", "消息", "代办"],
+    "text": ["暂无"],
     "viewAll": "查看全部"
   },
   "worktab": {
@@ -460,7 +439,7 @@
       "description": "公开商品详情",
       "price": "价格(元)",
       "priceShort": "价格",
-      "premiumCost": "预选加价/成本",
+      "premiumCost": "预选卡加价/成本",
       "draftPremium": "预选加价(元)",
       "draftPremiumShort": "加价",
       "draftPremiumHint": "买家预选卡密时默认增加的金额",
@@ -1649,7 +1628,13 @@
       "queueDown": "队列未开启:同步任务不会执行",
       "queueDownTip": "任务已创建但会一直停留在「排队中」。请在服务器上启动队列常驻进程(宝塔:进程守护管理器;或 systemd 服务),执行:",
       "queueDownHelp": "启动后回到本页面,队列状态会自动变为正常;历史任务可点「重新同步」再次执行",
-      "taskPriceUpdated": "价格更新 {n}"
+      "taskPriceUpdated": "价格更新 {n}",
+      "taskManualPriceSkipped": "手动价保护跳过 {n}",
+      "taskForceReprice": "覆盖调价",
+      "taskForceRepriceTag": "覆盖手动价",
+      "taskForceRepriceConfirmTitle": "覆盖手动价并重新定价",
+      "taskForceRepriceConfirm": "将按当前渠道定价规则全量重算该货源所有商品，并清除商品的手动价保护，使后续同步继续自动跟随。此操作不会修改「预选卡加价」。是否继续？",
+      "taskForceRepriceDispatched": "全量重新定价任务已提交"
     },
     "supplierAccount": {
       "title": "供货账号管理",

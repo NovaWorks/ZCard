@@ -48,20 +48,11 @@
   "setting": {
     "menuType": {
       "title": "Menu Layout",
-      "list": [
-        "Vertical",
-        "Horizontal",
-        "Mixed",
-        "Dual"
-      ]
+      "list": ["Vertical", "Horizontal", "Mixed", "Dual"]
     },
     "theme": {
       "title": "Theme Style",
-      "list": [
-        "Light",
-        "Dark",
-        "System"
-      ]
+      "list": ["Light", "Dark", "System"]
     },
     "menu": {
       "title": "Menu Style"
@@ -71,17 +62,11 @@
     },
     "box": {
       "title": "Box Style",
-      "list": [
-        "Border",
-        "Shadow"
-      ]
+      "list": ["Border", "Shadow"]
     },
     "container": {
       "title": "Container Width",
-      "list": [
-        "Full",
-        "Boxed"
-      ]
+      "list": ["Full", "Boxed"]
     },
     "basics": {
       "title": "Basic Config",
@@ -127,14 +112,8 @@
   "notice": {
     "title": "Notice",
     "btnRead": "Mark as read",
-    "bar": [
-      "Notice",
-      "Message",
-      "Todo"
-    ],
-    "text": [
-      "No"
-    ],
+    "bar": ["Notice", "Message", "Todo"],
+    "text": ["No"],
     "viewAll": "View all"
   },
   "worktab": {
@@ -460,7 +439,7 @@
       "description": "Public Product Details",
       "price": "Price (¥)",
       "priceShort": "Price",
-      "premiumCost": "Draft Premium / Cost",
+      "premiumCost": "Premium-card Markup / Cost",
       "draftPremium": "Draft Premium (¥)",
       "draftPremiumShort": "Premium",
       "draftPremiumHint": "Default surcharge when a buyer preselects a card",
@@ -1649,7 +1628,13 @@
       "queueDown": "Queue is not running: sync tasks will NOT execute",
       "queueDownTip": "Tasks are created but stay \"queued\" forever. Start the queue worker on your server (BT panel: process manager; or systemd), run:",
       "queueDownHelp": "After starting, return to this page and the queue status will turn green; use \"Sync again\" to rerun past tasks",
-      "taskPriceUpdated": "{n} price updated"
+      "taskPriceUpdated": "{n} price updated",
+      "taskManualPriceSkipped": "{n} protected manual price skipped",
+      "taskForceReprice": "Override prices",
+      "taskForceRepriceTag": "Manual prices overridden",
+      "taskForceRepriceConfirmTitle": "Override manual prices and reprice",
+      "taskForceRepriceConfirm": "All products from this source will be repriced using the current channel rules. Manual price protection will be cleared so future syncs continue to follow upstream prices. Premium-card markup will not be changed. Continue?",
+      "taskForceRepriceDispatched": "Full repricing task dispatched"
     },
     "supplierAccount": {
       "title": "Supplier Accounts",

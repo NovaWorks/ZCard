@@ -115,6 +115,7 @@ class SupplySourceController extends Controller
         $task = SupplySyncTask::create([
             'supply_source_id' => $supplySource->id,
             'mode' => 'full',
+            'force_reprice' => false,
             'status' => SupplySyncTask::STATUS_QUEUED,
         ]);
         SyncSupplySourceProducts::dispatch($supplySource->id, 'full', $task->id);
@@ -158,7 +159,13 @@ class SupplySourceController extends Controller
      */
     public function sync(Request $request, SupplySource $supplySource): JsonResponse
     {
-        $mode = in_array($request->input('mode'), ['full', 'incremental']) ? $request->input('mode') : 'incremental';
+        $data = $request->validate([
+            'mode' => 'sometimes|in:full,incremental',
+            'force_reprice' => 'sometimes|boolean',
+        ]);
+        $forceReprice = (bool) ($data['force_reprice'] ?? false);
+        // 覆盖手动价必须全量拉取，避免增量接口漏掉未发生上游变化的历史商品。
+        $mode = $forceReprice ? 'full' : ($data['mode'] ?? 'incremental');
 
         // 防重:同一货源已有排队/运行中任务时拒绝
         if (SupplySyncTask::where('supply_source_id', $supplySource->id)
@@ -173,10 +180,11 @@ class SupplySourceController extends Controller
         $task = SupplySyncTask::create([
             'supply_source_id' => $supplySource->id,
             'mode' => $mode,
+            'force_reprice' => $forceReprice,
             'status' => SupplySyncTask::STATUS_QUEUED,
         ]);
 
-        SyncSupplySourceProducts::dispatch($supplySource->id, $mode, $task->id);
+        SyncSupplySourceProducts::dispatch($supplySource->id, $mode, $task->id, $forceReprice);
 
         return response()->json(['ok' => true, 'task' => $task]);
     }

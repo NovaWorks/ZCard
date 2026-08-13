@@ -34,6 +34,7 @@ class SyncSupplySourceProducts implements ShouldQueue
         public readonly int $sourceId,
         public readonly string $mode = 'incremental',
         public readonly ?int $taskId = null,
+        public readonly bool $forceReprice = false,
     ) {}
 
     public function handle(SupplyManager $manager, SupplySyncService $sync): void
@@ -56,7 +57,7 @@ class SyncSupplySourceProducts implements ShouldQueue
         }
 
         $page = 1;
-        $created = $updated = $priceUpdated = $hidden = $processed = $total = 0;
+        $created = $updated = $priceUpdated = $manualPriceSkipped = $hidden = $processed = $total = 0;
         // 全量同步:本次拉取到的全部商品 code,用于检测上游已删除/消失的商品 → 标隐藏
         $seenCodes = $this->mode === 'full' ? [] : null;
 
@@ -89,13 +90,23 @@ class SyncSupplySourceProducts implements ShouldQueue
                         $seenCodes[] = $dto->code;
                     }
 
-                    $before = Product::where('upstream_source_id', $source->id)
+                    $beforeProduct = Product::where('upstream_source_id', $source->id)
                         ->where('upstream_product_code', $dto->code)
-                        ->value('price');
-                    $exists = $before !== null;
-                    $sync->upsertProduct($source, $dto);
+                        ->first(['price', 'price_manual']);
+                    $before = $beforeProduct?->price;
+                    $exists = $beforeProduct !== null;
+                    $manualPriceProtected = $exists
+                        && ! $this->forceReprice
+                        && (bool) $beforeProduct->price_manual
+                        && (bool) ($source->settings['auto_sync_price'] ?? true)
+                        && (string) ($source->settings['default_pricing_mode'] ?? 'percent') !== 'pending';
+
+                    $sync->upsertProduct($source, $dto, forcePrice: $this->forceReprice);
                     if ($exists) {
                         $updated++;
+                        if ($manualPriceProtected) {
+                            $manualPriceSkipped++;
+                        }
                         // 价格核对:同步后价格与同步前不一致 → 计数(上游调价跟随生效)
                         $after = Product::where('upstream_source_id', $source->id)
                             ->where('upstream_product_code', $dto->code)
@@ -120,6 +131,7 @@ class SyncSupplySourceProducts implements ShouldQueue
                             'created_count' => $created,
                             'updated_count' => $updated,
                             'price_updated_count' => $priceUpdated,
+                            'manual_price_skipped_count' => $manualPriceSkipped,
                             'hidden_count' => $hidden,
                         ]);
                     }
@@ -144,7 +156,7 @@ class SyncSupplySourceProducts implements ShouldQueue
             }
 
             $source->update(['last_synced_at' => now(), 'last_error' => null]);
-            Log::info("supply sync done source={$source->id} created={$created} updated={$updated} priceUpdated={$priceUpdated} hidden={$hidden}");
+            Log::info("supply sync done source={$source->id} created={$created} updated={$updated} priceUpdated={$priceUpdated} manualPriceSkipped={$manualPriceSkipped} hidden={$hidden}");
 
             $this->finish(SupplySyncTask::STATUS_SUCCESS, $task, null, [
                 'total_products' => $total,
@@ -152,6 +164,7 @@ class SyncSupplySourceProducts implements ShouldQueue
                 'created_count' => $created,
                 'updated_count' => $updated,
                 'price_updated_count' => $priceUpdated,
+                'manual_price_skipped_count' => $manualPriceSkipped,
                 'hidden_count' => $hidden,
             ]);
         } catch (Throwable $e) {
@@ -166,6 +179,7 @@ class SyncSupplySourceProducts implements ShouldQueue
                 'created_count' => $created,
                 'updated_count' => $updated,
                 'price_updated_count' => $priceUpdated,
+                'manual_price_skipped_count' => $manualPriceSkipped,
                 'hidden_count' => $hidden,
             ]);
             throw $e;
@@ -182,6 +196,7 @@ class SyncSupplySourceProducts implements ShouldQueue
         return SupplySyncTask::create([
             'supply_source_id' => $this->sourceId,
             'mode' => $this->mode,
+            'force_reprice' => $this->forceReprice,
             'status' => SupplySyncTask::STATUS_QUEUED,
         ]);
     }

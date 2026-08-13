@@ -23,12 +23,14 @@ class SupplySyncTask extends Model
     public const STATUS_CANCELLED = 'cancelled';
 
     protected $fillable = [
-        'supply_source_id', 'mode', 'status', 'total_products', 'processed_products',
-        'created_count', 'updated_count', 'price_updated_count', 'hidden_count', 'error',
+        'supply_source_id', 'mode', 'force_reprice', 'status', 'total_products', 'processed_products',
+        'created_count', 'updated_count', 'price_updated_count', 'manual_price_skipped_count',
+        'hidden_count', 'error',
         'started_at', 'finished_at',
     ];
 
     protected $casts = [
+        'force_reprice' => 'boolean',
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
     ];

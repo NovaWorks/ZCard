@@ -37,9 +37,15 @@ class SupplySyncService
      *                               'markup_amount'=>float(元)]
      *                               为 null 时走货源 settings 默认定价。
      * @param  array|null  $categoryMap  上游分类 code → 本地分类 id 映射(勾选导入时)
+     * @param  bool  $forcePrice  显式覆盖手动价并恢复自动定价(仅管理员确认后的全量重算)
      */
-    public function upsertProduct(SupplySource $source, UpstreamProduct $dto, ?array $pricing = null, ?array $categoryMap = null): Product
-    {
+    public function upsertProduct(
+        SupplySource $source,
+        UpstreamProduct $dto,
+        ?array $pricing = null,
+        ?array $categoryMap = null,
+        bool $forcePrice = false,
+    ): Product {
         // 含软删除查找:删除过的商品重新导入时恢复原记录。
         // ⚠️ 只用 upstream_product_code 精确匹配 —— 不能再用 slug 兜底:
         // 上游不同商品(如"美区Gemini"与"随机Gemini")的 Str::slug(name) 相同,
@@ -84,11 +90,16 @@ class SupplySyncService
             $autoPrice = (bool) ($source->settings['auto_sync_price'] ?? true);
             $defaultMode = (string) ($source->settings['default_pricing_mode'] ?? 'percent');
             $priceManual = (bool) $existing->price_manual;
-            if ($pricing !== null
+            if ($forcePrice
+                || $pricing !== null
                 || ($autoPrice && ! $priceManual && $defaultMode !== 'pending')
                 || (int) $existing->price <= 0) {
                 $newPrice = $this->computeInitialPrice($source, $dto->factoryPrice, $dto->price, $pricing);
                 $update['price'] = $newPrice ?? 0;
+                if ($forcePrice) {
+                    // 管理员已明确选择覆盖手动价:本次重算后恢复后续自动跟随。
+                    $update['price_manual'] = false;
+                }
                 // pending 模式新导入/重定价 → 待审不上架
                 if ($newPrice === null) {
                     $update['status'] = 0;

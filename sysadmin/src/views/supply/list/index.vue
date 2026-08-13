@@ -74,13 +74,21 @@
             </ElTag>
           </template>
         </ElTableColumn>
-        <ElTableColumn :label="t('zcard.common.actions')" width="280" fixed="right">
+        <ElTableColumn :label="t('zcard.common.actions')" width="350" fixed="right">
           <template #default="{ row }">
             <ElButton text type="primary" :loading="testingId === row.id" @click="handleTest(row)">
               {{ t('zcard.supply.test') }}
             </ElButton>
             <ElButton text type="primary" :loading="syncingId === row.id" @click="handleSync(row)">
               {{ t('zcard.supply.sync') }}
+            </ElButton>
+            <ElButton
+              text
+              type="warning"
+              :loading="repricingId === row.id"
+              @click="handleForceReprice(row)"
+            >
+              {{ t('zcard.supply.taskForceReprice') }}
             </ElButton>
             <ElButton
               text
@@ -326,6 +334,7 @@
             <div class="all-task-source">{{ task.source_name }}</div>
             <ElTag :type="taskStatusTag(task.status)" size="small">{{ taskStatusText(task.status) }}</ElTag>
             <span class="task-mode">{{ task.mode === 'full' ? t('zcard.supply.taskModeFull') : t('zcard.supply.taskModeInc') }}</span>
+            <ElTag v-if="task.force_reprice" type="warning" size="small">{{ t('zcard.supply.taskForceRepriceTag') }}</ElTag>
           </div>
           <div class="all-task-progress" v-if="task.total_products > 0">
             <ElProgress :percentage="taskProgress(task)" :stroke-width="10" />
@@ -333,6 +342,7 @@
               {{ t('zcard.supply.taskProcessed', { n: task.processed_products, total: task.total_products }) }}
               · +{{ task.created_count }} {{ t('zcard.supply.taskCreated') }}
               · <span v-if="task.price_updated_count" class="task-price-updated">💰 {{ t('zcard.supply.taskPriceUpdated', { n: task.price_updated_count }) }}</span>
+              · <span v-if="task.manual_price_skipped_count" class="task-manual-skipped">{{ t('zcard.supply.taskManualPriceSkipped', { n: task.manual_price_skipped_count }) }}</span>
             </span>
           </div>
           <div v-else-if="task.status === 'queued' || task.status === 'running'" class="all-task-waiting">
@@ -365,6 +375,7 @@
             <span class="task-label">{{ t('zcard.supply.taskStatus') }}</span>
             <ElTag :type="taskStatusTag(activeTask.status)" size="small">{{ taskStatusText(activeTask.status) }}</ElTag>
             <span class="task-mode">{{ activeTask.mode === 'full' ? t('zcard.supply.taskModeFull') : t('zcard.supply.taskModeInc') }}</span>
+            <ElTag v-if="activeTask.force_reprice" type="warning" size="small">{{ t('zcard.supply.taskForceRepriceTag') }}</ElTag>
           </div>
 
           <!-- 进度条 -->
@@ -385,6 +396,7 @@
             <span class="task-count created">+{{ activeTask.created_count }} {{ t('zcard.supply.taskCreated') }}</span>
             <span class="task-count updated">{{ activeTask.updated_count }} {{ t('zcard.supply.taskUpdated') }}</span>
             <span class="task-count price" v-if="activeTask.price_updated_count">{{ t('zcard.supply.taskPriceUpdated', { n: activeTask.price_updated_count }) }}</span>
+            <span class="task-count skipped" v-if="activeTask.manual_price_skipped_count">{{ t('zcard.supply.taskManualPriceSkipped', { n: activeTask.manual_price_skipped_count }) }}</span>
             <span class="task-count hidden" v-if="activeTask.hidden_count">{{ activeTask.hidden_count }} {{ t('zcard.supply.taskHidden') }}</span>
           </div>
 
@@ -951,6 +963,7 @@
 
   /** 触发同步(异步任务,弹窗轮询进度) */
   const syncingId = ref<number | null>(null)
+  const repricingId = ref<number | null>(null)
   const handleSync = async (row: SupplySource) => {
     syncingId.value = row.id
     try {
@@ -962,6 +975,31 @@
       // 拦截器已提示
     } finally {
       syncingId.value = null
+    }
+  }
+
+  /** 按当前渠道规则全量重算价格，并恢复自动跟价 */
+  const handleForceReprice = async (row: SupplySource) => {
+    try {
+      await ElMessageBox.confirm(
+        t('zcard.supply.taskForceRepriceConfirm'),
+        t('zcard.supply.taskForceRepriceConfirmTitle'),
+        { type: 'warning' }
+      )
+    } catch {
+      return
+    }
+
+    repricingId.value = row.id
+    try {
+      await syncSupplySource(row.id, 'full', true)
+      openTaskDialog(row)
+      ElMessage.success(t('zcard.supply.taskForceRepriceDispatched'))
+      fetchData()
+    } catch {
+      // 拦截器已提示
+    } finally {
+      repricingId.value = null
     }
   }
 
@@ -1762,6 +1800,8 @@
 .task-count.created { color: var(--el-color-success); }
 .task-count.price { color: var(--el-color-warning); font-weight: 600; }
 .task-price-updated { color: var(--el-color-warning); font-weight: 600; }
+.task-count.skipped,
+.task-manual-skipped { color: var(--el-color-danger); font-weight: 600; }
 .task-count.updated { color: var(--el-color-primary); }
 .task-count.hidden { color: var(--el-color-warning); }
 .task-error {
