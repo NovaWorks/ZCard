@@ -20,8 +20,10 @@ onMounted(() => {
   settings.load()
   prefs.load()
 })
-const siteName = computed(() => settings.config?.site_name || 'ZCard')
+const siteName = computed(() => settings.config?.site_name?.trim() || '')
 const siteLogo = computed(() => settings.config?.site_logo || '')
+/** 无 logo 时的首字占位(取站名首字,避免硬编码品牌字母) */
+const siteInitial = computed(() => siteName.value.charAt(0) || '')
 // 顶部品牌条文案:后台可配置(支持中英,英文留空回退中文,中文留空回退 i18n 默认)
 const isEn = computed(() => (prefs.language || 'zh') === 'en')
 const brandSlogan = computed(() => {
@@ -95,7 +97,7 @@ const mobileMenuOpen = ref(false)
       <RouterLink to="/" class="flex items-center gap-2">
         <!-- Logo (优先使用自定义 logo,否则用首字母方块) -->
         <img v-if="siteLogo" :src="siteLogo" :alt="siteName" class="w-9 h-9 rounded-[10px] object-cover shadow-sm" />
-        <span v-else class="w-9 h-9 bg-gradient-to-br from-primary to-primary-hover rounded-[10px] text-white font-extrabold flex items-center justify-center text-lg shadow-sm">Z</span>
+        <span v-else class="w-9 h-9 bg-gradient-to-br from-primary to-primary-hover rounded-[10px] text-white font-extrabold flex items-center justify-center text-lg shadow-sm">{{ siteInitial }}</span>
         <span class="text-xl font-extrabold text-ink tracking-tight">{{ siteName }}</span>
       </RouterLink>
       <!-- 桌面端导航 (md 以上显示) -->

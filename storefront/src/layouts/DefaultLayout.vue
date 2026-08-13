@@ -6,7 +6,6 @@ import AppFooter from '@/components/AppFooter.vue'
 import ServiceWidget from '@/components/ServiceWidget.vue'
 import NoticeModal from '@/components/NoticeModal.vue'
 import { useSettingsStore } from '@/stores/settings'
-import { getStorefrontSettings } from '@/api/settings'
 import { on as onEvent } from '@/utils/eventBus'
 import { setSeo } from '@/utils/seo'
 import AppIcon from '@/components/AppIcon.vue'
@@ -37,13 +36,18 @@ watchEffect(() => {
   }
 })
 
+// 启动:同步恢复缓存配置(首帧即显示后台 logo/站名,不闪默认品牌)→ 网络拉取最新覆盖
+settings.restore()
+const current = settings.config
+maintenanceMode.value = !!current?.maintenance_mode
+maintenanceMessage.value = current?.maintenance_message || t('layout.maintenanceDefault')
+
 onMounted(async () => {
   try {
-    const config = await getStorefrontSettings()
-    settings.config = config
-    settings.loaded = true
-    maintenanceMode.value = !!config.maintenance_mode
-    maintenanceMessage.value = config.maintenance_message || t('layout.maintenanceDefault')
+    await settings.refresh()
+    const config = settings.config
+    maintenanceMode.value = !!config?.maintenance_mode
+    maintenanceMessage.value = config?.maintenance_message || t('layout.maintenanceDefault')
   } catch (e: any) {
     // 维护模式时 API 返回 503
     if (e?.response?.status === 503) {

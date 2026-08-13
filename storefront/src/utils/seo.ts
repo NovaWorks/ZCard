@@ -10,6 +10,8 @@ interface SeoOptions {
   image?: string
   /** 页面类型(og:type),默认 website */
   type?: string
+  /** 站点名称(og:site_name 使用,不传则回退 title) */
+  siteName?: string
 }
 
 function upsertMeta(attr: 'name' | 'property', key: string, content: string): void {
@@ -54,7 +56,7 @@ export function setSeo(opts: SeoOptions): void {
 
   if (opts.title) {
     upsertMeta('property', 'og:title', opts.title)
-    upsertMeta('property', 'og:site_name', opts.title)
+    upsertMeta('property', 'og:site_name', opts.siteName || opts.title)
   }
   if (opts.type) {
     upsertMeta('property', 'og:type', opts.type)

@@ -12,7 +12,7 @@ onMounted(() => {
 })
 const cfg = computed(() => settings.config)
 
-const siteName = computed(() => cfg.value?.site_name || 'ZCard')
+const siteName = computed(() => cfg.value?.site_name?.trim() || '')
 const siteLogo = computed(() => cfg.value?.site_logo || '')
 const about = computed(() => cfg.value?.footer_about || '')
 const links = computed(() => cfg.value?.footer_links || [])

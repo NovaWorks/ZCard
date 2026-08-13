@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getProduct, type Product } from '@/api/products'
@@ -109,16 +109,6 @@ onMounted(async () => {
   try {
     product.value = await getProduct(route.params.id as string)
     selectedSku.value = product.value.skus?.[0]?.id ?? null
-    // 商品级 SEO:标题 = 商品名,关键词/描述 = 后端自动组合(可后台自定义 seo_*)
-    const siteName = settings.config?.site_name || 'ZCard'
-    const seo = (product.value as any)?.seo || {}
-    setSeo({
-      title: seo.title ? `${seo.title} - ${siteName}` : `${product.value.name} - ${siteName}`,
-      description: seo.description || '',
-      keywords: seo.keywords || '',
-      image: product.value.cover || undefined,
-      type: 'product',
-    })
   } catch (e) { err.value = t('product.detail.notFound') }
 
   // 拉取合并评价(真实 + 虚拟)
@@ -137,6 +127,22 @@ onMounted(async () => {
       reviewOrderId.value = el.order_id
     } catch { /* 未登录/接口异常不显示入口 */ }
   }
+})
+
+// 商品级 SEO:标题 = 商品名 - 后台站名(响应式:配置到达后自动重设,避免刷新期间闪默认品牌)
+watchEffect(() => {
+  const p = product.value
+  const siteName = settings.config?.site_name?.trim() || ''
+  if (!p || !siteName) return
+  const seo = (p as any)?.seo || {}
+  setSeo({
+    title: seo.title ? `${seo.title} - ${siteName}` : `${p.name} - ${siteName}`,
+    description: seo.description || '',
+    keywords: seo.keywords || '',
+    image: p.cover || undefined,
+    type: 'product',
+    siteName,
+  })
 })
 
 function openReview() {
