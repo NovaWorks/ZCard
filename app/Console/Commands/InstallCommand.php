@@ -255,6 +255,7 @@ class InstallCommand extends Command
             storage_path('framework/views'),
             storage_path('logs'),
             base_path('bootstrap/cache'),
+            base_path('vendor'), // composer install 以 root 执行时 vendor 属主为 root,PHP 进程删除旧包会失败
         ];
 
         foreach ($dirs as $dir) {

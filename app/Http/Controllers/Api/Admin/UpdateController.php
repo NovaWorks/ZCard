@@ -167,11 +167,8 @@ class UpdateController extends Controller
 
             // Step 4: composer install(设置 COMPOSER_HOME 避免容器无 HOME)
             $this->log($logFile, '安装依赖...');
-            $output = $this->shell(
-                'cd '.base_path().' && COMPOSER_HOME=/tmp/composer composer install --no-dev --optimize-autoloader --no-interaction 2>&1',
-                true,
-                'Composer 安装失败(请确认服务器使用 Composer 2.2 或更高版本)'
-            );
+            $this->assertVendorWritable();
+            $output = $this->composerInstall();
             $this->log($logFile, $output);
 
             // Step 5: 数据库迁移
@@ -294,11 +291,8 @@ class UpdateController extends Controller
 
             // Step 3: 安装依赖(可能需要降级)
             $this->log($logFile, '安装依赖...');
-            $output = $this->shell(
-                'cd '.base_path().' && COMPOSER_HOME=/tmp/composer composer install --no-dev --optimize-autoloader --no-interaction 2>&1',
-                true,
-                'Composer 安装失败(请确认服务器使用 Composer 2.2 或更高版本)'
-            );
+            $this->assertVendorWritable();
+            $output = $this->composerInstall();
             $this->log($logFile, $output);
 
             // Step 4: 数据库回滚迁移
@@ -410,6 +404,56 @@ class UpdateController extends Controller
         }
 
         return $output;
+    }
+
+    /**
+     * composer install 预检:vendor 目录必须可写。
+     *
+     * composer 在依赖增删时会**删除/替换旧包文件**;若服务器曾用 root 执行过
+     * composer install / git pull,vendor 内文件属主为 root,而 PHP-FPM 以 www
+     * 用户运行 → 删除失败 → composer 中断回滚。此预检在 composer 执行前给出
+     * 明确修复指令,而不是等 composer 报笼统错误。
+     */
+    private function assertVendorWritable(): void
+    {
+        $vendor = base_path('vendor');
+        if (! is_dir($vendor) || is_writable($vendor)) {
+            return;
+        }
+
+        throw new \RuntimeException(
+            'vendor 目录不可写:可能曾用 root 执行过 composer install,文件属主为 root,'
+            .'而 PHP 进程(www)无权删除/替换旧包文件,导致 composer 更新中断。'
+            .'请在服务器 SSH 执行(需 root): chown -R www:www '.base_path()
+            .' 然后重新点击在线更新。'
+        );
+    }
+
+    /**
+     * 执行 composer install,并对"删除旧 vendor 文件失败"给出针对性诊断。
+     */
+    private function composerInstall(): string
+    {
+        try {
+            return $this->shell(
+                'cd '.base_path().' && COMPOSER_HOME=/tmp/composer composer install --no-dev --optimize-autoloader --no-interaction 2>&1',
+                true,
+                'Composer 安装失败(请确认服务器使用 Composer 2.2 或更高版本)'
+            );
+        } catch (\RuntimeException $e) {
+            $message = $e->getMessage();
+            // 删除旧 vendor 文件失败 → 属主权限问题,给出针对性指令
+            if (preg_match('/failed to remove|Could not delete|Unable to remove|Permission denied|rm: cannot remove/i', $message)) {
+                throw new \RuntimeException(
+                    'Composer 删除旧依赖文件失败:vendor 内文件属主可能为 root(曾用 root 执行过 '
+                    .'composer install),PHP 进程(www)无权删除。请在服务器 SSH 执行(需 root): '
+                    .'chown -R www:www '.base_path()
+                    .' 然后重新点击在线更新。原始输出: '.$message
+                );
+            }
+
+            throw $e;
+        }
     }
 
     /**
