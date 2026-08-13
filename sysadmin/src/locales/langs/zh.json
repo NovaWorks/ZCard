@@ -1361,7 +1361,16 @@
       "serviceScriptPlaceholder": "粘贴 Chatwoot / Crisp 等平台的安装脚本,原样注入前台页面",
       "serviceScriptTip": "Chatwoot: Settings → Website → Code 复制安装脚本;Crisp: Settings → Websites → 你的网站 → Install code。配置后前台直接执行脚本,由第三方原生渲染客服气泡,不再叠加本站浮窗",
       "siteFavicon": "站点图标 (favicon)",
-      "siteFaviconTip": "浏览器标签页图标;留空则使用站点 Logo"
+      "siteFaviconTip": "浏览器标签页图标;留空则使用站点 Logo",
+      "adminAlertSection": "登录安全告警",
+      "adminAlertEnabled": "启用登录安全告警",
+      "adminAlertEnabledTip": "超级管理员从陌生 IP 或新设备登录时,向以下渠道发送告警(首次登录仅建立基线,不告警)",
+      "adminAlertEmail": "告警邮箱",
+      "adminAlertEmailTip": "需已启用邮件(SMTP)配置;留空则不启用邮件渠道",
+      "adminAlertTgToken": "Telegram Bot Token",
+      "adminAlertTgChatId": "Telegram Chat ID",
+      "adminAlertWecomWebhook": "企业微信机器人 Webhook",
+      "adminAlertChannelTip": "渠道配置非空即启用。TG:向 @BotFather 创建机器人获取 Token;企业微信:群聊添加群机器人复制 Webhook"
     },
     "common": {
       "id": "ID",
@@ -1442,7 +1451,15 @@
       "lowStockTip": "库存不足，请及时补货",
       "pendingWithdrawalsTip": "有待审核提现申请",
       "pendingAmountTip": "待付款订单金额合计",
-      "pendingOrderTip": "待付款订单合计"
+      "pendingOrderTip": "待付款订单合计",
+      "statOnline": "实时在线",
+      "onlineTip": "最近 5 分钟活跃会话",
+      "trafficTitle": "前台流量走势",
+      "trafficPv": "浏览量 PV",
+      "trafficUv": "访客数 UV",
+      "refundTitle": "退款率趋势",
+      "refundCount": "退款单数",
+      "refundRate": "退款率"
     },
     "member": {
       "introTitle": "会员等级管理",

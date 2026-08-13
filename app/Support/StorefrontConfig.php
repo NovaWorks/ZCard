@@ -156,6 +156,13 @@ class StorefrontConfig
                 'script' => '',
             ],
 
+            // 管理员登录安全告警(issue #6):渠道配置非空即启用;总开关 admin_alert_enabled
+            'admin_alert_enabled' => false,
+            'admin_alert_email' => '',
+            'admin_alert_tg_token' => '',
+            'admin_alert_tg_chat_id' => '',
+            'admin_alert_wecom_webhook' => '',
+
             // 邮件设置(SMTP)
             'mail_enabled' => false,
             'mail_host' => '',

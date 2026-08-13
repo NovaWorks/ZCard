@@ -116,6 +116,7 @@ Route::middleware(['auth:sanctum', 'active.user', 'admin.role', 'audit.admin'])-
     Route::get('dashboard/trends', [AdminDashboardController::class, 'trends']);
     Route::get('dashboard/top-products', [AdminDashboardController::class, 'topProducts']);
     Route::get('dashboard/top-channels', [AdminDashboardController::class, 'topChannels']);
+    Route::get('dashboard/traffic', [AdminDashboardController::class, 'traffic']);
 
     // 在线更新(检查版本/执行更新/日志)
     Route::get('update/check', [AdminUpdateController::class, 'check']);

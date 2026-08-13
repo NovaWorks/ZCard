@@ -46,6 +46,27 @@
       <div ref="trendChartEl" class="chart-box"></div>
     </ElCard>
 
+    <!-- Row 3.5: 流量走势 + 退款率趋势 -->
+    <div class="row-two row-50-50">
+      <ElCard class="chart-card" shadow="never">
+        <template #header>
+          <div class="card-header">
+            <span class="card-title">{{ t('zcard.dashboard.trafficTitle') }}</span>
+          </div>
+        </template>
+        <div ref="trafficChartEl" class="chart-box"></div>
+      </ElCard>
+
+      <ElCard class="chart-card" shadow="never">
+        <template #header>
+          <div class="card-header">
+            <span class="card-title">{{ t('zcard.dashboard.refundTitle') }}</span>
+          </div>
+        </template>
+        <div ref="refundChartEl" class="chart-box"></div>
+      </ElCard>
+    </div>
+
     <!-- Row 4: 订单趋势柱状图 + 商品排行 -->
     <div class="row-two row-60-40">
       <ElCard class="chart-card" shadow="never">
@@ -174,8 +195,10 @@ import {
   getTrends,
   getTopProducts,
   getTopChannels,
+  getTraffic,
   type OverviewData,
   type TrendPoint,
+  type TrafficPoint,
   type TopProduct,
   type TopChannel,
 } from '@/api/dashboard'
@@ -192,6 +215,7 @@ const overview = ref<OverviewData | null>(null)
 const trends = ref<TrendPoint[]>([])
 const topProducts = ref<TopProduct[]>([])
 const topChannels = ref<TopChannel[]>([])
+const traffic = ref<TrafficPoint[]>([])
 
 // ===== 格式化 =====
 const formatAmount = (fen: number | null | undefined): string =>
@@ -228,7 +252,16 @@ const statCards = computed<StatCard[]>(() => {
   const subPending = t('zcard.dashboard.pendingOrderTip')
   const subNewUser = `${t('zcard.dashboard.statTotalProducts')} ${formatCount(o?.total_products)}`
   const subStock = `${t('zcard.dashboard.statLowStock')} ${formatCount(o?.low_stock_products)} ${t('zcard.dashboard.productUnit')}`
+  const subOnline = t('zcard.dashboard.onlineTip')
   return [
+    {
+      key: 'onlineUsers',
+      label: 'zcard.dashboard.statOnline',
+      value: o?.online_users,
+      sub: subOnline,
+      icon: 'ri:wifi-line',
+      color: '#10b981',
+    },
     {
       key: 'paidOrders',
       label: 'zcard.dashboard.statPaidOrders',
@@ -324,12 +357,18 @@ const rateTagType = (rate: number): 'success' | 'warning' | 'danger' => {
 // ===== ECharts =====
 const trendChartEl = ref<HTMLElement>()
 const orderChartEl = ref<HTMLElement>()
+const trafficChartEl = ref<HTMLElement>()
+const refundChartEl = ref<HTMLElement>()
 let trendChart: echarts.ECharts | null = null
 let orderChart: echarts.ECharts | null = null
+let trafficChart: echarts.ECharts | null = null
+let refundChart: echarts.ECharts | null = null
 
 const handleResize = () => {
   trendChart?.resize()
   orderChart?.resize()
+  trafficChart?.resize()
+  refundChart?.resize()
 }
 
 const trendDates = computed(() => trends.value.map((p) => p.date.slice(5)))
@@ -403,6 +442,130 @@ const updateTrendChart = () => {
   })
 }
 
+// ===== 流量走势(PV/UV) =====
+const trafficDates = computed(() => traffic.value.map((p) => p.date.slice(5)))
+const trafficPv = computed(() => traffic.value.map((p) => Number(p.pv || 0)))
+const trafficUv = computed(() => traffic.value.map((p) => Number(p.uv || 0)))
+
+const initTrafficChart = () => {
+  if (!trafficChartEl.value) return
+  trafficChart = echarts.init(trafficChartEl.value)
+  updateTrafficChart()
+}
+
+const updateTrafficChart = () => {
+  if (!trafficChart) return
+  trafficChart.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    legend: {
+      data: [t('zcard.dashboard.trafficPv'), t('zcard.dashboard.trafficUv')],
+      top: 0,
+    },
+    grid: { left: 44, right: 16, top: 40, bottom: 30 },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: trafficDates.value,
+      axisLine: { lineStyle: { color: '#e5e7eb' } },
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: 1,
+      splitLine: { lineStyle: { color: '#f0f0f0' } },
+    },
+    series: [
+      {
+        name: t('zcard.dashboard.trafficPv'),
+        type: 'line',
+        smooth: true,
+        showSymbol: false,
+        data: trafficPv.value,
+        lineStyle: { width: 2.5, color: '#0ea5e9' },
+        itemStyle: { color: '#0ea5e9' },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(14,165,233,0.3)' },
+            { offset: 1, color: 'rgba(14,165,233,0.02)' },
+          ]),
+        },
+      },
+      {
+        name: t('zcard.dashboard.trafficUv'),
+        type: 'line',
+        smooth: true,
+        showSymbol: false,
+        data: trafficUv.value,
+        lineStyle: { width: 2.5, color: '#9254de' },
+        itemStyle: { color: '#9254de' },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(146,84,222,0.25)' },
+            { offset: 1, color: 'rgba(146,84,222,0.02)' },
+          ]),
+        },
+      },
+    ],
+  })
+}
+
+// ===== 退款率趋势 =====
+const refundDates = computed(() => trends.value.map((p) => p.date.slice(5)))
+const refundCount = computed(() => trends.value.map((p) => Number(p.refunded_count || 0)))
+const refundRate = computed(() => trends.value.map((p) => Number(p.refund_rate || 0)))
+
+const initRefundChart = () => {
+  if (!refundChartEl.value) return
+  refundChart = echarts.init(refundChartEl.value)
+  updateRefundChart()
+}
+
+const updateRefundChart = () => {
+  if (!refundChart) return
+  refundChart.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: {
+      data: [t('zcard.dashboard.refundCount'), t('zcard.dashboard.refundRate')],
+      top: 0,
+    },
+    grid: { left: 44, right: 40, top: 40, bottom: 30 },
+    xAxis: {
+      type: 'category',
+      data: refundDates.value,
+      axisLine: { lineStyle: { color: '#e5e7eb' } },
+    },
+    yAxis: [
+      {
+        type: 'value',
+        minInterval: 1,
+        splitLine: { lineStyle: { color: '#f0f0f0' } },
+      },
+      {
+        type: 'value',
+        axisLabel: { formatter: '{value}%' },
+        splitLine: { show: false },
+      },
+    ],
+    series: [
+      {
+        name: t('zcard.dashboard.refundCount'),
+        type: 'bar',
+        data: refundCount.value,
+        barWidth: '40%',
+        itemStyle: { color: '#f56c6c', borderRadius: [4, 4, 0, 0] },
+      },
+      {
+        name: t('zcard.dashboard.refundRate'),
+        type: 'line',
+        yAxisIndex: 1,
+        smooth: true,
+        data: refundRate.value,
+        lineStyle: { width: 2.5, color: '#e6a23c' },
+        itemStyle: { color: '#e6a23c' },
+      },
+    ],
+  })
+}
+
 const initOrderChart = () => {
   if (!orderChartEl.value) return
   orderChart = echarts.init(orderChartEl.value)
@@ -454,17 +617,23 @@ const loadAll = async () => {
     getTrends(params),
     getTopProducts({ days: days.value, limit: 10 }),
     getTopChannels({ days: days.value }),
+    getTraffic(params),
   ])
   if (results[0].status === 'fulfilled') overview.value = results[0].value
   if (results[1].status === 'fulfilled') trends.value = results[1].value || []
   if (results[2].status === 'fulfilled') topProducts.value = results[2].value || []
   if (results[3].status === 'fulfilled') topChannels.value = results[3].value || []
+  if (results[4].status === 'fulfilled') traffic.value = results[4].value || []
   loading.value = false
   await nextTick()
   if (!trendChart) initTrendChart()
   else updateTrendChart()
   if (!orderChart) initOrderChart()
   else updateOrderChart()
+  if (!trafficChart) initTrafficChart()
+  else updateTrafficChart()
+  if (!refundChart) initRefundChart()
+  else updateRefundChart()
 }
 
 onMounted(async () => {
@@ -476,8 +645,12 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   trendChart?.dispose()
   orderChart?.dispose()
+  trafficChart?.dispose()
+  refundChart?.dispose()
   trendChart = null
   orderChart = null
+  trafficChart = null
+  refundChart = null
 })
 </script>
 

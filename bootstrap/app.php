@@ -13,6 +13,7 @@ use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\SupplyAuth;
 use App\Http\Middleware\SupplyRateLimit;
+use App\Http\Middleware\TrackVisitor;
 use App\Models\SupplySource;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -40,6 +41,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // SPA 入口 HTML 不缓存(防止更新后旧 index.html 引用已删除的 hash JS → 404 白屏)
         $middleware->append(NoCacheHtml::class);
         $middleware->append(SecurityHeaders::class);
+
+        // 前台流量埋点(数据看板 PV/UV):web 组全局统计
+        $middleware->append(TrackVisitor::class);
 
         // API 路由加入 Session 支持(mews/captcha 验证码需要 session 存储)
         // 注意:必须同时加 EncryptCookies —— 验证码图片走 web 组(有 EncryptCookies),

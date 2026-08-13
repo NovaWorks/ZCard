@@ -1361,7 +1361,16 @@
       "serviceScriptPlaceholder": "Paste the Chatwoot / Crisp install script; it will be injected into the storefront",
       "serviceScriptTip": "Chatwoot: Settings → Website → Code. Crisp: Settings → Websites → your website → Install code. The script is executed as-is and renders the native chat bubble; no local widget is added",
       "siteFavicon": "Favicon",
-      "siteFaviconTip": "Browser tab icon; falls back to the site logo when empty"
+      "siteFaviconTip": "Browser tab icon; falls back to the site logo when empty",
+      "adminAlertSection": "Login Security Alerts",
+      "adminAlertEnabled": "Enable login security alerts",
+      "adminAlertEnabledTip": "Send alerts when a super admin logs in from an unknown IP or a new device (first login only builds the baseline, no alert)",
+      "adminAlertEmail": "Alert email",
+      "adminAlertEmailTip": "Requires mail (SMTP) to be enabled; leave empty to disable the email channel",
+      "adminAlertTgToken": "Telegram Bot Token",
+      "adminAlertTgChatId": "Telegram Chat ID",
+      "adminAlertWecomWebhook": "WeCom group robot Webhook",
+      "adminAlertChannelTip": "A channel is enabled when its config is non-empty. TG: create a bot via @BotFather. WeCom: add a group robot and copy its webhook"
     },
     "common": {
       "id": "ID",
@@ -1442,7 +1451,15 @@
       "lowStockTip": "Low stock, please restock",
       "pendingWithdrawalsTip": "Withdrawal requests awaiting review",
       "pendingAmountTip": "Total amount of pending orders",
-      "pendingOrderTip": "Sum of pending orders"
+      "pendingOrderTip": "Sum of pending orders",
+      "statOnline": "Online Now",
+      "onlineTip": "Active sessions in last 5 min",
+      "trafficTitle": "Storefront Traffic",
+      "trafficPv": "PV",
+      "trafficUv": "UV",
+      "refundTitle": "Refund Rate Trend",
+      "refundCount": "Refunds",
+      "refundRate": "Refund rate"
     },
     "member": {
       "introTitle": "Member Level Management",

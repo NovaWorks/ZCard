@@ -37,6 +37,31 @@ class MailService
     }
 
     /**
+     * 发送纯文本告警邮件(管理员登录告警等)。
+     * 返回是否发送成功(配置缺失/失败时 false,不抛出)。
+     */
+    public static function sendAlert(string $toEmail, string $subject, string $content): bool
+    {
+        if (! StorefrontConfig::get('mail_enabled')) {
+            return false;
+        }
+
+        self::configure();
+
+        try {
+            Mail::raw($content, function ($message) use ($toEmail, $subject): void {
+                $message->to($toEmail)->subject($subject);
+            });
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('告警邮件发送失败: '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
      * 发送发卡通知邮件。
      */
     public static function sendDeliveryNotification(string $toEmail, array $data): void

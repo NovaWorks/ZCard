@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\AdminLoginAlertService;
 use App\Support\CaptchaService;
 use App\Support\MailService;
+use App\Support\SecurityAudit;
 use App\Support\StorefrontConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -105,6 +107,9 @@ class AuthController extends Controller
             ->first();
 
         if (! $user || ! Hash::check($data['password'], $user->password)) {
+            SecurityAudit::record($request, 'login.failed', User::class, $user?->id, [
+                'identifier' => mb_substr($identifier, 0, 100),
+            ]);
             throw ValidationException::withMessages([
                 'email' => [__('messages.auth.invalid_credentials')],
             ]);
@@ -118,6 +123,20 @@ class AuthController extends Controller
 
         $user->update(['last_login_at' => now()]);
         $token = $user->createToken('storefront')->plainTextToken;
+
+        // 超级管理员:陌生 IP/设备登录告警(邮件/Telegram/企业微信,异步)。
+        // 必须在登录审计**之前**执行:history 不含本次登录,陌生判定才准确
+        if ($user->hasRole('super_admin')) {
+            try {
+                AdminLoginAlertService::checkAndAlert($request, $user);
+            } catch (\Throwable $e) {
+                // 告警失败不影响登录
+                report($e);
+            }
+        }
+
+        // 登录审计(记录 IP/UA,供后续异常登录检测)
+        SecurityAudit::record($request, 'login.success', User::class, $user->id, [], 200, $user->id);
 
         return response()->json([
             'token' => $token,

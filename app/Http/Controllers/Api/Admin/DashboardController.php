@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\User;
+use App\Models\VisitLog;
 use App\Models\Withdrawal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -55,7 +56,18 @@ class DashboardController extends Controller
 
         $pendingWithdrawals = Withdrawal::where('status', 'pending')->count();
 
+        // 实时在线人数:database session 驱动下,sessions 表 5 分钟内活跃的会话数
+        $onlineUsers = 0;
+        try {
+            $onlineUsers = (int) DB::table('sessions')
+                ->where('last_activity', '>=', now()->subMinutes(5)->getTimestamp())
+                ->count();
+        } catch (\Throwable $e) {
+            // session 驱动非 database 时忽略(返回 0)
+        }
+
         return response()->json([
+            'online_users' => $onlineUsers,
             'total_orders' => $totalOrders,
             'paid_orders' => $paidOrders,
             'paid_amount' => (int) $paidAmount,
@@ -88,7 +100,8 @@ class DashboardController extends Controller
             DB::raw('COUNT(*) as order_count'),
             DB::raw("SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as paid_count"),
             DB::raw("SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) as paid_amount"),
-            DB::raw("SUM(CASE WHEN status = 'paid' THEN cost ELSE 0 END) as paid_cost")
+            DB::raw("SUM(CASE WHEN status = 'paid' THEN cost ELSE 0 END) as paid_cost"),
+            DB::raw("SUM(CASE WHEN status = 'refunded' THEN 1 ELSE 0 END) as refunded_count")
         )
             ->where('created_at', '>=', now()->subDays($days)->startOfDay())
             ->groupBy(DB::raw('DATE(created_at)'))
@@ -103,13 +116,17 @@ class DashboardController extends Controller
             $row = $rows->get($date);
             $paidAmount = $row ? (int) $row->paid_amount : 0;
             $paidCost = $row ? (int) $row->paid_cost : 0;
+            $refundedCount = $row ? (int) $row->refunded_count : 0;
+            $paidCount = $row ? (int) $row->paid_count : 0;
             $result[] = [
                 'date' => $date,
                 'order_count' => $row ? (int) $row->order_count : 0,
-                'paid_count' => $row ? (int) $row->paid_count : 0,
+                'paid_count' => $paidCount,
                 'paid_amount' => $paidAmount,
                 'paid_cost' => $paidCost,
                 'profit' => $paidAmount - $paidCost,
+                'refunded_count' => $refundedCount,
+                'refund_rate' => $paidCount > 0 ? round($refundedCount / $paidCount * 100, 1) : 0,
             ];
         }
 
@@ -120,6 +137,39 @@ class DashboardController extends Controller
      * 热销商品排行(按已付订单数/金额)。
      * GET /api/admin/dashboard/top-products?days=7&limit=10
      */
+    /**
+     * 前台流量走势(PV/UV,近 N 天)。
+     * GET /api/admin/dashboard/traffic?days=7
+     */
+    public function traffic(Request $request): JsonResponse
+    {
+        $days = min(90, max(1, (int) $request->input('days', 7)));
+
+        $rows = VisitLog::select(
+            DB::raw('DATE(created_at) as date'),
+            DB::raw('COUNT(*) as pv'),
+            DB::raw('COUNT(DISTINCT ip) as uv')
+        )
+            ->where('created_at', '>=', now()->subDays($days)->startOfDay())
+            ->groupBy(DB::raw('DATE(created_at)'))
+            ->orderBy('date')
+            ->get()
+            ->keyBy('date');
+
+        $result = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $date = now()->subDays($i)->format('Y-m-d');
+            $row = $rows->get($date);
+            $result[] = [
+                'date' => $date,
+                'pv' => $row ? (int) $row->pv : 0,
+                'uv' => $row ? (int) $row->uv : 0,
+            ];
+        }
+
+        return response()->json($result);
+    }
+
     public function topProducts(Request $request): JsonResponse
     {
         $days = min(90, max(1, (int) $request->input('days', 7)));

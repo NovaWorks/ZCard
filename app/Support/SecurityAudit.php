@@ -15,10 +15,11 @@ class SecurityAudit
         int|string|null $targetId = null,
         array $metadata = [],
         ?int $statusCode = null,
+        int|string|null $actorId = null,
     ): void {
         try {
             SecurityAuditLog::create([
-                'actor_id' => $request->user()?->id,
+                'actor_id' => $actorId ?? $request->user()?->id,
                 'source' => 'admin_api',
                 'action' => $action,
                 'target_type' => $targetType,

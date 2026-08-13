@@ -10,6 +10,7 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\User;
+use App\Models\VisitLog;
 use App\Support\CardCipher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
@@ -51,6 +52,50 @@ class DashboardTest extends TestCase
             'quantity' => 1, 'amount' => 10000, 'cost' => 6000, 'status' => 'paid', 'paid_at' => now(),
         ]);
         Payment::create(['order_id' => $order->id, 'channel' => 'alipay', 'amount' => 10000, 'status' => 'success']);
+    }
+
+    public function test_overview_returns_online_users(): void
+    {
+        $this->seedData();
+        $resp = $this->withHeaders($this->adminHeaders())->getJson('/api/admin/dashboard/overview?days=7');
+        $resp->assertOk()
+            ->assertJsonStructure(['online_users']);
+    }
+
+    public function test_traffic_returns_pv_uv_series(): void
+    {
+        // 造 3 条访问日志:今天 2 个 IP(1 个重复)
+        $today = now()->toDateString();
+        VisitLog::create(['ip' => '1.2.3.4', 'user_agent' => 'Mozilla', 'path' => '/']);
+        VisitLog::create(['ip' => '1.2.3.4', 'user_agent' => 'Mozilla', 'path' => '/product/1']);
+        VisitLog::create(['ip' => '5.6.7.8', 'user_agent' => 'Mozilla', 'path' => '/']);
+
+        $resp = $this->withHeaders($this->adminHeaders())->getJson('/api/admin/dashboard/traffic?days=7');
+        $resp->assertOk();
+        $series = $resp->json();
+        $todayRow = collect($series)->firstWhere('date', $today);
+        $this->assertNotNull($todayRow, 'traffic 应包含今天');
+        $this->assertSame(3, (int) $todayRow['pv'], 'PV = 日志条数');
+        $this->assertSame(2, (int) $todayRow['uv'], 'UV = distinct IP');
+    }
+
+    public function test_trends_include_refund_metrics(): void
+    {
+        $this->seedData();
+        // 补一条退款单
+        $order = Order::where('order_no', 'ORD001')->firstOrFail();
+        Order::create([
+            'order_no' => 'ORD002', 'merchant_id' => $order->merchant_id, 'user_id' => null, 'product_id' => $order->product_id,
+            'quantity' => 1, 'amount' => 5000, 'cost' => 3000, 'status' => 'refunded',
+        ]);
+
+        $resp = $this->withHeaders($this->adminHeaders())->getJson('/api/admin/dashboard/trends?days=7');
+        $resp->assertOk();
+        $todayRow = collect($resp->json())->firstWhere('date', now()->toDateString());
+        $this->assertNotNull($todayRow);
+        $this->assertSame(1, (int) $todayRow['refunded_count'], '退款单数 = 1');
+        $this->assertGreaterThan(0, (float) $todayRow['refund_rate'], '退款率 > 0');
+        $this->assertArrayHasKey('refund_rate', $todayRow);
     }
 
     public function test_overview_returns_all_metrics(): void

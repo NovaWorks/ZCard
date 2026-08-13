@@ -1,6 +1,7 @@
 import http from '@/utils/http'
 
 export interface OverviewData {
+  online_users: number
   total_orders: number
   paid_orders: number
   paid_amount: number
@@ -25,6 +26,14 @@ export interface TrendPoint {
   paid_amount: number
   paid_cost: number
   profit: number
+  refunded_count: number
+  refund_rate: number
+}
+
+export interface TrafficPoint {
+  date: string
+  pv: number
+  uv: number
 }
 
 export interface TopProduct {
@@ -54,3 +63,6 @@ export const getTopProducts = (params?: any) =>
 
 export const getTopChannels = (params?: any) =>
   http.get<TopChannel[]>({ url: '/admin/dashboard/top-channels', params })
+
+export const getTraffic = (params?: any) =>
+  http.get<TrafficPoint[]>({ url: '/admin/dashboard/traffic', params })

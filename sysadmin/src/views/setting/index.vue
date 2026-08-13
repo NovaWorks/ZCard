@@ -315,6 +315,27 @@
               <ArtWangEditor v-model="form.site_notice" mode="default" :placeholder="t('zcard.setting.siteNoticePlaceholder')" />
               <span class="form-tip">{{ t('zcard.setting.siteNoticeHint') }}</span>
             </ElFormItem>
+
+            <!-- 登录安全告警(issue #6) -->
+            <ElDivider>{{ t('zcard.setting.adminAlertSection') }}</ElDivider>
+            <ElFormItem :label="t('zcard.setting.adminAlertEnabled')">
+              <ElSwitch v-model="form.admin_alert_enabled" />
+              <span class="form-tip">{{ t('zcard.setting.adminAlertEnabledTip') }}</span>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.adminAlertEmail')">
+              <ElInput v-model="form.admin_alert_email" placeholder="admin@example.com" />
+              <span class="form-tip">{{ t('zcard.setting.adminAlertEmailTip') }}</span>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.adminAlertTgToken')">
+              <ElInput v-model="form.admin_alert_tg_token" placeholder="123456:ABC-DEF..." />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.adminAlertTgChatId')">
+              <ElInput v-model="form.admin_alert_tg_chat_id" placeholder="-1001234567890" />
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.adminAlertWecomWebhook')">
+              <ElInput v-model="form.admin_alert_wecom_webhook" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..." />
+              <span class="form-tip">{{ t('zcard.setting.adminAlertChannelTip') }}</span>
+            </ElFormItem>
           </ElForm>
         </ElTabPane>
 
@@ -547,6 +568,11 @@
     serviceWidgetTitleEn: string
     serviceWidgetLinksJson: string
     serviceWidgetScript: string
+    admin_alert_enabled: boolean
+    admin_alert_email: string
+    admin_alert_tg_token: string
+    admin_alert_tg_chat_id: string
+    admin_alert_wecom_webhook: string
     category_nav_style: string
     list_default_view: string
     grid_columns: number
@@ -651,6 +677,11 @@
     serviceWidgetTitleEn: '',
     serviceWidgetLinksJson: '[]',
     serviceWidgetScript: '',
+    admin_alert_enabled: false,
+    admin_alert_email: '',
+    admin_alert_tg_token: '',
+    admin_alert_tg_chat_id: '',
+    admin_alert_wecom_webhook: '',
     category_nav_style: 'pills',
     list_default_view: 'grid',
     grid_columns: 4,
@@ -929,6 +960,11 @@
       form.serviceWidgetTitleEn = sw.title_en || ''
       form.serviceWidgetLinksJson = toText(sw.links || [])
       form.serviceWidgetScript = sw.script || ''
+      form.admin_alert_enabled = coerceBool(data.admin_alert_enabled, d.admin_alert_enabled)
+      form.admin_alert_email = coerce(data.admin_alert_email, d.admin_alert_email)
+      form.admin_alert_tg_token = coerce(data.admin_alert_tg_token, d.admin_alert_tg_token)
+      form.admin_alert_tg_chat_id = coerce(data.admin_alert_tg_chat_id, d.admin_alert_tg_chat_id)
+      form.admin_alert_wecom_webhook = coerce(data.admin_alert_wecom_webhook, d.admin_alert_wecom_webhook)
     } catch (e) {
       // 拦截器处理
     } finally {
