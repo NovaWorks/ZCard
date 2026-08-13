@@ -1350,16 +1350,18 @@
       "showOutOfStockTip": "When off, products with 0 stock are hidden in storefront lists/featured",
       "tabService": "Online Service",
       "serviceEnabled": "Enable service widget",
-      "serviceEnabledTip": "Shows a customer service entry at the bottom-right of the storefront (suggest enabling only one platform to avoid multiple bubbles)",
+      "serviceEnabledTip": "Enables the service widget. When a third-party script (Chatwoot/Crisp) is configured, it renders its native bubble; no local button is shown",
       "serviceTitle": "Widget title (Chinese)",
       "serviceTitlePlaceholder": "在线客服",
       "serviceTitleEn": "Widget title (English)",
       "serviceTitleEnPlaceholder": "Customer Service",
       "serviceLinks": "Service links (JSON)",
-      "serviceLinksTip": "Format [{\"label\":\"Telegram\",\"url\":\"https://t.me/xxx\"}]. Supports http/https/mailto/tel, opens in a new tab",
+      "serviceLinksTip": "Format [{\"label\":\"Telegram\",\"url\":\"https://t.me/xxx\"}]. Only shown as a local widget when no third-party script is configured (native service takes priority otherwise)",
       "serviceScript": "Third-party service script (Chatwoot / Crisp, etc.)",
       "serviceScriptPlaceholder": "Paste the Chatwoot / Crisp install script; it will be injected into the storefront",
-      "serviceScriptTip": "Chatwoot: Settings → Website → Code. Crisp: Settings → Websites → your website → Install code. Leave empty to skip"
+      "serviceScriptTip": "Chatwoot: Settings → Website → Code. Crisp: Settings → Websites → your website → Install code. The script is executed as-is and renders the native chat bubble; no local widget is added",
+      "siteFavicon": "Favicon",
+      "siteFaviconTip": "Browser tab icon; falls back to the site logo when empty"
     },
     "common": {
       "id": "ID",

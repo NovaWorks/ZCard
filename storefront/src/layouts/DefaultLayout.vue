@@ -33,6 +33,18 @@ watchEffect(() => {
       keywords: config.site_keywords || '',
       type: 'website',
     })
+    // 站点图标(favicon):优先 site_favicon,回退 site_logo
+    const iconUrl = config.site_favicon || config.site_logo || ''
+    if (iconUrl) {
+      let link = document.head.querySelector<HTMLLinkElement>('link[rel="icon"]')
+      if (!link) {
+        link = document.createElement('link')
+        link.rel = 'icon'
+        link.type = 'image/x-icon'
+        document.head.appendChild(link)
+      }
+      link.href = iconUrl
+    }
   }
 })
 

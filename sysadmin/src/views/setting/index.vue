@@ -14,6 +14,10 @@
             <ElFormItem :label="t('zcard.setting.siteLogo')">
               <ImagePicker v-model="form.site_logo" />
             </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.siteFavicon')">
+              <ImagePicker v-model="form.site_favicon" />
+              <span class="form-tip">{{ t('zcard.setting.siteFaviconTip') }}</span>
+            </ElFormItem>
             <ElFormItem :label="t('zcard.setting.siteDescription')">
               <ElInput v-model="form.site_description" type="textarea" :rows="2" :placeholder="t('zcard.setting.siteDescriptionPlaceholder')" maxlength="120" show-word-limit />
             </ElFormItem>
@@ -521,6 +525,7 @@
     site_name: string
     site_url: string
     site_logo: string
+    site_favicon: string
     site_description: string
     site_keywords: string
     brand_slogan: string
@@ -624,6 +629,7 @@
     site_name: 'ZCard',
     site_url: '',
     site_logo: '',
+    site_favicon: '',
     site_description: '',
     site_keywords: '',
     brand_slogan: '',
@@ -829,6 +835,7 @@
         site_name: coerce(data.site_name, d.site_name),
         site_url: coerce(data.site_url, d.site_url),
         site_logo: coerce(data.site_logo, d.site_logo),
+        site_favicon: coerce(data.site_favicon, d.site_favicon),
         site_description: coerce(data.site_description, d.site_description),
         site_keywords: coerce(data.site_keywords, d.site_keywords),
         brand_slogan: coerce(data.brand_slogan, d.brand_slogan),

@@ -1,43 +1,57 @@
 <script setup lang="ts">
 /**
- * 右下角在线客服浮窗(issue #7)
- * - links:后台配置的可跳转客服链接(TG/DC/邮箱等)
- * - script:Chatwoot/Crisp 等第三方客服代码(原样注入 head,由其自带气泡渲染)
+ * 右下角在线客服(issue #7)
+ * - 配置了第三方脚本(Chatwoot/Crisp 等):**原样注入执行,由其原生渲染气泡**,
+ *   不再叠加本站按钮,避免双气泡/嵌套冲突;
+ * - 未配置脚本:渲染本站链接浮窗(fallback,仅当配置了可跳转链接时)。
+ * 注入为响应式:配置异步到达后自动执行(修复配置了不显示的问题)。
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watchEffect, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
 import AppIcon from '@/components/AppIcon.vue'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const settings = useSettingsStore()
 const open = ref(false)
-let scriptInjected = false
 
 const widget = computed(() => settings.config?.service_widget || { enabled: false, links: [], script: '' })
-const links = computed(() => (widget.value.links || []).filter((l: any) => l?.url))
+/** 已配置第三方脚本 → 纯原生模式(不渲染本站 UI) */
+const nativeMode = computed(() => !!widget.value.enabled && !!widget.value.script?.trim())
+/** 未配置脚本 → 本站链接浮窗 */
+const links = computed(() => {
+  const w = widget.value
+  if (!w.enabled || nativeMode.value) return []
+  return (w.links || []).filter((l: any) => l?.url)
+})
 const title = computed(() => {
   const w = widget.value
-  const isEn = (window as any).__zcardLocale === 'en' || document.documentElement.lang === 'en'
+  const isEn = locale.value === 'en'
   if (isEn && w.title_en) return w.title_en
   return w.title || t('service.title')
 })
 
-/** 注入第三方客服脚本(仅一次) */
-onMounted(() => {
+/** 第三方脚本注入(响应式:配置到达后自动执行;仅注入一次) */
+let injected = false
+const stop = watchEffect(() => {
   const script = widget.value.script
-  if (!script || scriptInjected) return
-  scriptInjected = true
+  if (!script || injected) return
+  injected = true
   const el = document.createElement('script')
   el.textContent = script
   el.async = true
   document.head.appendChild(el)
 })
+
+onUnmounted(() => stop())
 </script>
 
 <template>
-  <div v-if="widget.enabled" class="fixed right-4 bottom-4 z-50 flex flex-col items-end">
-    <!-- 展开面板 -->
+  <!-- 原生模式:第三方脚本自带气泡,本站不渲染任何 UI -->
+  <template v-if="nativeMode" />
+
+  <!-- 链接浮窗(未配置第三方脚本时) -->
+  <div v-else-if="links.length" class="fixed right-4 bottom-4 z-50 flex flex-col items-end">
     <Transition name="sw-pop">
       <div v-if="open" class="sw-panel mb-2 w-64 rounded-card border border-border bg-surface shadow-card overflow-hidden">
         <div class="px-4 py-3 bg-primary text-white text-sm font-bold flex items-center gap-2">
@@ -56,12 +70,10 @@ onMounted(() => {
             <span>{{ l.label }}</span>
             <span class="text-ink-muted">↗</span>
           </a>
-          <p v-if="!links.length" class="px-4 py-3 text-xs text-ink-muted">{{ t('service.noLinks') }}</p>
         </div>
       </div>
     </Transition>
 
-    <!-- 气泡按钮 -->
     <button
       class="w-12 h-12 rounded-full bg-primary text-white shadow-card flex items-center justify-center hover:bg-primary-hover transition active:scale-95"
       :aria-label="title"

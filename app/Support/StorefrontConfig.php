@@ -30,7 +30,7 @@ class StorefrontConfig
         'order_query_faqs', 'trade_captcha', 'order_close_minutes', 'contact_type',
         'guest_checkout', 'require_contact', 'register_open', 'register_type',
         'captcha_register', 'captcha_login', 'username_min_length', 'forget_type',
-        'site_notice', 'site_name', 'site_url', 'site_logo', 'site_description', 'site_keywords',
+        'site_notice', 'site_name', 'site_url', 'site_logo', 'site_favicon', 'site_description', 'site_keywords',
         'brand_slogan', 'brand_slogan_en', 'brand_secure', 'brand_secure_en',
         'brand_privacy', 'brand_privacy_en', 'footer_about', 'footer_links',
         'footer_contact', 'footer_social', 'footer_help_links', 'footer_copyright',
@@ -102,6 +102,8 @@ class StorefrontConfig
             'site_name' => 'ZCard',
             'site_url' => '',
             'site_logo' => '',
+            // 站点图标(favicon,浏览器标签页;留空回退 site_logo)
+            'site_favicon' => '',
             'site_description' => 'ZCard — 现代化插件制虚拟商品自动发卡平台,7×24 小时极速发货,安全可靠。',
             'site_keywords' => '虚拟商品,自动发卡,卡密,游戏账号,会员充值',
             // 顶部品牌条文案(后台可自定义;英文留空回退中文;中文留空回退前端 i18n 默认)
@@ -236,7 +238,7 @@ class StorefrontConfig
         $config = array_intersect_key(self::all(), array_flip(self::PUBLIC_KEYS));
         $config['site_notice'] = HtmlContentSanitizer::sanitize((string) ($config['site_notice'] ?? ''));
 
-        foreach (['site_url', 'site_logo'] as $key) {
+        foreach (['site_url', 'site_logo', 'site_favicon'] as $key) {
             $config[$key] = self::safePublicUrl((string) ($config[$key] ?? ''));
         }
         foreach (['footer_links', 'footer_social', 'footer_help_links'] as $key) {
