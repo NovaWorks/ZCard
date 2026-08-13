@@ -288,6 +288,76 @@
       </template>
     </ElDialog>
 
+    <!-- 同步任务弹窗(异步入库,轮询进度/支持取消/重新同步) -->
+    <ElDialog
+      v-model="taskDialogVisible"
+      :title="t('zcard.supply.taskTitle')"
+      width="620px"
+      destroy-on-close
+      @closed="stopTaskPolling"
+    >
+      <div v-if="taskSource">
+        <div class="task-source-name">{{ taskSource.name }}</div>
+
+        <!-- 当前/最近任务状态卡片 -->
+        <div v-if="activeTask" class="task-card" :class="'task-' + activeTask.status">
+          <div class="task-row">
+            <span class="task-label">{{ t('zcard.supply.taskStatus') }}</span>
+            <ElTag :type="taskStatusTag(activeTask.status)" size="small">{{ taskStatusText(activeTask.status) }}</ElTag>
+            <span class="task-mode">{{ activeTask.mode === 'full' ? t('zcard.supply.taskModeFull') : t('zcard.supply.taskModeInc') }}</span>
+          </div>
+
+          <!-- 进度条 -->
+          <div class="task-progress" v-if="activeTask.status === 'running' || activeTask.status === 'queued'">
+            <ElProgress
+              :percentage="taskProgress(activeTask)"
+              :indeterminate="activeTask.total_products === 0"
+              :stroke-width="14"
+              :text-inside="true"
+            />
+            <div class="task-progress-text">
+              {{ t('zcard.supply.taskProcessed', { n: activeTask.processed_products, total: activeTask.total_products }) }}
+            </div>
+          </div>
+
+          <!-- 计数 -->
+          <div class="task-counts" v-if="activeTask.processed_products > 0 || ['success', 'failed', 'cancelled'].includes(activeTask.status)">
+            <span class="task-count created">+{{ activeTask.created_count }} {{ t('zcard.supply.taskCreated') }}</span>
+            <span class="task-count updated">{{ activeTask.updated_count }} {{ t('zcard.supply.taskUpdated') }}</span>
+            <span class="task-count hidden" v-if="activeTask.hidden_count">{{ activeTask.hidden_count }} {{ t('zcard.supply.taskHidden') }}</span>
+          </div>
+
+          <div v-if="activeTask.error" class="task-error">{{ activeTask.error }}</div>
+          <div v-else-if="activeTask.status === 'success'" class="task-done">{{ t('zcard.supply.taskDone', { t: formatTime(activeTask.finished_at) }) }}</div>
+
+          <!-- 操作按钮 -->
+          <div class="task-actions">
+            <ElButton v-if="['queued', 'running'].includes(activeTask.status)" size="small" type="danger" plain :loading="cancelling" @click="handleCancelTask">
+              {{ t('zcard.supply.taskCancel') }}
+            </ElButton>
+            <ElButton v-if="['success', 'failed', 'cancelled'].includes(activeTask.status)" size="small" type="primary" :loading="syncingId === taskSource.id" @click="handleResync(taskSource)">
+              {{ t('zcard.supply.taskResync') }}
+            </ElButton>
+          </div>
+        </div>
+
+        <div v-else class="task-empty">{{ t('zcard.supply.taskEmpty') }}</div>
+
+        <!-- 历史任务 -->
+        <div v-if="taskHistory.length" class="task-history">
+          <div class="task-history-title">{{ t('zcard.supply.taskHistory') }}</div>
+          <div v-for="task in taskHistory" :key="task.id" class="task-history-row">
+            <ElTag :type="taskStatusTag(task.status)" size="small">{{ taskStatusText(task.status) }}</ElTag>
+            <span class="task-history-info">
+              {{ t('zcard.supply.taskProcessed', { n: task.processed_products, total: task.total_products }) }}
+              · +{{ task.created_count }} {{ t('zcard.supply.taskCreated') }}
+            </span>
+            <span class="task-history-time">{{ formatTime(task.finished_at || task.created_at) }}</span>
+          </div>
+        </div>
+      </div>
+    </ElDialog>
+
     <!-- 拉取/勾选导入商品弹窗 -->
     <ElDialog
       v-model="previewVisible"
@@ -550,6 +620,9 @@
     deleteSupplySource,
     testSupplySource,
     syncSupplySource,
+    getSupplySyncTasks,
+    cancelSupplySync,
+    type SupplySyncTask,
     previewSupplyProducts,
     importSupplyProducts,
     type SupplySource,
@@ -715,6 +788,7 @@
       failure_action: rs.failure_action || 'manual',
       default_pricing_mode: rs.default_pricing_mode || 'percent',
       default_markup_percent: rs.default_markup_percent ?? 10,
+      auto_sync_price: rs.auto_sync_price ?? true,
       default_markup_amount: rs.default_markup_amount ?? 0,
       auto_list: rs.auto_list ?? true,
       sync_public_description: rs.sync_public_description ?? true,
@@ -809,12 +883,13 @@
     }
   }
 
-  /** 触发同步 */
+  /** 触发同步(异步任务,弹窗轮询进度) */
   const syncingId = ref<number | null>(null)
   const handleSync = async (row: SupplySource) => {
     syncingId.value = row.id
     try {
       await syncSupplySource(row.id, 'incremental')
+      openTaskDialog(row)
       ElMessage.success(t('zcard.supply.syncDispatched'))
       fetchData()
     } catch {
@@ -822,6 +897,96 @@
     } finally {
       syncingId.value = null
     }
+  }
+
+  /** ===== 同步任务弹窗(异步任务状态/进度/取消/重新同步) ===== */
+  const taskDialogVisible = ref(false)
+  const taskSource = ref<SupplySource | null>(null)
+  const tasks = ref<SupplySyncTask[]>([])
+  const cancelling = ref(false)
+  let taskPollTimer: ReturnType<typeof setInterval> | null = null
+
+  const activeTask = computed(() => tasks.value[0] || null)
+  const taskHistory = computed(() => tasks.value.slice(1))
+
+  const openTaskDialog = (row: SupplySource) => {
+    taskSource.value = row
+    taskDialogVisible.value = true
+    loadTasks(row.id)
+    startTaskPolling(row.id)
+  }
+
+  const loadTasks = async (id: number) => {
+    try {
+      const data = await getSupplySyncTasks(id)
+      tasks.value = data.tasks || []
+    } catch {
+      // 拦截器已提示
+    }
+  }
+
+  /** 轮询:仅进行中任务时持续拉取 */
+  const startTaskPolling = (id: number) => {
+    stopTaskPolling()
+    taskPollTimer = setInterval(() => {
+      const t = tasks.value[0]
+      if (t && ['queued', 'running'].includes(t.status)) {
+        loadTasks(id)
+      } else if (taskPollTimer) {
+        stopTaskPolling()
+      }
+    }, 3000)
+  }
+
+  const stopTaskPolling = () => {
+    if (taskPollTimer) {
+      clearInterval(taskPollTimer)
+      taskPollTimer = null
+    }
+  }
+
+  const handleCancelTask = async () => {
+    if (!taskSource.value) return
+    cancelling.value = true
+    try {
+      await cancelSupplySync(taskSource.value.id)
+      await loadTasks(taskSource.value.id)
+      startTaskPolling(taskSource.value.id)
+      ElMessage.success(t('zcard.supply.taskCancelled'))
+    } catch {
+      // 拦截器已提示
+    } finally {
+      cancelling.value = false
+    }
+  }
+
+  /** 重新同步(结束后按钮):换新任务并打开弹窗轮询 */
+  const handleResync = async (row: SupplySource) => {
+    await handleSync(row)
+  }
+
+  const taskProgress = (t: SupplySyncTask): number => {
+    if (!t.total_products) return 0
+    return Math.min(100, Math.round((t.processed_products / t.total_products) * 100))
+  }
+
+  const taskStatusTag = (s: string): 'primary' | 'success' | 'danger' | 'warning' | 'info' => {
+    if (s === 'success') return 'success'
+    if (s === 'failed') return 'danger'
+    if (s === 'running') return 'primary'
+    if (s === 'cancelled') return 'warning'
+    return 'info'
+  }
+
+  const taskStatusText = (s: string): string => {
+    const map: Record<string, string> = {
+      queued: t('zcard.supply.taskQueued'),
+      running: t('zcard.supply.taskRunning'),
+      success: t('zcard.supply.taskSuccess'),
+      failed: t('zcard.supply.taskFailed'),
+      cancelled: t('zcard.supply.taskCancelledStatus'),
+    }
+    return map[s] || s
   }
 
   /** ===== 拉取商品 + 勾选导入 ===== */
@@ -1423,4 +1588,93 @@
     padding: 40px;
     font-size: 13px;
   }
+
+.task-source-name {
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.task-card {
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.task-label {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+.task-mode {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.task-progress {
+  margin: 6px 0;
+}
+.task-progress-text {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-top: 4px;
+}
+.task-counts {
+  display: flex;
+  gap: 14px;
+  margin: 6px 0;
+  font-size: 13px;
+}
+.task-count.created { color: var(--el-color-success); }
+.task-count.updated { color: var(--el-color-primary); }
+.task-count.hidden { color: var(--el-color-warning); }
+.task-error {
+  margin: 6px 0;
+  font-size: 12px;
+  color: var(--el-color-danger);
+  word-break: break-all;
+  max-height: 80px;
+  overflow-y: auto;
+}
+.task-done {
+  margin: 6px 0;
+  font-size: 12px;
+  color: var(--el-color-success);
+}
+.task-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+}
+.task-empty {
+  padding: 20px 0;
+  text-align: center;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+.task-history {
+  border-top: 1px dashed var(--el-border-color);
+  padding-top: 10px;
+}
+.task-history-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.task-history-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 5px 0;
+}
+.task-history-info {
+  flex: 1;
+  color: var(--el-text-color-regular);
+}
+.task-history-time {
+  color: var(--el-text-color-secondary);
+}
 </style>

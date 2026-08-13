@@ -87,12 +87,32 @@ export const testSupplySource = (id: number) =>
   request.post<SupplyTestResult>({ url: `/admin/supply-sources/${id}/test` })
 
 /** 触发商品同步(mode: full 全量 / incremental 增量) */
-export const syncSupplySource = (id: number, mode: 'full' | 'incremental' = 'incremental') =>
-  request.post<{ ok: boolean; message: string; mode: string }>({ url: `/admin/supply-sources/${id}/sync`, data: { mode } })
+export interface SupplySyncTask {
+  id: number
+  supply_source_id: number
+  mode: 'full' | 'incremental'
+  status: 'queued' | 'running' | 'success' | 'failed' | 'cancelled'
+  total_products: number
+  processed_products: number
+  created_count: number
+  updated_count: number
+  hidden_count: number
+  error: string | null
+  started_at: string | null
+  finished_at: string | null
+  created_at: string
+}
 
-/** 查询同步状态/进度 */
-export const getSupplySyncStatus = (id: number) =>
-  request.get<SupplySyncStatus>({ url: `/admin/supply-sources/${id}/sync-status` })
+export const syncSupplySource = (id: number, mode: 'full' | 'incremental' = 'incremental') =>
+  request.post<{ ok: boolean; task: SupplySyncTask }>({ url: `/admin/supply-sources/${id}/sync`, data: { mode } })
+
+/** 同步任务列表(最新优先) */
+export const getSupplySyncTasks = (id: number) =>
+  request.get<{ ok: boolean; tasks: SupplySyncTask[] }>({ url: `/admin/supply-sources/${id}/sync-tasks` })
+
+/** 取消进行中的同步任务 */
+export const cancelSupplySync = (id: number) =>
+  request.post<{ ok: boolean; task: SupplySyncTask }>({ url: `/admin/supply-sources/${id}/sync-cancel` })
 
 /** 上游商品(预览拉取,供勾选导入) */
 export interface UpstreamProductItem {

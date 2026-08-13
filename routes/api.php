@@ -263,6 +263,8 @@ Route::middleware(['auth:sanctum', 'active.user', 'admin.role', 'audit.admin'])-
         ->parameter('supply-sources', 'supplySource');
     Route::post('supply-sources/{supplySource}/test', [SupplySourceController::class, 'test']);
     Route::post('supply-sources/{supplySource}/sync', [SupplySourceController::class, 'sync']);
+    Route::get('supply-sources/{supplySource}/sync-tasks', [SupplySourceController::class, 'syncTasks']);
+    Route::post('supply-sources/{supplySource}/sync-cancel', [SupplySourceController::class, 'syncCancel']);
     Route::get('supply-sources/{supplySource}/sync-status', [SupplySourceController::class, 'syncStatus']);
     // 商品预览(实时拉取上游,供勾选) + 勾选导入 + 调试
     Route::get('supply-sources/{supplySource}/products/preview', [SupplySourceController::class, 'previewProducts']);

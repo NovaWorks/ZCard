@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\SyncSupplySourceProducts;
 use App\Models\Product;
 use App\Models\SupplySource;
+use App\Models\SupplySyncTask;
 use App\Supply\SupplyManager;
 use App\Supply\SupplySyncService;
 use Illuminate\Http\JsonResponse;
@@ -107,20 +108,66 @@ class SupplySourceController extends Controller
         }
     }
 
-    /** POST /api/admin/supply-sources/{source}/sync 触发商品同步(同步执行,不走队列) */
+    /**
+     * POST /api/admin/supply-sources/{source}/sync 触发商品同步(异步任务)。
+     * 返回任务记录,前端轮询状态/进度;同货源有进行中任务时拒绝重复派发(409)。
+     */
     public function sync(Request $request, SupplySource $supplySource): JsonResponse
     {
         $mode = in_array($request->input('mode'), ['full', 'incremental']) ? $request->input('mode') : 'incremental';
-        try {
-            // 同步执行(原为异步 dispatch,但生产环境常无 queue:worker 导致任务永不执行,
-            // 用户点同步无反应。改为同步执行,立即返回结果)。
-            $job = new SyncSupplySourceProducts($supplySource->id, $mode);
-            $job->handle(app(SupplyManager::class), app(SupplySyncService::class));
 
-            return response()->json(['ok' => true, 'message' => '同步完成', 'mode' => $mode]);
-        } catch (\Throwable $e) {
-            return response()->json(['ok' => false, 'message' => $e->getMessage(), 'mode' => $mode], 500);
+        // 防重:同一货源已有排队/运行中任务时拒绝
+        if (SupplySyncTask::where('supply_source_id', $supplySource->id)
+            ->whereIn('status', [SupplySyncTask::STATUS_QUEUED, SupplySyncTask::STATUS_RUNNING])
+            ->exists()) {
+            return response()->json([
+                'ok' => false,
+                'message' => '该货源已有同步任务进行中,请等待完成或先取消',
+            ], 409);
         }
+
+        $task = SupplySyncTask::create([
+            'supply_source_id' => $supplySource->id,
+            'mode' => $mode,
+            'status' => SupplySyncTask::STATUS_QUEUED,
+        ]);
+
+        SyncSupplySourceProducts::dispatch($supplySource->id, $mode, $task->id);
+
+        return response()->json(['ok' => true, 'task' => $task]);
+    }
+
+    /**
+     * GET /api/admin/supply-sources/{source}/sync-tasks 同步任务列表(最新优先,含进行中)。
+     */
+    public function syncTasks(SupplySource $supplySource): JsonResponse
+    {
+        $tasks = SupplySyncTask::where('supply_source_id', $supplySource->id)
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get();
+
+        return response()->json(['ok' => true, 'tasks' => $tasks]);
+    }
+
+    /**
+     * POST /api/admin/supply-sources/{source}/sync-cancel 取消进行中的同步任务。
+     * 置 cancelled 标记,Job 感知后立即停止(无需强杀进程)。
+     */
+    public function syncCancel(Request $request, SupplySource $supplySource): JsonResponse
+    {
+        $task = SupplySyncTask::where('supply_source_id', $supplySource->id)
+            ->whereIn('status', [SupplySyncTask::STATUS_QUEUED, SupplySyncTask::STATUS_RUNNING])
+            ->latest('id')
+            ->first();
+
+        if (! $task) {
+            return response()->json(['ok' => false, 'message' => '没有进行中的同步任务'], 404);
+        }
+
+        $task->update(['status' => SupplySyncTask::STATUS_CANCELLED]);
+
+        return response()->json(['ok' => true, 'task' => $task]);
     }
 
     /** GET /api/admin/supply-sources/{source}/sync-status */

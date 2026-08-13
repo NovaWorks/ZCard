@@ -3,7 +3,9 @@
 use App\Jobs\SyncSupplySourceProducts;
 use App\Models\SubsiteLedgerEntry;
 use App\Models\SupplySource;
+use App\Models\SupplySyncTask;
 use App\Supply\NonceStore;
+use App\Support\StorefrontConfig;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -25,14 +27,26 @@ Schedule::call(function () {
 // 货源商品自动同步(spec §6.6) —— 每小时跑增量,只对开启自动同步的 active 货源
 // 注意:JSON_EXTRACT 为 MySQL 专属语法(生产环境),SQLite 测试环境不会执行调度
 Schedule::call(function () {
-    if (! \App\Support\StorefrontConfig::get('supply_enabled')) {
+    if (! StorefrontConfig::get('supply_enabled')) {
         return;
     }
     SupplySource::where('status', 'active')
         ->whereRaw("JSON_EXTRACT(settings, '$.auto_sync') = true")
-        ->each(fn ($s) => SyncSupplySourceProducts::dispatch($s->id, 'incremental'));
+        ->each(function ($s) {
+            // 定时同步同样建任务记录(统一在后台任务弹窗查看);防重:进行中则跳过
+            if (SupplySyncTask::where('supply_source_id', $s->id)
+                ->whereIn('status', ['queued', 'running'])
+                ->exists()) {
+                return;
+            }
+            $task = SupplySyncTask::create([
+                'supply_source_id' => $s->id,
+                'mode' => 'incremental',
+                'status' => 'queued',
+            ]);
+            SyncSupplySourceProducts::dispatch($s->id, 'incremental', $task->id);
+        });
 })->hourly();
 
 // nonce 清理(database 模式,spec §8.5):每天清掉过期记录
 Schedule::call(fn () => app(NonceStore::class)->pruneExpiredDatabase())->daily();
-
