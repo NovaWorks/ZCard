@@ -21,7 +21,7 @@ class Product extends Model
         // SEO(自定义标题/关键词/描述,留空前端自动组合)
         'seo_title', 'seo_keywords', 'seo_description',
         'factory_price', 'draft_premium',
-        'member_price', 'cover', 'images', 'stock_type', 'fulfillment_type', 'stock_visible',
+        'member_price', 'cover', 'images', 'stock_type', 'fulfillment_type', 'stock_visible', 'price_manual',
         'control_config', 'delivery_mode', 'sort', 'status',
         // P1-A 新增
         'is_featured', 'virtual_sales', 'virtual_reviews', 'min_order', 'max_order',
@@ -51,6 +51,7 @@ class Product extends Model
             'factory_price' => 'integer',
             'draft_premium' => 'integer',
             'stock_visible' => 'boolean',
+            'price_manual' => 'boolean',
             'is_featured' => 'boolean',
             'send_email' => 'boolean',
             'only_user' => 'boolean',

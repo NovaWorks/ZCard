@@ -275,6 +275,10 @@
           <ElSwitch v-model="formData.settings.auto_list" />
           <div class="field-help">{{ t('zcard.supply.autoListTip') }}</div>
         </ElFormItem>
+        <ElFormItem :label="t('zcard.supply.autoSyncPrice')">
+          <ElSwitch v-model="formData.settings.auto_sync_price" />
+          <div class="field-help">{{ t('zcard.supply.autoSyncPriceTip') }}</div>
+        </ElFormItem>
       </ElForm>
       <template #footer>
         <ElButton @click="dialogVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
@@ -623,6 +627,7 @@
     default_markup_percent: 10,
     default_markup_amount: 0,
     auto_list: true,
+    auto_sync_price: true,
     sync_public_description: true,
     content_locale: 'zh-CN'
   })

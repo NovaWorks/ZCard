@@ -42,10 +42,10 @@ class SupplySyncServiceTest extends TestCase
         $this->assertSame('UP1', $product->upstream_product_code);
         $this->assertSame($source->id, $product->upstream_source_id);
         $this->assertSame(500, (int) $product->factory_price);
-        $this->assertSame(550, (int) $product->price); // 500 × 110% = 550
+        $this->assertSame(880, (int) $product->price); // 800(上游售价) × 110% = 880
     }
 
-    public function test_resync_updates_factory_price_but_keeps_local_price(): void
+    public function test_resync_follows_upstream_price_change_by_default(): void
     {
         $source = $this->makeSource(['default_pricing_mode' => 'equal']);
         $service = app(SupplySyncService::class);
@@ -54,13 +54,57 @@ class SupplySyncServiceTest extends TestCase
         $p1 = $service->upsertProduct($source, new UpstreamProduct(code: 'UP2', name: 'A', price: 500, factoryPrice: 500));
         $this->assertSame(500, (int) $p1->price);
 
-        // 运营手动改价
-        $p1->update(['price' => 999]);
-
-        // 再次同步,上游涨价到 600
+        // 上游涨价到 600 → 自动跟随(auto_sync_price 默认开启)
         $p2 = $service->upsertProduct($source, new UpstreamProduct(code: 'UP2', name: 'A', price: 600, factoryPrice: 600));
         $this->assertSame(600, (int) $p2->factory_price); // 成本更新
-        $this->assertSame(999, (int) $p2->price); // 售价不动(售价保护)
+        $this->assertSame(600, (int) $p2->price); // 售价跟随(equal 平价)
+    }
+
+    public function test_resync_protects_manually_edited_price(): void
+    {
+        $source = $this->makeSource(['default_pricing_mode' => 'equal']);
+        $service = app(SupplySyncService::class);
+
+        // 首次同步
+        $p1 = $service->upsertProduct($source, new UpstreamProduct(code: 'UP2', name: 'A', price: 500, factoryPrice: 500));
+
+        // 运营手动改价(后台保存 → price_manual=true)
+        $p1->update(['price' => 999, 'price_manual' => true]);
+
+        // 再次同步,上游涨价到 600 → 手动价保护不动
+        $p2 = $service->upsertProduct($source, new UpstreamProduct(code: 'UP2', name: 'A', price: 600, factoryPrice: 600));
+        $this->assertSame(600, (int) $p2->factory_price); // 成本仍更新
+        $this->assertSame(999, (int) $p2->price); // 售价保护
+    }
+
+    public function test_resync_protects_when_auto_sync_price_disabled(): void
+    {
+        $source = $this->makeSource(['default_pricing_mode' => 'equal', 'auto_sync_price' => false]);
+        $service = app(SupplySyncService::class);
+
+        $p1 = $service->upsertProduct($source, new UpstreamProduct(code: 'UP3', name: 'A', price: 500, factoryPrice: 500));
+        $this->assertSame(500, (int) $p1->price);
+
+        // 上游涨价但货源关闭自动跟随 → 售价不动
+        $p2 = $service->upsertProduct($source, new UpstreamProduct(code: 'UP3', name: 'A', price: 600, factoryPrice: 600));
+        $this->assertSame(600, (int) $p2->factory_price);
+        $this->assertSame(500, (int) $p2->price);
+    }
+
+    public function test_pending_pricing_mode_never_auto_recalculates(): void
+    {
+        $source = $this->makeSource(['default_pricing_mode' => 'pending']);
+        $service = app(SupplySyncService::class);
+
+        $p1 = $service->upsertProduct($source, new UpstreamProduct(code: 'UP4', name: 'A', price: 500, factoryPrice: 500));
+        $this->assertSame(0, (int) $p1->price); // pending 首次导入:待审不上架,price=0
+
+        // 运营手动定价
+        $p1->update(['price' => 500, 'price_manual' => true]);
+
+        // 上游涨价 → pending 模式不自动重算,手动价保护
+        $p2 = $service->upsertProduct($source, new UpstreamProduct(code: 'UP4', name: 'A', price: 600, factoryPrice: 600));
+        $this->assertSame(500, (int) $p2->price);
     }
 
     public function test_resync_keeps_locally_edited_product_name(): void

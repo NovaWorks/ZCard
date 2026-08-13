@@ -1599,7 +1599,9 @@
       "previewFailed": "拉取上游商品失败",
       "importSelected": "导入选中({n})",
       "importSuccess": "导入成功",
-      "importFailed": "导入失败"
+      "importFailed": "导入失败",
+      "autoSyncPrice": "自动跟随上游调价",
+      "autoSyncPriceTip": "开启后每次同步按加价规则重算本地售价,上游调价自动生效;关闭则保护运营手动设置的售价(默认开启;待审定价模式不自动重算)"
     },
     "supplierAccount": {
       "title": "供货账号管理",

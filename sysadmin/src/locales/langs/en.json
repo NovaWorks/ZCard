@@ -1599,7 +1599,9 @@
       "previewFailed": "Failed to pull upstream products",
       "importSelected": "Import Selected ({n})",
       "importSuccess": "Import succeeded",
-      "importFailed": "Import failed"
+      "importFailed": "Import failed",
+      "autoSyncPrice": "Auto-follow upstream price",
+      "autoSyncPriceTip": "When enabled, local selling price is recalculated on every sync so upstream price changes apply automatically; when disabled, manually set prices are protected (default on; pending pricing mode never auto-recalculates)"
     },
     "supplierAccount": {
       "title": "Supplier Accounts",

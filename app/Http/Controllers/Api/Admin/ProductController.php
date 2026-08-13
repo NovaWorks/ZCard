@@ -186,6 +186,11 @@ class ProductController extends Controller
         ]);
 
         $this->normalizeFulfillmentData($data, $product);
+
+        // 手动改过售价 → 置 price_manual 标记(后续货源同步保护该商品价格不被覆盖)
+        if (array_key_exists('price', $data)) {
+            $data['price_manual'] = true;
+        }
         $product->update($data);
 
         $after = $product->fresh()->only(array_keys($before));

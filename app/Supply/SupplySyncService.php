@@ -14,9 +14,9 @@ use Illuminate\Support\Str;
  * 商品同步服务(spec §5.1)
  * 全量/增量同步上游商品进本地 products 表,含售价保护(再次同步不动 price)。
  *
- * 售价保护:运营在后台手动设置的 price 由运营所有;再次同步时仅更新上游拥有的字段
- * (factory_price / description / cover / 分类 / 上游同步时间 / hide),
- * 永不覆盖 price。首次同步 price 为空时按 default_pricing_mode 计算初始售价。
+ * 售价:加价基数为**上游售价**(非上游成本价),按 default_pricing_mode 计算本地售价;
+ * 手动改过价(price_manual)或货源关闭 auto_sync_price 时保护不被同步覆盖;
+ * 默认 auto_sync_price 开启 → 上游调价后本地售价自动跟随重算。
  */
 class SupplySyncService
 {
@@ -72,7 +72,20 @@ class SupplySyncService
             if ($this->shouldSyncPublicDescription($source)) {
                 $update['description'] = $this->normalizeDescription($source, $dto->description);
             }
-            if ($pricing !== null || (int) $existing->price <= 0) {
+            // 价格重算条件(任一满足):
+            // 1. 勾选导入显式传了 pricing;
+            // 2. 货源开启「自动跟随上游调价」(auto_sync_price,默认开启)、默认定价非 pending、
+            //    且该商品售价**未被运营手动改过**(price_manual=false)——
+            //    上游调价后本地售价按加价规则重算,前台价格跟随;手动改过价的商品保护不动;
+            //    注意:默认 percent/fixed/equal 才自动重算,pending(待审)模式下重算会把
+            //    商品反复下架,故不自动跟随,保持人工审核流程;
+            // 3. price<=0 是导入定价失败的脏数据,重算。
+            $autoPrice = (bool) ($source->settings['auto_sync_price'] ?? true);
+            $defaultMode = (string) ($source->settings['default_pricing_mode'] ?? 'percent');
+            $priceManual = (bool) $existing->price_manual;
+            if ($pricing !== null
+                || ($autoPrice && ! $priceManual && $defaultMode !== 'pending')
+                || (int) $existing->price <= 0) {
                 $newPrice = $this->computeInitialPrice($source, $dto->factoryPrice, $dto->price, $pricing);
                 $update['price'] = $newPrice ?? 0;
                 // pending 模式新导入/重定价 → 待审不上架
@@ -142,7 +155,10 @@ class SupplySyncService
      */
     private function computeInitialPrice(SupplySource $source, int $factoryPrice, int $upstreamPrice, ?array $pricing = null): ?int
     {
-        $base = $factoryPrice > 0 ? $factoryPrice : $upstreamPrice;
+        // 加价基数 = **上游售价**(upstreamPrice)优先:站长按"上游卖多少钱"加价,
+        // 而不是按上游的成本价(factory_price,即上游的上游供货价,如 7.5 vs 6.1)。
+        // 上游售价缺失(0)时才回退成本价。
+        $base = $upstreamPrice > 0 ? $upstreamPrice : $factoryPrice;
         $mode = $pricing['mode'] ?? $source->settings['default_pricing_mode'] ?? 'percent';
         // markup_amount 单位:元 → 分(fixed 加价)
         $amountFen = (int) round(((float) ($pricing['markup_amount'] ?? $source->settings['default_markup_amount'] ?? 0)) * 100);
