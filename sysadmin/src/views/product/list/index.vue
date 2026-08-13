@@ -173,6 +173,35 @@
             </div>
           </template>
         </ElTableColumn>
+        <ElTableColumn :label="t('zcard.product.upstreamPriceShort')" width="160" align="center">
+          <template #default="{ row }">
+            <template v-if="row.upstream_source_id">
+              <div class="price-pair">
+                <span>{{ t('zcard.product.upstreamPrice') }}: ¥{{ formatPrice(row.upstream_price ?? 0) }}</span>
+                <span class="price-pair-cost">
+                  <template v-if="markupBase(row) === null">
+                    {{ t('zcard.product.upstreamPricePending') }}
+                  </template>
+                  <template v-else>
+                    {{ t('zcard.product.markupShort') }}:
+                    <span v-if="markupOf(row) === 0" class="markup-flat">{{ t('zcard.product.markupFlat') }}</span>
+                    <template v-else>¥{{ formatPrice(markupOf(row) ?? 0) }}</template>
+                    <span v-if="markupRateOf(row) !== null && markupRateOf(row) !== 0" class="text-muted">({{ markupRateOf(row) }}%)</span>
+                  </template>
+                </span>
+              </div>
+              <a
+                v-if="row.upstream_product_url"
+                :href="row.upstream_product_url"
+                target="_blank"
+                rel="noopener"
+                class="upstream-link-small"
+                @click.stop
+              >{{ t('zcard.product.upstreamLink') }} ↗</a>
+            </template>
+            <span v-else class="text-muted">—</span>
+          </template>
+        </ElTableColumn>
         <ElTableColumn :label="t('zcard.product.stock')" width="110" align="center">
           <template #default="{ row }">
             <ElTag v-if="row.stock === -1" type="success" size="small">{{ t('zcard.product.stockUnlimited') }}</ElTag>
@@ -930,6 +959,28 @@
 
   /** 金额分 -> 元(两位小数) */
   const formatPrice = (fen: number): string => ((Number(fen) || 0) / 100).toFixed(2)
+
+/**
+ * 加价基准(分):上游售价快照优先;缺失时回退成本价;
+ * 两者都未知(未同步/上游未提供)返回 null —— 显示「待同步」而非 0 误导。
+ */
+const markupBase = (row: any): number | null => {
+  if ((Number(row.upstream_price) || 0) > 0) return Number(row.upstream_price)
+  if ((Number(row.factory_price) || 0) > 0) return Number(row.factory_price)
+  return null
+}
+/** 加价金额(分):本地售价 - 加价基准;基准未知返回 null */
+const markupOf = (row: any): number | null => {
+  const base = markupBase(row)
+  if (base === null) return null
+  return (Number(row.price) || 0) - base
+}
+/** 加价比例(%) */
+const markupRateOf = (row: any): number | null => {
+  const base = markupBase(row)
+  if (!base) return null
+  return Math.round(((Number(row.price) || 0) - Number(base)) / Number(base) * 100)
+}
 
   /** 库存类型标签 */
   const stockTypeLabel = (type?: string): string => {
@@ -2174,4 +2225,14 @@
   .ml-2 {
     margin-left: 8px;
   }
+.upstream-link-small {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--el-color-primary);
+  word-break: break-all;
+}
+.markup-flat {
+  color: var(--el-text-color-secondary);
+}
 </style>

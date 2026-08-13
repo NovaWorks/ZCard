@@ -642,7 +642,9 @@
       "upstreamPriceShort": "上游价格/加价",
       "upstreamPrice": "上游售价",
       "markupShort": "加价",
-      "upstreamLink": "上游商品"
+      "upstreamLink": "上游商品",
+      "upstreamPricePending": "待同步",
+      "markupFlat": "平价"
     },
     "category": {
       "title": "分类管理",

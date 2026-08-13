@@ -642,7 +642,9 @@
       "upstreamPriceShort": "Upstream / Markup",
       "upstreamPrice": "Upstream price",
       "markupShort": "Markup",
-      "upstreamLink": "Upstream"
+      "upstreamLink": "Upstream",
+      "upstreamPricePending": "Pending sync",
+      "markupFlat": "Flat"
     },
     "category": {
       "title": "Categories",
