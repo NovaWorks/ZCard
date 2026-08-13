@@ -158,12 +158,20 @@
           <template #default="{ row }">
             <ElButton text type="primary" size="small" @click="showDetail(row)">{{ t('zcard.order.detail') }}</ElButton>
             <ElButton
-              v-if="row.status === 'paid' && row.delivery_status === 'pending' && row.fulfillment_type_snapshot === 'manual'"
+              v-if="row.status === 'paid' && row.delivery_status === 'pending' && ['manual', 'upstream'].includes(row.fulfillment_type_snapshot)"
               text
               type="success"
               size="small"
               @click="openFulfill(row)"
             >{{ t('zcard.order.manualFulfill') }}</ElButton>
+            <ElButton
+              v-if="row.status === 'paid' && row.delivery_status === 'pending' && row.fulfillment_type_snapshot === 'upstream'"
+              text
+              type="primary"
+              size="small"
+              :loading="refetchingId === row.id"
+              @click="handleRefetch(row)"
+            >{{ t('zcard.order.refetch') }}</ElButton>
             <ElButton v-if="row.status === 'pending'" text type="danger" size="small" @click="handleClose(row)">{{ t('zcard.order.close') }}</ElButton>
           </template>
         </ElTableColumn>
@@ -184,10 +192,12 @@
     </ElCard>
 
     <!-- 详情/卡密弹窗 -->
-    <ElDialog v-model="detailVisible" :title="t('zcard.order.detail')" width="600px" destroy-on-close>
+    <ElDialog v-model="detailVisible" :title="t('zcard.order.detail')" width="720px" destroy-on-close>
       <div v-if="currentOrder" class="detail-content">
-        <ElDescriptions :column="2" border>
-          <ElDescriptionsItem :label="t('zcard.order.orderNo')">{{ currentOrder.order_no }}</ElDescriptionsItem>
+        <!-- 订单信息 -->
+        <div class="detail-section-title">{{ t('zcard.order.sectionOrder') }}</div>
+        <ElDescriptions :column="2" border class="order-descriptions">
+          <ElDescriptionsItem :label="t('zcard.order.orderNo')"  :span="2">{{ currentOrder.order_no }}</ElDescriptionsItem>
           <ElDescriptionsItem :label="t('zcard.order.status')">
             <ElTag :type="statusTagType(currentOrder.status)" size="small">{{ statusLabel(currentOrder.status) }}</ElTag>
           </ElDescriptionsItem>
@@ -197,16 +207,54 @@
           <ElDescriptionsItem :label="t('zcard.order.fulfillmentType')">
             {{ fulfillmentTypeLabel(currentOrder.fulfillment_type_snapshot) }}
           </ElDescriptionsItem>
-          <ElDescriptionsItem :label="t('zcard.order.product')">{{ currentOrder.product?.name || '-' }}</ElDescriptionsItem>
-          <ElDescriptionsItem :label="t('zcard.order.sku')">{{ currentOrder.sku_name || '-' }}</ElDescriptionsItem>
-          <ElDescriptionsItem :label="t('zcard.order.amount')">¥{{ formatAmount(currentOrder.amount) }}</ElDescriptionsItem>
-          <ElDescriptionsItem :label="t('zcard.order.quantity')">{{ currentOrder.quantity }}</ElDescriptionsItem>
-          <ElDescriptionsItem :label="t('zcard.order.cost')">¥{{ formatAmount(currentOrder.cost) }}</ElDescriptionsItem>
-          <ElDescriptionsItem :label="t('zcard.order.commission')">¥{{ formatAmount(currentOrder.amount - currentOrder.cost) }}</ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('zcard.order.product')"  :span="2">{{ currentOrder.product?.name || '-' }}</ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('zcard.order.sku')" :span="2">{{ currentOrder.sku_name || '-' }}</ElDescriptionsItem>
           <ElDescriptionsItem :label="t('zcard.order.paymentChannel')">{{ currentOrder.payment_channel || '-' }}</ElDescriptionsItem>
           <ElDescriptionsItem :label="t('zcard.order.contact')">{{ currentOrder.contact || '-' }}</ElDescriptionsItem>
           <ElDescriptionsItem :label="t('zcard.order.createTime')">{{ formatTime(currentOrder.created_at) }}</ElDescriptionsItem>
           <ElDescriptionsItem :label="t('zcard.order.paidTime')">{{ currentOrder.paid_at ? formatTime(currentOrder.paid_at) : '-' }}</ElDescriptionsItem>
+        </ElDescriptions>
+
+        <!-- 财务信息 -->
+        <div class="detail-section-title">{{ t('zcard.order.sectionFinance') }}</div>
+        <ElDescriptions :column="3" border class="order-descriptions">
+          <ElDescriptionsItem :label="t('zcard.order.amount')">¥{{ formatAmount(currentOrder.amount) }}</ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('zcard.order.quantity')">{{ currentOrder.quantity }}</ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('zcard.order.unitPrice')">¥{{ formatAmount(currentOrder.unit_price ?? currentOrder.amount) }}</ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('zcard.order.cost')">¥{{ formatAmount(currentOrder.cost) }}</ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('zcard.order.unitCost')">¥{{ formatAmount(currentOrder.unit_cost ?? currentOrder.cost) }}</ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('zcard.order.profit')">
+            <span :class="(currentOrder.profit ?? 0) < 0 ? 'profit-negative' : 'profit-positive'">
+              ¥{{ formatAmount(currentOrder.profit ?? currentOrder.amount - currentOrder.cost) }}
+              <span class="text-muted">({{ currentOrder.profit_rate ?? 0 }}%)</span>
+            </span>
+          </ElDescriptionsItem>
+        </ElDescriptions>
+
+        <!-- 上游货源信息 -->
+        <div v-if="currentOrder.upstream_source_name" class="detail-section-title">{{ t('zcard.order.sectionUpstream') }}</div>
+        <ElDescriptions v-if="currentOrder.upstream_source_name" :column="2" border class="order-descriptions">
+          <ElDescriptionsItem :label="t('zcard.order.upstreamSource')">{{ currentOrder.upstream_source_name }}</ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('zcard.order.upstreamOrderId')">
+            {{ currentOrder.upstream_order_id || '-' }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem :label="t('zcard.order.upstreamLink')" :span="2">
+            <a
+              v-if="currentOrder.upstream_product_url"
+              :href="currentOrder.upstream_product_url"
+              target="_blank"
+              rel="noopener"
+              class="upstream-link"
+            >{{ currentOrder.upstream_product_url }} ↗</a>
+            <a
+              v-else-if="currentOrder.upstream_base_url"
+              :href="currentOrder.upstream_base_url"
+              target="_blank"
+              rel="noopener"
+              class="upstream-link"
+            >{{ currentOrder.upstream_base_url }} ↗</a>
+            <span v-else>-</span>
+          </ElDescriptionsItem>
         </ElDescriptions>
 
         <!-- 卡密列表 -->
@@ -452,6 +500,25 @@
     await showDetail(row)
   }
 
+  /** 手动重新拿货(自动拿货失败兜底) */
+  const refetchingId = ref<number | null>(null)
+  const handleRefetch = async (row: Order) => {
+    refetchingId.value = row.id
+    try {
+      const data = await refetchUpstreamOrder(row.id)
+      ElMessage.success(data.message || t('zcard.order.refetchDone'))
+      fetchOrders()
+      if (currentOrder.value?.id === row.id) {
+        await showDetail(row)
+      }
+    } catch (e: any) {
+      ElMessage.error(e?.response?.data?.message || t('zcard.order.refetchFailed'))
+      fetchOrders()
+    } finally {
+      refetchingId.value = null
+    }
+  }
+
   const fulfillVisible = ref(false)
   const fulfilling = ref(false)
   const fulfillTarget = ref<Order | null>(null)
@@ -692,8 +759,36 @@
     color: var(--el-text-color-placeholder);
   }
 
+.detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.detail-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 10px;
+  padding-left: 8px;
+  border-left: 3px solid var(--el-color-primary);
+  line-height: 1.4;
+}
+.order-descriptions {
+  margin-top: 6px;
+}
+.order-descriptions .el-descriptions__label {
+  width: 96px;
+  white-space: nowrap;
+}
+.order-descriptions .el-descriptions__content {
+  word-break: break-all;
+}
 .profit-negative {
   color: var(--el-color-danger);
+  font-weight: 600;
+}
+.profit-positive {
+  color: var(--el-color-success);
+  font-weight: 600;
 }
 .upstream-link {
   color: var(--el-color-primary);

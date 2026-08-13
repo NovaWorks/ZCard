@@ -836,7 +836,10 @@
       "upstreamLink": "Upstream product link",
       "refetch": "Refetch",
       "refetchDone": "Refetch request submitted to upstream",
-      "refetchFailed": "Refetch failed, you can fulfill manually"
+      "refetchFailed": "Refetch failed, you can fulfill manually",
+      "sectionOrder": "Order",
+      "sectionFinance": "Finance",
+      "sectionUpstream": "Upstream Source"
     },
     "bill": {
       "title": "Bills",

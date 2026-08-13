@@ -836,7 +836,10 @@
       "upstreamLink": "上游商品链接",
       "refetch": "重新拿货",
       "refetchDone": "已向上游提交拿货请求",
-      "refetchFailed": "拿货失败,可尝试手动发货"
+      "refetchFailed": "拿货失败,可尝试手动发货",
+      "sectionOrder": "订单信息",
+      "sectionFinance": "财务信息",
+      "sectionUpstream": "上游货源信息"
     },
     "bill": {
       "title": "账单管理",
