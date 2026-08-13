@@ -58,6 +58,25 @@ class OrderUpstreamDetailTest extends TestCase
         ]);
     }
 
+    public function test_product_list_includes_upstream_price_and_link(): void
+    {
+        $order = $this->makeUpstreamOrder();
+        $product = Product::find($order->product_id);
+
+        $resp = $this->withHeaders($this->adminHeaders())
+            ->getJson('/api/admin/products?pageSize=15');
+        $resp->assertOk();
+        $row = collect($resp->json('data'))->firstWhere('id', $product->id);
+        $this->assertNotNull($row);
+        // 模拟同步写入上游售价快照
+        $product->update(['upstream_price' => 750]);
+        $resp = $this->withHeaders($this->adminHeaders())
+            ->getJson('/api/admin/products?pageSize=15');
+        $row = collect($resp->json('data'))->firstWhere('id', $product->id);
+        $this->assertSame(750, (int) $row['upstream_price']);
+        $this->assertSame('https://up.example.com/buy/UP123', $row['upstream_product_url']);
+    }
+
     public function test_order_detail_includes_finance_and_upstream_info(): void
     {
         $order = $this->makeUpstreamOrder();

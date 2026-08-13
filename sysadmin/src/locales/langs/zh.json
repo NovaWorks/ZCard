@@ -638,7 +638,11 @@
       "supplierSource": "货源商",
       "stockUnlimited": "不限",
       "followUpstreamPrice": "跟随上游调价",
-      "followUpstreamPriceTip": "开启:每次同步按加价规则自动重算售价,上游调价自动生效;关闭:保护当前手动设置的价格"
+      "followUpstreamPriceTip": "开启:每次同步按加价规则自动重算售价,上游调价自动生效;关闭:保护当前手动设置的价格",
+      "upstreamPriceShort": "上游价格/加价",
+      "upstreamPrice": "上游售价",
+      "markupShort": "加价",
+      "upstreamLink": "上游商品"
     },
     "category": {
       "title": "分类管理",

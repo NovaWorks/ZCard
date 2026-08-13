@@ -16,6 +16,9 @@ export interface Product {
   price: number // 分
   price_manual?: boolean // 售价是否被手动修改(同步保护)
   factory_price?: number // 分
+  upstream_price?: number // 上游售价快照(分)
+  upstream_product_url?: string | null // 上游商品链接
+  upstream_product_code?: string | null
   draft_premium?: number // 分
   description?: string | null
   leave_message?: string | null

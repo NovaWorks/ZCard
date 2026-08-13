@@ -638,7 +638,11 @@
       "supplierSource": "Supplier",
       "stockUnlimited": "Unlimited",
       "followUpstreamPrice": "Follow upstream price",
-      "followUpstreamPriceTip": "On: selling price is recalculated on every sync so upstream changes apply; Off: protect the manually set price"
+      "followUpstreamPriceTip": "On: selling price is recalculated on every sync so upstream changes apply; Off: protect the manually set price",
+      "upstreamPriceShort": "Upstream / Markup",
+      "upstreamPrice": "Upstream price",
+      "markupShort": "Markup",
+      "upstreamLink": "Upstream"
     },
     "category": {
       "title": "Categories",

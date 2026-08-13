@@ -406,6 +406,11 @@
               <ElSwitch v-model="formData.followUpstreamPrice" />
               <span class="form-hint">{{ t('zcard.product.followUpstreamPriceTip') }}</span>
             </ElFormItem>
+            <ElFormItem v-if="isUpstreamProduct && upstreamProductUrl" :label="t('zcard.product.upstreamLink')">
+              <a :href="upstreamProductUrl" target="_blank" rel="noopener" class="upstream-link-small">
+                {{ upstreamProductUrl }} ↗
+              </a>
+            </ElFormItem>
 
             <ElFormItem :label="t('zcard.product.draftPremium')">
               <ElInputNumber
@@ -1280,6 +1285,9 @@
     pick_type: string
   }
 
+  /** 上游商品链接(编辑抽屉展示,核对用) */
+  const upstreamProductUrl = ref('')
+
   const createEmptyForm = (): ProductForm => ({
     name: '',
     slug: '',
@@ -1699,6 +1707,7 @@
     editId.value = row.id
     activeTab.value = 'basic'
     isUpstreamProduct.value = !!row.upstream_source_id || row.fulfillment_type === 'upstream'
+    upstreamProductUrl.value = row.upstream_product_url || ''
     // 先用列表行预填,然后再拉详情补全
     Object.assign(formData, createEmptyForm(), {
       name: row.name,

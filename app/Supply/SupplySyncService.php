@@ -64,6 +64,7 @@ class SupplySyncService
                 'cover' => $this->normalizeCover($source, $dto->cover),
                 'images' => $this->normalizeImages($source, $dto->images, $dto->cover),
                 'factory_price' => $dto->factoryPrice,
+                'upstream_price' => $dto->price, // 上游售价快照(列表展示/加价核对)
                 'stock_cache' => $dto->stockQuantity, // 上游库存缓存
                 'category_id' => $this->resolveCategoryId($source, $dto->categoryCode, $dto->categoryName, $categoryMap),
                 'upstream_synced_at' => now(),
@@ -125,6 +126,7 @@ class SupplySyncService
             'images' => $this->normalizeImages($source, $dto->images, $dto->cover),
             'price' => $price ?? 0,
             'factory_price' => $dto->factoryPrice,
+            'upstream_price' => $dto->price, // 上游售价快照
             'stock_type' => 'card',
             'fulfillment_type' => Product::FULFILLMENT_UPSTREAM,
             'status' => ($price === null || ! ($source->settings['auto_list'] ?? true)) ? 0 : 1,

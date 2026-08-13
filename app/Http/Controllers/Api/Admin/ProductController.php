@@ -17,7 +17,7 @@ class ProductController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Product::with('category')
+        $query = Product::with(['category', 'upstreamSource:id,name,base_url,driver,settings'])
             ->withCount(['cards as stock' => fn ($q) => $q->where('status', 'unused')]);
 
         if ($search = $request->input('keyword')) {
@@ -71,6 +71,8 @@ class ProductController extends Controller
         $products = $query->orderByDesc('id')->paginate($request->input('pageSize', 15));
         $products->getCollection()->each(function (Product $product) {
             $product->setAttribute('stock', $product->availableStock());
+            // 上游商品链接(订单/列表核对用;本地商品为 null)
+            $product->setAttribute('upstream_product_url', $product->upstreamSource?->productUrlFor($product->upstream_product_code));
         });
 
         return response()->json($products);
