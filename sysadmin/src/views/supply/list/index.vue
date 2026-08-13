@@ -1182,9 +1182,9 @@
   /** 上游参考售价(分):预览展示,与上游页面价格一致 */
   const upstreamPrice = (p: UpstreamCategory['products'][number]): number => p.price ?? 0
 
-  /** 加价基准 = 拿货成本(批发价),为 0 时回退上游售价(与后端一致) */
+  /** 加价基准 = 上游售价优先(v1.12.71 起后端同为该口径),为 0 时回退成本价 */
   const costBase = (p: UpstreamCategory['products'][number]): number =>
-    (p.factory_price ?? 0) > 0 ? p.factory_price : (p.price ?? 0)
+    (p.price ?? 0) > 0 ? p.price : (p.factory_price ?? 0)
 
   /** 按所选策略实时计算售价(分);pending 返回 null(待审) */
   const calcPrice = (p: UpstreamCategory['products'][number]): number | null => {
