@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\ServiceWidgetScript;
 use App\Support\StorefrontConfig;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 
 class StorefrontSettingsController extends Controller
 {
@@ -21,5 +23,16 @@ class StorefrontSettingsController extends Controller
         }
 
         return response()->json($config);
+    }
+
+    /** 返回同源客服脚本，兼容 Chatwoot/Crisp 官方完整安装代码。 */
+    public function serviceWidgetScript(): Response
+    {
+        $script = ServiceWidgetScript::compile(StorefrontConfig::get('service_widget'));
+
+        return response($script, 200, [
+            'Content-Type' => 'application/javascript; charset=UTF-8',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+        ]);
     }
 }

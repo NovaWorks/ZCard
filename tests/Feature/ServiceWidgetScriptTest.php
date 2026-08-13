@@ -1,0 +1,86 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Support\ServiceWidgetScript;
+use App\Support\StorefrontConfig;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class ServiceWidgetScriptTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_crisp_install_code_is_served_as_same_origin_javascript(): void
+    {
+        StorefrontConfig::setMany([
+            'service_widget' => [
+                'enabled' => true,
+                'links' => [],
+                'script' => <<<'HTML'
+<script type="text/javascript">window.$crisp=[];window.CRISP_WEBSITE_ID="site-id";(function(){var d=document;var s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.head.appendChild(s);})();</script>
+HTML,
+            ],
+        ]);
+
+        $settings = $this->getJson('/api/settings/storefront')->assertOk();
+        $settings->assertJsonPath('service_widget.script_configured', true)
+            ->assertJsonMissingPath('service_widget.script');
+
+        $response = $this->get('/api/settings/service-widget.js')->assertOk()
+            ->assertHeader('Content-Type', 'application/javascript; charset=UTF-8');
+
+        $this->assertStringContainsString('window.CRISP_WEBSITE_ID="site-id"', $response->getContent());
+        $this->assertStringNotContainsString('<script', $response->getContent());
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+    }
+
+    public function test_chatwoot_origin_is_added_to_storefront_csp_without_unsafe_inline_script(): void
+    {
+        StorefrontConfig::setMany([
+            'service_widget' => [
+                'enabled' => true,
+                'links' => [],
+                'script' => <<<'HTML'
+<script>(function(d,t){var BASE_URL="https://chat.example.com";var g=d.createElement(t);g.src=BASE_URL+"/packs/js/sdk.js";g.onload=function(){window.chatwootSDK.run({websiteToken:"token",baseUrl:BASE_URL})};d.head.appendChild(g)})(document,"script");</script>
+HTML,
+            ],
+        ]);
+
+        $response = $this->get('/')->assertOk();
+        $csp = (string) $response->headers->get('Content-Security-Policy');
+
+        $this->assertStringContainsString("script-src 'self' https://chat.example.com", $csp);
+        $this->assertStringContainsString("frame-src 'self' https://chat.example.com", $csp);
+        $this->assertStringNotContainsString("script-src 'self' 'unsafe-inline'", $csp);
+    }
+
+    public function test_external_script_tags_are_compiled_and_insecure_sources_are_ignored(): void
+    {
+        $compiled = ServiceWidgetScript::compile([
+            'enabled' => true,
+            'script' => '<script src="https://cdn.example.com/widget.js" async></script>'
+                .'<script src="javascript:alert(1)"></script>',
+        ]);
+
+        $this->assertStringContainsString('https://cdn.example.com/widget.js', $compiled);
+        $this->assertStringContainsString('s.async=true', $compiled);
+        $this->assertStringNotContainsString('javascript:', $compiled);
+    }
+
+    public function test_disabled_widget_returns_empty_script_and_does_not_relax_csp(): void
+    {
+        StorefrontConfig::setMany([
+            'service_widget' => [
+                'enabled' => false,
+                'links' => [],
+                'script' => '<script src="https://client.crisp.chat/l.js"></script>',
+            ],
+        ]);
+
+        $this->get('/api/settings/service-widget.js')->assertOk()->assertContent('');
+
+        $csp = (string) $this->get('/')->assertOk()->headers->get('Content-Security-Policy');
+        $this->assertStringNotContainsString('client.crisp.chat', $csp);
+    }
+}

@@ -295,6 +295,7 @@ Route::middleware(['auth:sanctum', 'active.user'])->post('/reviews', [ReviewCont
 // 可评价状态(需登录):静态路由先于资源式注册
 Route::middleware(['auth:sanctum', 'active.user'])->get('/reviews/eligibility/{productId}', [ReviewController::class, 'eligibility'])->name('api.reviews.eligibility');
 Route::get('/settings/storefront', [StorefrontSettingsController::class, 'show'])->middleware(['display.currency', 'set.locale'])->name('api.settings.storefront');
+Route::get('/settings/service-widget.js', [StorefrontSettingsController::class, 'serviceWidgetScript'])->name('api.settings.service-widget-script');
 
 // 验证码(图形验证码,基于 mews/captcha)
 Route::get('/captcha/config', [CaptchaController::class, 'config'])->name('api.captcha.config');

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 右下角在线客服(issue #7)
- * - 配置了第三方脚本(Chatwoot/Crisp 等):**原样注入执行,由其原生渲染气泡**,
+ * - 配置了第三方脚本(Chatwoot/Crisp 等):通过同源端点编译执行,由其原生渲染气泡,
  *   不再叠加本站按钮,避免双气泡/嵌套冲突;
  * - 未配置脚本:渲染本站链接浮窗(fallback,仅当配置了可跳转链接时)。
  * 注入为响应式:配置异步到达后自动执行(修复配置了不显示的问题)。
@@ -15,9 +15,9 @@ const { t, locale } = useI18n()
 const settings = useSettingsStore()
 const open = ref(false)
 
-const widget = computed(() => settings.config?.service_widget || { enabled: false, links: [], script: '' })
+const widget = computed(() => settings.config?.service_widget || { enabled: false, links: [], script_configured: false })
 /** 已配置第三方脚本 → 纯原生模式(不渲染本站 UI) */
-const nativeMode = computed(() => !!widget.value.enabled && !!widget.value.script?.trim())
+const nativeMode = computed(() => !!widget.value.enabled && !!widget.value.script_configured)
 /** 未配置脚本 → 本站链接浮窗 */
 const links = computed(() => {
   const w = widget.value
@@ -31,15 +31,20 @@ const title = computed(() => {
   return w.title || t('service.title')
 })
 
-/** 第三方脚本注入(响应式:配置到达后自动执行;仅注入一次) */
+/** 从同源端点加载已编译脚本，既兼容完整 <script> 代码，也不放宽 CSP 的内联限制。 */
 let injected = false
 const stop = watchEffect(() => {
-  const script = widget.value.script
-  if (!script || injected) return
+  if (!nativeMode.value || injected) return
+  const existing = document.querySelector('script[data-zcard-service-widget]')
+  if (existing) {
+    injected = true
+    return
+  }
   injected = true
   const el = document.createElement('script')
-  el.textContent = script
+  el.src = '/api/settings/service-widget.js'
   el.async = true
+  el.dataset.zcardServiceWidget = 'true'
   document.head.appendChild(el)
 })
 

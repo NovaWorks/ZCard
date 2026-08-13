@@ -268,6 +268,9 @@ class StorefrontConfig
 
                 return $item;
             }, is_array($widget['links'] ?? null) ? $widget['links'] : []);
+            // 原始安装代码由同源 JS 端点返回，公开 JSON 只告诉前端是否启用原生客服。
+            $widget['script_configured'] = trim((string) ($widget['script'] ?? '')) !== '';
+            unset($widget['script']);
             $config['service_widget'] = $widget;
         }
 
