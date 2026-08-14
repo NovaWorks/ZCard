@@ -338,15 +338,15 @@ class OrderService
      * 因此发卡与状态变更同事务,保证一致性(参考 acg-faka orderSuccess)。
      * 若发卡失败,整个事务回滚,订单回到 pending,第三方会重试回调。
      */
-    public function markPaid(string $orderNo): Order
+    public function markPaid(string $orderNo, ?string $paymentChannel = null): Order
     {
-        $order = DB::transaction(function () use ($orderNo) {
+        $order = DB::transaction(function () use ($orderNo, $paymentChannel) {
             $order = Order::where('order_no', $orderNo)->lockForUpdate()->firstOrFail();
             if ($order->status !== 'pending') {
                 throw new \RuntimeException("订单状态异常: {$order->status},无法支付");
             }
             // 快照支付渠道(从 payments 关联取成功的渠道码)
-            $paymentChannel = Payment::where('order_id', $order->id)
+            $paymentChannel ??= Payment::where('order_id', $order->id)
                 ->where('status', 'success')->value('channel');
             $order->update([
                 'status' => 'paid',

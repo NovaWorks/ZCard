@@ -240,11 +240,59 @@ class CartCheckoutTest extends TestCase
             ->assertSeeText('success');
 
         $this->assertSame('paid', $order->fresh()->status);
+        $this->assertSame('epay', $order->fresh()->payment_channel);
         $this->assertDatabaseHas('payments', [
             'order_id' => $order->id,
             'channel' => 'epay',
             'status' => 'success',
         ]);
+    }
+
+    public function test_batch_callback_snapshots_channel_on_every_paid_order(): void
+    {
+        $this->seedBase();
+        $orders = app(OrderService::class)->batchCreate(
+            [
+                ['product_id' => $this->makeProduct('EPAY-BATCH-A', 2100, 1)->id, 'qty' => 1],
+                ['product_id' => $this->makeProduct('EPAY-BATCH-B', 900, 1)->id, 'qty' => 1],
+            ],
+            ['contact' => 'batch-callback@example.com'],
+        );
+        $channel = PaymentChannel::updateOrCreate(
+            ['merchant_id' => 1, 'code' => 'epay'],
+            [
+                'name' => '易支付',
+                'driver' => EpayDriver::class,
+                'config' => [
+                    'url' => 'https://pay.test',
+                    'pid' => '1001',
+                    'key' => 'secret-001',
+                    'sign_type' => 'MD5',
+                ],
+                'enabled' => true,
+                'sort' => 0,
+            ],
+        );
+        app(PaymentService::class)->createBatchPayment($orders->pluck('id')->all(), $channel->id);
+
+        $params = [
+            'pid' => '1001',
+            'out_trade_no' => $orders->first()->order_no,
+            'trade_no' => 'EPAY-BATCH-PAID-001',
+            'money' => '30.00',
+            'trade_status' => 'TRADE_FINISHED',
+            'sign_type' => 'MD5',
+        ];
+        $params['sign'] = md5($this->epaySignContent($params).'secret-001');
+
+        $this->post('/api/payments/notify/epay', $params)
+            ->assertOk()
+            ->assertSeeText('success');
+
+        foreach ($orders as $order) {
+            $this->assertSame('paid', $order->fresh()->status);
+            $this->assertSame('epay', $order->fresh()->payment_channel);
+        }
     }
 
     private function epaySignContent(array $params): string
