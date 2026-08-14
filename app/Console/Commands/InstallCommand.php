@@ -110,7 +110,7 @@ class InstallCommand extends Command
                 && Hash::check('admin123456', $existingUser->password);
 
             if ((int) $existingUser->status !== 1 || $isLegacyDefaultCredential) {
-                $newPassword = $this->option('password') ?: Str::random(12);
+                $newPassword = $this->option('password') ?: $this->generateAdminPassword();
                 $existingUser->forceFill([
                     'email' => $email,
                     'username' => 'admin',
@@ -128,7 +128,8 @@ class InstallCommand extends Command
                 $adminUser->assignRole('super_admin');
             }
         } else {
-            $newPassword = $this->option('password') ?: Str::random(8);
+            // CLI 安装不传 --password 时使用随机密码,并在下方完成区打印。
+            $newPassword = $this->option('password') ?: $this->generateAdminPassword();
             $adminUser = User::create([
                 'username' => 'admin',
                 'name' => 'Super Admin',
@@ -167,9 +168,10 @@ class InstallCommand extends Command
         if ($newPassword !== null) {
             $this->info('');
             $this->info('  管理员账号:');
+            $this->line('    用户名:  admin');
             $this->line("    邮箱:  {$email}");
             $this->line("    密码:  {$newPassword}");
-            $this->warn('    ⚠ 首次登录后请立即修改密码');
+            $this->warn('    ⚠ 以上凭据仅在此处显示一次,请立即登录后台并修改密码');
         }
 
         $this->info('');
@@ -178,6 +180,15 @@ class InstallCommand extends Command
         $this->info('');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * 生成管理员随机密码(16 位字母+数字,无特殊符号,便于命令行显示与复制)。
+     * CLI 安装未提供 --password 时使用;Web 安装由客户自行输入。
+     */
+    private function generateAdminPassword(): string
+    {
+        return Str::password(16, letters: true, numbers: true, symbols: false);
     }
 
     /**

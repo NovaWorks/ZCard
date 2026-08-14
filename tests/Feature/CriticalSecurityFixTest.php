@@ -60,6 +60,27 @@ class CriticalSecurityFixTest extends TestCase
         $this->assertTrue($admin->hasRole('super_admin'));
     }
 
+    public function test_cli_install_without_password_option_generates_random_password_and_prints_it(): void
+    {
+        // 把占位账号改名,模拟"全新安装、admin 不存在"的分支。
+        $placeholder = User::withTrashed()->where('username', 'admin')->first();
+        $placeholder->forceFill(['username' => 'placeholder_old', 'email' => 'placeholder@example.com'])->save();
+
+        $this->artisan('zcard:install', ['--skip-db' => true, '--email' => 'boss2@test.com'])
+            ->expectsOutputToContain('密码:')
+            ->expectsOutputToContain('用户名:  admin')
+            ->assertSuccessful();
+
+        $admin = User::withTrashed()->where('username', 'admin')->first();
+        $this->assertNotNull($admin);
+        $this->assertSame(1, (int) $admin->status);
+        $this->assertSame('boss2@test.com', $admin->email);
+        // 随机生成,绝不等于任何默认/常见密码
+        $this->assertFalse(Hash::check('admin123456', $admin->password));
+        $this->assertFalse(Hash::check('password', $admin->password));
+        $this->assertTrue($admin->hasRole('super_admin'));
+    }
+
     public function test_install_run_rejected_when_active_admin_exists(): void
     {
         // 模拟"installed 锁文件丢失但站点已有启用管理员"的场景(H-2)。
