@@ -29,12 +29,15 @@ HTML,
         $settings->assertJsonPath('service_widget.script_configured', true)
             ->assertJsonMissingPath('service_widget.script');
 
-        $response = $this->get('/api/settings/service-widget.js')->assertOk()
-            ->assertHeader('Content-Type', 'application/javascript; charset=UTF-8');
+        // 新旧两条端点都必须可用(新端点无扩展名,规避 nginx 把 .js 当静态文件的 404)。
+        foreach (['/api/settings/service-widget-script', '/api/settings/service-widget.js'] as $path) {
+            $response = $this->get($path)->assertOk()
+                ->assertHeader('Content-Type', 'application/javascript; charset=UTF-8');
 
-        $this->assertStringContainsString('window.CRISP_WEBSITE_ID="site-id"', $response->getContent());
-        $this->assertStringNotContainsString('<script', $response->getContent());
-        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+            $this->assertStringContainsString('window.CRISP_WEBSITE_ID="site-id"', $response->getContent());
+            $this->assertStringNotContainsString('<script', $response->getContent());
+            $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        }
     }
 
     public function test_chatwoot_origin_is_added_to_storefront_csp_without_unsafe_inline_script(): void
@@ -274,5 +277,50 @@ HTML,
 
         $this->assertNotContains('https://evil.example.com', $origins);
         $this->assertContains('https://client.crisp.chat', $origins);
+    }
+
+    /** 通配写法 *.example.com 等价于 example.com:任意层级子域名均可通过编译。 */
+    public function test_wildcard_entry_matches_all_subdomain_levels(): void
+    {
+        $widget = [
+            'enabled' => true,
+            'script' => '<script src="https://a.b.chat.example.com/packs/js/sdk.js"></script>',
+        ];
+
+        $compiled = ServiceWidgetScript::compile($widget, '*.example.com');
+
+        $this->assertStringContainsString('a.b.chat.example.com/packs/js/sdk.js', $compiled);
+    }
+
+    /** 填主域名(不带 *)同样放行任意层级子域名;相似但不同的主域名不放行。 */
+    public function test_bare_domain_entry_matches_subdomains_but_not_similar_domains(): void
+    {
+        // notexample.com 不在 example.com 主域名下 → 该条被丢弃,编译结果为空
+        $bad = ServiceWidgetScript::compile([
+            'enabled' => true,
+            'script' => '<script src="https://notexample.com/evil.js"></script>',
+        ], 'example.com');
+        $this->assertSame('', $bad);
+
+        // 仅含合法子域名时通过
+        $ok = ServiceWidgetScript::compile([
+            'enabled' => true,
+            'script' => '<script src="https://cdn.chat.example.com/sdk.js"></script>',
+        ], 'example.com');
+        $this->assertStringContainsString('cdn.chat.example.com/sdk.js', $ok);
+    }
+
+    /** 通配条目在 CSP 中生成 *.host 通配源,子域名资源不被拦。 */
+    public function test_csp_contains_wildcard_source_for_allowlisted_domain(): void
+    {
+        $widget = [
+            'enabled' => true,
+            'script' => '<script src="https://chat.example.com/sdk.js"></script>',
+        ];
+
+        $origins = ServiceWidgetScript::allowedOrigins($widget, '*.example.com');
+
+        $this->assertContains('https://example.com', $origins);
+        $this->assertContains('https://*.example.com', $origins);
     }
 }

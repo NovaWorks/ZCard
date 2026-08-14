@@ -295,6 +295,9 @@ Route::middleware(['auth:sanctum', 'active.user'])->post('/reviews', [ReviewCont
 // 可评价状态(需登录):静态路由先于资源式注册
 Route::middleware(['auth:sanctum', 'active.user'])->get('/reviews/eligibility/{productId}', [ReviewController::class, 'eligibility'])->name('api.reviews.eligibility');
 Route::get('/settings/storefront', [StorefrontSettingsController::class, 'show'])->middleware(['display.currency', 'set.locale'])->name('api.settings.storefront');
+// 客服脚本同源端点。保留 .js 旧路径兼容既有部署;但部分 nginx 会把 .js 后缀
+// 当静态文件处理导致 404(到不了 PHP),因此前端默认使用无扩展名路径。
+Route::get('/settings/service-widget-script', [StorefrontSettingsController::class, 'serviceWidgetScript'])->name('api.settings.service-widget-script.new');
 Route::get('/settings/service-widget.js', [StorefrontSettingsController::class, 'serviceWidgetScript'])->name('api.settings.service-widget-script');
 
 // 验证码(图形验证码,基于 mews/captcha)

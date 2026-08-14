@@ -42,7 +42,8 @@ const stop = watchEffect(() => {
   }
   injected = true
   const el = document.createElement('script')
-  el.src = '/api/settings/service-widget.js'
+  // 使用无扩展名端点:部分 nginx 会把 .js 后缀的 API 路径当静态文件处理而 404。
+  el.src = '/api/settings/service-widget-script'
   el.async = true
   el.dataset.zcardServiceWidget = 'true'
   document.head.appendChild(el)

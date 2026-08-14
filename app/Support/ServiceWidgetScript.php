@@ -104,8 +104,11 @@ final class ServiceWidgetScript
         // 白名单内的全部域名直接加入 CSP 放行:第三方 SDK 常从多个官方域名加载
         // 运行期资源(Crisp: client.crisp.chat → settings.crisp.chat;Chatwoot:
         // app.chatwoot.com → cdn.chatwoot.com),这些域名不会出现在安装代码文本里。
+        // 同时按"主域名 + 任意子域名"语义放行(填 example.com 或 *.example.com
+        // 均表示该主域名及其任意层级子域名),CSP 追加 *.host 通配源。
         foreach ($hosts as $host) {
             $origins['https://'.$host] = true;
+            $origins['https://*.'.$host] = true;
         }
 
         foreach ($matches[0] ?? [] as $url) {
@@ -167,6 +170,8 @@ final class ServiceWidgetScript
      * 解析受信域名白名单(容错):
      * - 数组或字符串均接受;支持逗号/空格/分号/全角逗号分隔;
      * - 自动剥离 https:// 前缀、路径与尾点;
+     * - 支持通配写法 `*.example.com`,归一化为 `example.com`(语义一致:主域名 +
+     *   任意层级子域名均放行,如 a.example.com、b.c.example.com);
      * - 兼容"多域名被点号连成一段"的误填(如 app.chatwoot.com.cdn.chatwoot.com → 拆成两个);
      * - 非法条目(无点的单token等)直接丢弃;
      * - **最终白名单 = 默认官方域名 + 用户追加条目**。原因:第三方 SDK 常从多个
@@ -200,6 +205,10 @@ final class ServiceWidgetScript
                 $blocks = preg_split('/(?<=\.(?:com|net|org|io|chat|app))\./', $entry) ?: [$entry];
                 foreach ($blocks as $host) {
                     $host = trim($host);
+                    // 通配写法 *.example.com 归一化为 example.com(主域名 + 全部子域名)。
+                    if (str_starts_with($host, '*.')) {
+                        $host = substr($host, 2);
+                    }
                     if ($host !== ''
                         && preg_match('/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/', $host)) {
                         $hosts[] = $host;
@@ -212,6 +221,10 @@ final class ServiceWidgetScript
         return array_values(array_unique(array_merge($hosts, self::DEFAULT_ALLOWED_HOSTS)));
     }
 
+    /**
+     * 判断 host 是否在白名单内:条目为主域名,命中 = 完全相等或为其任意层级子域名
+     * (example.com 放行 a.example.com、b.c.example.com;notexample.com 不放行)。
+     */
     private static function hostAllowed(string $host, array $hosts): bool
     {
         if ($host === '') {
