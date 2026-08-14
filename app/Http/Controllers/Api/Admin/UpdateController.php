@@ -279,26 +279,36 @@ class UpdateController extends Controller
             return response()->json(['message' => '已有更新或回退正在进行中,无法回退'], 409);
         }
 
-        // 安全(H-5):回滚降级防护——禁止回退到低于安全基线的版本,
-        // 防止被盗管理员把系统退回存在已公开漏洞的历史版本再利用。
-        $targetVersion = trim((string) $this->shell(
-            'cd '.escapeshellarg(base_path()).' && '.$this->gitCmd('show HEAD~1:VERSION 2>/dev/null'),
-        ));
-        if ($targetVersion === '' || version_compare($targetVersion, self::MIN_SECURITY_VERSION, '<')) {
-            $shown = $targetVersion !== '' ? $targetVersion : '未知';
+        $preflightComplete = false;
+        try {
+            // 安全(H-5):回滚降级防护——禁止回退到低于安全基线的版本,
+            // 防止被盗管理员把系统退回存在已公开漏洞的历史版本再利用。
+            $targetVersion = trim((string) $this->shell(
+                'cd '.escapeshellarg(base_path()).' && '.$this->gitCmd('show HEAD~1:VERSION 2>/dev/null'),
+            ));
+            if ($targetVersion === '' || version_compare($targetVersion, self::MIN_SECURITY_VERSION, '<')) {
+                $shown = $targetVersion !== '' ? $targetVersion : '未知';
 
-            return response()->json([
-                'message' => "禁止回滚:目标版本({$shown})低于安全基线 v".self::MIN_SECURITY_VERSION,
-            ], 422);
-        }
+                return response()->json([
+                    'message' => "禁止回滚:目标版本({$shown})低于安全基线 v".self::MIN_SECURITY_VERSION,
+                ], 422);
+            }
 
-        // 安全(H-5):回滚次数上限(防反复回退制造降级窗口)
-        $countFile = storage_path('app/rollback.count');
-        $rollbackCount = (int) (@file_get_contents($countFile) ?: 0);
-        if ($rollbackCount >= 3) {
-            return response()->json(['message' => '回滚次数已达上限(3 次),如需继续请人工介入处理'], 422);
+            // 安全(H-5):回滚次数上限(防反复回退制造降级窗口)
+            $countFile = storage_path('app/rollback.count');
+            $rollbackCount = (int) (@file_get_contents($countFile) ?: 0);
+            if ($rollbackCount >= 3) {
+                return response()->json(['message' => '回滚次数已达上限(3 次),如需继续请人工介入处理'], 422);
+            }
+            file_put_contents($countFile, (string) ($rollbackCount + 1));
+
+            $preflightComplete = true;
+        } finally {
+            // 预检拒绝或抛出异常时尚未进入下方主流程,必须在此释放持久锁。
+            if (! $preflightComplete) {
+                $operationLock->release();
+            }
         }
-        file_put_contents($countFile, (string) ($rollbackCount + 1));
 
         $lockFile = storage_path('app/update.lock');
         file_put_contents($lockFile, json_encode(['started_at' => now()->toIso8601String(), 'operation' => 'rollback']));
