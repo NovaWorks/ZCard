@@ -18,23 +18,14 @@ export const staticRoutes: AppRouteRecordRaw[] = [
   //   component: () => import('@views/dashboard/console/index.vue'),
   //   meta: { title: 'menus.dashboard.title' }
   // },
+  // 注意:后台不提供自助注册/找回密码页面(issue #24)。
+  // 管理员账号由超级管理员在后台创建,密码丢失走线下/邮件运维流程,
+  // 前台顾客的注册与找回密码在 storefront(/)完成。
   {
     path: '/auth/login',
     name: 'Login',
     component: () => import('@views/auth/login/index.vue'),
     meta: { title: 'menus.login.title', isHideTab: true }
-  },
-  {
-    path: '/auth/register',
-    name: 'Register',
-    component: () => import('@views/auth/register/index.vue'),
-    meta: { title: 'menus.register.title', isHideTab: true }
-  },
-  {
-    path: '/auth/forget-password',
-    name: 'ForgetPassword',
-    component: () => import('@views/auth/forget-password/index.vue'),
-    meta: { title: 'menus.forgetPassword.title', isHideTab: true }
   },
   {
     path: '/403',

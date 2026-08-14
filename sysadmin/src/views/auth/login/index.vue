@@ -81,13 +81,11 @@
               </div>
             </ElFormItem>
 
-            <div class="flex-cb mt-2 text-sm">
+            <!-- 后台不提供自助找回密码(issue #24):管理员密码重置由超级管理员在后台操作 -->
+            <div class="mt-2 text-sm">
               <ElCheckbox v-model="formData.rememberPassword">{{
                 $t('login.rememberPwd')
               }}</ElCheckbox>
-              <RouterLink class="text-theme" :to="{ name: 'ForgetPassword' }">{{
-                $t('login.forgetPwd')
-              }}</RouterLink>
             </div>
 
             <div style="margin-top: 30px">
