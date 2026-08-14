@@ -94,6 +94,7 @@ class VirtualCoinDriverTest extends TestCase
             $data = $request->data();
 
             return $data['unique_id'] === 'ORD-1'
+                && $data['amount'] === '1.4'
                 && $data['coin'] === 'USDT'
                 && ! empty($data['sign'])
                 && str_contains($request->url(), '/payLink');
@@ -129,8 +130,8 @@ class VirtualCoinDriverTest extends TestCase
 
         $this->assertNotNull($result);
         $this->assertSame('ORD-1', $result['out_trade_no']);
-        // 1.4 USDT × 0.14 汇率 × 100 = 19.6 → 20 分(四舍五入)
-        $this->assertSame(20, $result['amount']);
+        // 配置口径是 1 元 = 0.14 USDT；1.4 USDT ÷ 0.14 × 100 = 1000 分。
+        $this->assertSame(1000, $result['amount']);
     }
 
     public function test_tokenpay_pay_redirects(): void
@@ -158,6 +159,7 @@ class VirtualCoinDriverTest extends TestCase
             $payload = $request->data();
 
             return $payload['OutOrderId'] === 'ORD-1'
+                && $payload['ActualAmount'] === '1.4'
                 && str_contains($request->url(), '/CreateOrder')
                 && ! empty($payload['Signature']);
         });
@@ -183,6 +185,6 @@ class VirtualCoinDriverTest extends TestCase
 
         $this->assertNotNull($result);
         $this->assertSame('ORD-1', $result['out_trade_no']);
-        $this->assertSame(20, $result['amount']); // 1.4 × 0.14 × 100 = 19.6 → 20
+        $this->assertSame(1000, $result['amount']); // 1.4 ÷ 0.14 × 100 = 1000
     }
 }
