@@ -2,8 +2,9 @@
 
 namespace App\Payment\Drivers;
 
-use App\Payment\Contracts\Payable;
 use App\Payment\AbstractPaymentDriver;
+use App\Payment\Contracts\Payable;
+use App\Payment\FiatAmount;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -24,7 +25,7 @@ use Illuminate\Support\Facades\Http;
  */
 class BEpusdtDriver extends AbstractPaymentDriver
 {
-        /**
+    /**
      * BEpusdt MD5 签名(与 EpuSdt 不同,本驱动末尾直接追加 token,中间无 &):
      * 1. 剔除 signature 字段及空值(null / "")
      * 2. 参数名按 ASCII 字典序排序
@@ -54,7 +55,12 @@ class BEpusdtDriver extends AbstractPaymentDriver
     {
         $apiUrl = rtrim($config['api_url'] ?? '', '/');
         $apiToken = $config['api_token'] ?? '';
-        $fiat = strtolower($config['fiat'] ?? 'cny');
+        $fiat = strtoupper($config['fiat'] ?? ($config['target_currency'] ?? 'CNY'));
+        $amount = FiatAmount::convertFromBase(
+            $order->getPayableAmount(),
+            $config['exchange_rate'] ?? '1',
+            $fiat
+        );
         // currencies 配置为数组(后台多选),下单时拼成 BEpusdt 要求的逗号分隔串
         // 如 ['USDT','USDC'] → 'USDT,USDC';留空则不传(不限币种,用户在收银台自选)
         $currencyList = $config['currencies'] ?? [];
@@ -69,8 +75,8 @@ class BEpusdtDriver extends AbstractPaymentDriver
 
         $params = [
             'order_id' => $order->getPayableKey(),
-            'amount' => (float) bcdiv((string) $order->getPayableAmount(), '100', 2), // 分→元(法币)
-            'fiat' => strtoupper($fiat),
+            'amount' => (float) FiatAmount::formatMinor($amount, $fiat),
+            'fiat' => $fiat,
             'notify_url' => $notifyUrl,
             'redirect_url' => $redirectUrl,
             'name' => $order->getPayableKey(),
@@ -101,7 +107,7 @@ class BEpusdtDriver extends AbstractPaymentDriver
             throw new \RuntimeException('BEpusdt 未返回支付链接');
         }
 
-        return PaymentResult::redirect($paymentUrl);
+        return PaymentResult::redirect($paymentUrl, $fiat, $amount);
     }
 
     public function verifyCallback(Request $request, array $config): ?array
@@ -122,13 +128,15 @@ class BEpusdtDriver extends AbstractPaymentDriver
             return null;
         }
 
-        // amount 是法币金额(元),转回分
-        $amountYuan = (float) ($data['amount'] ?? 0);
+        $fiat = strtoupper($config['fiat'] ?? ($config['target_currency'] ?? 'CNY'));
+        if (isset($data['fiat']) && strtoupper((string) $data['fiat']) !== $fiat) {
+            return null;
+        }
 
         return [
             'channel_order_no' => $data['block_transaction_id'] ?? ($data['trade_id'] ?? null),
             'out_trade_no' => $data['order_id'] ?? null,
-            'amount' => (int) round($amountYuan * 100), // 元→分
+            'amount' => FiatAmount::fromMajor($data['amount'] ?? null, $fiat),
             'raw' => $data,
         ];
     }

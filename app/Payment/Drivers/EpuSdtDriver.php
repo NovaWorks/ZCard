@@ -2,8 +2,9 @@
 
 namespace App\Payment\Drivers;
 
-use App\Payment\Contracts\Payable;
 use App\Payment\AbstractPaymentDriver;
+use App\Payment\Contracts\Payable;
+use App\Payment\FiatAmount;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -18,7 +19,7 @@ use Illuminate\Support\Facades\Http;
  */
 class EpuSdtDriver extends AbstractPaymentDriver
 {
-        /**
+    /**
      * GMPay HMAC-SHA256 签名:
      * 1. 排除 signature 字段
      * 2. 非空参数按 key ASCII 字典序排序
@@ -45,7 +46,12 @@ class EpuSdtDriver extends AbstractPaymentDriver
         $apiUrl = rtrim($config['api_url'] ?? '', '/');
         $pid = $config['pid'] ?? '';
         $secretKey = $config['secret_key'] ?? '';
-        $currency = $config['currency'] ?? 'cny';
+        $currency = strtoupper($config['currency'] ?? ($config['target_currency'] ?? 'CNY'));
+        $amount = FiatAmount::convertFromBase(
+            $order->getPayableAmount(),
+            $config['exchange_rate'] ?? '1',
+            $currency
+        );
         $token = $config['token'] ?? 'USDT';
         $network = $config['network'] ?? 'TRC20';
 
@@ -55,8 +61,8 @@ class EpuSdtDriver extends AbstractPaymentDriver
         $params = [
             'pid' => (string) $pid,
             'order_id' => $order->getPayableKey(),
-            'currency' => $currency,
-            'amount' => bcdiv((string) $order->getPayableAmount(), '100', 2), // 分→元
+            'currency' => strtolower($currency),
+            'amount' => FiatAmount::formatMinor($amount, $currency),
             'notify_url' => $notifyUrl,
             'redirect_url' => $redirectUrl,
             'name' => $order->getPayableKey(),
@@ -83,7 +89,7 @@ class EpuSdtDriver extends AbstractPaymentDriver
             throw new \RuntimeException('EpuSdt 未返回支付链接');
         }
 
-        return PaymentResult::redirect($paymentUrl);
+        return PaymentResult::redirect($paymentUrl, $currency, $amount);
     }
 
     public function verifyCallback(Request $request, array $config): ?array
@@ -104,13 +110,15 @@ class EpuSdtDriver extends AbstractPaymentDriver
             return null;
         }
 
-        // amount 是法币金额(元),转回分
-        $amountYuan = (float) ($data['amount'] ?? 0);
+        $currency = strtoupper($config['currency'] ?? ($config['target_currency'] ?? 'CNY'));
+        if (isset($data['currency']) && strtoupper((string) $data['currency']) !== $currency) {
+            return null;
+        }
 
         return [
             'channel_order_no' => $data['trade_id'] ?? null,
             'out_trade_no' => $data['order_id'] ?? null,
-            'amount' => (int) round($amountYuan * 100), // 元→分
+            'amount' => FiatAmount::fromMajor($data['amount'] ?? null, $currency),
             'raw' => $data,
         ];
     }

@@ -72,11 +72,8 @@ class PaymentService
 
         $driver = $this->resolveDriver($channel);
         $config = $this->configForPayment($driver, $channel->config ?? [], $payType);
-        // 通道目标货币 + 汇率(spec §5.3):作为审计元数据记录。
-        // 注意:各驱动 pay() 实际以「基础货币」金额向网关发起收款(未做通道换算),
-        // 因此 charged_amount = payable.amount(基础货币分),与驱动 verifyCallback 回报的
-        // 基础货币分口径一致,保证回调金额校验正确。target_currency/exchange_rate 仅记录
-        // 该通道声明的目标货币与汇率,供对账/审计使用。
+        // 通道目标货币 + 汇率(spec §5.3):驱动负责按网关币种换算并回报实际收款快照。
+        // 尚未回报快照的旧驱动继续使用基础货币分,保持向后兼容。
         $supported = $driver->getSupportedCurrencies();
         $targetCur = strtoupper($config['target_currency'] ?? ($supported[0] ?? 'CNY'));
         $rate = (float) ($config['exchange_rate'] ?? 1);
