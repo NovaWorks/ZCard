@@ -45,8 +45,18 @@ class FetchFromUpstream implements ShouldQueue
 
         $service->fetchFromUpstream($order, $source);
 
-        if ($order->fresh()->delivery_status !== 'delivered' && $this->attempts() >= $this->tries) {
-            $service->handleTimeout($order, $source);
+        if ($order->fresh()->delivery_status !== 'pending') {
+            return;
         }
+
+        $attempt = $this->attempts();
+        if ($attempt >= $this->tries) {
+            $service->handleTimeout($order, $source);
+
+            return;
+        }
+
+        $delays = $this->backoff();
+        $this->release($delays[min($attempt - 1, count($delays) - 1)]);
     }
 }

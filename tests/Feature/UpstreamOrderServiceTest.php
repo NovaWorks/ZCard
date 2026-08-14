@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\FetchFromUpstream;
 use App\Models\Card;
 use App\Models\Merchant;
 use App\Models\Order;
@@ -86,5 +87,63 @@ class UpstreamOrderServiceTest extends TestCase
         $this->assertSame('delivered', $fresh->delivery_status);
         $this->assertSame('<p>上游付款后教程</p>', $fresh->instructions_snapshot);
         $this->assertDatabaseHas('order_deliveries', ['order_id' => $order->id, 'card_content' => 'CARD-Z']);
+    }
+
+    public function test_pending_upstream_fetch_is_released_for_the_next_poll(): void
+    {
+        $merchant = $this->makeMerchant();
+        $source = SupplySource::create([
+            'name' => 'S',
+            'driver' => 'zcard',
+            'base_url' => 'https://x.com',
+            'credentials' => [],
+            'status' => 'active',
+        ]);
+        $product = Product::create([
+            'merchant_id' => $merchant->id,
+            'name' => 'Pending upstream product',
+            'slug' => 'pending-upstream',
+            'price' => 500,
+            'factory_price' => 400,
+            'stock_type' => 'card',
+            'fulfillment_type' => 'upstream',
+            'status' => 1,
+            'upstream_source_id' => $source->id,
+            'upstream_product_code' => 'UP-PENDING',
+        ]);
+        $order = Order::create([
+            'order_no' => 'O-PENDING',
+            'merchant_id' => $merchant->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'amount' => 500,
+            'status' => 'paid',
+            'delivery_status' => 'pending',
+            'fulfillment_type_snapshot' => 'upstream',
+            'upstream_source_id' => $source->id,
+            'paid_at' => now(),
+        ]);
+        $service = $this->mock(UpstreamOrderService::class);
+        $service->shouldReceive('fetchFromUpstream')->once()->withArgs(
+            fn (Order $actualOrder, SupplySource $actualSource) => $actualOrder->is($order) && $actualSource->is($source)
+        );
+        $service->shouldNotReceive('handleTimeout');
+
+        $job = (new FetchFromUpstream($order->id))->withFakeQueueInteractions();
+        $job->handle($service);
+
+        $job->assertReleased(10);
+
+        $timeoutService = \Mockery::mock(UpstreamOrderService::class);
+        $timeoutService->shouldReceive('fetchFromUpstream')->once();
+        $timeoutService->shouldReceive('handleTimeout')->once()->withArgs(
+            fn (Order $actualOrder, SupplySource $actualSource) => $actualOrder->is($order) && $actualSource->is($source)
+        );
+        $finalJob = (new FetchFromUpstream($order->id))->withFakeQueueInteractions();
+        $finalJob->job->attempts = $finalJob->tries;
+
+        $finalJob->handle($timeoutService);
+
+        $finalJob->assertNotReleased();
     }
 }
