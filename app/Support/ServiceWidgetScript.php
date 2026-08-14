@@ -153,19 +153,52 @@ final class ServiceWidgetScript
     }
 
     /** @param  mixed  $allowedHosts  配置值(数组或逗号分隔字符串) */
+    /**
+     * 解析受信域名白名单(容错):
+     * - 数组或字符串均接受;支持逗号/空格/分号/全角逗号分隔;
+     * - 自动剥离 https:// 前缀、路径与尾点;
+     * - 兼容"多域名被点号连成一段"的误填(如 app.chatwoot.com.cdn.chatwoot.com → 拆成两个);
+     * - 非法条目(无点的单token等)直接丢弃;全部非法时回退默认官方域名。
+     */
     private static function normalizeHosts(mixed $allowedHosts): array
     {
-        if (is_string($allowedHosts)) {
-            $allowedHosts = preg_split('/[\s,]+/', $allowedHosts, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        }
-        if (! is_array($allowedHosts) || $allowedHosts === []) {
-            $allowedHosts = self::DEFAULT_ALLOWED_HOSTS;
+        $raw = is_array($allowedHosts)
+            ? implode(',', array_map(fn (mixed $h) => trim((string) $h), $allowedHosts))
+            : trim((string) $allowedHosts);
+
+        if ($raw === '') {
+            return self::DEFAULT_ALLOWED_HOSTS;
         }
 
-        return array_values(array_unique(array_map(
-            fn (mixed $h) => strtolower(trim((string) $h)),
-            $allowedHosts,
-        )));
+        $hosts = [];
+        foreach (preg_split('/[\s,，;]+/u', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $entry) {
+            $entry = strtolower(trim($entry));
+            if ($entry === '') {
+                continue;
+            }
+
+            // 剥离协议与路径,只保留主机名
+            if (str_contains($entry, '://')) {
+                $entry = (string) (parse_url($entry, PHP_URL_HOST) ?? '');
+            } else {
+                $entry = (string) explode('/', $entry)[0];
+            }
+            $entry = rtrim($entry, '.');
+
+            // 兼容"多个域名被点号连成一段"的误填
+            $blocks = preg_split('/(?<=\.(?:com|net|org|io|chat|app))\./', $entry) ?: [$entry];
+            foreach ($blocks as $host) {
+                $host = trim($host);
+                if ($host !== ''
+                    && preg_match('/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/', $host)) {
+                    $hosts[] = $host;
+                }
+            }
+        }
+
+        $hosts = array_values(array_unique($hosts));
+
+        return $hosts === [] ? self::DEFAULT_ALLOWED_HOSTS : $hosts;
     }
 
     private static function hostAllowed(string $host, array $hosts): bool

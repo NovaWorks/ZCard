@@ -115,4 +115,64 @@ HTML,
         $csp = (string) $this->get('/')->assertOk()->headers->get('Content-Security-Policy');
         $this->assertStringNotContainsString('client.crisp.chat', $csp);
     }
+
+    public function test_chatwoot_official_snippet_compiles_with_default_hosts(): void
+    {
+        $widget = [
+            'enabled' => true,
+            'script' => <<<'HTML'
+<script>
+(function(d,t){var BASE_URL="https://app.chatwoot.com";var g=d.createElement(t),s=d.getElementsByTagName(t)[0];g.src=BASE_URL+"/packs/js/sdk.js";g.defer=true;g.async=true;g.onload=function(){window.chatwootSDK.run({websiteToken:'token',baseUrl:BASE_URL})};s.parentNode.insertBefore(g,s);})(document,"script");
+</script>
+HTML,
+        ];
+
+        $compiled = ServiceWidgetScript::compile($widget, null);
+        $this->assertStringContainsString('chatwootSDK', $compiled);
+    }
+
+    public function test_dot_joined_hosts_and_stray_tokens_are_normalized(): void
+    {
+        // 用户误填:多个域名被点号连成一段 + 尾随逗号和残token('s')
+        $raw = 'app.chatwoot.com.cdn.chatwoot.com.client.crisp.chat,s';
+
+        $compiled = ServiceWidgetScript::compile([
+            'enabled' => true,
+            'script' => '<script src="https://app.chatwoot.com/packs/js/sdk.js"></script>',
+        ], $raw);
+
+        // 规范化后 app.chatwoot.com 被正确识别,脚本正常编译
+        $this->assertStringContainsString('app.chatwoot.com/packs/js/sdk.js', $compiled);
+    }
+
+    public function test_whitespace_and_semicolon_separators_are_supported(): void
+    {
+        $compiled = ServiceWidgetScript::compile([
+            'enabled' => true,
+            'script' => '<script src="https://client.crisp.chat/l.js"></script>',
+        ], "app.chatwoot.com; client.crisp.chat\ncdn.chatwoot.com");
+
+        $this->assertStringContainsString('client.crisp.chat/l.js', $compiled);
+    }
+
+    public function test_scheme_and_path_are_stripped_from_allowlist_entries(): void
+    {
+        $compiled = ServiceWidgetScript::compile([
+            'enabled' => true,
+            'script' => '<script src="https://app.chatwoot.com/packs/js/sdk.js"></script>',
+        ], 'https://app.chatwoot.com/, https://cdn.chatwoot.com/some/path');
+
+        $this->assertStringContainsString('app.chatwoot.com/packs/js/sdk.js', $compiled);
+    }
+
+    public function test_all_invalid_entries_fall_back_to_defaults(): void
+    {
+        $compiled = ServiceWidgetScript::compile([
+            'enabled' => true,
+            'script' => '<script src="https://client.crisp.chat/l.js"></script>',
+        ], 's, , 123, ,');
+
+        // 非法条目全部剔除 → 回退默认官方域名 → crisp 正常编译
+        $this->assertStringContainsString('client.crisp.chat/l.js', $compiled);
+    }
 }

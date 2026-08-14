@@ -1017,10 +1017,9 @@
           links: serviceLinks,
           script: form.serviceWidgetScript,
         } as any,
-        service_widget_allowed_hosts: form.serviceWidgetAllowedHosts
-          .split(',')
-          .map((h) => h.trim().toLowerCase())
-          .filter(Boolean),
+        // 原样提交字符串,由后端统一解析(兼容逗号/空格/分号分隔、自动去协议头、
+        // 自动拆分被点号连串的域名、剔除非法项;全部非法时回退默认官方域名)。
+        service_widget_allowed_hosts: form.serviceWidgetAllowedHosts.trim(),
       }
       delete (payload as any).footerLinksJson
       delete (payload as any).footerContactJson
