@@ -201,8 +201,12 @@ final class ServiceWidgetScript
                 }
                 $entry = rtrim($entry, '.');
 
-                // 兼容"多个域名被点号连成一段"的误填
-                $blocks = preg_split('/(?<=\.(?:com|net|org|io|chat|app))\./', $entry) ?: [$entry];
+                // 兼容"多个域名被点号连成一段"的误填(如 app.chatwoot.com.cdn.chatwoot.com)。
+                // 注意:不能用变长 lookbehind 写法 (?<=\.(?:com|net|org|io|chat|app))\.
+                // —— PCRE2 < 10.43(PHP 8.3 及以下)不支持变长 lookbehind,表达式无法编译,
+                // 白名单非空时设置/客服接口直接 500。改用捕获组替换成逗号再拆分,语义一致。
+                $splitEntry = preg_replace('/\.(com|net|org|io|chat|app)\./', '.$1,', $entry);
+                $blocks = $splitEntry === null ? [$entry] : explode(',', $splitEntry);
                 foreach ($blocks as $host) {
                     $host = trim($host);
                     // 通配写法 *.example.com 归一化为 example.com(主域名 + 全部子域名)。

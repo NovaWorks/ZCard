@@ -323,4 +323,19 @@ HTML,
         $this->assertContains('https://example.com', $origins);
         $this->assertContains('https://*.example.com', $origins);
     }
+
+    /**
+     * 回归(issue #14):点号连串拆分不得使用变长 lookbehind 正则——
+     * PCRE2 < 10.43(PHP 8.3 及以下)不支持变长 lookbehind,表达式编译失败导致
+     * 白名单非空时设置/客服接口 500。此用例验证拆分语义不受影响。
+     */
+    public function test_dot_joined_host_split_is_compatible_with_pcre2_10_42(): void
+    {
+        $compiled = ServiceWidgetScript::compile([
+            'enabled' => true,
+            'script' => '<script src="https://cdn.chatwoot.com/packs/js/sdk.js"></script>',
+        ], 'app.chatwoot.com.cdn.chatwoot.com');
+
+        $this->assertStringContainsString('cdn.chatwoot.com/packs/js/sdk.js', $compiled);
+    }
 }
