@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite --open",
     "build": "vue-tsc --noEmit && vite build",
+    "test:base-path": "node tests/base-path.test.mjs",
     "serve": "vite preview",
     "lint": "eslint",
     "fix": "eslint --fix",
