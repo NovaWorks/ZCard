@@ -1365,7 +1365,7 @@
       "serviceScriptTip": "⚠️ 危险操作:该脚本会以本站同源身份在所有访客页面执行,可读取登录会话。仅粘贴完全可信平台的代码;支持 Chatwoot / Crisp 官方完整安装代码或纯 JavaScript;外部 SDK 地址必须使用 HTTPS 且域名须在白名单内(见下方受信域名白名单)",
       "serviceAllowedHosts": "受信域名白名单",
       "serviceAllowedHostsPlaceholder": "app.chatwoot.com,client.crisp.chat",
-      "serviceAllowedHostsTip": "多个域名用英文逗号、空格或分号分隔,无需带 https:// 和路径;系统会自动规范化(去协议、拆分被点号连串的域名、剔除非法项)。脚本引用的外部域名必须在此列表内,否则相关代码会被丢弃。留空使用默认:Chatwoot / Crisp 官方域名",
+      "serviceAllowedHostsTip": "在此追加你自己的客服域名(多个用英文逗号、空格或分号分隔,无需 https:// 和路径)。最终生效白名单 = 默认官方域名(Chatwoot/Crisp 全套子域名,保证 SDK 运行期依赖的域名都能加载)+ 你追加的域名;输入会自动规范化。脚本引用的外部域名必须在白名单内,否则相关代码会被丢弃",
       "serviceScriptDroppedWarning": "客服代码已被安全策略丢弃:代码引用的外部域名不在受信域名白名单内,前台不会显示该客服(自动回退为链接浮窗)。请把代码中引用的全部域名加入「受信域名白名单」后重新保存",
       "siteFavicon": "站点图标 (favicon)",
       "siteFaviconTip": "浏览器标签页图标;留空则使用站点 Logo",

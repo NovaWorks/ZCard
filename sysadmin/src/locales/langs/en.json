@@ -1365,7 +1365,7 @@
       "serviceScriptTip": "⚠️ DANGER: this script runs same-origin on every visitor page and can read login sessions. Only paste code from fully trusted providers. Supports complete Chatwoot/Crisp install snippets or plain JavaScript; external SDK URLs must use HTTPS and their domains must be in the allowlist below",
       "serviceAllowedHosts": "Allowed host whitelist",
       "serviceAllowedHostsPlaceholder": "app.chatwoot.com,client.crisp.chat",
-      "serviceAllowedHostsTip": "Separate multiple hosts with commas, spaces or semicolons; no https:// prefix or path needed. The system normalizes input (strips schemes, splits dot-joined hosts, drops invalid entries). Domains referenced by the snippet must be listed here, otherwise the code is dropped. Leave empty for defaults: official Chatwoot / Crisp domains",
+      "serviceAllowedHostsTip": "Append your own service domains here (separate with commas, spaces or semicolons; no https:// or path). Effective whitelist = default official domains (all Chatwoot/Crisp sub-domains, so SDK runtime dependencies load correctly) + your additions; input is auto-normalized. Domains referenced by the snippet must be in the whitelist, otherwise the code is dropped",
       "serviceScriptDroppedWarning": "The service script was dropped by the security policy: its external domains are not in the allowed host whitelist, so the storefront will NOT show it (falls back to the links widget). Add every referenced domain to the whitelist and save again",
       "siteFavicon": "Favicon",
       "siteFaviconTip": "Browser tab icon; falls back to the site logo when empty",

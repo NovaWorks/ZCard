@@ -21,12 +21,15 @@ use Illuminate\Support\Facades\Log;
  */
 final class ServiceWidgetScript
 {
-    /** 默认受信客服脚本域名(允许被覆盖)。 */
+    /** 默认受信客服脚本域名(允许被覆盖)。Crisp 的实时通道(relay)/图片/存储是独立子域名,必须一并放行。 */
     public const DEFAULT_ALLOWED_HOSTS = [
         'app.chatwoot.com',
         'cdn.chatwoot.com',
         'client.crisp.chat',
         'settings.crisp.chat',
+        'client.relay.crisp.chat',
+        'image.crisp.chat',
+        'storage.crisp.chat',
         'widget.crisp.chat',
     ];
 
@@ -98,6 +101,13 @@ final class ServiceWidgetScript
         preg_match_all('~https://[^\s\"\'<>\\)]+~i', $source, $matches);
         $origins = [];
 
+        // 白名单内的全部域名直接加入 CSP 放行:第三方 SDK 常从多个官方域名加载
+        // 运行期资源(Crisp: client.crisp.chat → settings.crisp.chat;Chatwoot:
+        // app.chatwoot.com → cdn.chatwoot.com),这些域名不会出现在安装代码文本里。
+        foreach ($hosts as $host) {
+            $origins['https://'.$host] = true;
+        }
+
         foreach ($matches[0] ?? [] as $url) {
             $parts = parse_url(rtrim((string) $url, '.,;'));
             $host = strtolower((string) ($parts['host'] ?? ''));
@@ -158,7 +168,11 @@ final class ServiceWidgetScript
      * - 数组或字符串均接受;支持逗号/空格/分号/全角逗号分隔;
      * - 自动剥离 https:// 前缀、路径与尾点;
      * - 兼容"多域名被点号连成一段"的误填(如 app.chatwoot.com.cdn.chatwoot.com → 拆成两个);
-     * - 非法条目(无点的单token等)直接丢弃;全部非法时回退默认官方域名。
+     * - 非法条目(无点的单token等)直接丢弃;
+     * - **最终白名单 = 默认官方域名 + 用户追加条目**。原因:第三方 SDK 常从多个
+     *   官方域名加载资源(如 Crisp 主脚本在 client.crisp.chat、网站设置在
+     *   settings.crisp.chat;Chatwoot 主脚本 app.chatwoot.com、静态资源 cdn.chatwoot.com),
+     *   只按填写内容放行会导致组件初始化失败。默认域名均为官方域名,合并不引入新风险面。
      */
     private static function normalizeHosts(mixed $allowedHosts): array
     {
@@ -166,39 +180,36 @@ final class ServiceWidgetScript
             ? implode(',', array_map(fn (mixed $h) => trim((string) $h), $allowedHosts))
             : trim((string) $allowedHosts);
 
-        if ($raw === '') {
-            return self::DEFAULT_ALLOWED_HOSTS;
-        }
-
         $hosts = [];
-        foreach (preg_split('/[\s,，;]+/u', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $entry) {
-            $entry = strtolower(trim($entry));
-            if ($entry === '') {
-                continue;
-            }
+        if ($raw !== '') {
+            foreach (preg_split('/[\s,，;]+/u', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $entry) {
+                $entry = strtolower(trim($entry));
+                if ($entry === '') {
+                    continue;
+                }
 
-            // 剥离协议与路径,只保留主机名
-            if (str_contains($entry, '://')) {
-                $entry = (string) (parse_url($entry, PHP_URL_HOST) ?? '');
-            } else {
-                $entry = (string) explode('/', $entry)[0];
-            }
-            $entry = rtrim($entry, '.');
+                // 剥离协议与路径,只保留主机名
+                if (str_contains($entry, '://')) {
+                    $entry = (string) (parse_url($entry, PHP_URL_HOST) ?? '');
+                } else {
+                    $entry = (string) explode('/', $entry)[0];
+                }
+                $entry = rtrim($entry, '.');
 
-            // 兼容"多个域名被点号连成一段"的误填
-            $blocks = preg_split('/(?<=\.(?:com|net|org|io|chat|app))\./', $entry) ?: [$entry];
-            foreach ($blocks as $host) {
-                $host = trim($host);
-                if ($host !== ''
-                    && preg_match('/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/', $host)) {
-                    $hosts[] = $host;
+                // 兼容"多个域名被点号连成一段"的误填
+                $blocks = preg_split('/(?<=\.(?:com|net|org|io|chat|app))\./', $entry) ?: [$entry];
+                foreach ($blocks as $host) {
+                    $host = trim($host);
+                    if ($host !== ''
+                        && preg_match('/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/', $host)) {
+                        $hosts[] = $host;
+                    }
                 }
             }
         }
 
-        $hosts = array_values(array_unique($hosts));
-
-        return $hosts === [] ? self::DEFAULT_ALLOWED_HOSTS : $hosts;
+        // 默认官方域名始终放行(见方法注释),与用户追加条目合并去重。
+        return array_values(array_unique(array_merge($hosts, self::DEFAULT_ALLOWED_HOSTS)));
     }
 
     private static function hostAllowed(string $host, array $hosts): bool

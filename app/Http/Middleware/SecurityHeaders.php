@@ -37,8 +37,8 @@ class SecurityHeaders
 
             $externalSources = $widgetOrigins === [] ? '' : ' '.implode(' ', $widgetOrigins);
             // 安全(低危):wss 只放行客服白名单主机的 WebSocket(裸 wss: 允许连任意
-            // WS 服务器外发数据,绕过 connect-src 白名单的初衷);Chatwoot/Crisp 的
-            // 实时通道与其 SDK 同域名,不受影响。
+            // WS 服务器外发数据,绕过 connect-src 白名单的初衷)。注意 Crisp 的实时
+            // 通道在独立子域名 client.relay.crisp.chat,已包含在默认白名单中。
             $widgetWss = implode(' ', array_map(
                 fn (string $origin) => str_replace('https://', 'wss://', $origin),
                 $widgetOrigins,

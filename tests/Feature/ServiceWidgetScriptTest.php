@@ -54,8 +54,12 @@ HTML,
         $response = $this->get('/')->assertOk();
         $csp = (string) $response->headers->get('Content-Security-Policy');
 
-        $this->assertStringContainsString("script-src 'self' https://chat.example.com", $csp);
-        $this->assertStringContainsString("frame-src 'self' https://chat.example.com", $csp);
+        // 自建域名 + 默认官方域名(合并)都要放行;顺序不再断言(按字典序拼接)。
+        $this->assertStringContainsString("script-src 'self'", $csp);
+        $this->assertStringContainsString('https://chat.example.com', $csp);
+        $this->assertStringContainsString('https://app.chatwoot.com', $csp);
+        $this->assertStringContainsString('wss://client.relay.crisp.chat', $csp);
+        $this->assertStringContainsString("frame-src 'self'", $csp);
         $this->assertStringNotContainsString("script-src 'self' 'unsafe-inline'", $csp);
     }
 
@@ -227,5 +231,48 @@ HTML,
         ]);
         $resp->assertOk();
         $this->assertNull($resp->json('service_widget_script_dropped'));
+    }
+
+    /** CSP 必须放行白名单内的全部域名,即使它们没出现在安装代码文本里(Crisp 的 settings.crisp.chat 即典型)。 */
+    public function test_csp_includes_all_allowlisted_hosts_even_if_not_in_snippet(): void
+    {
+        $widget = [
+            'enabled' => true,
+            'script' => '<script>(function(){var s=document.createElement("script");s.src="https://client.crisp.chat/l.js";document.head.appendChild(s)})()</script>',
+        ];
+
+        $origins = ServiceWidgetScript::allowedOrigins($widget, 'client.crisp.chat,settings.crisp.chat');
+
+        $this->assertContains('https://client.crisp.chat', $origins);
+        $this->assertContains('https://settings.crisp.chat', $origins);
+    }
+
+    /** 白名单只填主域名时,默认官方子域名也必须放行(SDK 运行期依赖)。 */
+    public function test_default_provider_subdomains_always_allowed_in_csp(): void
+    {
+        $widget = [
+            'enabled' => true,
+            'script' => '<script>(function(){var s=document.createElement("script");s.src="https://client.crisp.chat/l.js";document.head.appendChild(s)})()</script>',
+        ];
+
+        $origins = ServiceWidgetScript::allowedOrigins($widget, 'client.crisp.chat');
+
+        $this->assertContains('https://client.crisp.chat', $origins);
+        $this->assertContains('https://settings.crisp.chat', $origins);
+        $this->assertContains('https://app.chatwoot.com', $origins);
+    }
+
+    /** 白名单外的未知域名依然不进 CSP(收紧不放开)。 */
+    public function test_untrusted_host_still_excluded_from_csp(): void
+    {
+        $widget = [
+            'enabled' => true,
+            'script' => '<script src="https://evil.example.com/x.js"></script>',
+        ];
+
+        $origins = ServiceWidgetScript::allowedOrigins($widget, 'client.crisp.chat');
+
+        $this->assertNotContains('https://evil.example.com', $origins);
+        $this->assertContains('https://client.crisp.chat', $origins);
     }
 }
