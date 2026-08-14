@@ -128,9 +128,22 @@ class OrderController extends Controller
         $order = Order::with(['product:id,name,upstream_source_id,upstream_product_code,upstream_product_url', 'orderDeliveries:id,order_id,card_content,delivered_mode,delivered_at'])
             ->findOrFail($id);
 
-        // 把 orderDeliveries 映射成 deliveries(前端期望的字段名)
+        // 把 orderDeliveries 映射成 deliveries(前端期望的字段名)。
+        // 注意:OrderDelivery 模型已 $hidden card_content(防误序列化外泄),
+        // 本端点由 admin.role + audit.admin 守卫,是管理员核对发货内容的正式入口
+        // (含上游拿货卡密),因此显式回填卡密明文。
         $data = $order->toArray();
-        $data['deliveries'] = $data['order_deliveries'] ?? [];
+        unset($data['order_deliveries']);
+        $data['deliveries'] = $order->orderDeliveries
+            ->map(fn ($d) => [
+                'id' => $d->id,
+                'order_id' => $d->order_id,
+                'card_content' => $d->card_content,
+                'delivered_mode' => $d->delivered_mode,
+                'delivered_at' => $d->delivered_at,
+            ])
+            ->values()
+            ->all();
 
         // 财务信息:单价/成本单价/利润/利润率(金额均为分)
         $qty = max(1, (int) $order->quantity);
