@@ -322,7 +322,7 @@ class PaymentService
 
             foreach ($orderNos as $paidOrderNo) {
                 try {
-                    app(OrderService::class)->markPaid($paidOrderNo);
+                    app(OrderService::class)->markPaid($paidOrderNo, $channelCode);
                 } catch (\RuntimeException $e) {
                     $fresh = Order::where('order_no', $paidOrderNo)->first();
                     if ($fresh && $fresh->status === 'paid') {
