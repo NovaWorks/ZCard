@@ -179,7 +179,7 @@ php artisan zcard:install --skip-db --email=admin@example.com --password=xxx
 
 ### 环境要求
 
-PHP ≥ 8.3（pdo_mysql/mbstring/openssl/bcmath/curl/gd）、MySQL ≥ 8.0、Redis ≥ 6.0（可选，缺失降级 database 缓存）、Composer ≥ 2.8、Node ≥ 20 + pnpm（仅前端开发需要）。
+PHP ≥ 8.3（pdo_mysql/mbstring/openssl/bcmath/curl/gd）、MySQL ≥ 8.0、Redis ≥ 6.0（可选，缺失降级 database 缓存）、Composer ≥ 2.8、Node ≥ 20.19 + pnpm（仅前端开发需要，sysadmin `engines.node` 强制校验）。
 
 ---
 
