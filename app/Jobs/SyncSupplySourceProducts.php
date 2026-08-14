@@ -8,6 +8,7 @@ use App\Models\SupplySyncTask;
 use App\Supply\Dto\UpstreamProduct;
 use App\Supply\Exceptions\SyncTaskCancelledException;
 use App\Supply\SupplyManager;
+use App\Supply\SupplyScheduleService;
 use App\Supply\SupplySyncError;
 use App\Supply\SupplySyncService;
 use App\Supply\SupplySyncTaskState;
@@ -88,7 +89,13 @@ class SyncSupplySourceProducts implements ShouldQueue
         try {
             $this->pulse($states, $task, 'connecting');
             $driver = $manager->driver($source);
-            $updatedAfter = $this->mode === 'incremental' ? $source->last_synced_at : null;
+            $cursorColumn = app(SupplyScheduleService::class)->lastRunColumn($this->scope);
+            $cursor = $source->{$cursorColumn};
+            // 升级前只有 last_synced_at；首次采集沿用旧游标，避免无谓全量拉取。
+            if ($this->scope === SupplySyncTask::SCOPE_COLLECT && $cursor === null) {
+                $cursor = $source->last_synced_at;
+            }
+            $updatedAfter = $this->mode === 'incremental' ? $cursor : null;
             // 完整同步，或驱动本身不支持 updatedAfter（acg-faka/ZCard 每次均返回完整快照）时，
             // 本次集合具有权威性，可检测上游已删除/消失的商品并执行软删除。
             // 仅「采集商品」做删除对账；价格/上下架同步不做(不越权)。
@@ -193,7 +200,12 @@ class SyncSupplySourceProducts implements ShouldQueue
                 'finalizing',
                 $this->counts($total, $processed, $created, $updated, $priceUpdated, $manualPriceSkipped, $deleted),
             );
-            $source->update(['last_synced_at' => now(), 'last_error' => null]);
+            $sourceUpdate = [$cursorColumn => now(), 'last_error' => null];
+            if ($isCollect) {
+                // last_synced_at 是旧版本兼容字段，只代表完整采集成功，不能被轻量任务推进。
+                $sourceUpdate['last_synced_at'] = now();
+            }
+            $source->update($sourceUpdate);
             Log::info("supply sync done scope={$this->scope} source={$source->id} created={$created} updated={$updated} priceUpdated={$priceUpdated} manualPriceSkipped={$manualPriceSkipped} deleted={$deleted}");
 
             $states->succeed(
