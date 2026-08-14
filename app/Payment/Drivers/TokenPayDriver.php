@@ -37,11 +37,13 @@ class TokenPayDriver extends AbstractPaymentDriver
         $gateway = rtrim((string) ($config['gateway_url'] ?? ''), '/');
         $secret = (string) ($config['notify_secret'] ?? '');
         $currency = strtoupper((string) ($config['currency'] ?? 'USDT'));
-        $rate = (float) ($config['exchange_rate'] ?? 1);
+        $rate = (string) ($config['exchange_rate'] ?? 1);
 
-        // 分 → 元 → (÷rate) USDT
+        // exchange_rate 口径:1 法币 = N 币。分 → 元 → ×rate 得到 USDT。
         $yuan = bcdiv((string) $order->getPayableAmount(), '100', 2);
-        $amount = $rate > 0 ? bcdiv($yuan, (string) $rate, 8) : $yuan;
+        $amount = is_numeric($rate) && bccomp($rate, '0', 8) === 1
+            ? bcmul($yuan, $rate, 8)
+            : $yuan;
 
         $payload = [
             'OutOrderId' => $order->getPayableKey(),
@@ -84,7 +86,7 @@ class TokenPayDriver extends AbstractPaymentDriver
     public function verifyCallback(Request $request, array $config): ?array
     {
         $secret = (string) ($config['notify_secret'] ?? '');
-        $rate = (float) ($config['exchange_rate'] ?? 1);
+        $rate = (string) ($config['exchange_rate'] ?? 1);
 
         $raw = $request->json() ? $request->json()->all() : [];
         if (empty($raw)) {
@@ -107,9 +109,15 @@ class TokenPayDriver extends AbstractPaymentDriver
             return null;
         }
 
-        // 回调 ActualAmount 是 USDT → 反算回分:USDT × rate × 100
-        $usdt = (float) ($raw['ActualAmount'] ?? $raw['actual_amount'] ?? 0);
-        $fen = $rate > 0 ? (int) round($usdt * $rate * 100) : (int) round($usdt * 100);
+        // 回调 ActualAmount 是币数，按配置口径反算:币 ÷ (币/法币) × 100 = 分。
+        $coinAmount = (string) ($raw['ActualAmount'] ?? $raw['actual_amount'] ?? '');
+        if (! is_numeric($coinAmount)) {
+            return null;
+        }
+        $baseYuan = is_numeric($rate) && bccomp($rate, '0', 8) === 1
+            ? bcdiv($coinAmount, $rate, 10)
+            : $coinAmount;
+        $fen = (int) bcadd(bcmul($baseYuan, '100', 10), '0.5', 0);
 
         return [
             'channel_order_no' => $raw['Id'] ?? $raw['id'] ?? null,

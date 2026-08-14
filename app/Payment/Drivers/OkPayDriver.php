@@ -37,12 +37,14 @@ class OkPayDriver extends AbstractPaymentDriver
         $merchantId = (string) ($config['merchant_id'] ?? '');
         $token = (string) ($config['merchant_token'] ?? '');
         $coin = strtoupper((string) ($config['coin'] ?? 'USDT'));
-        $rate = (float) ($config['exchange_rate'] ?? 1);
+        $rate = (string) ($config['exchange_rate'] ?? 1);
 
-        // 分 → 元 → (÷rate) USDT/TRX,保留 8 位小数(与 OKPay 协议一致)
+        // exchange_rate 口径:1 法币 = N 币。分 → 元 → ×rate 得到 USDT/TRX。
         $yuan = bcdiv((string) $order->getPayableAmount(), '100', 2);
-        $amount = $rate > 0 ? bcdiv($yuan, (string) $rate, 8) : $yuan;
-        $amount = rtrim(rtrim(number_format((float) $amount, 8, '.', ''), '0'), '.');
+        $amount = is_numeric($rate) && bccomp($rate, '0', 8) === 1
+            ? bcmul($yuan, $rate, 8)
+            : $yuan;
+        $amount = rtrim(rtrim($amount, '0'), '.');
 
         $params = [
             'unique_id' => $order->getPayableKey(),
@@ -74,7 +76,7 @@ class OkPayDriver extends AbstractPaymentDriver
     public function verifyCallback(Request $request, array $config): ?array
     {
         $token = (string) ($config['merchant_token'] ?? '');
-        $rate = (float) ($config['exchange_rate'] ?? 1);
+        $rate = (string) ($config['exchange_rate'] ?? 1);
 
         // 回调可能是 form 或 JSON,合并读取
         $raw = $request->post() ?: ($request->json() ? $request->json()->all() : []);
@@ -115,9 +117,15 @@ class OkPayDriver extends AbstractPaymentDriver
             return null;
         }
 
-        // 回调 amount 是 USDT 数值 → 反算回分:USDT × rate × 100 = 分
-        $usdt = (float) ($data['amount'] ?? 0);
-        $fen = $rate > 0 ? (int) round($usdt * $rate * 100) : (int) round($usdt * 100);
+        // 回调 amount 是币数，按配置口径反算:币 ÷ (币/法币) × 100 = 分。
+        $coinAmount = (string) ($data['amount'] ?? '');
+        if (! is_numeric($coinAmount)) {
+            return null;
+        }
+        $baseYuan = is_numeric($rate) && bccomp($rate, '0', 8) === 1
+            ? bcdiv($coinAmount, $rate, 10)
+            : $coinAmount;
+        $fen = (int) bcadd(bcmul($baseYuan, '100', 10), '0.5', 0);
 
         return [
             'channel_order_no' => $data['order_id'] ?? null,
