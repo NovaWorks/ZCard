@@ -26,8 +26,14 @@ class SupplySyncTask extends Model
 
     public const STATUS_TIMED_OUT = 'timed_out';
 
+    public const SCOPE_COLLECT = 'collect';
+
+    public const SCOPE_PRICE = 'price';
+
+    public const SCOPE_STATUS = 'status';
+
     protected $fillable = [
-        'supply_source_id', 'mode', 'force_reprice', 'status', 'total_products', 'processed_products',
+        'supply_source_id', 'mode', 'scope', 'force_reprice', 'status', 'total_products', 'processed_products',
         'created_count', 'updated_count', 'price_updated_count', 'manual_price_skipped_count',
         'hidden_count', 'deleted_count', 'error', 'error_code', 'error_context',
         'started_at', 'heartbeat_at', 'current_stage', 'current_page', 'stage_current', 'stage_total',

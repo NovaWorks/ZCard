@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Product;
 use App\Models\SupplySource;
 use App\Models\SupplySyncTask;
+use App\Supply\Dto\UpstreamProduct;
 use App\Supply\Exceptions\SyncTaskCancelledException;
 use App\Supply\SupplyManager;
 use App\Supply\SupplySyncError;
@@ -26,6 +27,12 @@ use Throwable;
  *
  * 状态流转:queued → running → success | failed | timed_out；
  * 取消流转:queued → cancelled，running → cancelling → cancelled。
+ *
+ * scope(任务类型):
+ * - collect(采集商品):完整/增量同步,新建商品 + 更新元数据/价格/库存 + 全量对账删除(默认,手动同步走这里);
+ * - price(同步价格):只更新已有商品的售价/成本/库存缓存,不建新商品、不改元数据、不对账;
+ * - status(同步上下架):只更新已有商品的 hide(上游失效→下架,恢复→上架)。
+ * 定时调度按货源 schedule 计划派发(见 SupplyScheduleService / supply:scheduled-sync)。
  */
 class SyncSupplySourceProducts implements ShouldQueue
 {
@@ -43,7 +50,16 @@ class SyncSupplySourceProducts implements ShouldQueue
         public readonly string $mode = 'incremental',
         public readonly ?int $taskId = null,
         public readonly bool $forceReprice = false,
-    ) {}
+        public readonly string $scope = SupplySyncTask::SCOPE_COLLECT,
+    ) {
+        if (! in_array($this->scope, [
+            SupplySyncTask::SCOPE_COLLECT,
+            SupplySyncTask::SCOPE_PRICE,
+            SupplySyncTask::SCOPE_STATUS,
+        ], true)) {
+            throw new \InvalidArgumentException("未知同步范围: {$this->scope}");
+        }
+    }
 
     public function handle(
         SupplyManager $manager,
@@ -67,6 +83,7 @@ class SyncSupplySourceProducts implements ShouldQueue
         $created = $updated = $priceUpdated = $manualPriceSkipped = $deleted = $processed = $total = 0;
         $reportedTotal = null;
         $seenCodes = null;
+        $isCollect = $this->scope === SupplySyncTask::SCOPE_COLLECT;
 
         try {
             $this->pulse($states, $task, 'connecting');
@@ -74,19 +91,24 @@ class SyncSupplySourceProducts implements ShouldQueue
             $updatedAfter = $this->mode === 'incremental' ? $source->last_synced_at : null;
             // 完整同步，或驱动本身不支持 updatedAfter（acg-faka/ZCard 每次均返回完整快照）时，
             // 本次集合具有权威性，可检测上游已删除/消失的商品并执行软删除。
-            $seenCodes = $this->mode === 'full' || ! $driver->supportsIncrementalProductSync()
+            // 仅「采集商品」做删除对账；价格/上下架同步不做(不越权)。
+            $seenCodes = $isCollect && ($this->mode === 'full' || ! $driver->supportsIncrementalProductSync())
                 ? []
                 : null;
+
+            // 请求节流:每次拉取上游分页之间等待的秒数(货源 schedule.request_delay,0=不限)。
+            // 上游对请求频率敏感(频繁请求会被限流)时,由后台「设置任务」配置。
+            $requestDelay = max(0, (int) ($source->settings['schedule']['request_delay'] ?? 0));
 
             do {
                 $this->pulse($states, $task, 'fetching_products', ['current_page' => $page]);
 
-                // 同步模式补查真实库存(fetchStock=true):上游 items 对手动发货商品
-                // 不返回 stock,逐个补查(并发10)让库存准确
+                // 采集/价格同步需要真实库存(fetchStock=true):上游 items 对手动发货商品
+                // 不返回 stock,逐个补查(并发10)让库存准确;上下架同步只关心 hide,不补查库存。
                 $result = $driver->listProducts(
                     $updatedAfter,
                     $page,
-                    fetchStock: true,
+                    fetchStock: $this->scope !== SupplySyncTask::SCOPE_STATUS,
                     progress: function (string $stage, int $current, int $stageTotal) use ($states, $task, $page): void {
                         $this->pulse($states, $task, $stage, [
                             'current_page' => $page,
@@ -120,36 +142,10 @@ class SyncSupplySourceProducts implements ShouldQueue
                         $seenCodes[] = $dto->code;
                     }
 
-                    $beforeProduct = Product::where('upstream_source_id', $source->id)
-                        ->where('upstream_product_code', $dto->code)
-                        ->first(['price', 'price_manual']);
-                    $before = $beforeProduct?->price;
-                    $exists = $beforeProduct !== null;
-                    $manualPriceProtected = $exists
-                        && ! $this->forceReprice
-                        && (bool) $beforeProduct->price_manual
-                        && (bool) ($source->settings['auto_sync_price'] ?? true)
-                        && (string) ($source->settings['default_pricing_mode'] ?? 'percent') !== 'pending';
-
-                    $sync->upsertProduct($source, $dto, forcePrice: $this->forceReprice);
-                    if (! $dto->isActive) {
-                        if ($exists) {
-                            $deleted++;
-                        }
-                    } elseif ($exists) {
-                        $updated++;
-                        if ($manualPriceProtected) {
-                            $manualPriceSkipped++;
-                        }
-                        // 价格核对:同步后价格与同步前不一致 → 计数(上游调价跟随生效)
-                        $after = Product::where('upstream_source_id', $source->id)
-                            ->where('upstream_product_code', $dto->code)
-                            ->value('price');
-                        if ($after !== null && (int) $after !== (int) $before) {
-                            $priceUpdated++;
-                        }
+                    if ($isCollect) {
+                        $this->handleCollectItem($source, $sync, $dto, $created, $updated, $priceUpdated, $manualPriceSkipped, $deleted);
                     } else {
-                        $created++;
+                        $this->handleLightItem($source, $sync, $dto, $this->scope, $updated, $priceUpdated);
                     }
                     $processed++;
 
@@ -165,6 +161,9 @@ class SyncSupplySourceProducts implements ShouldQueue
                 }
 
                 $page++;
+                if ($requestDelay > 0 && ! empty($result['has_more'])) {
+                    sleep($requestDelay);
+                }
             } while (! empty($result['has_more']));
 
             // 全量核对前先验证分页完整性。若上游声称的总数大于实际处理数，
@@ -195,7 +194,7 @@ class SyncSupplySourceProducts implements ShouldQueue
                 $this->counts($total, $processed, $created, $updated, $priceUpdated, $manualPriceSkipped, $deleted),
             );
             $source->update(['last_synced_at' => now(), 'last_error' => null]);
-            Log::info("supply sync done source={$source->id} created={$created} updated={$updated} priceUpdated={$priceUpdated} manualPriceSkipped={$manualPriceSkipped} deleted={$deleted}");
+            Log::info("supply sync done scope={$this->scope} source={$source->id} created={$created} updated={$updated} priceUpdated={$priceUpdated} manualPriceSkipped={$manualPriceSkipped} deleted={$deleted}");
 
             $states->succeed(
                 $task,
@@ -203,12 +202,12 @@ class SyncSupplySourceProducts implements ShouldQueue
             );
         } catch (SyncTaskCancelledException) {
             $states->finishCancelled($task);
-            Log::info("supply sync cancelled source={$source->id} task={$task->id}");
+            Log::info("supply sync cancelled scope={$this->scope} source={$source->id} task={$task->id}");
         } catch (Throwable $e) {
             $diagnostic = SupplySyncError::diagnose($e);
             $msg = $diagnostic['message'];
             $source->update(['last_error' => mb_strlen($msg) > 500 ? mb_substr($msg, 0, 500).'…' : $msg]);
-            Log::error("supply sync failed source={$source->id} code={$diagnostic['code']}: {$e->getMessage()}");
+            Log::error("supply sync failed scope={$this->scope} source={$source->id} code={$diagnostic['code']}: {$e->getMessage()}");
 
             $states->fail(
                 $task,
@@ -216,6 +215,98 @@ class SyncSupplySourceProducts implements ShouldQueue
                 $this->counts($total, $processed, $created, $updated, $priceUpdated, $manualPriceSkipped, $deleted),
             );
             throw $e;
+        }
+    }
+
+    /**
+     * 采集商品:完整的 upsert(新建/更新元数据/价格/库存/隐藏) + 计数。
+     *
+     * @param  int  $created  引用计数:新增商品数
+     * @param  int  $updated  引用计数:更新商品数
+     * @param  int  $priceUpdated  引用计数:价格变化数
+     * @param  int  $manualPriceSkipped  引用计数:手动价保护跳过数
+     * @param  int  $deleted  引用计数:上游失效删除数
+     */
+    private function handleCollectItem(
+        SupplySource $source,
+        SupplySyncService $sync,
+        UpstreamProduct $dto,
+        int &$created,
+        int &$updated,
+        int &$priceUpdated,
+        int &$manualPriceSkipped,
+        int &$deleted,
+    ): void {
+        $beforeProduct = Product::where('upstream_source_id', $source->id)
+            ->where('upstream_product_code', $dto->code)
+            ->first(['price', 'price_manual']);
+        $before = $beforeProduct?->price;
+        $exists = $beforeProduct !== null;
+        $manualPriceProtected = $exists
+            && ! $this->forceReprice
+            && (bool) $beforeProduct->price_manual
+            && (bool) ($source->settings['auto_sync_price'] ?? true)
+            && (string) ($source->settings['default_pricing_mode'] ?? 'percent') !== 'pending';
+
+        $sync->upsertProduct($source, $dto, forcePrice: $this->forceReprice);
+        if (! $dto->isActive) {
+            if ($exists) {
+                $deleted++;
+            }
+        } elseif ($exists) {
+            $updated++;
+            if ($manualPriceProtected) {
+                $manualPriceSkipped++;
+            }
+            // 价格核对:同步后价格与同步前不一致 → 计数(上游调价跟随生效)
+            $after = Product::where('upstream_source_id', $source->id)
+                ->where('upstream_product_code', $dto->code)
+                ->value('price');
+            if ($after !== null && (int) $after !== (int) $before) {
+                $priceUpdated++;
+            }
+        } else {
+            $created++;
+        }
+    }
+
+    /**
+     * 价格/上下架同步:只处理已有本地商品,不做创建/删除,也不改元数据。
+     *
+     * @param  int  $updated  引用计数:处理数(价格同步=处理数;上下架=hide 变化数)
+     * @param  int  $priceUpdated  引用计数:价格变化数(仅价格同步)
+     */
+    private function handleLightItem(
+        SupplySource $source,
+        SupplySyncService $sync,
+        UpstreamProduct $dto,
+        string $scope,
+        int &$updated,
+        int &$priceUpdated,
+    ): void {
+        $beforeProduct = Product::where('upstream_source_id', $source->id)
+            ->where('upstream_product_code', $dto->code)
+            ->first(['price', 'hide']);
+        if (! $beforeProduct || $beforeProduct->trashed()) {
+            return; // 本地不存在的商品由「采集商品」负责创建
+        }
+
+        if ($scope === SupplySyncTask::SCOPE_PRICE) {
+            $before = (int) $beforeProduct->price;
+            $product = $sync->updatePriceOnly($source, $dto);
+            $updated++;
+            if ($product !== null && (int) $product->price !== $before) {
+                $priceUpdated++;
+            }
+        } else {
+            $beforeHide = (bool) $beforeProduct->hide;
+            $sync->updateStatusOnly($source, $dto);
+            $afterHide = (bool) Product::where('upstream_source_id', $source->id)
+                ->where('upstream_product_code', $dto->code)
+                ->value('hide');
+            if ($afterHide !== $beforeHide) {
+                $updated++;
+            }
         }
     }
 
@@ -249,6 +340,7 @@ class SyncSupplySourceProducts implements ShouldQueue
         return SupplySyncTask::create([
             'supply_source_id' => $this->sourceId,
             'mode' => $this->mode,
+            'scope' => $this->scope,
             'force_reprice' => $this->forceReprice,
             'status' => SupplySyncTask::STATUS_QUEUED,
         ]);

@@ -1,12 +1,8 @@
 <?php
 
-use App\Jobs\SyncSupplySourceProducts;
 use App\Models\SubsiteLedgerEntry;
-use App\Models\SupplySource;
-use App\Models\SupplySyncTask;
 use App\Supply\NonceStore;
 use App\Supply\SupplySyncTaskState;
-use App\Support\StorefrontConfig;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -25,30 +21,12 @@ Schedule::call(function () {
         ->update(['status' => 'available']);
 })->daily();
 
-// 货源商品自动同步(spec §6.6) —— 每小时跑增量,只对开启自动同步的 active 货源
-// 注意:JSON_EXTRACT 为 MySQL 专属语法(生产环境),SQLite 测试环境不会执行调度
-Schedule::call(function () {
-    if (! StorefrontConfig::get('supply_enabled')) {
-        return;
-    }
-    SupplySource::where('status', 'active')
-        ->whereRaw("JSON_EXTRACT(settings, '$.auto_sync') = true")
-        ->each(function ($s) {
-            // 定时同步同样建任务记录(统一在后台任务弹窗查看);防重:进行中则跳过
-            app(SupplySyncTaskState::class)->reapStale($s->id);
-            if (SupplySyncTask::where('supply_source_id', $s->id)
-                ->whereIn('status', ['queued', 'running', 'cancelling'])
-                ->exists()) {
-                return;
-            }
-            $task = SupplySyncTask::create([
-                'supply_source_id' => $s->id,
-                'mode' => 'incremental',
-                'status' => 'queued',
-            ]);
-            SyncSupplySourceProducts::dispatch($s->id, 'incremental', $task->id);
-        });
-})->hourly();
+// 货源定时同步:每分钟由 supply:scheduled-sync 命令按每个货源 settings.schedule
+// 计划检查「采集商品/同步价格/同步上下架」是否到期并派发(取代旧的每小时硬编码增量同步)。
+Schedule::command('supply:scheduled-sync')
+    ->name('supply-scheduled-sync')
+    ->everyMinute()
+    ->withoutOverlapping();
 
 // 同步任务看门狗：worker 异常退出时将无心跳任务收口为超时/已取消。
 Schedule::call(fn () => app(SupplySyncTaskState::class)->reapStale())

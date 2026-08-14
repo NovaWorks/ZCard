@@ -48,11 +48,20 @@
   "setting": {
     "menuType": {
       "title": "菜单布局",
-      "list": ["垂直", "水平", "混合", "双列"]
+      "list": [
+        "垂直",
+        "水平",
+        "混合",
+        "双列"
+      ]
     },
     "theme": {
       "title": "主题风格",
-      "list": ["浅色", "深色", "系统"]
+      "list": [
+        "浅色",
+        "深色",
+        "系统"
+      ]
     },
     "menu": {
       "title": "菜单风格"
@@ -62,11 +71,17 @@
     },
     "box": {
       "title": "盒子样式",
-      "list": ["边框", "阴影"]
+      "list": [
+        "边框",
+        "阴影"
+      ]
     },
     "container": {
       "title": "容器宽度",
-      "list": ["铺满", "定宽"]
+      "list": [
+        "铺满",
+        "定宽"
+      ]
     },
     "basics": {
       "title": "基础配置",
@@ -112,8 +127,14 @@
   "notice": {
     "title": "通知",
     "btnRead": "标为已读",
-    "bar": ["通知", "消息", "代办"],
-    "text": ["暂无"],
+    "bar": [
+      "通知",
+      "消息",
+      "代办"
+    ],
+    "text": [
+      "暂无"
+    ],
     "viewAll": "查看全部"
   },
   "worktab": {
@@ -1661,7 +1682,44 @@
       "taskForceRepriceTag": "覆盖手动价",
       "taskForceRepriceConfirmTitle": "覆盖手动价并重新定价",
       "taskForceRepriceConfirm": "将按当前渠道定价规则全量重算该货源所有商品，并清除商品的手动价保护，使后续同步继续自动跟随。此操作不会修改「预选卡加价」。是否继续？",
-      "taskForceRepriceDispatched": "全量重新定价任务已提交"
+      "taskForceRepriceDispatched": "全量重新定价任务已提交",
+      "scheduleBtn": "设置任务",
+      "scheduleTitle": "定时任务设置",
+      "scheduleSource": "货源",
+      "scheduleSourcePlaceholder": "选择要配置定时任务的货源",
+      "scheduleEnabled": "启用定时任务",
+      "scheduleEnabledTip": "关闭后该货源不再自动采集/同步价格/同步上下架(手动同步不受影响)",
+      "scheduleRequestDelay": "请求间隔",
+      "scheduleRequestDelayUnit": "秒",
+      "scheduleRequestDelayTip": "每次请求上游之间等待的秒数(0=不等待)。上游对请求频率敏感时建议设置,防止被限流",
+      "scheduleTasksTitle": "任务类型",
+      "scheduleTaskCollect": "采集商品",
+      "scheduleTaskCollectTip": "拉取上游商品并同步名称/描述/分类/价格/库存,发现新商品自动入库",
+      "scheduleTaskPrice": "同步价格",
+      "scheduleTaskPriceTip": "按加价规则更新已有商品售价与库存(手动改过价的商品不受影响)",
+      "scheduleTaskStatus": "同步上下架",
+      "scheduleTaskStatusTip": "根据上游商品有效状态自动上架/下架本地商品",
+      "scheduleInterval": "执行间隔",
+      "scheduleIntervalMin": "分钟",
+      "scheduleMode": "同步模式",
+      "scheduleWindows": "执行时间窗口",
+      "scheduleWindowStart": "开始",
+      "scheduleWindowEnd": "结束",
+      "scheduleWindowsTip": "只在该时间段内执行,可添加多条;不设置则全天执行",
+      "scheduleAddWindow": "添加时间段",
+      "scheduleSave": "保存设置",
+      "scheduleSaved": "定时任务设置已保存",
+      "scheduleSelectRequired": "请先选择货源",
+      "scheduleSummary": "定时任务",
+      "scheduleSummaryOn": "已启用",
+      "scheduleSummaryOff": "未启用",
+      "scheduleScopeCollect": "采集",
+      "scheduleScopePrice": "价格",
+      "scheduleScopeStatus": "上下架",
+      "scheduleSerialTip": "提示:同一货源同一时间只执行一个同步任务(采集优先);任务执行期间其他任务会顺延,待其结束后按各自间隔再执行",
+      "intervalMin": "分钟",
+      "intervalHour": "小时",
+      "intervalDay": "天"
     },
     "supplierAccount": {
       "title": "供货账号管理",

@@ -14,6 +14,7 @@ class SupplySource extends Model
     protected $fillable = [
         'name', 'driver', 'base_url', 'credentials', 'status', 'settings',
         'last_synced_at', 'last_error', 'balance_cache', 'sort',
+        'last_collect_at', 'last_price_sync_at', 'last_status_sync_at',
     ];
 
     /** 安全(M-15):上游凭据解密后不得因模型序列化意外进入接口响应。 */
@@ -24,6 +25,9 @@ class SupplySource extends Model
         return [
             'settings' => 'array',
             'last_synced_at' => 'datetime',
+            'last_collect_at' => 'datetime',
+            'last_price_sync_at' => 'datetime',
+            'last_status_sync_at' => 'datetime',
             'balance_cache' => 'integer',
         ];
     }

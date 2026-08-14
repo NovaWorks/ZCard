@@ -259,4 +259,89 @@ class SupplySyncServiceTest extends TestCase
         $this->assertLessThanOrEqual(500, mb_strlen($product->fresh()->name));
         $this->assertLessThanOrEqual(500, mb_strlen($product->fresh()->slug));
     }
+
+    public function test_update_price_only_updates_price_and_stock_but_not_metadata(): void
+    {
+        $source = $this->makeSource(['default_pricing_mode' => 'equal', 'auto_list' => true]);
+        $service = app(SupplySyncService::class);
+
+        // 先由采集创建商品
+        $product = $service->upsertProduct($source, new UpstreamProduct(
+            code: 'UP_PRICE_1', name: '原始名称', price: 500, factoryPrice: 500,
+            description: '<p>原始详情</p>', stockQuantity: 10,
+        ));
+        $this->assertSame(500, (int) $product->price);
+
+        // 价格同步:上游涨价 + 名称/详情变化 → 只更新价格/成本/库存,名称与详情保持本地
+        $product = $service->updatePriceOnly($source, new UpstreamProduct(
+            code: 'UP_PRICE_1', name: '上游改名', price: 600, factoryPrice: 550,
+            description: '<p>上游新详情</p>', stockQuantity: 7,
+        ));
+
+        $this->assertSame(600, (int) $product->price);          // 售价跟随(equal)
+        $this->assertSame(550, (int) $product->factory_price);  // 成本更新
+        $this->assertSame(7, (int) $product->stock_cache);      // 库存更新
+        $this->assertSame('原始名称', $product->name);          // 元数据不动
+        $this->assertSame('<p>原始详情</p>', $product->description);
+    }
+
+    public function test_update_price_only_respects_manual_price_protection(): void
+    {
+        $source = $this->makeSource(['default_pricing_mode' => 'equal']);
+        $service = app(SupplySyncService::class);
+
+        $product = $service->upsertProduct($source, new UpstreamProduct(code: 'UP_PRICE_2', name: 'A', price: 500, factoryPrice: 500));
+        $product->update(['price' => 999, 'price_manual' => true]);
+
+        $product = $service->updatePriceOnly($source, new UpstreamProduct(code: 'UP_PRICE_2', name: 'A', price: 600, factoryPrice: 600));
+
+        $this->assertSame(999, (int) $product->price);          // 手动价保护
+        $this->assertSame(600, (int) $product->factory_price);  // 成本仍更新
+    }
+
+    public function test_update_price_only_does_not_create_missing_products(): void
+    {
+        $source = $this->makeSource([]);
+        $service = app(SupplySyncService::class);
+
+        $result = $service->updatePriceOnly($source, new UpstreamProduct(code: 'UP_MISSING', name: 'A', price: 500, factoryPrice: 500));
+
+        $this->assertNull($result);
+        $this->assertSame(0, $source->products()->count());
+    }
+
+    public function test_update_status_only_toggles_hide_without_touching_price(): void
+    {
+        $source = $this->makeSource(['default_pricing_mode' => 'equal']);
+        $service = app(SupplySyncService::class);
+
+        $product = $service->upsertProduct($source, new UpstreamProduct(
+            code: 'UP_STATUS_1', name: 'A', price: 500, factoryPrice: 500, isActive: true,
+        ));
+        $this->assertFalse((bool) $product->hide);
+
+        // 上游下架 → hide=true,价格不动
+        $product = $service->updateStatusOnly($source, new UpstreamProduct(
+            code: 'UP_STATUS_1', name: 'A', price: 600, factoryPrice: 600, isActive: false,
+        ));
+        $this->assertTrue((bool) $product->hide);
+        $this->assertSame(500, (int) $product->price);
+
+        // 上游恢复 → hide=false
+        $product = $service->updateStatusOnly($source, new UpstreamProduct(
+            code: 'UP_STATUS_1', name: 'A', price: 600, factoryPrice: 600, isActive: true,
+        ));
+        $this->assertFalse((bool) $product->hide);
+    }
+
+    public function test_update_status_only_does_not_create_missing_products(): void
+    {
+        $source = $this->makeSource([]);
+        $service = app(SupplySyncService::class);
+
+        $result = $service->updateStatusOnly($source, new UpstreamProduct(code: 'UP_MISSING2', name: 'A', price: 500, factoryPrice: 500, isActive: false));
+
+        $this->assertNull($result);
+        $this->assertSame(0, $source->products()->count());
+    }
 }

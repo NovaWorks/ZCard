@@ -48,11 +48,20 @@
   "setting": {
     "menuType": {
       "title": "Menu Layout",
-      "list": ["Vertical", "Horizontal", "Mixed", "Dual"]
+      "list": [
+        "Vertical",
+        "Horizontal",
+        "Mixed",
+        "Dual"
+      ]
     },
     "theme": {
       "title": "Theme Style",
-      "list": ["Light", "Dark", "System"]
+      "list": [
+        "Light",
+        "Dark",
+        "System"
+      ]
     },
     "menu": {
       "title": "Menu Style"
@@ -62,11 +71,17 @@
     },
     "box": {
       "title": "Box Style",
-      "list": ["Border", "Shadow"]
+      "list": [
+        "Border",
+        "Shadow"
+      ]
     },
     "container": {
       "title": "Container Width",
-      "list": ["Full", "Boxed"]
+      "list": [
+        "Full",
+        "Boxed"
+      ]
     },
     "basics": {
       "title": "Basic Config",
@@ -112,8 +127,14 @@
   "notice": {
     "title": "Notice",
     "btnRead": "Mark as read",
-    "bar": ["Notice", "Message", "Todo"],
-    "text": ["No"],
+    "bar": [
+      "Notice",
+      "Message",
+      "Todo"
+    ],
+    "text": [
+      "No"
+    ],
     "viewAll": "View all"
   },
   "worktab": {
@@ -1661,7 +1682,44 @@
       "taskForceRepriceTag": "Manual prices overridden",
       "taskForceRepriceConfirmTitle": "Override manual prices and reprice",
       "taskForceRepriceConfirm": "All products from this source will be repriced using the current channel rules. Manual price protection will be cleared so future syncs continue to follow upstream prices. Premium-card markup will not be changed. Continue?",
-      "taskForceRepriceDispatched": "Full repricing task dispatched"
+      "taskForceRepriceDispatched": "Full repricing task dispatched",
+      "scheduleBtn": "Schedule",
+      "scheduleTitle": "Scheduled Tasks",
+      "scheduleSource": "Supply Source",
+      "scheduleSourcePlaceholder": "Select a supply source to configure",
+      "scheduleEnabled": "Enable scheduled tasks",
+      "scheduleEnabledTip": "When off, this source stops auto collect / price / status sync (manual sync is not affected)",
+      "scheduleRequestDelay": "Request delay",
+      "scheduleRequestDelayUnit": "sec",
+      "scheduleRequestDelayTip": "Seconds to wait between upstream requests (0 = no wait). Set this if the upstream rate-limits frequent requests",
+      "scheduleTasksTitle": "Task Types",
+      "scheduleTaskCollect": "Collect Products",
+      "scheduleTaskCollectTip": "Fetch upstream products and sync name/description/category/price/stock; new products are imported automatically",
+      "scheduleTaskPrice": "Sync Price",
+      "scheduleTaskPriceTip": "Update price and stock of existing products by markup rules (manually priced products are protected)",
+      "scheduleTaskStatus": "Sync Status",
+      "scheduleTaskStatusTip": "Auto list/unlist local products based on upstream product active state",
+      "scheduleInterval": "Interval",
+      "scheduleIntervalMin": "min",
+      "scheduleMode": "Sync Mode",
+      "scheduleWindows": "Time Windows",
+      "scheduleWindowStart": "Start",
+      "scheduleWindowEnd": "End",
+      "scheduleWindowsTip": "Only run within these windows; multiple allowed. Leave empty to run all day",
+      "scheduleAddWindow": "Add window",
+      "scheduleSave": "Save Settings",
+      "scheduleSaved": "Schedule settings saved",
+      "scheduleSelectRequired": "Please select a supply source first",
+      "scheduleSummary": "Schedule",
+      "scheduleSummaryOn": "Enabled",
+      "scheduleSummaryOff": "Disabled",
+      "scheduleScopeCollect": "Collect",
+      "scheduleScopePrice": "Price",
+      "scheduleScopeStatus": "Status",
+      "scheduleSerialTip": "Only one sync task runs per source at a time (collect first); other tasks wait and run by their own intervals",
+      "intervalMin": "min",
+      "intervalHour": "h",
+      "intervalDay": "d"
     },
     "supplierAccount": {
       "title": "Supplier Accounts",

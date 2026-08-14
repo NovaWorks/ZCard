@@ -18,6 +18,9 @@
         </div>
         <div class="toolbar-right">
           <ElButton :icon="List" @click="openAllTasks">{{ t('zcard.supply.viewTasks') }}</ElButton>
+          <ElButton :icon="Timer" @click="openScheduleDialog">{{
+            t('zcard.supply.scheduleBtn')
+          }}</ElButton>
           <ElButton type="primary" :icon="Plus" @click="openAdd">{{
             t('zcard.supply.add')
           }}</ElButton>
@@ -72,6 +75,14 @@
                   : t('zcard.supply.statusDisabled')
               }}
             </ElTag>
+          </template>
+        </ElTableColumn>
+        <ElTableColumn :label="t('zcard.supply.scheduleSummary')" width="190">
+          <template #default="{ row }">
+            <span v-if="scheduleSummary(row)" class="schedule-summary">{{
+              scheduleSummary(row)
+            }}</span>
+            <span v-else class="text-muted">—</span>
           </template>
         </ElTableColumn>
         <ElTableColumn :label="t('zcard.common.actions')" width="350" fixed="right">
@@ -338,6 +349,7 @@
             <div class="all-task-source">{{ task.source_name }}</div>
             <ElTag :type="taskStatusTag(task.status)" size="small">{{ taskStatusText(task.status) }}</ElTag>
             <span class="task-mode">{{ task.mode === 'full' ? t('zcard.supply.taskModeFull') : t('zcard.supply.taskModeInc') }}</span>
+            <ElTag :type="taskScopeTag(task.scope)" size="small" effect="plain">{{ taskScopeText(task.scope) }}</ElTag>
             <ElTag v-if="task.force_reprice" type="warning" size="small">{{ t('zcard.supply.taskForceRepriceTag') }}</ElTag>
             <ElButton
               v-if="['queued', 'running'].includes(task.status)"
@@ -382,6 +394,140 @@
       </div>
     </ElDialog>
 
+    <!-- 定时任务设置弹窗(按货源配置采集/价格/上下架的间隔与时间窗口) -->
+    <ElDialog
+      v-model="scheduleVisible"
+      :title="t('zcard.supply.scheduleTitle')"
+      width="min(760px, 94vw)"
+      top="6vh"
+      destroy-on-close
+    >
+      <ElForm label-width="120px">
+        <ElFormItem :label="t('zcard.supply.scheduleSource')" required>
+          <ElSelect
+            v-model="scheduleSourceId"
+            :placeholder="t('zcard.supply.scheduleSourcePlaceholder')"
+            style="width: 100%"
+            filterable
+            @change="loadScheduleForSource"
+          >
+            <ElOption v-for="s in tableData" :key="s.id" :label="s.name" :value="s.id" />
+          </ElSelect>
+        </ElFormItem>
+
+        <template v-if="scheduleSourceId">
+          <ElFormItem :label="t('zcard.supply.scheduleEnabled')">
+            <ElSwitch v-model="scheduleForm.enabled" />
+            <div class="field-help">{{ t('zcard.supply.scheduleEnabledTip') }}</div>
+          </ElFormItem>
+          <ElFormItem :label="t('zcard.supply.scheduleRequestDelay')">
+            <div class="input-with-unit">
+              <ElInputNumber
+                v-model="scheduleForm.request_delay"
+                :min="0"
+                :max="3600"
+                :precision="0"
+                controls-position="right"
+                style="width: 160px"
+              />
+              <span class="unit">{{ t('zcard.supply.scheduleRequestDelayUnit') }}</span>
+            </div>
+            <div class="field-help">{{ t('zcard.supply.scheduleRequestDelayTip') }}</div>
+          </ElFormItem>
+
+          <ElDivider content-position="left">{{ t('zcard.supply.scheduleTasksTitle') }}</ElDivider>
+          <div class="schedule-task-list">
+            <div v-for="tk in scheduleTaskDefs" :key="tk.key" class="schedule-task-block">
+              <div class="schedule-task-head">
+                <span class="schedule-task-label">{{ tk.label }}</span>
+                <ElSwitch v-model="scheduleForm[tk.key].enabled" />
+              </div>
+              <div class="field-help">{{ tk.tip }}</div>
+              <template v-if="scheduleForm[tk.key].enabled">
+                <div class="schedule-task-row">
+                  <span class="schedule-sub-label">{{ t('zcard.supply.scheduleInterval') }}</span>
+                  <ElInputNumber
+                    v-model="scheduleForm[tk.key].interval"
+                    :min="1"
+                    :max="10080"
+                    :precision="0"
+                    controls-position="right"
+                    style="width: 130px"
+                  />
+                  <span class="unit">{{ t('zcard.supply.scheduleIntervalMin') }}</span>
+                  <ElButton
+                    v-for="p in intervalPresets"
+                    :key="p"
+                    size="small"
+                    :type="scheduleForm[tk.key].interval === p ? 'primary' : 'default'"
+                    @click="scheduleForm[tk.key].interval = p"
+                  >
+                    {{ formatInterval(p) }}
+                  </ElButton>
+                </div>
+                <div v-if="tk.hasMode" class="schedule-task-row">
+                  <span class="schedule-sub-label">{{ t('zcard.supply.scheduleMode') }}</span>
+                  <ElRadioGroup v-model="scheduleForm[tk.key].mode">
+                    <ElRadio value="incremental">{{
+                      t('zcard.supply.taskModeInc')
+                    }}</ElRadio>
+                    <ElRadio value="full">{{ t('zcard.supply.taskModeFull') }}</ElRadio>
+                  </ElRadioGroup>
+                </div>
+                <div class="schedule-task-row schedule-window-row">
+                  <span class="schedule-sub-label">{{ t('zcard.supply.scheduleWindows') }}</span>
+                  <div class="schedule-windows">
+                    <div
+                      v-for="(w, i) in scheduleForm[tk.key].windows"
+                      :key="i"
+                      class="schedule-window"
+                    >
+                      <ElTimeSelect
+                        v-model="w.start"
+                        start="00:00"
+                        end="23:30"
+                        step="00:30"
+                        :placeholder="t('zcard.supply.scheduleWindowStart')"
+                        style="width: 110px"
+                      />
+                      <span class="window-sep">~</span>
+                      <ElTimeSelect
+                        v-model="w.end"
+                        start="00:00"
+                        end="23:30"
+                        step="00:30"
+                        :placeholder="t('zcard.supply.scheduleWindowEnd')"
+                        style="width: 110px"
+                      />
+                      <ElButton
+                        link
+                        type="danger"
+                        :icon="Delete"
+                        @click="removeWindow(tk.key, i)"
+                      />
+                    </div>
+                    <div class="schedule-window-add">
+                      <ElButton link type="primary" :icon="Plus" @click="addWindow(tk.key)">{{
+                        t('zcard.supply.scheduleAddWindow')
+                      }}</ElButton>
+                    </div>
+                    <div class="field-help">{{ t('zcard.supply.scheduleWindowsTip') }}</div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+          <div class="schedule-tip">{{ t('zcard.supply.scheduleSerialTip') }}</div>
+        </template>
+      </ElForm>
+      <template #footer>
+        <ElButton @click="scheduleVisible = false">{{ t('zcard.common.cancel') }}</ElButton>
+        <ElButton type="primary" :loading="scheduleSaving" @click="handleScheduleSubmit">{{
+          t('zcard.supply.scheduleSave')
+        }}</ElButton>
+      </template>
+    </ElDialog>
+
     <!-- 同步任务弹窗(异步入库,轮询进度/支持取消/重新同步) -->
     <ElDialog
       v-model="taskDialogVisible"
@@ -399,6 +545,7 @@
             <span class="task-label">{{ t('zcard.supply.taskStatus') }}</span>
             <ElTag :type="taskStatusTag(activeTask.status)" size="small">{{ taskStatusText(activeTask.status) }}</ElTag>
             <span class="task-mode">{{ activeTask.mode === 'full' ? t('zcard.supply.taskModeFull') : t('zcard.supply.taskModeInc') }}</span>
+            <ElTag :type="taskScopeTag(activeTask.scope)" size="small" effect="plain">{{ taskScopeText(activeTask.scope) }}</ElTag>
             <ElTag v-if="activeTask.force_reprice" type="warning" size="small">{{ t('zcard.supply.taskForceRepriceTag') }}</ElTag>
           </div>
 
@@ -718,7 +865,7 @@
 </template>
 
 <script setup lang="ts">
-  import { Plus, List, ArrowDown } from '@element-plus/icons-vue'
+  import { Plus, List, ArrowDown, Timer, Delete } from '@element-plus/icons-vue'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
   import { useI18n } from 'vue-i18n'
@@ -741,6 +888,10 @@
     type SupplySyncTask,
     previewSupplyProducts,
     importSupplyProducts,
+    defaultSupplySchedule,
+    readSupplySchedule,
+    type SupplySchedule,
+    type TaskSchedule,
     type SupplySource,
     type SupplyDriver,
     type UpstreamCategory
@@ -1250,6 +1401,125 @@
     if (typeof context.http_status === 'number') parts.push(`HTTP ${context.http_status}`)
     if (typeof context.endpoint === 'string' && context.endpoint) parts.push(context.endpoint)
     return parts.join(' · ')
+  }
+
+  /** 任务类型(scope)标签文案与颜色 */
+  const taskScopeText = (scope?: string): string => {
+    if (scope === 'price') return t('zcard.supply.scheduleScopePrice')
+    if (scope === 'status') return t('zcard.supply.scheduleScopeStatus')
+    return t('zcard.supply.scheduleScopeCollect')
+  }
+  const taskScopeTag = (scope?: string): 'primary' | 'warning' | 'info' => {
+    if (scope === 'price') return 'warning'
+    if (scope === 'status') return 'info'
+    return 'primary'
+  }
+
+  /** ===== 定时任务设置弹窗(采集/价格/上下架的间隔 + 时间窗口) ===== */
+  const scheduleVisible = ref(false)
+  const scheduleSaving = ref(false)
+  const scheduleSourceId = ref<number | null>(null)
+  const scheduleForm = reactive<SupplySchedule>(defaultSupplySchedule())
+
+  /** 三类任务的定义(模板 v-for 渲染) */
+  const scheduleTaskDefs = computed(() => [
+    {
+      key: 'collect' as const,
+      label: t('zcard.supply.scheduleTaskCollect'),
+      tip: t('zcard.supply.scheduleTaskCollectTip'),
+      hasMode: true
+    },
+    {
+      key: 'price' as const,
+      label: t('zcard.supply.scheduleTaskPrice'),
+      tip: t('zcard.supply.scheduleTaskPriceTip'),
+      hasMode: false
+    },
+    {
+      key: 'status' as const,
+      label: t('zcard.supply.scheduleTaskStatus'),
+      tip: t('zcard.supply.scheduleTaskStatusTip'),
+      hasMode: false
+    }
+  ])
+
+  /** 间隔快捷预设(分钟) */
+  const intervalPresets = [15, 30, 60, 180, 360, 720, 1440]
+
+  /** 分钟数 → 人类可读(15分钟/2小时/1天) */
+  const formatInterval = (m: number | null): string => {
+    const n = Number(m)
+    if (!n || n <= 0) return ''
+    if (n < 60) return `${n}${t('zcard.supply.intervalMin')}`
+    if (n % 1440 === 0) return `${n / 1440}${t('zcard.supply.intervalDay')}`
+    if (n % 60 === 0) return `${n / 60}${t('zcard.supply.intervalHour')}`
+    return `${n}${t('zcard.supply.intervalMin')}`
+  }
+
+  const openScheduleDialog = () => {
+    scheduleVisible.value = true
+    // 默认选中第一行货源(用户可在弹窗内切换);上次选中的货源若不在列表则回退
+    const exists = tableData.value.some((s) => s.id === scheduleSourceId.value)
+    if (!exists && tableData.value.length > 0) {
+      scheduleSourceId.value = tableData.value[0].id
+    }
+    loadScheduleForSource()
+  }
+
+  /** 按当前选中的货源回填计划表单 */
+  const loadScheduleForSource = () => {
+    const row = tableData.value.find((s) => s.id === scheduleSourceId.value)
+    if (!row) {
+      Object.assign(scheduleForm, defaultSupplySchedule())
+      return
+    }
+    Object.assign(scheduleForm, readSupplySchedule(row.settings))
+  }
+
+  const addWindow = (key: keyof SupplySchedule) => {
+    const task = scheduleForm[key] as TaskSchedule
+    task.windows.push({ start: '02:00', end: '06:00' })
+  }
+
+  const removeWindow = (key: keyof SupplySchedule, index: number) => {
+    const task = scheduleForm[key] as TaskSchedule
+    task.windows.splice(index, 1)
+  }
+
+  /** 保存:合并进货源 settings 的 schedule 键(不影响其他设置) */
+  const handleScheduleSubmit = async () => {
+    const row = tableData.value.find((s) => s.id === scheduleSourceId.value)
+    if (!row) {
+      ElMessage.warning(t('zcard.supply.scheduleSelectRequired'))
+      return
+    }
+    scheduleSaving.value = true
+    try {
+      const settings = { ...(row.settings || {}), schedule: JSON.parse(JSON.stringify(scheduleForm)) }
+      await updateSupplySource(row.id, { settings } as any)
+      ElMessage.success(t('zcard.supply.scheduleSaved'))
+      scheduleVisible.value = false
+      fetchData()
+    } catch {
+      // 拦截器已提示
+    } finally {
+      scheduleSaving.value = false
+    }
+  }
+
+  /** 表格「定时任务」摘要列:启用状态 + 各任务间隔 */
+  const scheduleSummary = (row: SupplySource): string => {
+    const s = readSupplySchedule(row.settings)
+    if (!s.enabled) return t('zcard.supply.scheduleSummaryOff')
+    const parts: string[] = []
+    const add = (key: 'collect' | 'price' | 'status', label: string) => {
+      const task = s[key]
+      if (task.enabled && task.interval) parts.push(`${label}·${formatInterval(task.interval)}`)
+    }
+    add('collect', t('zcard.supply.scheduleScopeCollect'))
+    add('price', t('zcard.supply.scheduleScopePrice'))
+    add('status', t('zcard.supply.scheduleScopeStatus'))
+    return parts.length ? parts.join('  ') : t('zcard.supply.scheduleSummaryOn')
   }
 
   /** ===== 拉取商品 + 勾选导入 ===== */
@@ -2066,5 +2336,73 @@
 .all-task-meta {
   margin-top: 4px;
   font-size: 12px;
+}
+
+/* 定时任务设置弹窗 */
+.schedule-summary {
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+  line-height: 1.5;
+}
+.schedule-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.schedule-task-block {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.schedule-task-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+.schedule-task-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.schedule-task-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.schedule-sub-label {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  flex-shrink: 0;
+  min-width: 64px;
+}
+.schedule-window-row {
+  align-items: flex-start;
+}
+.schedule-windows {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.schedule-window {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.window-sep {
+  color: var(--el-text-color-placeholder);
+}
+.schedule-window-add {
+  margin-top: 2px;
+}
+.schedule-tip {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
+  line-height: 1.5;
 }
 </style>

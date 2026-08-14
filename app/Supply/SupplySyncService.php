@@ -165,6 +165,67 @@ class SupplySyncService
         return $query->delete();
     }
 
+    /**
+     * 定时「同步价格」专用：只更新已有本地商品的价格/成本/库存缓存，
+     * 不创建新商品、不改名称/描述/封面/分类等元数据，也不做删除对账。
+     *
+     * 售价重算规则与 upsertProduct 完全一致(自动跟随上游调价 + 手动价保护 + pending 不自动重算)，
+     * 保证价格同步不会破坏运营手动设置的售价。
+     */
+    public function updatePriceOnly(SupplySource $source, UpstreamProduct $dto): ?Product
+    {
+        $existing = Product::where('upstream_source_id', $source->id)
+            ->where('upstream_product_code', $dto->code)
+            ->first();
+        if (! $existing || $existing->trashed()) {
+            // 本地还不存在的商品由「采集商品」任务负责创建,价格同步不越权
+            return null;
+        }
+
+        $update = [
+            'factory_price' => $dto->factoryPrice,
+            'upstream_price' => $dto->price,
+            'stock_cache' => $dto->stockQuantity,
+            'upstream_synced_at' => now(),
+        ];
+        $autoPrice = (bool) ($source->settings['auto_sync_price'] ?? true);
+        $defaultMode = (string) ($source->settings['default_pricing_mode'] ?? 'percent');
+        $priceManual = (bool) $existing->price_manual;
+        if ($autoPrice && ! $priceManual && $defaultMode !== 'pending') {
+            $newPrice = $this->computeInitialPrice($source, $dto->factoryPrice, $dto->price);
+            if ($newPrice !== null) {
+                $update['price'] = $newPrice;
+            }
+        }
+        $existing->update($update);
+
+        return $existing->fresh();
+    }
+
+    /**
+     * 定时「同步上下架」专用：只更新已有本地商品的 hide(上游失效→下架,恢复→上架)，
+     * 不创建新商品、不动价格/名称/分类，也不做删除对账。
+     */
+    public function updateStatusOnly(SupplySource $source, UpstreamProduct $dto): ?Product
+    {
+        $existing = Product::where('upstream_source_id', $source->id)
+            ->where('upstream_product_code', $dto->code)
+            ->first();
+        if (! $existing || $existing->trashed()) {
+            return null;
+        }
+
+        $hide = ! $dto->isActive;
+        if ((bool) $existing->hide !== $hide) {
+            $existing->update([
+                'hide' => $hide,
+                'upstream_synced_at' => now(),
+            ]);
+        }
+
+        return $existing->fresh();
+    }
+
     private function createProduct(SupplySource $source, UpstreamProduct $dto, ?int $price, ?array $pricing, ?array $categoryMap, bool $unique = false): Product
     {
         return Product::create([

@@ -13,6 +13,10 @@ export interface SupplySource {
   last_synced_at: string | null
   last_error: string | null
   balance_cache: number | null
+  /** 定时任务上次执行时间(调度器写) */
+  last_collect_at?: string | null
+  last_price_sync_at?: string | null
+  last_status_sync_at?: string | null
   sort: number
   created_at?: string
   updated_at?: string
@@ -91,6 +95,8 @@ export interface SupplySyncTask {
   id: number
   supply_source_id: number
   mode: 'full' | 'incremental'
+  /** 任务类型:collect=采集商品 | price=同步价格 | status=同步上下架 */
+  scope: 'collect' | 'price' | 'status'
   force_reprice: boolean
   status: 'queued' | 'running' | 'cancelling' | 'success' | 'failed' | 'cancelled' | 'timed_out'
   total_products: number
@@ -217,3 +223,74 @@ export const importSupplyProducts = (
       data: { codes, ...options }
     }
   )
+
+/** ===== 定时任务计划(settings.schedule) ===== */
+
+/** 执行时间窗口:留空数组=全天 */
+export interface ScheduleWindow {
+  start: string // "HH:mm"
+  end: string // "HH:mm"
+}
+
+/** 单类任务计划 */
+export interface TaskSchedule {
+  enabled: boolean
+  /** 执行间隔(分钟) */
+  interval: number | null
+  /** 仅采集商品:incremental 增量 / full 全量 */
+  mode?: 'incremental' | 'full'
+  /** 时间窗口,空=全天 */
+  windows: ScheduleWindow[]
+}
+
+/** 货源定时任务计划(存在 supply_sources.settings.schedule) */
+export interface SupplySchedule {
+  /** 定时任务总开关 */
+  enabled: boolean
+  /** 每次请求上游间隔(秒),0=不限 */
+  request_delay: number
+  collect: TaskSchedule
+  price: TaskSchedule
+  status: TaskSchedule
+}
+
+/** 默认计划:采集每 6 小时增量,价格每 30 分钟,上下架每 60 分钟 */
+export const defaultSupplySchedule = (): SupplySchedule => ({
+  enabled: true,
+  request_delay: 0,
+  collect: { enabled: true, mode: 'incremental', interval: 360, windows: [] },
+  price: { enabled: true, interval: 30, windows: [] },
+  status: { enabled: true, interval: 60, windows: [] }
+})
+
+/** 从货源 settings 读取计划(无配置时返回默认值,旧 auto_sync=true 按每 60 分钟采集兼容) */
+export const readSupplySchedule = (settings: Record<string, any> | null): SupplySchedule => {
+  const s = settings || {}
+  const raw: any = s.schedule
+  const def = defaultSupplySchedule()
+  const disabled = (base: TaskSchedule): TaskSchedule => ({ ...base, enabled: false })
+  // 旧版只开了 auto_sync:保持每小时增量采集,价格/上下架关闭
+  if (!raw || typeof raw !== 'object') {
+    if (s.auto_sync) {
+      return { ...def, collect: { ...def.collect, interval: 60 }, price: disabled(def.price), status: disabled(def.status) }
+    }
+    return def
+  }
+  const task = (key: string, base: TaskSchedule): TaskSchedule => {
+    const t = raw[key]
+    if (!t || typeof t !== 'object') return disabled(base)
+    return {
+      enabled: t.enabled ?? base.enabled,
+      interval: typeof t.interval === 'number' && t.interval > 0 ? t.interval : base.interval,
+      mode: t.mode === 'full' ? 'full' : base.mode,
+      windows: Array.isArray(t.windows) ? t.windows : base.windows
+    }
+  }
+  return {
+    enabled: raw.enabled ?? def.enabled,
+    request_delay: typeof raw.request_delay === 'number' && raw.request_delay >= 0 ? raw.request_delay : 0,
+    collect: task('collect', def.collect),
+    price: task('price', def.price),
+    status: task('status', def.status)
+  }
+}
