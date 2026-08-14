@@ -44,7 +44,7 @@ class SupplyScheduledSyncCommandTest extends TestCase
         return $this->makeSource($settings);
     }
 
-    public function test_dispatches_collect_when_due_and_marks_last_collect_at(): void
+    public function test_dispatches_collect_when_due_without_advancing_success_cursor(): void
     {
         $source = $this->scheduleSource();
         $this->assertNull($source->last_collect_at);
@@ -56,7 +56,7 @@ class SupplyScheduledSyncCommandTest extends TestCase
                 && $job->scope === 'collect'
                 && $job->mode === 'incremental';
         });
-        $this->assertNotNull($source->fresh()->last_collect_at);
+        $this->assertNull($source->fresh()->last_collect_at);
         // 任务记录带 scope
         $task = SupplySyncTask::where('supply_source_id', $source->id)->first();
         $this->assertSame('collect', $task->scope);
@@ -99,7 +99,7 @@ class SupplyScheduledSyncCommandTest extends TestCase
         Queue::assertPushed(SyncSupplySourceProducts::class, fn (SyncSupplySourceProducts $job) => $job->sourceId === $source->id && $job->scope === 'price');
         // 同一周期只派发一个任务:price 已派发,status 等下一周期
         $this->assertSame(1, Queue::pushed(SyncSupplySourceProducts::class)->count());
-        $this->assertNotNull($source->fresh()->last_price_sync_at);
+        $this->assertNull($source->fresh()->last_price_sync_at);
     }
 
     public function test_collect_takes_priority_over_price_and_status(): void

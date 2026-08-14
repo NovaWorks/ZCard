@@ -15,6 +15,7 @@ use App\Supply\SupplySyncService;
 use App\Supply\SupplySyncTaskState;
 use App\Support\AppHelper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Queue;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -164,6 +165,56 @@ class SupplySyncTaskTest extends TestCase
 
         $this->assertNotSoftDeleted('products', ['id' => $existing->id]);
         $this->assertSame(0, (int) $task->fresh()->deleted_count);
+    }
+
+    public function test_incremental_sync_scopes_keep_independent_success_cursors(): void
+    {
+        Carbon::setTestNow('2026-08-14 12:00:00');
+        $source = $this->makeSource();
+        $source->update([
+            'last_synced_at' => Carbon::parse('2026-08-14 06:00:00'),
+            'last_collect_at' => Carbon::parse('2026-08-14 06:00:00'),
+            'last_price_sync_at' => Carbon::parse('2026-08-14 09:00:00'),
+            'last_status_sync_at' => Carbon::parse('2026-08-14 10:00:00'),
+        ]);
+
+        $run = function (string $scope, string $expectedCursor) use ($source): void {
+            $task = SupplySyncTask::create([
+                'supply_source_id' => $source->id,
+                'mode' => 'incremental',
+                'scope' => $scope,
+                'status' => SupplySyncTask::STATUS_QUEUED,
+            ]);
+            $driver = $this->createMock(SupplyDriver::class);
+            $driver->method('supportsIncrementalProductSync')->willReturn(true);
+            $driver->expects($this->once())
+                ->method('listProducts')
+                ->with(
+                    $this->callback(fn (?Carbon $cursor) => $cursor?->toDateTimeString() === $expectedCursor),
+                    1,
+                    $scope !== SupplySyncTask::SCOPE_STATUS,
+                    $this->isType('callable'),
+                )
+                ->willReturn(['items' => [], 'total' => 0, 'page' => 1, 'has_more' => false]);
+            $manager = $this->createMock(SupplyManager::class);
+            $manager->method('driver')->willReturn($driver);
+
+            (new SyncSupplySourceProducts($source->id, 'incremental', $task->id, false, $scope))
+                ->handle($manager, app(SupplySyncService::class));
+        };
+
+        $run(SupplySyncTask::SCOPE_PRICE, '2026-08-14 09:00:00');
+        $this->assertSame('2026-08-14 06:00:00', $source->fresh()->last_synced_at->toDateTimeString());
+
+        Carbon::setTestNow('2026-08-14 12:01:00');
+        $run(SupplySyncTask::SCOPE_STATUS, '2026-08-14 10:00:00');
+        $this->assertSame('2026-08-14 06:00:00', $source->fresh()->last_synced_at->toDateTimeString());
+
+        Carbon::setTestNow('2026-08-14 12:02:00');
+        $run(SupplySyncTask::SCOPE_COLLECT, '2026-08-14 06:00:00');
+        $source->refresh();
+        $this->assertSame('2026-08-14 12:02:00', $source->last_synced_at->toDateTimeString());
+        $this->assertSame('2026-08-14 12:02:00', $source->last_collect_at->toDateTimeString());
     }
 
     public function test_incremental_mode_reconciles_missing_products_for_full_snapshot_driver(): void

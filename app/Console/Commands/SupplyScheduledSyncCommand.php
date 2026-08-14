@@ -18,7 +18,7 @@ use Illuminate\Console\Command;
  *
  * 约定:
  * - 同一货源同一时刻只派发一个任务(防重),采集优先于价格/上下架(采集已覆盖价格与上下架);
- * - 派发成功后才记录 last_{scope}_at,避免失败后长时间不重试;
+ * - worker 成功后才记录 last_{scope}_at,失败任务下个周期可重试且不会推进增量游标;
  * - 旧版仅 auto_sync=true 的货源按「每小时增量采集」兼容。
  */
 class SupplyScheduledSyncCommand extends Command
@@ -73,7 +73,6 @@ class SupplyScheduledSyncCommand extends Command
                     'status' => SupplySyncTask::STATUS_QUEUED,
                 ]);
                 SyncSupplySourceProducts::dispatch($source->id, $mode, $task->id, false, $scope);
-                $source->update([$schedule->lastRunColumn($scope) => now()]);
                 $dispatched++;
 
                 $this->line("  派发 scope={$scope} mode={$mode} source={$source->id}({$source->name}) task={$task->id}");
