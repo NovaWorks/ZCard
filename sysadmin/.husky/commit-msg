@@ -1,1 +1,2 @@
-pnpm dlx commitlint --edit $1
+f="$(pwd)/$1"
+pnpm --dir sysadmin exec commitlint --edit "$f"

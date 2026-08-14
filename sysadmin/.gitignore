@@ -5,7 +5,6 @@ dist-ssr
 *.local
 .cursorrules
 
-# Auto-generated files
-src/types/import/auto-imports.d.ts
-src/types/import/components.d.ts
-.auto-import.json
+# 说明:src/types/import/*.d.ts 与 .auto-import.json 虽由 unplugin 自动生成,
+# 但内容稳定,且 vue-tsc(构建前置类型检查)与 eslint.config.mjs 在干净检出
+# 时就要读取——必须入库,否则首次 pnpm build / pnpm lint 直接失败(issue #18)。
