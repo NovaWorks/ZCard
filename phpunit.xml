@@ -25,7 +25,10 @@
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
         <env name="CARD_ENCRYPTION_KEY" value="base64:lB/I9UOezhNICph0qOP5e3O0Ta16zR+KUOZA2+oJFCQ="/>
-        <env name="DB_DATABASE" value="testing"/>
+        <!-- 测试固定用 SQLite 内存库:不依赖任何外部数据库,裸 php artisan test 开箱即用(issue #15)。
+             注意:金额迁移等 DDL 必须保持跨驱动可移植(见 tests/Feature/MigrationPortabilityTest.php)。 -->
+        <env name="DB_CONNECTION" value="sqlite"/>
+        <env name="DB_DATABASE" value=":memory:"/>
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
