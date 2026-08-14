@@ -279,34 +279,48 @@ class UpdateController extends Controller
             return response()->json(['message' => '已有更新或回退正在进行中,无法回退'], 409);
         }
 
-        // 安全(H-5):回滚降级防护——禁止回退到低于安全基线的版本,
-        // 防止被盗管理员把系统退回存在已公开漏洞的历史版本再利用。
-        $targetVersion = trim((string) $this->shell(
-            'cd '.escapeshellarg(base_path()).' && '.$this->gitCmd('show HEAD~1:VERSION 2>/dev/null'),
-        ));
-        if ($targetVersion === '' || version_compare($targetVersion, self::MIN_SECURITY_VERSION, '<')) {
-            $shown = $targetVersion !== '' ? $targetVersion : '未知';
+        // 安全(H-5)预检(降级基线 + 回滚次数上限)在持有操作锁期间执行。
+        // 修复(issue #22):预检的 422 拒绝分支与预检异常都必须立即释放操作锁,
+        // 否则一次无副作用的拒绝会把 zcard:system-update 锁占用到 600 秒 TTL 过期,
+        // 期间所有更新/回退请求持续返回 409(生产 file/redis 驱动下可复现;
+        // array 测试驱动在对象销毁时自动释放进程内锁,故此前测试未能发现)。
+        try {
+            // 回滚降级防护——禁止回退到低于安全基线的版本,
+            // 防止被盗管理员把系统退回存在已公开漏洞的历史版本再利用。
+            $targetVersion = trim((string) $this->shell(
+                'cd '.escapeshellarg(base_path()).' && '.$this->gitCmd('show HEAD~1:VERSION 2>/dev/null'),
+            ));
+            if ($targetVersion === '' || version_compare($targetVersion, self::MIN_SECURITY_VERSION, '<')) {
+                $operationLock->release();
+                $shown = $targetVersion !== '' ? $targetVersion : '未知';
 
-            return response()->json([
-                'message' => "禁止回滚:目标版本({$shown})低于安全基线 v".self::MIN_SECURITY_VERSION,
-            ], 422);
-        }
+                return response()->json([
+                    'message' => "禁止回滚:目标版本({$shown})低于安全基线 v".self::MIN_SECURITY_VERSION,
+                ], 422);
+            }
 
-        // 安全(H-5):回滚次数上限(防反复回退制造降级窗口)
-        $countFile = storage_path('app/rollback.count');
-        $rollbackCount = (int) (@file_get_contents($countFile) ?: 0);
-        if ($rollbackCount >= 3) {
-            return response()->json(['message' => '回滚次数已达上限(3 次),如需继续请人工介入处理'], 422);
+            // 回滚次数上限(防反复回退制造降级窗口)
+            $countFile = storage_path('app/rollback.count');
+            $rollbackCount = (int) (@file_get_contents($countFile) ?: 0);
+            if ($rollbackCount >= 3) {
+                $operationLock->release();
+
+                return response()->json(['message' => '回滚次数已达上限(3 次),如需继续请人工介入处理'], 422);
+            }
+            file_put_contents($countFile, (string) ($rollbackCount + 1));
+        } catch (\Throwable $e) {
+            // 预检异常(如 git 命令执行失败):同样立即释放锁,避免锁泄漏
+            $operationLock->release();
+            throw $e;
         }
-        file_put_contents($countFile, (string) ($rollbackCount + 1));
 
         $lockFile = storage_path('app/update.lock');
-        file_put_contents($lockFile, json_encode(['started_at' => now()->toIso8601String(), 'operation' => 'rollback']));
-
         $logFile = storage_path('app/update.log');
-        file_put_contents($logFile, '=== 回退开始 '.now()." ===\n");
 
         try {
+            // 锁/日志文件写入并入主 try:即使这些写入抛异常,finally 也会释放操作锁
+            file_put_contents($lockFile, json_encode(['started_at' => now()->toIso8601String(), 'operation' => 'rollback']));
+            file_put_contents($logFile, '=== 回退开始 '.now()." ===\n");
             // Step 1: 维护模式(不指定 render 视图)
             $this->log($logFile, '进入维护模式...');
             Artisan::call('down');
