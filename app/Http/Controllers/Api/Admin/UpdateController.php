@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -138,6 +139,11 @@ class UpdateController extends Controller
         try {
             $this->log($logFile, '当前版本: '.$currentVersion);
 
+            $currentCommit = $this->resolveGitCommit('HEAD');
+            file_put_contents(storage_path('app/last_commit.txt'), $currentCommit);
+            file_put_contents(storage_path('app/last_migration_batch.txt'), '0');
+            file_put_contents(storage_path('app/rollback.count'), '0');
+
             // Step 1: 维护模式(不指定 render 视图,避免找不到组件)
             $this->log($logFile, '进入维护模式...');
             Artisan::call('down');
@@ -182,8 +188,14 @@ class UpdateController extends Controller
 
             // Step 5: 数据库迁移
             $this->log($logFile, '执行数据库迁移...');
+            $previousMigrationBatch = (int) DB::table('migrations')->max('batch');
             Artisan::call('migrate', ['--force' => true]);
             $this->log($logFile, Artisan::output());
+            $currentMigrationBatch = (int) DB::table('migrations')->max('batch');
+            file_put_contents(
+                storage_path('app/last_migration_batch.txt'),
+                (string) ($currentMigrationBatch > $previousMigrationBatch ? $currentMigrationBatch : 0),
+            );
 
             // Step 6: 缓存优化(先清后建,避免旧缓存)
             // 注意: 不执行 view:cache —— Filament v5 有动态 Blade 组件(如 modal),
@@ -285,10 +297,11 @@ class UpdateController extends Controller
         // 期间所有更新/回退请求持续返回 409(生产 file/redis 驱动下可复现;
         // array 测试驱动在对象销毁时自动释放进程内锁,故此前测试未能发现)。
         try {
+            $targetCommit = $this->rollbackTargetCommit();
             // 回滚降级防护——禁止回退到低于安全基线的版本,
             // 防止被盗管理员把系统退回存在已公开漏洞的历史版本再利用。
             $targetVersion = trim((string) $this->shell(
-                'cd '.escapeshellarg(base_path()).' && '.$this->gitCmd('show HEAD~1:VERSION 2>/dev/null'),
+                'cd '.escapeshellarg(base_path()).' && '.$this->gitCmd('show '.escapeshellarg($targetCommit.':VERSION').' 2>/dev/null'),
             ));
             if ($targetVersion === '' || version_compare($targetVersion, self::MIN_SECURITY_VERSION, '<')) {
                 $operationLock->release();
@@ -308,6 +321,7 @@ class UpdateController extends Controller
                 return response()->json(['message' => '回滚次数已达上限(3 次),如需继续请人工介入处理'], 422);
             }
             file_put_contents($countFile, (string) ($rollbackCount + 1));
+            $migrationBatch = $this->rollbackMigrationBatch();
         } catch (\Throwable $e) {
             // 预检异常(如 git 命令执行失败):同样立即释放锁,避免锁泄漏
             $operationLock->release();
@@ -325,7 +339,21 @@ class UpdateController extends Controller
             $this->log($logFile, '进入维护模式...');
             Artisan::call('down');
 
-            // Step 2: git reset 回退(保护 .env 不被覆盖)
+            // Step 2:仍在新代码上回退更新时记录的迁移批次。若先 reset,目标提交中
+            // 不存在的新迁移文件会被 Laravel 标记为 Migration not found 并直接跳过。
+            $this->log($logFile, '回滚数据库迁移...');
+            $migrationArguments = ['--force' => true];
+            if ($migrationBatch !== null) {
+                $migrationArguments['--batch'] = $migrationBatch;
+            }
+            if ($migrationBatch !== 0) {
+                Artisan::call('migrate:rollback', $migrationArguments);
+                $this->log($logFile, Artisan::output());
+            } else {
+                $this->log($logFile, '本次更新未执行新迁移,跳过数据库回滚');
+            }
+
+            // Step 3: git reset 到更新前的精确提交(保护 .env 不被覆盖)
             $this->log($logFile, '回退代码到上一版本...');
             $this->ensureGitSafeDirectory();
             $this->ensureHttpsRemote();
@@ -333,7 +361,7 @@ class UpdateController extends Controller
             $this->preserveUserFiles();
             $userFilesPreserved = true;
             $output = $this->shell(
-                'cd '.base_path().' && '.$this->gitCmd('reset --hard HEAD~1').' 2>&1',
+                $this->gitRollbackCommand($targetCommit),
                 true,
                 'Git 回退失败'
             );
@@ -345,17 +373,13 @@ class UpdateController extends Controller
             }
             $this->restoreUserFiles();
             $userFilesPreserved = false;
+            $this->assertGitReferenceMatches($targetCommit);
 
-            // Step 3: 安装依赖(可能需要降级)
+            // Step 4: 安装依赖(可能需要降级)
             $this->log($logFile, '安装依赖...');
             $this->assertVendorWritable();
             $output = $this->composerInstall();
             $this->log($logFile, $output);
-
-            // Step 4: 数据库回滚迁移
-            $this->log($logFile, '回滚数据库迁移...');
-            Artisan::call('migrate:rollback', ['--force' => true]);
-            $this->log($logFile, Artisan::output());
 
             // Step 5: 前端构建
             $this->buildFrontend($logFile, 'sysadmin');
@@ -384,6 +408,9 @@ class UpdateController extends Controller
             AppHelper::clearVersionCache();
             $version = AppHelper::version();
             $this->log($logFile, "回退完成! 当前版本: {$version}");
+            @unlink(storage_path('app/last_commit.txt'));
+            @unlink(storage_path('app/last_migration_batch.txt'));
+            @unlink(storage_path('app/last_version.txt'));
 
             return response()->json([
                 'message' => '已回退到上一个版本',
@@ -822,9 +849,70 @@ class UpdateController extends Controller
      */
     private function gitSyncCommand(): string
     {
-        return 'cd '.base_path()
+        return 'cd '.escapeshellarg(base_path())
             .' && '.$this->gitCmd('fetch --force origin main:refs/remotes/origin/main').' 2>&1'
             .' && '.$this->gitCmd('reset --hard FETCH_HEAD').' 2>&1';
+    }
+
+    /** 读取并校验一个 Git 引用对应的完整提交 SHA。 */
+    private function resolveGitCommit(string $reference): string
+    {
+        $commit = trim($this->shell(
+            'cd '.escapeshellarg(base_path()).' && '.$this->gitCmd('rev-parse '.escapeshellarg($reference.'^{commit}')).' 2>/dev/null',
+            true,
+            '读取 Git 提交失败',
+        ));
+        if (! preg_match('/^[0-9a-f]{40}$/i', $commit)) {
+            throw new \RuntimeException("Git 引用无效: {$reference}");
+        }
+
+        return strtolower($commit);
+    }
+
+    /** 优先使用新更新器记录的精确提交,并兼容旧版本留下的版本号。 */
+    private function rollbackTargetCommit(): string
+    {
+        $recorded = trim((string) @file_get_contents(storage_path('app/last_commit.txt')));
+        if (preg_match('/^[0-9a-f]{40}$/i', $recorded)) {
+            return $this->resolveGitCommit($recorded);
+        }
+
+        $version = trim((string) @file_get_contents(storage_path('app/last_version.txt')));
+        if ($version !== '' && preg_match('/^[0-9A-Za-z._-]+$/', $version)) {
+            try {
+                return $this->resolveGitCommit('refs/tags/v'.ltrim($version, 'v'));
+            } catch (\Throwable) {
+                // 旧安装未保留对应 tag 时,继续使用旧版的一步回退语义。
+            }
+        }
+
+        return $this->resolveGitCommit('HEAD~1');
+    }
+
+    /** null=旧更新记录(回退当前最后一批),0=本次无新迁移,正整数=精确批次。 */
+    private function rollbackMigrationBatch(): ?int
+    {
+        $path = storage_path('app/last_migration_batch.txt');
+        if (! is_file($path)) {
+            return null;
+        }
+
+        $value = trim((string) file_get_contents($path));
+        if (! preg_match('/^\d+$/', $value)) {
+            throw new \RuntimeException('更新迁移批次记录损坏,已阻断回滚');
+        }
+
+        return (int) $value;
+    }
+
+    private function gitRollbackCommand(string $commit): string
+    {
+        if (! preg_match('/^[0-9a-f]{40}$/i', $commit)) {
+            throw new \InvalidArgumentException('回滚目标必须是完整 Git 提交 SHA');
+        }
+
+        return 'cd '.escapeshellarg(base_path())
+            .' && '.$this->gitCmd('reset --hard '.escapeshellarg(strtolower($commit))).' 2>&1';
     }
 
     /**

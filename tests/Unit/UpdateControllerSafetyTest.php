@@ -71,6 +71,72 @@ class UpdateControllerSafetyTest extends TestCase
         }
     }
 
+    #[Test]
+    public function rollback_uses_the_recorded_exact_commit_instead_of_new_head_parent(): void
+    {
+        $commitFile = storage_path('app/last_commit.txt');
+        $previous = is_file($commitFile) ? file_get_contents($commitFile) : null;
+        $head = $this->invokePrivate('resolveGitCommit', ['HEAD']);
+        file_put_contents($commitFile, $head);
+
+        try {
+            $this->assertSame($head, $this->invokePrivate('rollbackTargetCommit'));
+            $command = $this->invokePrivate('gitRollbackCommand', [$head]);
+            $this->assertStringContainsString('reset --hard', $command);
+            $this->assertStringContainsString($head, $command);
+            $this->assertStringNotContainsString('HEAD~1', $command);
+        } finally {
+            if ($previous === null) {
+                @unlink($commitFile);
+            } else {
+                file_put_contents($commitFile, $previous);
+            }
+        }
+    }
+
+    #[Test]
+    public function rollback_rejects_non_commit_command_targets(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->invokePrivate('gitRollbackCommand', ['HEAD~1']);
+    }
+
+    #[Test]
+    public function rollback_migration_batch_snapshot_is_validated(): void
+    {
+        $batchFile = storage_path('app/last_migration_batch.txt');
+        $previous = is_file($batchFile) ? file_get_contents($batchFile) : null;
+
+        try {
+            file_put_contents($batchFile, '42');
+            $this->assertSame(42, $this->invokePrivate('rollbackMigrationBatch'));
+
+            file_put_contents($batchFile, '42; rm -rf /');
+            $this->expectException(RuntimeException::class);
+            $this->invokePrivate('rollbackMigrationBatch');
+        } finally {
+            if ($previous === null) {
+                @unlink($batchFile);
+            } else {
+                file_put_contents($batchFile, $previous);
+            }
+        }
+    }
+
+    #[Test]
+    public function rollback_runs_migrations_before_resetting_to_old_code(): void
+    {
+        $source = (string) file_get_contents(app_path('Http/Controllers/Api/Admin/UpdateController.php'));
+        $rollback = substr($source, strpos($source, 'public function rollback()'));
+        $migrationPosition = strpos($rollback, "Artisan::call('migrate:rollback'");
+        $resetPosition = strpos($rollback, '$this->gitRollbackCommand($targetCommit)');
+
+        $this->assertNotFalse($migrationPosition);
+        $this->assertNotFalse($resetPosition);
+        $this->assertLessThan($resetPosition, $migrationPosition);
+    }
+
     private function invokePrivate(string $method, array $arguments = []): mixed
     {
         $reflection = new ReflectionMethod(UpdateController::class, $method);
