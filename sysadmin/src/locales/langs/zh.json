@@ -1083,6 +1083,7 @@
       "username": "用户名",
       "email": "邮箱",
       "balance": "余额",
+      "balanceHint": "修改余额将自动生成账单流水(账单管理可查),不允许修改本人余额",
       "roles": "角色",
       "status": "状态",
       "registerTime": "注册时间",

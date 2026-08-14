@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Bill;
 use App\Models\Card;
 use App\Models\Merchant;
 use App\Models\Product;
@@ -66,19 +67,70 @@ class SecurityAuditFixTest extends TestCase
         $this->assertDatabaseHas('bills', ['user_id' => $other->id, 'amount' => 5000, 'type' => 1]);
     }
 
-    public function test_user_update_ignores_balance_field(): void
+    public function test_user_update_balance_goes_through_bill_service(): void
     {
         $admin = $this->makeAdmin();
-        $target = User::factory()->create(['balance' => 100]);
+        $target = User::factory()->create(['balance' => 2000]); // 20 元 = 2000 分
 
         $this->actingAs($admin, 'sanctum')
             ->putJson('/api/admin/users/'.$target->id, [
                 'name' => '改名',
-                'balance' => 999999,
+                'balance' => 0,
             ])
             ->assertOk();
 
-        // balance 不允许直写,必须走 BillService
+        // 余额已变更,且产生支出流水(20 元),带操作人记录
+        $this->assertSame(0, (int) $target->fresh()->balance);
+        $this->assertDatabaseHas('bills', [
+            'user_id' => $target->id,
+            'amount' => 2000,
+            'type' => Bill::TYPE_EXPENSE,
+            'admin_id' => $admin->id,
+        ]);
+    }
+
+    public function test_user_update_balance_income_creates_bill(): void
+    {
+        $admin = $this->makeAdmin();
+        $target = User::factory()->create(['balance' => 0]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->putJson('/api/admin/users/'.$target->id, ['balance' => 3000])
+            ->assertOk();
+
+        $this->assertSame(3000, (int) $target->fresh()->balance);
+        $this->assertDatabaseHas('bills', [
+            'user_id' => $target->id,
+            'amount' => 3000,
+            'type' => Bill::TYPE_INCOME,
+            'admin_id' => $admin->id,
+        ]);
+    }
+
+    public function test_admin_cannot_modify_own_balance_via_user_update(): void
+    {
+        $admin = $this->makeAdmin();
+        $admin->update(['balance' => 1000]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->putJson('/api/admin/users/'.$admin->id, ['balance' => 0])
+            ->assertStatus(422);
+
+        $this->assertSame(1000, (int) $admin->fresh()->balance);
+        $this->assertDatabaseMissing('bills', ['user_id' => $admin->id]);
+    }
+
+    public function test_balance_change_fails_when_insufficient_ledger(): void
+    {
+        $admin = $this->makeAdmin();
+        $target = User::factory()->create(['balance' => 100]);
+
+        // 目标余额 min:0 校验挡负数;这里验证"把余额改小但差额超出现有余额"不可能发生——
+        // min:0 下差额最多 = 当前余额,一定足够;此用例锁定负值输入被 422 拒绝。
+        $this->actingAs($admin, 'sanctum')
+            ->putJson('/api/admin/users/'.$target->id, ['balance' => -1])
+            ->assertStatus(422);
+
         $this->assertSame(100, (int) $target->fresh()->balance);
     }
 

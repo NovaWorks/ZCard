@@ -189,6 +189,7 @@
         <ElFormItem :label="t('zcard.user.balance')" prop="balance">
           <ElInputNumber v-model="formData.balance" :min="0" :step="100" style="width: 100%" />
           <div class="form-hint">¥{{ formatPrice(formData.balance || 0) }}</div>
+          <div class="form-hint">{{ t('zcard.user.balanceHint') }}</div>
         </ElFormItem>
         <ElFormItem :label="t('zcard.user.points')" prop="points">
           <ElInputNumber v-model="formData.points" :min="0" :step="1" style="width: 100%" />

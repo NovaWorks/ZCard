@@ -1083,6 +1083,7 @@
       "username": "Username",
       "email": "Email",
       "balance": "Balance",
+      "balanceHint": "Changing balance creates a ledger entry (visible in Bills). You cannot modify your own balance",
       "roles": "Roles",
       "status": "Status",
       "registerTime": "Register Time",

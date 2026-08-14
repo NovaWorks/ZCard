@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Bill;
 use App\Models\User;
+use App\Support\BillService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 /**
  * 后台用户管理(spec §7.x)。用户 CRUD + 角色分配。
@@ -117,11 +120,35 @@ class UserController extends Controller
             'points' => 'nullable|integer|min:0',
             'pid' => 'nullable|integer|min:0',
             'group_id' => 'nullable|integer|min:0',
-            // 安全：余额不允许在此直写（会绕过 BillService、不产生流水）。
-            // 调账请使用 POST /api/admin/bills/adjust（走 BillService + 流水 + 禁自调）。
+            // 安全(H2 整改后恢复):余额修改不再直写 users.balance,
+            // 而是计算差额后经 BillService 生成账单流水(账单管理可查、含操作人),
+            // 与 POST /api/admin/bills/adjust 同一套口径;禁止修改本人余额。
+            'balance' => 'nullable|integer|min:0',
             'roles' => 'nullable|array',
             'roles.*' => 'string|exists:roles,name',
         ]);
+
+        // 余额变动先校验并入账(失败时不落任何用户字段,保证一致)。
+        if (array_key_exists('balance', $data) && (int) $data['balance'] !== (int) $user->balance) {
+            if ($user->id === $request->user()->id) {
+                throw ValidationException::withMessages(['balance' => ['不允许修改本人账户余额']]);
+            }
+
+            $delta = (int) $data['balance'] - (int) $user->balance;
+            $type = $delta > 0 ? Bill::TYPE_INCOME : Bill::TYPE_EXPENSE;
+            try {
+                BillService::record(
+                    $user->id,
+                    abs($delta),
+                    $type,
+                    '管理员调整余额(用户管理)',
+                    null,
+                    $request->user()->id,
+                );
+            } catch (\RuntimeException $e) {
+                throw ValidationException::withMessages(['balance' => [$e->getMessage()]]);
+            }
+        }
 
         $user->update([
             'username' => $data['username'] ?? $user->username,
