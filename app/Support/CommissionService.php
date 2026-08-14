@@ -57,10 +57,12 @@ class CommissionService
         }
 
         $current = $buyer->parent; // L1
+        $seen = [(int) $buyerId => true]; // 同一买家;环状 pid 下同一人只发一份佣金
         for ($tier = 1; $tier <= 3 && $current; $tier++) {
-            if ($current->id === $buyerId) {
-                break; // 自购拦截(防止环形引用)
+            if (isset($seen[$current->id])) {
+                break; // 自购拦截 + 环形引用(同一 referrer 重复出现即停)
             }
+            $seen[$current->id] = true;
             $rate = $rates[$tier] ?? 0;
             $amount = (int) round($profit * $rate / 100);
             if ($amount > 0) {

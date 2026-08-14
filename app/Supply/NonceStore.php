@@ -55,24 +55,26 @@ class NonceStore
     {
         try {
             // 复用现有唯一约束:命名空间拼进 nonce 值(不新增列,兼容旧表结构)。
+            // 低危修复:存 sha256 定长摘要——此前存 "api_key|nonce" 原文,nonce 允许
+            // 128 字符,超出 nonce varchar(64) 严格模式恒 1406、非严格模式截断互撞。
             SupplyNonce::create([
-                'nonce' => $namespace.'|'.$nonce,
+                'nonce' => hash('sha256', $namespace.'|'.$nonce),
                 'expires_at' => now()->addSeconds($ttl),
             ]);
 
             return true;
-        } catch (\Throwable $e) {
-            // 唯一约束冲突 = 已存在 = 重放。
-            // 兼容两种异常:Laravel QueryException(MySQL "Duplicate"/Pg "unique")
-            // 与 UniqueConstraintViolationException(PDO/sqlite 直抛,Laravel 包装)。
-            if ($e instanceof UniqueConstraintViolationException
-                || $e instanceof QueryException
-                || str_contains($e->getMessage(), 'Duplicate')
-                || str_contains($e->getMessage(), 'unique')
-                || str_contains($e->getMessage(), 'UNIQUE constraint failed')) {
-                return false;
+        } catch (QueryException $e) {
+            // 仅唯一约束冲突视为重放;死锁/连接断开等其他异常向上抛(不该误判重放)
+            $code = $e->errorInfo[1] ?? null;
+            $isDuplicate = $code === 1062
+                || $e instanceof UniqueConstraintViolationException
+                || str_contains((string) $e->getMessage(), 'Duplicate')
+                || str_contains((string) $e->getMessage(), 'UNIQUE constraint failed');
+            if (! $isDuplicate) {
+                throw $e;
             }
-            throw $e;
+
+            return false;
         }
     }
 }

@@ -28,7 +28,42 @@ class OrderService
      */
     public function createOrder(int $productId, ?int $skuId, int $qty, array $customer, ?string $displayCurrency = null): Order
     {
-        $product = Product::with('skus')->findOrFail($productId);
+        // 安全(H-1):上架/隐藏状态与购买约束必须服务端强制——此前仅在前台列表过滤,
+        // 直接调 API 可购买下架/隐藏商品、游客购买会员商品、无视限购囤货。
+        // 下架/隐藏与"不存在"同响应(404),不泄露商品存在性。
+        $product = Product::with('skus')
+            ->where('status', true)
+            ->where('hide', false)
+            ->findOrFail($productId);
+
+        $userId = $customer['user_id'] ?? null;
+        if ($product->only_user && ! $userId) {
+            throw new \RuntimeException(__('messages.order.member_only'));
+        }
+
+        $minOrder = max(1, (int) ($product->min_order ?? 1));
+        if ($qty < $minOrder) {
+            throw new \RuntimeException(__('messages.order.below_min_order', ['min' => $minOrder]));
+        }
+        $maxOrder = (int) ($product->max_order ?? 0);
+        if ($maxOrder > 0 && $qty > $maxOrder) {
+            throw new \RuntimeException(__('messages.order.above_max_order', ['max' => $maxOrder]));
+        }
+        $purchaseLimit = (int) ($product->purchase_limit ?? 0);
+        if ($purchaseLimit > 0) {
+            if (! $userId) {
+                throw new \RuntimeException(__('messages.order.member_only'));
+            }
+            // 限购按「已支付 + 待支付」累计数量口径(待支付同样占用库存与购买名额)
+            $bought = (int) Order::where('user_id', $userId)
+                ->where('product_id', $productId)
+                ->whereIn('status', ['paid', 'pending'])
+                ->sum('quantity');
+            if ($bought + $qty > $purchaseLimit) {
+                throw new \RuntimeException(__('messages.order.purchase_limit_exceeded', ['limit' => $purchaseLimit]));
+            }
+        }
+
         $fulfillmentType = $product->resolvedFulfillmentType();
         $premium = $fulfillmentType === Product::FULFILLMENT_AUTO_CARD
             && ($product->pick_type ?? 'general') === 'premium';
@@ -50,9 +85,12 @@ class OrderService
             }
             $unitPrice = $selectedCard->price ?? (int) $product->price;
         } else {
-            $unitPrice = $skuId
-                ? ($product->skus->firstWhere('id', $skuId)?->price ?? $product->price)
-                : $product->price;
+            // 安全(H-1):SKU 必须归属本商品且启用;跨商品/禁用 SKU 直接拒绝,不再回退商品原价
+            $sku = $skuId ? $product->skus->firstWhere('id', $skuId) : null;
+            if ($skuId && (! $sku || ! $sku->status)) {
+                throw new \RuntimeException(__('messages.order.sku_unavailable'));
+            }
+            $unitPrice = $sku ? (int) $sku->price : (int) $product->price;
         }
         $amount = $unitPrice * $qty;
 
@@ -337,6 +375,13 @@ class OrderService
 
         $count = 0;
         foreach ($expired as $order) {
+            // 安全(H-8):慢支付通道(USDT 链上)到账常超过常规关单时间;存在未结慢通道
+            // 支付流水且流水仍在宽限期内的订单顺延关闭,防止「用户已转账、订单已被关、
+            // 卡已释放被他人买走 → 付款成功永不发货」的资损场景。
+            if ($this->hasActiveSlowChannelPayment($order->id)) {
+                continue;
+            }
+
             $closed = DB::transaction(function () use ($order) {
                 // 安全(M-7):行锁后复检状态——支付回调可能在关单瞬间把订单置为 paid,
                 // 未复检会导致"已付款订单被翻成 closed、付款不发卡"。
@@ -352,6 +397,7 @@ class OrderService
                         'locked_at' => null,
                         'order_id' => null,
                     ]);
+                CouponService::release($locked->id);
 
                 return true;
             });
@@ -362,6 +408,21 @@ class OrderService
         }
 
         return $count;
+    }
+
+    /** 慢支付通道列表(链上到账通常 >15 分钟) */
+    public const SLOW_CHANNELS = ['usdt', 'okpay', 'tokenpay', 'epusdt', 'bepusdt'];
+
+    /** 是否存在仍在宽限期内的未结慢通道支付流水 */
+    private function hasActiveSlowChannelPayment(int $orderId): bool
+    {
+        $grace = (int) (StorefrontConfig::get('slow_channel_close_grace_minutes') ?: 60);
+
+        return Payment::where('order_id', $orderId)
+            ->whereIn('channel', self::SLOW_CHANNELS)
+            ->where('status', 'pending')
+            ->where('created_at', '>', now()->subMinutes(max(5, $grace)))
+            ->exists();
     }
 
     /** 后台手动关闭 */
@@ -378,6 +439,7 @@ class OrderService
             Card::where('order_id', $order->id)
                 ->where('status', Card::STATUS_LOCKED)
                 ->update(['status' => Card::STATUS_UNUSED, 'locked_at' => null, 'order_id' => null]);
+            CouponService::release($order->id);
         });
 
         return $order->fresh();
@@ -511,7 +573,11 @@ class OrderService
             'paid_at' => $order->paid_at,
             'cards' => $cards,
             'instructions' => $order->status === 'paid' ? ($order->instructions_snapshot ?: null) : null,
-            'extra' => $order->extra,
+            // 安全(低危):extra 只回传控制字段,不含 query_password/access_token_hash
+            // 两个哈希(常被截图转发,离线爆破弱查询密码后可绕过在线锁定读卡密)。
+            'extra' => collect($order->extra ?? [])
+                ->except(['query_password', 'access_token_hash'])
+                ->all(),
         ];
     }
 

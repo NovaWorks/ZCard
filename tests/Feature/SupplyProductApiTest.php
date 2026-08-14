@@ -43,7 +43,7 @@ class SupplyProductApiTest extends TestCase
     {
         StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache']);
         $merchant = $this->makeMerchant();
-        $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'ak', 'api_secret' => 'sk', 'status' => 'active']);
+        $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'ak', 'api_secret' => 'sk', 'status' => 'active', 'approved' => true]);
         $product = Product::create([
             'merchant_id' => $merchant->id, 'name' => 'P', 'slug' => 'p1', 'price' => 800,
             'factory_price' => 500, 'stock_type' => 'card', 'status' => 1,
@@ -62,7 +62,7 @@ class SupplyProductApiTest extends TestCase
     {
         StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache']);
         $merchant = $this->makeMerchant();
-        $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'ak', 'api_secret' => 'sk', 'status' => 'active']);
+        $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'ak', 'api_secret' => 'sk', 'status' => 'active', 'approved' => true]);
         $product = Product::create([
             'merchant_id' => $merchant->id, 'name' => 'P', 'slug' => 'p2', 'price' => 800,
             'factory_price' => 500, 'stock_type' => 'card', 'status' => 1,
@@ -81,7 +81,7 @@ class SupplyProductApiTest extends TestCase
     {
         StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache']);
         $merchant = $this->makeMerchant();
-        $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'ak', 'api_secret' => 'sk', 'status' => 'active']);
+        $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'ak', 'api_secret' => 'sk', 'status' => 'active', 'approved' => true]);
         $product = Product::create([
             'merchant_id' => $merchant->id, 'name' => 'P', 'slug' => 'p3', 'price' => 800,
             'factory_price' => 500, 'stock_type' => 'card', 'status' => 1,

@@ -11,12 +11,16 @@ use App\Support\SecurityAudit;
 use App\Support\StorefrontConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    /** 时序侧信道防护(V-9):用户不存在时用固定哈希做一次等代价比较 */
+    private const DUMMY_BCRYPT_HASH = '$2y$12$AlsWrDJvJTgYvK5Qxg3s4.b6az4f4gg665Fw8WGt8XgjgGpCJD.m2';
+
     public function register(Request $request): JsonResponse
     {
         // 注册开关
@@ -79,6 +83,10 @@ class AuthController extends Controller
         // 前端 SPA 通过 HttpOnly Cookie 维持登录态(见 config/sanctum.php stateful)。
         $token = $user->createToken('storefront')->plainTextToken;
         auth()->login($user);
+        // 安全(V-2):登录/注册成功后重建会话 ID,防会话固定攻击
+        if ($request->hasSession()) {
+            $request->session()->regenerate();
+        }
 
         return response()->json([
             'token' => $token,
@@ -123,7 +131,13 @@ class AuthController extends Controller
             ->where(fn ($q) => $q->where('email', $identifier)->orWhere('username', $identifier))
             ->first();
 
-        if (! $user || ! Hash::check($data['password'], $user->password)) {
+        // 安全(V-9):用户不存在时也执行一次等代价哈希比较,拉平响应耗时防时序侧信道枚举用户名
+        $passwordOk = $user !== null && Hash::check($data['password'], $user->password);
+        if ($user === null) {
+            Hash::check($data['password'], self::DUMMY_BCRYPT_HASH);
+        }
+
+        if (! $passwordOk) {
             SecurityAudit::record($request, 'login.failed', User::class, $user?->id, [
                 'identifier' => mb_substr($identifier, 0, 100),
             ]);
@@ -151,6 +165,10 @@ class AuthController extends Controller
         $token = $user->createToken('storefront')->plainTextToken;
         // 同时写入会话(web guard),SPA 通过 HttpOnly Cookie 保持登录态。
         auth()->login($user);
+        // 安全(V-2):登录成功后重建会话 ID,防会话固定攻击
+        if ($request->hasSession()) {
+            $request->session()->regenerate();
+        }
 
         // 超级管理员:陌生 IP/设备登录告警(邮件/Telegram/企业微信,异步)。
         // 必须在登录审计**之前**执行:history 不含本次登录,陌生判定才准确
@@ -217,6 +235,9 @@ class AuthController extends Controller
             'password_changed_at' => now(),
         ]);
         $user->tokens()->delete();
+        // 安全(M-12):改密后吊销该用户全部会话(database 驱动删 sessions 行),
+        // 被盗的其他 Cookie 会话一并踢出,不只当前会话。
+        DB::table('sessions')->where('user_id', $user->id)->delete();
         // Cookie 会话同样失效,要求改密后重新登录。
         if ($request->hasSession()) {
             $request->session()->invalidate();
@@ -252,8 +273,8 @@ class AuthController extends Controller
             'captcha' => 'nullable|string',
         ]);
 
-        // 图形验证码校验(注册场景的验证码复用)
-        if (CaptchaService::isEnabled('register')) {
+        // 图形验证码校验(找回密码场景;注册或登录任一开启即要求,防换 IP 灌验证码邮件)
+        if (CaptchaService::isEnabled('register') || CaptchaService::isEnabled('login')) {
             if (! CaptchaService::verify('register', $data['captcha'] ?? null)) {
                 throw ValidationException::withMessages([
                     'captcha' => [__('messages.auth.captcha_error')],
@@ -334,6 +355,8 @@ class AuthController extends Controller
             'password_changed_at' => now(),
         ]);
         $user->tokens()->delete();
+        // 安全(M-12):重置密码同样吊销全部会话,被盗 Cookie 一并失效
+        DB::table('sessions')->where('user_id', $user->id)->delete();
 
         cache()->forget("reset_code:{$emailKey}");
         cache()->forget($attemptKey);

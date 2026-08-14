@@ -41,7 +41,7 @@ class SupplyCallbackServiceTest extends TestCase
         ]);
         $account = SupplierAccount::create([
             'name' => 'A', 'api_key' => 'ak', 'api_secret' => Crypt::encryptString('sk'),
-            'balance' => 0, 'status' => 'active',
+            'balance' => 0, 'status' => 'active', 'approved' => true,
         ]);
         $supplyOrder = SupplyOrder::create([
             'supplier_account_id' => $account->id, 'order_id' => $order->id,

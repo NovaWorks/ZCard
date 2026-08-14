@@ -53,10 +53,10 @@ class Card extends Model
         return $this->belongsTo(Order::class, 'order_id');
     }
 
-    /** 取明文卡密（解密） */
-    public function plainContent(): string
+    /** 取明文卡密（解密;$strict=true 供发货链路,解密失败直接抛异常阻断发废卡） */
+    public function plainContent(bool $strict = false): string
     {
-        return CardCipher::decrypt($this->content);
+        return CardCipher::decrypt($this->content, $strict);
     }
 
     /** 查看明文(同 plainContent,语义别名供 Filament modal 用) */

@@ -28,7 +28,8 @@ class NonceStoreTest extends TestCase
         $nonce = 'db_nonce_'.uniqid();
 
         $this->assertTrue($store->remember('ns-b', $nonce, 300));
-        $this->assertDatabaseHas('supply_nonces', ['nonce' => 'ns-b|'.$nonce]);
+        // v1.12.90+:存 sha256 定长摘要(修复 nonce 列 varchar(64) 溢出/前缀互撞)
+        $this->assertDatabaseHas('supply_nonces', ['nonce' => hash('sha256', 'ns-b|'.$nonce)]);
         $this->assertFalse($store->remember('ns-b', $nonce, 300));
     }
 

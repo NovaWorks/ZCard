@@ -220,6 +220,11 @@ class InstallCommand extends Command
             $this->writeEnv('DB_PASSWORD', $password);
         }
 
+        // 安全(M-6):安装即生产,强制收敛 .env.example 的 local+debug 默认值
+        $this->writeEnv('APP_ENV', 'production');
+        $this->writeEnv('APP_DEBUG', 'false');
+        $this->writeEnv('LOG_LEVEL', 'error');
+
         $this->info(' ✔ 数据库配置已写入 .env');
 
         // 刷新进程内 DB 配置(让新 .env 的凭据立即生效)

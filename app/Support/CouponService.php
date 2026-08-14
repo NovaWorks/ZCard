@@ -118,6 +118,22 @@ class CouponService
     }
 
     /**
+     * 回滚已核销的优惠券(订单关闭/取消时):仅当券绑定该订单且状态为已使用。
+     * 条件更新保证并发安全,未命中(无券/已回滚)静默返回。
+     */
+    public static function release(int $orderId): void
+    {
+        Coupon::where('order_id', $orderId)
+            ->where('status', Coupon::STATUS_USED)
+            ->update([
+                'status' => Coupon::STATUS_ACTIVE,
+                'used_at' => null,
+                'used_by' => null,
+                'order_id' => null,
+            ]);
+    }
+
+    /**
      * 切换启用/禁用。
      */
     public static function toggle(int $couponId): Coupon

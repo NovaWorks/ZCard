@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Card;
+use App\Support\ServiceWidgetScript;
 use App\Support\StorefrontConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -65,6 +66,16 @@ class SettingController extends Controller
             $cardCount = Card::count();
             if ($cardCount > 0) {
                 $all['encryption_risk_cards'] = $cardCount;
+            }
+        }
+
+        // 客服脚本可用性检测(修复「填了代码前台不显示」无反馈):脚本非空但编译结果为空,
+        // 说明引用的外部域名不在受信白名单被整段丢弃,前台将回退链接浮窗模式。提示管理员补白名单。
+        $widget = is_array($kv['service_widget'] ?? null) ? $kv['service_widget'] : null;
+        if ($widget && trim((string) ($widget['script'] ?? '')) !== '') {
+            $compiled = ServiceWidgetScript::compile($widget, StorefrontConfig::get('service_widget_allowed_hosts'));
+            if (trim($compiled) === '') {
+                $all['service_widget_script_dropped'] = true;
             }
         }
 

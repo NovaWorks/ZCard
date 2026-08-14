@@ -32,4 +32,15 @@ abstract class AbstractPaymentDriver implements PaymentDriver
     {
         return app(PaymentUrlGenerator::class)->named($name, $params, $config);
     }
+
+    /**
+     * 默认敏感凭据键(兼容历史实现)。
+     * 各驱动如使用不在该列表中的凭据字段(如 merchant_token),必须覆写本方法,
+     * 否则回调会被「凭据未配置」门禁拦截(安全审计 H-3:OkPay/TokenPay 曾因此收款不发货)。
+     */
+    public function getCredentialKeys(): array
+    {
+        return ['key', 'secret', 'secret_key', 'private_key', 'public_key',
+            'app_secret', 'api_key', 'api_token', 'client_secret', 'webhook_secret', 'mch_secret_key'];
+    }
 }

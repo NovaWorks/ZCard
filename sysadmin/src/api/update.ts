@@ -34,11 +34,11 @@ export const checkUpdate = () => http.get<UpdateCheck>({ url: '/admin/update/che
 
 export const getVersions = () => http.get<VersionInfo[]>({ url: '/admin/update/versions' })
 
-// 更新执行耗时 30s-2min,设置 3 分钟超时
-export const runUpdate = () =>
-  http.post<UpdateResult>({ url: '/admin/update/run', timeout: 180000 })
+// 更新执行耗时 30s-2min,设置 3 分钟超时;password 为管理员密码二次确认(安全审计 H-5)
+export const runUpdate = (password: string) =>
+  http.post<UpdateResult>({ url: '/admin/update/run', timeout: 180000, data: { password } })
 
-export const rollbackUpdate = () =>
-  http.post<UpdateResult>({ url: '/admin/update/rollback', timeout: 180000 })
+export const rollbackUpdate = (password: string) =>
+  http.post<UpdateResult>({ url: '/admin/update/rollback', timeout: 180000, data: { password } })
 
 export const getUpdateLog = () => http.get<UpdateLog>({ url: '/admin/update/log' })

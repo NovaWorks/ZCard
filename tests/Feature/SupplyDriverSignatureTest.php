@@ -49,6 +49,7 @@ class SupplyDriverSignatureTest extends TestCase
             'api_secret' => self::API_SECRET,
             'balance' => 100000,
             'status' => 'active',
+            'approved' => true,
         ]);
     }
 
@@ -138,9 +139,11 @@ class SupplyDriverSignatureTest extends TestCase
             ['supply_order_id' => 2, 'amount' => 200, 'fulfillment' => ['status' => 'pending', 'cards' => []]],
         );
 
-        $expected = HmacSigner::sign(self::API_SECRET, HmacSigner::buildSignString(
+        $query = parse_url($sent->url(), PHP_URL_QUERY) ?: '';
+        $expected = HmacSigner::sign(self::API_SECRET, HmacSigner::buildSignStringWithQuery(
             'POST',
             '/api/supply/orders',
+            $query, // v1.12.90+:签名串追加 query md5 段(POST 通常为空)
             $sent->header('X-Supply-Timestamp')[0],
             $sent->header('X-Supply-Nonce')[0],
             md5($sent->body()), // 关键:对「实际发出的 body」做且只做一次 md5

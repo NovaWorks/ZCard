@@ -550,6 +550,8 @@
     "docStep3": "Endpoints: POST /api/supply/ping (test), GET /api/supply/products (list)",
     "docStep4": "POST /api/supply/orders to place orders, deducted from supply balance",
     "created": "API credentials created",
+    "pendingApproval": "Pending admin approval",
+    "pendingApprovalTip": "Your supplier account has been created and is awaiting admin approval. Supply API calls are rejected until approved; afterwards you can view the App Key here.",
     "regenerateConfirm": "Resetting App Key invalidates the old key immediately. Continue?",
     "regenerated": "App Key reset",
     "copied": "Copied"

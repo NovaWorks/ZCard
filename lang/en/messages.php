@@ -23,6 +23,11 @@ return [
     'order.status_abnormal' => 'Order status is abnormal.',
     'order.create_failed' => 'Failed to create order, please try again later.',
     'order.query_locked' => 'Too many lookup attempts, please try again in 15 minutes.',
+    'order.member_only' => 'This product is only available to signed-in users.',
+    'order.below_min_order' => 'Minimum :min item(s) per order for this product.',
+    'order.above_max_order' => 'Maximum :max item(s) per order for this product.',
+    'order.purchase_limit_exceeded' => 'Purchase limit of :limit item(s) exceeded for this product.',
+    'order.sku_unavailable' => 'The selected option is unavailable or off-shelf.',
 
     'review.order_not_found' => 'Order does not exist or is unpaid.',
     'review.already_reviewed' => 'This order has already been reviewed.',
@@ -78,6 +83,7 @@ return [
     'supply.pricing_equal_cost' => 'At cost',
     'supply.pricing_pending' => 'Leave blank',
     'supply.secret_show_once_warning' => 'Copy and save the API Secret now. It cannot be viewed again after closing.',
+    'supply.pending_approval' => 'Your supplier account is pending admin approval and cannot call the supply API yet.',
     'supply.balance_low_warning' => 'Low prepaid balance',
 
     'supply_api.insufficient_balance' => 'Insufficient balance',

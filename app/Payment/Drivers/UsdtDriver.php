@@ -64,35 +64,29 @@ class UsdtDriver implements PaymentDriver
 
     public function verifyCallback(Request $request, array $config): ?array
     {
-        // 安全(M-14):配置了 secret_key 时回调必须携带 HMAC-SHA256 签名(字段排序拼接);
-        // 未配置时回退到旧版静态 API Key 比较(兼容存量链上监听器)。
+        // 安全(H-4):仅支持 HMAC-SHA256 签名回调。旧版「静态 API Key 比较」回退模式
+        // 已移除——key 可经 GET 明文传输进访问日志、无时间戳/nonce 可重放,泄露即可
+        // 对任意 pending 订单伪造回调免费拿货。存量静态 key 对接需升级为 HMAC 监听器。
         $secret = (string) ($config['secret_key'] ?? '');
-        if ($secret !== '') {
-            $data = $request->all();
-            $provided = strtolower(trim((string) ($request->header('X-Signature') ?: ($data['signature'] ?? ''))));
-            unset($data['signature'], $data['sign']);
-            ksort($data);
-            $parts = [];
-            foreach ($data as $k => $v) {
-                if ($v === '' || $v === null || is_array($v)) {
-                    continue;
-                }
-                $parts[] = $k.'='.$v;
-            }
-            $canonical = implode('&', $parts);
-            if ($provided === '' || ! hash_equals(hash_hmac('sha256', $canonical, $secret), $provided)) {
-                return null;
-            }
-        } else {
-            $apiKey = $config['api_key'] ?? '';
-            $provided = $request->header('X-API-Key') ?: $request->input('api_key');
-
-            if (! hash_equals((string) $apiKey, (string) $provided)) {
-                return null;
-            }
+        if ($secret === '') {
+            return null;
         }
 
         $data = $request->all();
+        $provided = strtolower(trim((string) ($request->header('X-Signature') ?: ($data['signature'] ?? ''))));
+        unset($data['signature'], $data['sign']);
+        ksort($data);
+        $parts = [];
+        foreach ($data as $k => $v) {
+            if ($v === '' || $v === null || is_array($v)) {
+                continue;
+            }
+            $parts[] = $k.'='.$v;
+        }
+        $canonical = implode('&', $parts);
+        if ($provided === '' || ! hash_equals(hash_hmac('sha256', $canonical, $secret), $provided)) {
+            return null;
+        }
 
         if (($data['status'] ?? '') !== 'paid' && ($data['trade_status'] ?? '') !== 'SUCCESS') {
             return null;
@@ -139,15 +133,16 @@ class UsdtDriver implements PaymentDriver
                 'help' => '上面所选链网络的 USDT 收款地址(务必与所选链匹配,否则转账将丢失)。',
             ],
             'api_key' => [
-                'label' => '回调签名密钥(API Key)',
-                'type' => 'text',
-                'required' => true,
-            ],
-            'secret_key' => [
-                'label' => '回调 HMAC 密钥(可选,推荐)',
+                'label' => '静态 API Key(已废弃)',
                 'type' => 'text',
                 'required' => false,
-                'help' => '配置后回调必须携带 X-Signature(HMAC-SHA256,按字段名排序拼接后以本密钥签名),比静态 API Key 更安全;留空则回退 API Key 校验(兼容旧监听器)',
+                'help' => '旧版静态回调密钥,已因安全隐患移除校验(可经 GET 明文进日志且可重放)。仅保留字段避免旧配置报错,无需填写。',
+            ],
+            'secret_key' => [
+                'label' => '回调 HMAC 密钥',
+                'type' => 'text',
+                'required' => true,
+                'help' => '回调必须携带 X-Signature(HMAC-SHA256,按字段名排序拼接后以本密钥签名)。链上监听器需配置同密钥生成签名。',
             ],
             'rate' => [
                 'label' => '法币兑 USDT 汇率(1 USDT = ? 法币)',
@@ -192,5 +187,11 @@ class UsdtDriver implements PaymentDriver
     public function getSupportedCurrencies(): array
     {
         return ['USDT'];
+    }
+
+    /** 核心验签凭据:HMAC 密钥(H-3/H-4:静态 API Key 回退已移除) */
+    public function getCredentialKeys(): array
+    {
+        return ['secret_key'];
     }
 }

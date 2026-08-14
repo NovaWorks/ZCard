@@ -23,6 +23,11 @@ return [
     'order.status_abnormal' => '订单状态异常',
     'order.create_failed' => '下单失败,请稍后重试',
     'order.query_locked' => '查询尝试次数过多,请 15 分钟后再试',
+    'order.member_only' => '该商品仅限登录用户购买',
+    'order.below_min_order' => '该商品单次最少购买 :min 件',
+    'order.above_max_order' => '该商品单次最多购买 :max 件',
+    'order.purchase_limit_exceeded' => '该商品限购 :limit 件,已超出可购数量',
+    'order.sku_unavailable' => '所选规格不可用或已下架',
 
     'review.order_not_found' => '订单不存在或未支付',
     'review.already_reviewed' => '该订单已评价',
@@ -78,6 +83,7 @@ return [
     'supply.pricing_equal_cost' => '平价',
     'supply.pricing_pending' => '留空待定',
     'supply.secret_show_once_warning' => '请立即复制保存 API Secret,关闭后将无法再次查看',
+    'supply.pending_approval' => '供货账号待管理员审核,审核通过前无法调用供货 API',
     'supply.balance_low_warning' => '预存余额不足',
 
     // 供货 API 错误(spec §4.6)

@@ -5,6 +5,7 @@ namespace App\Payment\Drivers;
 use App\Payment\Contracts\Payable;
 use App\Payment\Contracts\PaymentDriver;
 use App\Payment\PaymentResult;
+use App\Payment\PaymentUrlGenerator;
 use Illuminate\Http\Request;
 use Yansongda\Pay\Pay;
 
@@ -53,6 +54,10 @@ class WechatPayDriver implements PaymentDriver
         $result = Pay::wechat()->scan([
             'out_trade_no' => $order->getPayableKey(),
             'description' => $order->getPayableKey(),
+            // 显式传递回调地址:yansongda v3 不传时依赖商户平台默认回调配置,
+            // 多通道/多域名部署时会回错地址导致收不到异步通知(可用性问题)。
+            'notify_url' => app(PaymentUrlGenerator::class)
+                ->named('payment.notify', ['channel' => 'wechatpay'], $config),
             'amount' => [
                 'total' => (int) $order->getPayableAmount(), // 微信 V3 用分,order->amount 已是分
                 'currency' => 'CNY',
@@ -179,5 +184,11 @@ class WechatPayDriver implements PaymentDriver
     public function getSupportedCurrencies(): array
     {
         return ['CNY'];
+    }
+
+    /** 核心验签凭据:v3 商户密钥(H-3 驱动自声明凭据键) */
+    public function getCredentialKeys(): array
+    {
+        return ['mch_secret_key'];
     }
 }

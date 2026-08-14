@@ -36,8 +36,10 @@ class SupplyController extends Controller
         $orderNo = $request->input('downstream_order_no');
         $order = $orderNo ? Order::where('order_no', $orderNo)->first() : null;
 
+        // 安全(低危):查单失败与验签失败统一返回 401 invalid_signature,
+        // 消除「404=单号存在 / 401=单号不存在」的订单号存在性枚举 oracle。
         if (! $order || ! $order->upstream_source_id) {
-            return response()->json(['ok' => false, 'error' => 'order_not_found'], 404);
+            return response()->json(['ok' => false, 'error' => 'invalid_signature'], 401);
         }
 
         $source = SupplySource::find($order->upstream_source_id);
@@ -45,6 +47,13 @@ class SupplyController extends Controller
         $payload = $driver->verifyCallback($request);
 
         if (! $payload) {
+            return response()->json(['ok' => false, 'error' => 'invalid_signature'], 401);
+        }
+
+        // 一致性校验(低危):回调声明的上游单号必须与本地登记的 upstream_order_id 一致,
+        // 防止被攻破/有 bug 的上游把 A 单的卡密写到 B 单。
+        $upstreamId = (string) ($payload['upstream_order_id'] ?? '');
+        if ($upstreamId !== '' && $upstreamId !== (string) $order->upstream_order_id) {
             return response()->json(['ok' => false, 'error' => 'invalid_signature'], 401);
         }
 

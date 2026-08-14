@@ -65,7 +65,10 @@ class SupplyOrderController extends Controller
         }
 
         $order = $supplyOrder->order;
-        $cards = $order->orderDeliveries()->pluck('card_content')->all();
+        // 安全(低危):未发货订单不回传卡密内容(与 instructions 的 delivered 判定同口径)
+        $cards = $order->delivery_status === 'delivered'
+            ? $order->orderDeliveries()->pluck('card_content')->all()
+            : [];
 
         return response()->json([
             'ok' => true,
@@ -92,9 +95,15 @@ class SupplyOrderController extends Controller
             return response()->json(['ok' => false, 'error_code' => 'order_not_found', 'message' => __('messages.supply_api.order_not_found')], 404);
         }
 
-        // 已发货的供货订单不可取消(卡密已发)
-        if ($supplyOrder->order->delivery_status === 'delivered') {
-            return response()->json(['ok' => false, 'error_code' => 'order_not_cancelable', 'message' => __('messages.supply_api.order_not_cancelable')], 409);
+        // 真实取消(M-5):事务内关闭本地订单、释放锁定卡、退款入账 + 账本流水
+        try {
+            app(SupplyOrderService::class)->cancelOrder($account, $supplyOrder);
+        } catch (SupplyApiException $e) {
+            return response()->json([
+                'ok' => false,
+                'error_code' => $e->errorCode,
+                'message' => $e->getMessage(),
+            ], $e->httpStatus);
         }
 
         return response()->json(['ok' => true, 'supply_order_id' => $supplyOrder->id, 'status' => 'canceled']);

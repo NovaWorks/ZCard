@@ -8,6 +8,7 @@ use App\Jobs\SyncSupplySourceProducts;
 use App\Models\Product;
 use App\Models\SupplySource;
 use App\Models\SupplySyncTask;
+use App\Supply\CallbackUrlGuard;
 use App\Supply\SupplyManager;
 use App\Supply\SupplySyncError;
 use App\Supply\SupplySyncService;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 /**
@@ -550,7 +552,7 @@ class SupplySourceController extends Controller
 
     private function validateSource(Request $request, ?SupplySource $existing = null): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'name' => 'sometimes|required|string|max:100',
             'driver' => ['sometimes', 'required', Rule::in(array_keys(SupplyManager::DRIVERS))],
             'base_url' => 'sometimes|required|url|max:255',
@@ -558,6 +560,19 @@ class SupplySourceController extends Controller
             'status' => 'sometimes|in:active,disabled',
             'settings' => 'sometimes|nullable|array',
         ]);
+
+        // 安全(低危,纵深防御):上游地址禁止指向内网/环回——管理员凭据被盗或 CSRF
+        // 时,服务端会向 base_url 发请求(SSRF 面)。与下游回调 CallbackUrlGuard 同口径:
+        // 校验域名全部解析记录为公网;本机自建上游请通过内网穿透等公网入口对接。
+        if (array_key_exists('base_url', $data) && $data['base_url'] !== ($existing->base_url ?? null)) {
+            if (! app(CallbackUrlGuard::class)->isAllowed((string) $data['base_url'])) {
+                throw ValidationException::withMessages([
+                    'base_url' => ['上游地址域名必须解析到公网 IP(禁止内网/环回地址)'],
+                ]);
+            }
+        }
+
+        return $data;
     }
 
     /** 凭证脱敏(安全审计 M-4):除明确非敏感键外一律掩码,防止新驱动敏感字段漏掩 */

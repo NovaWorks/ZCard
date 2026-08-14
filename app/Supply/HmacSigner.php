@@ -20,6 +20,16 @@ class HmacSigner
     }
 
     /**
+     * 构建含 query 完整性保护的签名串(低危修复:此前 query 不参与签名,
+     * 中间人可在窗口内改写查询参数转发)。第 6 段 = md5(原始 query string,空串=空 md5)。
+     * 服务端双口径验签(先旧后新),客户端从新口径起逐步升级。
+     */
+    public static function buildSignStringWithQuery(string $method, string $path, string $rawQuery, string $timestamp, string $nonce, string $bodyMd5): string
+    {
+        return implode("\n", [$method, $path, $timestamp, $nonce, $bodyMd5, md5($rawQuery)]);
+    }
+
+    /**
      * 计算签名(hex 小写)。
      */
     public static function sign(string $secret, string $signString): string
@@ -33,6 +43,7 @@ class HmacSigner
     public static function verify(string $secret, string $signString, string $signature): bool
     {
         $expected = self::sign($secret, $signString);
+
         return hash_equals($expected, $signature);
     }
 

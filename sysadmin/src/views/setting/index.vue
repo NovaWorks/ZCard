@@ -495,6 +495,10 @@
               <ElSwitch v-model="form.supply_supplier_enabled" />
               <span class="form-tip">{{ t('zcard.setting.supplySupplierEnabledTip') }}</span>
             </ElFormItem>
+            <ElFormItem class="supply-form-item" :label="t('zcard.setting.supplyAutoApprove')">
+              <ElSwitch v-model="form.supply_auto_approve" />
+              <span class="form-tip">{{ t('zcard.setting.supplyAutoApproveTip') }}</span>
+            </ElFormItem>
             <ElFormItem class="supply-form-item" :label="t('zcard.setting.supplyNonceStore')">
               <ElSelect v-model="form.supply_nonce_store" style="width: 220px">
                 <ElOption label="Cache (默认)" value="cache" />
@@ -651,6 +655,7 @@
     supply_enabled: boolean
     supply_upstream_enabled: boolean
     supply_supplier_enabled: boolean
+    supply_auto_approve: boolean
     supply_nonce_store: string
     supply_rate_limit: number
     supply_timestamp_skew: number
@@ -754,6 +759,7 @@
     supply_enabled: false,
     supply_upstream_enabled: true,
     supply_supplier_enabled: true,
+    supply_auto_approve: false,
     supply_nonce_store: 'cache',
     supply_rate_limit: 60,
     supply_timestamp_skew: 300,
@@ -951,6 +957,7 @@
         supply_enabled: coerceBool(data.supply_enabled, d.supply_enabled),
         supply_upstream_enabled: coerceBool(data.supply_upstream_enabled, d.supply_upstream_enabled),
         supply_supplier_enabled: coerceBool(data.supply_supplier_enabled, d.supply_supplier_enabled),
+        supply_auto_approve: coerceBool(data.supply_auto_approve, d.supply_auto_approve),
         supply_nonce_store: coerce(data.supply_nonce_store, d.supply_nonce_store),
         supply_rate_limit: Number(coerce(data.supply_rate_limit, d.supply_rate_limit)),
         supply_timestamp_skew: Number(coerce(data.supply_timestamp_skew, d.supply_timestamp_skew)),
@@ -1036,10 +1043,19 @@
       if (cardEncryptionKey.value.trim()) {
         payload.card_encryption_key = cardEncryptionKey.value.trim()
       }
-      await updateSettings(payload)
+      const res = await updateSettings(payload)
       raw.value = payload
       cardEncryptionKey.value = ''
       ElMessage.success(t('zcard.setting.saveSuccess'))
+      // 客服脚本被安全白名单整段丢弃 → 前台不会显示原生客服(回退链接浮窗),必须提示管理员补白名单
+      if ((res as any)?.service_widget_script_dropped) {
+        ElMessage({
+          type: 'warning',
+          duration: 10000,
+          showClose: true,
+          message: t('zcard.setting.serviceScriptDroppedWarning'),
+        })
+      }
     } catch (e) {
       // 拦截器处理
     } finally {

@@ -200,9 +200,9 @@ class OrderController extends Controller
             'access_token' => 'nullable|string|size:64',
         ]);
 
-        // 安全(M-9):按 IP+关键字计数,同关键字 5 次"命中但未授权"后锁定 15 分钟,
-        // 阻止对查单密码的在线爆破(查询密码一旦猜中即可读取卡密明文)。
-        $failKey = 'order_query_fail:'.hash('sha256', $request->ip().':'.trim($data['keyword']));
+        // 安全(M-9→低危加强):按关键字(不含 IP)计数锁定——纯 IP 维度可被代理池重置;
+        // 同关键字 5 次"命中但未授权"锁 15 分钟,阻止对查单密码的在线爆破。
+        $failKey = 'order_query_fail:'.hash('sha256', trim($data['keyword']));
         if ((int) cache()->get($failKey, 0) >= 5) {
             return response()->json(['message' => __('messages.order.query_locked')], 429);
         }

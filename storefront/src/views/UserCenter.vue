@@ -49,10 +49,12 @@ async function createSupply() {
   try {
     const acc = await getMySupplyAccount()
     supplyAccount.value = acc
-    if (acc.is_new) {
+    if (acc.is_new && acc.approved) {
       supplySecretPlain.value = acc.api_secret
       supplySecretVisible.value = true
       notify(t('supply.created'))
+    } else if (acc.is_new || !acc.approved) {
+      notify(t('supply.pendingApproval'))
     }
   } catch {
     // 拦截器提示
@@ -287,6 +289,18 @@ onMounted(loadData)
 
           <!-- 已开通 -->
           <template v-else>
+            <!-- 待审核提示:审核通过前供货 API 不可用 -->
+            <div
+              v-if="!supplyAccount.approved"
+              class="mb-3 flex items-start gap-2 rounded-field border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700"
+            >
+              <AppIcon name="ri:error-warning-line" class="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <span class="font-semibold">{{ t('supply.pendingApproval') }}</span>
+                <p class="mt-1 leading-relaxed">{{ t('supply.pendingApprovalTip') }}</p>
+              </div>
+            </div>
+
             <!-- 余额 + 充值 -->
             <div class="flex items-center justify-between bg-surface-subtle rounded-field p-4">
               <div>

@@ -44,8 +44,8 @@ class SupplySourceAdminTest extends TestCase
     {
         StorefrontConfig::setMany(['supply_enabled' => true]);
         $resp = $this->withToken($this->adminToken())->postJson('/api/admin/supply-sources', [
-            'name' => '主站', 'driver' => 'dujiao_next', 'base_url' => 'https://up.example.com',
-            'credentials' => ['base_url' => 'https://up.example.com', 'api_key' => 'ak', 'api_secret' => 'sk_secret'],
+            'name' => '主站', 'driver' => 'dujiao_next', 'base_url' => 'https://93.184.216.34',
+            'credentials' => ['base_url' => 'https://93.184.216.34', 'api_key' => 'ak', 'api_secret' => 'sk_secret'],
         ]);
         $resp->assertStatus(201);
         // 返回脱敏

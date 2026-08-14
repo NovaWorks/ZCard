@@ -22,7 +22,8 @@ class SupplyAuth
 
     public function handle(Request $request, Closure $next): mixed
     {
-        if (! StorefrontConfig::get('supply_enabled')) {
+        // 供货总开关 + 作为上游供货开关(supply_supplier_enabled 此前无代码消费,后台关闭形同虚设)
+        if (! StorefrontConfig::get('supply_enabled') || ! StorefrontConfig::get('supply_supplier_enabled')) {
             return $this->fail('unauthorized', 401);
         }
 
@@ -44,7 +45,8 @@ class SupplyAuth
         }
 
         $account = SupplierAccount::where('api_key', $apiKey)->first();
-        if (! $account || ! $account->isActive()) {
+        // 审核制(安全审计 H-2):自助开通的账号默认待审核,管理员审核通过前拒绝调用。
+        if (! $account || ! $account->isActive() || ! $account->isApproved()) {
             return $this->fail('unauthorized', 401);
         }
 
@@ -62,13 +64,24 @@ class SupplyAuth
             $secret = $rawSecret; // 未加密(测试或旧数据)
         }
 
-        // 验签:PATH 不含 query
+        // 验签:PATH 不含 query;双口径兼容(低危:新客户端签名串追加 query md5 段,
+        // 服务端先按旧口径验,失败再按新口径验,升级期互不影响)
         $path = $request->getPathInfo();
         $bodyMd5 = md5($request->getContent() ?: '');
         $signString = HmacSigner::buildSignString($request->method(), $path, $timestamp, $nonce, $bodyMd5);
 
         if (! HmacSigner::verify($secret, $signString, $signature)) {
-            return $this->fail('invalid_signature', 401);
+            $signStringV2 = HmacSigner::buildSignStringWithQuery(
+                $request->method(),
+                $path,
+                $request->server('QUERY_STRING') ?: '',
+                $timestamp,
+                $nonce,
+                $bodyMd5,
+            );
+            if (! HmacSigner::verify($secret, $signStringV2, $signature)) {
+                return $this->fail('invalid_signature', 401);
+            }
         }
 
         // nonce 防重放(安全审计 L-3):验签通过后才写入,key 绑定 api_key。

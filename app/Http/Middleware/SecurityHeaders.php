@@ -36,12 +36,20 @@ class SecurityHeaders
             }
 
             $externalSources = $widgetOrigins === [] ? '' : ' '.implode(' ', $widgetOrigins);
+            // 安全(低危):wss 只放行客服白名单主机的 WebSocket(裸 wss: 允许连任意
+            // WS 服务器外发数据,绕过 connect-src 白名单的初衷);Chatwoot/Crisp 的
+            // 实时通道与其 SDK 同域名,不受影响。
+            $widgetWss = implode(' ', array_map(
+                fn (string $origin) => str_replace('https://', 'wss://', $origin),
+                $widgetOrigins,
+            ));
+            $wssSources = $widgetWss === '' ? '' : ' '.$widgetWss;
             $headers->set(
                 'Content-Security-Policy',
                 "default-src 'self'; script-src 'self'{$externalSources}; style-src 'self' 'unsafe-inline'{$externalSources}; "
                 ."img-src 'self' data: blob: https:; font-src 'self' data:{$externalSources}; "
-                // 安全审计 M2:连接源从任意 https 收紧为本站 + 客服脚本白名单来源(WebSocket 保留 wss: 兼容 Chatwoot)。
-                ."connect-src 'self'{$externalSources} wss:; frame-src 'self'{$externalSources}; "
+                // 安全审计 M2:连接源收紧为本站 + 客服脚本白名单来源。
+                ."connect-src 'self'{$externalSources}{$wssSources}; frame-src 'self'{$externalSources}; "
                 ."object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
             );
         }

@@ -8,6 +8,10 @@
             <ElOption :label="t('zcard.supplierAccount.statusActive')" value="active" />
             <ElOption :label="t('zcard.supplierAccount.statusDisabled')" value="disabled" />
           </ElSelect>
+          <ElSelect v-model="filterApproved" :placeholder="t('zcard.supplierAccount.filterApproved')" clearable style="width: 160px" @change="fetchData">
+            <ElOption :label="t('zcard.supplierAccount.approvedNo')" :value="0" />
+            <ElOption :label="t('zcard.supplierAccount.approvedYes')" :value="1" />
+          </ElSelect>
           <ElButton @click="fetchData">{{ t('zcard.common.reset') }}</ElButton>
         </div>
         <div class="toolbar-right">
@@ -31,11 +35,24 @@
             </ElTag>
           </template>
         </ElTableColumn>
+        <ElTableColumn :label="t('zcard.supplierAccount.approved')" width="110">
+          <template #default="{ row }">
+            <ElTag :type="row.approved ? 'success' : 'warning'">
+              {{ row.approved ? t('zcard.supplierAccount.approvedYes') : t('zcard.supplierAccount.approvedNo') }}
+            </ElTag>
+          </template>
+        </ElTableColumn>
         <ElTableColumn :label="t('zcard.supplierAccount.contact')" prop="contact" min-width="120" show-overflow-tooltip>
           <template #default="{ row }"><span v-if="row.contact">{{ row.contact }}</span><span v-else class="text-muted">—</span></template>
         </ElTableColumn>
-        <ElTableColumn :label="t('zcard.common.actions')" width="340" fixed="right">
+        <ElTableColumn :label="t('zcard.common.actions')" width="400" fixed="right">
           <template #default="{ row }">
+            <ElButton v-if="!row.approved" text type="success" @click="handleApprove(row, true)">
+              {{ t('zcard.supplierAccount.approve') }}
+            </ElButton>
+            <ElButton v-else text type="info" @click="handleApprove(row, false)">
+              {{ t('zcard.supplierAccount.revokeApprove') }}
+            </ElButton>
             <ElButton text type="primary" @click="openRecharge(row)">{{ t('zcard.supplierAccount.recharge') }}</ElButton>
             <ElButton text type="primary" @click="openLedger(row)">{{ t('zcard.supplierAccount.ledger') }}</ElButton>
             <ElButton text type="warning" @click="handleResetSecret(row)">{{ t('zcard.supplierAccount.resetSecret') }}</ElButton>
@@ -73,6 +90,10 @@
             <ElOption :label="t('zcard.supplierAccount.statusActive')" value="active" />
             <ElOption :label="t('zcard.supplierAccount.statusDisabled')" value="disabled" />
           </ElSelect>
+        </ElFormItem>
+        <ElFormItem :label="t('zcard.supplierAccount.approved')" v-if="isEdit">
+          <ElSwitch v-model="formData.approved" />
+          <span class="form-tip">{{ t('zcard.supplierAccount.approvedTip') }}</span>
         </ElFormItem>
         <ElFormItem :label="t('zcard.supplierAccount.remark')" prop="remark">
           <ElInput v-model="formData.remark" type="textarea" :rows="2" :placeholder="t('zcard.supplierAccount.remarkPlaceholder')" />
@@ -187,6 +208,7 @@ import { useListTableHeight } from '@/hooks'
   const loading = ref(false)
   const tableData = ref<SupplierAccount[]>([])
   const filterStatus = ref('')
+  const filterApproved = ref<number | ''>('')
   const pagination = reactive({ page: 1, pageSize: 15, total: 0 })
   // 表格高度自适应:数据满页时表格内容撑高会被卡片裁掉分页栏,固定表格高度使其内部滚动
   const { cardRef, tableRef, paginationRef, tableHeight } = useListTableHeight()
@@ -200,6 +222,7 @@ import { useListTableHeight } from '@/hooks'
         page: pagination.page,
         per_page: pagination.pageSize,
         status: filterStatus.value || undefined,
+        approved: filterApproved.value === '' ? undefined : filterApproved.value === 1,
       })
       tableData.value = res.data || []
       pagination.total = res.total || 0
@@ -216,7 +239,7 @@ import { useListTableHeight } from '@/hooks'
   const isEdit = ref(false)
   const editingId = ref<number | null>(null)
   const formRef = ref<FormInstance>()
-  const defaultForm = () => ({ name: '', contact: '', remark: '', status: 'active' as 'active' | 'disabled' })
+  const defaultForm = () => ({ name: '', contact: '', remark: '', status: 'active' as 'active' | 'disabled', approved: true })
   const formData = reactive(defaultForm())
   const formRules = computed<FormRules>(() => ({
     name: [{ required: true, message: t('zcard.supplierAccount.nameRequired'), trigger: 'blur' }],
@@ -237,6 +260,7 @@ import { useListTableHeight } from '@/hooks'
     formData.contact = row.contact || ''
     formData.remark = row.remark || ''
     formData.status = row.status
+    formData.approved = !!row.approved
     dialogVisible.value = true
     nextTick(() => formRef.value?.clearValidate())
   }
@@ -256,6 +280,7 @@ import { useListTableHeight } from '@/hooks'
           contact: formData.contact || undefined,
           remark: formData.remark || undefined,
           status: formData.status,
+          approved: formData.approved,
         })
         ElMessage.success(t('zcard.supplierAccount.modified'))
         dialogVisible.value = false
@@ -276,6 +301,27 @@ import { useListTableHeight } from '@/hooks'
     } finally {
       saving.value = false
     }
+  }
+
+  /** 审核通过/撤销(自助开通的账号在通过前无法调用供货 API) */
+  const handleApprove = (row: SupplierAccount, approved: boolean) => {
+    ElMessageBox.confirm(
+      approved
+        ? t('zcard.supplierAccount.approveConfirm', { name: row.name })
+        : t('zcard.supplierAccount.revokeConfirm', { name: row.name }),
+      t('zcard.common.tips'),
+      { type: 'warning' },
+    )
+      .then(async () => {
+        try {
+          await updateSupplierAccount(row.id, { approved })
+          ElMessage.success(approved ? t('zcard.supplierAccount.approveSuccess') : t('zcard.supplierAccount.revokeSuccess'))
+          fetchData()
+        } catch (e: any) {
+          // 拦截器已提示
+        }
+      })
+      .catch(() => {})
   }
 
   const handleDelete = (row: SupplierAccount) => {

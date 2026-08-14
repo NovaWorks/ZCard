@@ -34,4 +34,12 @@ interface PaymentDriver
      * 法币驱动如支付宝返回 ['CNY'];PayPal 返回其通道配置的目标货币。
      */
     public function getSupportedCurrencies(): array;
+
+    /**
+     * 声明本驱动用于验签/收款的核心凭据配置键(安全审计 H-3)。
+     * PaymentService 在回调进入验签前,据此判断凭据是否已配置(防空 key 伪造签名)。
+     * 必须覆盖驱动实际消费的凭据字段名(如 OkPay 的 merchant_token),
+     * 否则凭据已配置也会被门禁误判为「未配置」→ 收款不发货。
+     */
+    public function getCredentialKeys(): array;
 }

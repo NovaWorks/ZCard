@@ -2,10 +2,11 @@
 
 namespace App\Payment\Drivers;
 
-use App\Payment\Contracts\Payable;
 use App\Payment\AbstractPaymentDriver;
+use App\Payment\Contracts\Payable;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class PaypalDriver extends AbstractPaymentDriver
@@ -20,11 +21,20 @@ class PaypalDriver extends AbstractPaymentDriver
             : 'https://api-m.paypal.com';
     }
 
-        /**
+    /**
      * 获取 PayPal access token (client credentials)。
+     * 低危(M-11):缓存 token(官方有效期约 9 小时)——匿名回调端点会触发
+     * accessToken() 出站请求,不缓存时每个请求都向 PayPal 换一次 token,
+     * 可被滥用打满商户 API 速率配额,导致真实买家 capture 失败。
      */
     protected function accessToken(array $config): string
     {
+        $cacheKey = 'paypal_token:'.hash('sha256', ($config['client_id'] ?? '').'|'.$this->baseUrl($config));
+        $cached = Cache::get($cacheKey);
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
+
         $tokenRes = Http::withBasicAuth(
             $config['client_id'] ?? '',
             $config['client_secret'] ?? ''
@@ -32,7 +42,14 @@ class PaypalDriver extends AbstractPaymentDriver
             'grant_type' => 'client_credentials',
         ]);
 
-        return (string) $tokenRes->json('access_token');
+        $token = (string) $tokenRes->json('access_token');
+        $expiresIn = (int) ($tokenRes->json('expires_in') ?? 0);
+        if ($token !== '' && $expiresIn > 300) {
+            // 提前 5 分钟失效,避免边界竞态
+            Cache::put($cacheKey, $token, $expiresIn - 300);
+        }
+
+        return $token;
     }
 
     public function pay(Payable $order, array $config): PaymentResult
@@ -84,12 +101,15 @@ class PaypalDriver extends AbstractPaymentDriver
 
     public function verifyCallback(Request $request, array $config): ?array
     {
-        $token = $this->accessToken($config);
-        $orderId = $request->input('token') ?: $request->input('orderID');
+        $orderId = (string) ($request->input('token') ?: $request->input('orderID') ?: '');
 
-        if (! $orderId) {
+        // 低危(M-11):单号格式白名单——匿名端点把该值拼进 PayPal API URL,
+        // 无格式约束时任意输入都会触发一次出站请求(速率配额放大器)
+        if ($orderId === '' || ! preg_match('/^[A-Z0-9]{5,30}$/', $orderId)) {
             return null;
         }
+
+        $token = $this->accessToken($config);
 
         $res = Http::withToken($token)
             ->post($this->baseUrl($config).'/v2/checkout/orders/'.$orderId.'/capture');

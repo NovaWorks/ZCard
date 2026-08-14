@@ -124,11 +124,34 @@ const handleCheck = async () => {
   }
 }
 
+// 安全(H-5):更新/回滚前要求管理员密码二次确认(后端强制校验)
+const promptPassword = (): Promise<string> =>
+  new Promise((resolve, reject) => {
+    ElMessageBox.prompt(t('zcard.update.passwordPromptTip'), t('zcard.update.passwordConfirmTitle'), {
+      type: 'warning',
+      inputType: 'password',
+      inputPlaceholder: t('zcard.update.passwordPlaceholder'),
+      inputValidator: (v: string) => !!v || t('zcard.update.passwordRequired'),
+      confirmButtonText: t('zcard.common.ok'),
+      cancelButtonText: t('zcard.common.cancel'),
+      closeOnClickModal: false,
+    })
+      .then(({ value }) => resolve(value))
+      .catch(() => reject(new Error('cancelled')))
+  })
+
 const performUpdate = async () => {
+  let password: string
+  try {
+    password = await promptPassword()
+  } catch {
+    ElMessage.info(t('zcard.update.updateCancelled'))
+    return
+  }
   updating.value = true
   failedVisible.value = false
   try {
-    const result = await runUpdate()
+    const result = await runUpdate(password)
     successResult.value = result
     updating.value = false
     successVisible.value = true
@@ -168,11 +191,17 @@ const handleRollback = () => {
     { type: 'warning', confirmButtonText: t('zcard.update.rollback'), cancelButtonText: t('zcard.common.cancel') }
   )
     .then(async () => {
+      let password: string
+      try {
+        password = await promptPassword()
+      } catch {
+        return
+      }
       failedVisible.value = false
       updating.value = true
       rollingBack.value = true
       try {
-        await rollbackUpdate()
+        await rollbackUpdate(password)
         ElMessage.success(t('zcard.update.rollbackSuccess'))
         setTimeout(() => window.location.reload(), 1500)
       } catch (e: any) {

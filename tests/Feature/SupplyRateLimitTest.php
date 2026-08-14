@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Models\SupplierAccount;
 use App\Supply\HmacSigner;
 use App\Support\StorefrontConfig;
-use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 /**
  * 供货 API 动态限流中间件测试
@@ -23,9 +23,10 @@ class SupplyRateLimitTest extends TestCase
     private function signedPingHeaders(SupplierAccount $account): array
     {
         $ts = (string) time();
-        $nonce = 'n' . uniqid();
+        $nonce = 'n'.uniqid();
         // postJson('/api/supply/ping') 不带数据 → body = '[]'
         $ss = HmacSigner::buildSignString('POST', '/api/supply/ping', $ts, $nonce, md5('[]'));
+
         return [
             'X-Supply-Key' => $account->api_key,
             'X-Supply-Timestamp' => $ts,
@@ -39,7 +40,7 @@ class SupplyRateLimitTest extends TestCase
         StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache', 'supply_rate_limit' => 3]);
 
         $account = SupplierAccount::create([
-            'name' => 'A', 'api_key' => 'ak_rate1', 'api_secret' => 'sk', 'balance' => 10000, 'status' => 'active',
+            'name' => 'A', 'api_key' => 'ak_rate1', 'api_secret' => 'sk', 'balance' => 10000, 'status' => 'active', 'approved' => true,
         ]);
 
         // 3 次以内应放行(200/201),ping 返回 200
@@ -54,7 +55,7 @@ class SupplyRateLimitTest extends TestCase
         StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache', 'supply_rate_limit' => 2]);
 
         $account = SupplierAccount::create([
-            'name' => 'A', 'api_key' => 'ak_rate2', 'api_secret' => 'sk', 'balance' => 10000, 'status' => 'active',
+            'name' => 'A', 'api_key' => 'ak_rate2', 'api_secret' => 'sk', 'balance' => 10000, 'status' => 'active', 'approved' => true,
         ]);
 
         // 前 2 次放行
@@ -70,7 +71,7 @@ class SupplyRateLimitTest extends TestCase
         StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache', 'supply_rate_limit' => 5]);
 
         $account = SupplierAccount::create([
-            'name' => 'A', 'api_key' => 'ak_rate3', 'api_secret' => 'sk', 'balance' => 10000, 'status' => 'active',
+            'name' => 'A', 'api_key' => 'ak_rate3', 'api_secret' => 'sk', 'balance' => 10000, 'status' => 'active', 'approved' => true,
         ]);
 
         // 用满 5 次

@@ -77,30 +77,51 @@ class CardCipher
 
     /**
      * 解密单条密文 → 明文(发货/展示时用)。
-     * 兼容两种状态:
-     * - 未开启加密:新卡密为明文原样返回;历史加密卡密尝试用已配置密钥解密(失败则视为明文)
-     * - 已开启加密:AES 解密;解密失败(历史明文/密钥变更)降级返回原值,避免展示/发货报错
+     * 安全(M-9):加密开关默认开启(密钥存在时)。为兼容存量明文卡,先做「密文形态
+     * 识别」——只有形如 Laravel 加密载荷(base64 JSON 含 iv/value/mac)的内容才尝试解密;
+     * 历史明文卡密(不含该结构)直接原样返回,发货不受影响。
+     *
+     * $strict=true(发货链路):形态像密文但解密失败(密钥变更/损坏)时抛异常阻断发货
+     * 并留 error 审计,而非把密文当卡密发给买家;$strict=false(展示/预览)降级返回原值。
      */
-    public static function decrypt(string $cipher): string
+    public static function decrypt(string $cipher, bool $strict = false): string
     {
-        try {
-            if (self::isEnabled()) {
-                return self::encrypter()->decryptString($cipher);
-            }
+        // 密文形态识别:非 Laravel 加密载荷 = 历史明文卡,直接返回(两种模式一致)
+        if (! self::looksEncrypted($cipher)) {
+            return $cipher;
+        }
 
-            // 未开启:若是历史密文则尝试解密(有 key 才可能成功),否则按明文返回
+        try {
             return self::encrypter()->decryptString($cipher);
         } catch (\Throwable $e) {
-            // 开启加密时解密失败 = 历史明文或密钥变更,debug 级记录便于排查
-            // (不抛异常:避免发货链路 500,保持降级返回原值)。
-            if (self::isEnabled()) {
-                Log::debug('卡密解密失败,按原值返回(可能为历史明文或密钥变更)', [
+            if ($strict) {
+                Log::error('卡密解密失败(发货链路,已阻断):疑似密钥变更或数据损坏', [
                     'error' => $e->getMessage(),
+                    'cipher_head' => mb_substr($cipher, 0, 24),
                 ]);
+                throw new \RuntimeException('卡密解密失败,已阻断发货:疑似加密密钥变更或数据损坏,请立即检查密钥配置');
             }
+
+            // 展示链路:降级返回原值,避免 500
+            Log::debug('卡密解密失败,按原值返回(可能为密钥变更)', [
+                'error' => $e->getMessage(),
+            ]);
 
             return $cipher;
         }
+    }
+
+    /** 是否形如 Laravel 加密载荷(base64 JSON 含 iv/value/mac 三键) */
+    private static function looksEncrypted(string $cipher): bool
+    {
+        $decoded = base64_decode($cipher, true);
+        if ($decoded === false || $decoded === '' || $cipher === '') {
+            return false;
+        }
+        $json = json_decode($decoded, true);
+
+        return is_array($json)
+            && isset($json['iv'], $json['value'], $json['mac']);
     }
 
     /** 明文 → sha256 hash（用于去重索引 content_hash） */

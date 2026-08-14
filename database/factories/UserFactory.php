@@ -31,7 +31,8 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'status' => 1,
-            'balance' => 0,
+            // balance 不在 fillable(安全审计低危:余额只允许走 BillService 流水变动),
+            // 依赖 users.balance 列默认值 0。
             'password_changed_at' => now(),
             'remember_token' => Str::random(10),
         ];

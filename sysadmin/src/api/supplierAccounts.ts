@@ -9,6 +9,9 @@ export interface SupplierAccount {
   api_secret: string
   balance: number
   status: 'active' | 'disabled'
+  /** 审核位:自助开通的账号需审核通过后才能调用供货 API */
+  approved: boolean
+  user_id?: number | null
   contact: string | null
   remark: string | null
   created_at?: string
@@ -71,9 +74,13 @@ export interface SupplierPricePage {
   per_page: number
 }
 
-/** 账号列表(分页) */
-export const getSupplierAccounts = (params?: { page?: number; per_page?: number; status?: string }) =>
-  request.get<SupplierAccountPage>({ url: '/admin/supplier-accounts', params })
+/** 账号列表(分页;approved 筛选审核状态) */
+export const getSupplierAccounts = (params?: {
+  page?: number
+  per_page?: number
+  status?: string
+  approved?: boolean | string
+}) => request.get<SupplierAccountPage>({ url: '/admin/supplier-accounts', params })
 
 /** 单个账号详情(凭证脱敏) */
 export const getSupplierAccount = (id: number) =>
@@ -83,9 +90,11 @@ export const getSupplierAccount = (id: number) =>
 export const createSupplierAccount = (data: { name: string; contact?: string; remark?: string }) =>
   request.post<SupplierSecretResponse>({ url: '/admin/supplier-accounts', data })
 
-/** 更新账号(改名/状态/联系方式/备注) */
-export const updateSupplierAccount = (id: number, data: Partial<Pick<SupplierAccount, 'name' | 'status' | 'contact' | 'remark'>>) =>
-  request.put<SupplierAccount>({ url: `/admin/supplier-accounts/${id}`, data })
+/** 更新账号(改名/状态/审核/联系方式/备注) */
+export const updateSupplierAccount = (
+  id: number,
+  data: Partial<Pick<SupplierAccount, 'name' | 'status' | 'approved' | 'contact' | 'remark'>>,
+) => request.put<SupplierAccount>({ url: `/admin/supplier-accounts/${id}`, data })
 
 /** 删除账号 */
 export const deleteSupplierAccount = (id: number) =>

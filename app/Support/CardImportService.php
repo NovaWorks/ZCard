@@ -140,7 +140,9 @@ class CardImportService
                 $number = $this->parsePremiumNumber($plain);
                 if ($number === null) {
                     $failed++;
-                    $errors[] = "第 {$i} 行靓号格式错误(需用 --- 分隔): {$plain}";
+                    // 安全(低危):错误日志不落整行明文卡密(error_log 会随批次详情展示),
+                    // 只记行号 + 内容哈希前缀,便于定位又不留明文残留
+                    $errors[] = "第 {$i} 行靓号格式错误(需用 --- 分隔): #".substr(CardCipher::hash($plain), 0, 8);
 
                     continue;
                 }

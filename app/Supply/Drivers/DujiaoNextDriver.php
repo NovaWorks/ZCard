@@ -12,6 +12,7 @@ use App\Supply\Dto\UpstreamProduct;
 use App\Support\StorefrontConfig;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class DujiaoNextDriver implements SupplyDriver
 {
@@ -209,6 +210,14 @@ class DujiaoNextDriver implements SupplyDriver
         if (! hash_equals($expected, $sig)) {
             return null;
         }
+
+        // 防重放(低危修复,与 ZCardDriver 对齐):dujiao 协议无 nonce 头,
+        // 以 ts+签名摘要为等价单次键,窗口内同一回调只处理一次。
+        $replayKey = 'upstream_cb:'.$this->source->id.':'.hash('sha256', $ts."\n".$sig);
+        if (! Cache::add($replayKey, 1, max(60, $skew))) {
+            return null;
+        }
+
         $data = $request->json()->all();
         $cards = [];
         if (($data['fulfillment']['payload'] ?? null)) {

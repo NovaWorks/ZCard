@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use App\Support\ServiceWidgetScript;
 use App\Support\StorefrontConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class ServiceWidgetScriptTest extends TestCase
@@ -174,5 +176,56 @@ HTML,
 
         // 非法条目全部剔除 → 回退默认官方域名 → crisp 正常编译
         $this->assertStringContainsString('client.crisp.chat/l.js', $compiled);
+    }
+
+    /**
+     * 修复(2026-08-14):脚本被白名单整段丢弃时,script_configured 必须为 false,
+     * 前台才会回退到链接浮窗模式,而不是进入原生模式加载空 JS 导致什么都不显示。
+     */
+    public function test_dropped_script_reports_not_configured_so_storefront_falls_back_to_links(): void
+    {
+        StorefrontConfig::setMany([
+            'service_widget' => [
+                'enabled' => true,
+                'links' => [['label' => 'Telegram', 'url' => 'https://t.me/xxx']],
+                // 网易七鱼域名不在默认白名单 → 编译结果为空
+                'script' => '<script src="https://cdn.qiyukf.com/sdk/widget.js"></script>',
+            ],
+        ]);
+
+        $settings = $this->getJson('/api/settings/storefront')->assertOk();
+        $settings->assertJsonPath('service_widget.script_configured', false);
+
+        $this->get('/api/settings/service-widget.js')->assertOk()->assertContent('');
+    }
+
+    /** 后台保存时,脚本非空但编译被丢弃 → 响应携带警示标记,前端提示补白名单。 */
+    public function test_admin_settings_save_warns_when_script_dropped(): void
+    {
+        $admin = User::factory()->create();
+        Role::firstOrCreate(['name' => 'super_admin']);
+        $admin->assignRole('super_admin');
+
+        $resp = $this->actingAs($admin, 'sanctum')->putJson('/api/admin/settings', [
+            'settings' => [
+                'service_widget' => [
+                    'enabled' => true,
+                    'links' => [],
+                    'script' => '<script src="https://cdn.qiyukf.com/sdk/widget.js"></script>',
+                ],
+            ],
+        ]);
+
+        $resp->assertOk();
+        $this->assertTrue((bool) $resp->json('service_widget_script_dropped'));
+
+        // 白名单内脚本不触发警示
+        $resp = $this->actingAs($admin, 'sanctum')->putJson('/api/admin/settings', [
+            'settings' => [
+                'service_widget_allowed_hosts' => 'cdn.qiyukf.com',
+            ],
+        ]);
+        $resp->assertOk();
+        $this->assertNull($resp->json('service_widget_script_dropped'));
     }
 }

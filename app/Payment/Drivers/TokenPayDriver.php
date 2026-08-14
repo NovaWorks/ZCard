@@ -2,8 +2,8 @@
 
 namespace App\Payment\Drivers;
 
+use App\Payment\AbstractPaymentDriver;
 use App\Payment\Contracts\Payable;
-use App\Payment\Contracts\PaymentDriver;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -12,13 +12,8 @@ use Illuminate\Support\Facades\Http;
  * TokenPay 虚拟货币支付驱动(USDT)。
  * POST {gateway}/CreateOrder 创建订单(JSON),回调 JSON + MD5 验签。
  */
-class TokenPayDriver implements PaymentDriver
+class TokenPayDriver extends AbstractPaymentDriver
 {
-    protected function namedUrl(string $name, array $params = []): string
-    {
-        return url(route($name, $params, false));
-    }
-
     /** TokenPay 签名:参数(去 Signature/空值)排序 → key=value&… + notify_secret → md5 小写 */
     protected function sign(array $params, string $secret): string
     {
@@ -163,5 +158,11 @@ class TokenPayDriver implements PaymentDriver
     public function getSupportedCurrencies(): array
     {
         return ['USDT'];
+    }
+
+    /** 核心验签凭据:回调签名密钥(不在历史默认键列表内,H-3 必须自声明) */
+    public function getCredentialKeys(): array
+    {
+        return ['notify_secret'];
     }
 }

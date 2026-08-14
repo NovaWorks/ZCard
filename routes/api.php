@@ -300,8 +300,9 @@ Route::get('/settings/service-widget.js', [StorefrontSettingsController::class, 
 // 验证码(图形验证码,基于 mews/captcha)
 Route::get('/captcha/config', [CaptchaController::class, 'config'])->name('api.captcha.config');
 
-// 优惠券验证(下单前预览折扣)
-Route::post('/coupons/validate', [CouponController::class, 'validateCode'])->name('api.coupons.validate');
+// 优惠券验证(下单前预览折扣);throttle(低危):防在线枚举券码
+Route::post('/coupons/validate', [CouponController::class, 'validateCode'])
+    ->middleware('throttle:10,1')->name('api.coupons.validate');
 
 Route::get('/captcha/{scene?}', function (Request $request, $scene = 'default') {
     return response()->json(CaptchaService::create($scene));
@@ -335,7 +336,10 @@ Route::post('/payments/balance', [PaymentController::class, 'balancePay'])->midd
 Route::post('/payments/balance-batch', [PaymentController::class, 'balanceBatchPay'])->middleware(['display.currency', 'set.locale'])->name('api.payments.balance-batch');
 // 支付回调:易支付(889 等)文档明确异步通知走 GET,部分平台走 POST,统一用 any 兼容。
 // 驱动 verifyCallback 内部已 array_merge(query, post) 兼容两种传参方式。
-Route::any('/payments/callback/{channel}', [PaymentController::class, 'callback'])->name('api.payments.callback');
+// throttle(M-11):匿名端点执行通道查询 + RSA/HMAC 验签 + 多表查询,
+// 防伪造海量回调打满 CPU/DB 延迟真实回调(网关重发频率远低于 60/分钟)。
+Route::any('/payments/callback/{channel}', [PaymentController::class, 'callback'])
+    ->middleware('throttle:60,1')->name('api.payments.callback');
 
 // 支付同步跳回(第三方支付完成后浏览器跳转,重定向到前台结果页)
 // 驱动用 payment.return / payment.cancel / payment.notify 命名路由拼接跳回地址
@@ -370,15 +374,18 @@ Route::get('/payments/cancel/{code}', function (Request $request, string $code) 
 })->name('payment.cancel');
 
 // payment.notify = 异步通知,与 callback 同义(部分第三方用 notify_url 命名)。
-// 易支付(889)异步通知走 GET,其他平台可能 POST,统一 any 兼容。
-Route::any('/payments/notify/{channel}', [PaymentController::class, 'callback'])->name('payment.notify');
+// 易支付(889)异步通知走 GET,其他平台可能 POST,统一 any 兼容;throttle 同 callback(M-11)。
+Route::any('/payments/notify/{channel}', [PaymentController::class, 'callback'])
+    ->middleware('throttle:60,1')->name('payment.notify');
 
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware(['auth:sanctum', 'active.user']);
 
 // ===== 供货 API(对外供货,spec §4.3) =====
-Route::prefix('supply')->middleware(['supply.auth', 'supply.rate'])
+// throttle 前置(M-4):supply.auth 在鉴权失败路径直接 401,supply.rate 不会执行,
+// 未认证请求可无限触发 DB 查询(每请求 3+ 条 SELECT)——按 IP 先限流兜底。
+Route::prefix('supply')->middleware(['throttle:60,1', 'supply.auth', 'supply.rate'])
     ->group(function () {
         Route::post('ping', [SupplyController::class, 'ping'])->name('api.supply.ping');
         Route::get('categories', [SupplyProductController::class, 'categories'])->name('api.supply.categories');

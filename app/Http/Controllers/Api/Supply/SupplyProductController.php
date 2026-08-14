@@ -55,7 +55,8 @@ class SupplyProductController extends Controller
         $pricing = app(SupplyPricingService::class);
         $product = Product::with(['skus' => fn ($q) => $q->where('status', 1)])->find($id);
 
-        if (! $product || $product->status != 1) {
+        // 安全(低危):hide 商品对下游同样不可见(与前台口径一致,防遍历 id 穿透)
+        if (! $product || $product->status != 1 || $product->hide) {
             return response()->json([
                 'ok' => false,
                 'error_code' => 'product_unavailable',
@@ -72,7 +73,8 @@ class SupplyProductController extends Controller
     public function stock(Request $request, int $id): JsonResponse
     {
         $product = Product::find($id);
-        if (! $product || $product->status != 1) {
+        // 安全(低危):hide 商品库存同样不可查询
+        if (! $product || $product->status != 1 || $product->hide) {
             return response()->json([
                 'ok' => false,
                 'error_code' => 'product_unavailable',

@@ -189,6 +189,13 @@ class AlipayDriver extends AbstractPaymentDriver
             return null;
         }
 
+        // 官方四要素核对之 app_id(低危):同一商户复用支付公钥的多应用场景,
+        // 其他应用的通知不应被本应用接受。
+        $expectedAppId = (string) ($config['app_id'] ?? '');
+        if ($expectedAppId !== '' && ! hash_equals($expectedAppId, (string) ($data['app_id'] ?? ''))) {
+            return null;
+        }
+
         $tradeStatus = $data['trade_status'] ?? null;
         if (! in_array($tradeStatus, ['TRADE_SUCCESS', 'TRADE_FINISHED'], true)) {
             return null;

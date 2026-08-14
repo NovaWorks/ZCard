@@ -109,7 +109,8 @@ class SupplyOrderService
 
                 if ($fulfillmentType === Product::FULFILLMENT_AUTO_CARD) {
                     foreach ($cards as $card) {
-                        $content = $card->plainContent();
+                        // strict 解密:密钥异常时阻断发货而非发废卡(M-9)
+                        $content = $card->plainContent(true);
                         $card->update(['status' => Card::STATUS_USED, 'order_id' => $order->id, 'used_at' => now()]);
                         OrderDelivery::create([
                             'order_id' => $order->id,
@@ -190,6 +191,51 @@ class SupplyOrderService
         return $code === 1062 // MySQL duplicate entry
             || str_contains($msg, 'uniq_supply_downstream_no')
             || str_contains($msg, 'UNIQUE constraint failed'); // SQLite
+    }
+
+    /**
+     * 取消未发货的供货订单并退还货款(安全审计 M-5)。
+     * 此前 cancel 端点返回成功但什么都不做——下游余额已被扣除且不可恢复,
+     * pending 单之后仍会发货,造成双方对账纠纷。
+     * 事务内:行锁复检 → 释放锁定卡 → 关闭本地订单 → 退款入账 + 账本流水。
+     *
+     * @throws SupplyApiException 已发货/已关闭的订单不可取消(409)
+     */
+    public function cancelOrder(SupplierAccount $account, SupplyOrder $supplyOrder): void
+    {
+        DB::transaction(function () use ($account, $supplyOrder): void {
+            $locked = SupplyOrder::whereKey($supplyOrder->id)
+                ->where('supplier_account_id', $account->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $order = Order::whereKey($locked->order_id)->lockForUpdate()->firstOrFail();
+
+            // 已发货或已关闭 → 不可取消(重复取消在此幂等拦截,409)
+            if ($order->delivery_status === 'delivered' || $order->status !== 'paid') {
+                throw SupplyApiException::orderNotCancelable();
+            }
+
+            // 释放仍处于锁定状态的本地卡(防御:auto card 正常即时发货,此为兜底)
+            Card::where('order_id', $order->id)
+                ->where('status', Card::STATUS_LOCKED)
+                ->update(['status' => Card::STATUS_UNUSED, 'locked_at' => null, 'order_id' => null]);
+
+            $order->update(['status' => 'closed', 'closed_at' => now()]);
+
+            // 退款入账(锁账号后写账本,幂等键防重复退款)
+            $lockedAccount = SupplierAccount::where('id', $account->id)->lockForUpdate()->firstOrFail();
+            $amount = (int) $order->amount;
+            $lockedAccount->increment('balance', $amount);
+            SupplierLedgerEntry::create([
+                'supplier_account_id' => $account->id,
+                'order_id' => $order->id,
+                'type' => SupplierLedgerEntry::TYPE_REFUND,
+                'amount' => $amount,
+                'balance_after' => (int) $lockedAccount->balance,
+                'idempotency_key' => "supply_cancel:{$locked->id}",
+                'remark' => "供货取消退款[{$locked->downstream_order_no}]",
+            ]);
+        });
     }
 
     private function formatResult(SupplyOrder $supplyOrder): array

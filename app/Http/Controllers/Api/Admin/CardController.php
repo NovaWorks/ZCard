@@ -41,12 +41,16 @@ class CardController extends Controller
         $cards = $query->orderByDesc('id')
             ->paginate($request->integer('pageSize', 15));
 
-        // 追加密钥内容预览(前30字符)
+        // 追加密钥内容预览(低危:短卡密做中段打码,防列表页一次看全文;长卡密截前30)
         $cards->getCollection()->transform(function ($card) {
             $plain = $card->plainContent();
-            $card->content_preview = mb_strlen($plain) > 30
-                ? mb_substr($plain, 0, 30).'...'
-                : $plain;
+            $len = mb_strlen($plain);
+            $card->content_preview = match (true) {
+                $len > 30 => mb_substr($plain, 0, 30).'...',
+                $len > 12 => mb_substr($plain, 0, 6).'••••••'.mb_substr($plain, -6),
+                $len > 6 => mb_substr($plain, 0, 3).'••••••'.mb_substr($plain, -3),
+                default => str_repeat('•', $len),
+            };
 
             return $card;
         });

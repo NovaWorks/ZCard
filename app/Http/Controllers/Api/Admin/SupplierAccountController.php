@@ -21,6 +21,8 @@ class SupplierAccountController extends Controller
     {
         $accounts = SupplierAccount::query()
             ->when($request->input('status'), fn ($q, $s) => $q->where('status', $s))
+            ->when($request->input('approved') !== null && $request->input('approved') !== '',
+                fn ($q) => $q->where('approved', (bool) $request->input('approved')))
             ->orderByDesc('id')
             ->paginate($request->integer('per_page', 20));
 
@@ -43,6 +45,8 @@ class SupplierAccountController extends Controller
             'api_secret' => Crypt::encryptString($plainSecret),
             'balance' => 0,
             'status' => SupplierAccount::STATUS_ACTIVE,
+            // 管理员手动创建的账号默认审核通过(审核制只针对用户自助开通)
+            'approved' => true,
             'contact' => $data['contact'] ?? null,
             'remark' => $data['remark'] ?? null,
         ]);
@@ -71,6 +75,8 @@ class SupplierAccountController extends Controller
         $data = $request->validate([
             'name' => 'sometimes|string|max:100',
             'status' => 'sometimes|in:active,disabled',
+            // 审核位:自助开通的账号由管理员在此审核通过/撤销
+            'approved' => 'sometimes|boolean',
             'contact' => 'sometimes|nullable|string|max:200',
             'remark' => 'sometimes|nullable|string|max:500',
         ]);

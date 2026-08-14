@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Support\AppHelper;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
@@ -114,9 +116,15 @@ class UpdateController extends Controller
         $currentVersion = AppHelper::version();
         $userFilesPreserved = false;
 
+        // 安全(H-5):更新通道以 PHP 进程执行 git/composer,属敏感运维 RCE 面,
+        // 必须二次认证(管理员密码),防止会话/令牌被盗后一键植入任意代码。
+        if ($guard = $this->guardSensitiveOperation($request)) {
+            return $guard;
+        }
+
         // 原子锁防止并发更新/回退；文件仅供前端展示运行状态。
-        $operationLock = Cache::lock('zcard:system-update', 600);
-        if (! $operationLock->get()) {
+        $operationLock = $this->acquireOperationLock();
+        if (! $operationLock) {
             return response()->json(['message' => '已有更新或回退正在进行中,请等待完成'], 409);
         }
 
@@ -142,6 +150,7 @@ class UpdateController extends Controller
             $this->log($logFile, '拉取最新代码...');
             $this->ensureGitSafeDirectory();
             $this->ensureHttpsRemote();
+            $this->assertTrustedRemote();
             $this->preserveUserFiles();
             $userFilesPreserved = true;
             // 显式更新远程跟踪引用,并以本次 fetch 的 FETCH_HEAD 为准。
@@ -260,10 +269,36 @@ class UpdateController extends Controller
     public function rollback(): JsonResponse
     {
         $userFilesPreserved = false;
-        $operationLock = Cache::lock('zcard:system-update', 600);
-        if (! $operationLock->get()) {
+
+        // 安全(H-5):回滚同样必须密码二次认证 + 原子锁
+        if ($guard = $this->guardSensitiveOperation(request())) {
+            return $guard;
+        }
+        $operationLock = $this->acquireOperationLock();
+        if (! $operationLock) {
             return response()->json(['message' => '已有更新或回退正在进行中,无法回退'], 409);
         }
+
+        // 安全(H-5):回滚降级防护——禁止回退到低于安全基线的版本,
+        // 防止被盗管理员把系统退回存在已公开漏洞的历史版本再利用。
+        $targetVersion = trim((string) $this->shell(
+            'cd '.escapeshellarg(base_path()).' && '.$this->gitCmd('show HEAD~1:VERSION 2>/dev/null'),
+        ));
+        if ($targetVersion === '' || version_compare($targetVersion, self::MIN_SECURITY_VERSION, '<')) {
+            $shown = $targetVersion !== '' ? $targetVersion : '未知';
+
+            return response()->json([
+                'message' => "禁止回滚:目标版本({$shown})低于安全基线 v".self::MIN_SECURITY_VERSION,
+            ], 422);
+        }
+
+        // 安全(H-5):回滚次数上限(防反复回退制造降级窗口)
+        $countFile = storage_path('app/rollback.count');
+        $rollbackCount = (int) (@file_get_contents($countFile) ?: 0);
+        if ($rollbackCount >= 3) {
+            return response()->json(['message' => '回滚次数已达上限(3 次),如需继续请人工介入处理'], 422);
+        }
+        file_put_contents($countFile, (string) ($rollbackCount + 1));
 
         $lockFile = storage_path('app/update.lock');
         file_put_contents($lockFile, json_encode(['started_at' => now()->toIso8601String(), 'operation' => 'rollback']));
@@ -280,6 +315,7 @@ class UpdateController extends Controller
             $this->log($logFile, '回退代码到上一版本...');
             $this->ensureGitSafeDirectory();
             $this->ensureHttpsRemote();
+            $this->assertTrustedRemote();
             $this->preserveUserFiles();
             $userFilesPreserved = true;
             $output = $this->shell(
@@ -431,6 +467,63 @@ class UpdateController extends Controller
      * 优先用 Symfony Process(更可靠的错误处理);若 proc_open 被 disable_functions
      * 禁用(宝塔常见),抛出含清晰提示的异常,而非 PHP fatal error。
      */
+    /** 回滚安全基线:低于该版本存在已公开修复的漏洞,禁止回退(H-5) */
+    public const MIN_SECURITY_VERSION = '1.12.85';
+
+    /**
+     * 敏感运维操作前置守卫(H-5):管理员密码二次认证。
+     * 更新/回滚以 PHP 进程执行 git/composer/artisan,凭据泄露即等同 RCE,
+     * 仅持有会话/令牌不足以执行,必须复验密码。
+     */
+    private function guardSensitiveOperation(Request $request): ?JsonResponse
+    {
+        $password = (string) $request->input('password', '');
+        $user = $request->user();
+        if ($password === '' || ! $user || ! Hash::check($password, $user->password)) {
+            return response()->json([
+                'message' => '安全操作需确认管理员密码',
+                'code' => 'password_confirmation_required',
+            ], 422);
+        }
+
+        return null;
+    }
+
+    /**
+     * 获取更新原子锁;array 缓存驱动下锁为进程内即抛即弃(静默失效),
+     * 生产环境直接拒绝执行以防并发 update/rollback 交错损坏工作区(低危加固)。
+     */
+    private function acquireOperationLock(): ?Lock
+    {
+        if (config('cache.default') === 'array' && app()->environment('production')) {
+            return null;
+        }
+
+        $lock = Cache::lock('zcard:system-update', 600);
+
+        return $lock->get() ? $lock : null;
+    }
+
+    /**
+     * 校验 git remote origin 与官方仓库一致(H-5):更新来源的唯一信任根。
+     * 本地攻击者改写 .git/config 指向恶意仓库时,下一次「合法更新」即部署任意代码,
+     * 必须在 fetch 前校验并阻断。
+     */
+    private function assertTrustedRemote(): void
+    {
+        $expected = strtolower(rtrim('https://github.com/'.config('zcard.update.repo'), '/'));
+        $remote = strtolower(rtrim(trim((string) $this->shell(
+            'cd '.escapeshellarg(base_path()).' && '.$this->gitCmd('remote get-url origin 2>/dev/null'),
+        )), '/'));
+        $normalize = fn (string $url): string => str_ends_with($url, '.git') ? substr($url, 0, -4) : $url;
+        if ($normalize($remote) !== $normalize($expected)) {
+            throw new \RuntimeException(
+                "git remote origin 与官方仓库不一致,已阻断更新(当前: {$remote}, 期望: {$expected})。"
+                .'服务器可能被本地篡改,请人工排查 .git/config。'
+            );
+        }
+    }
+
     private function shell(string $command, bool $mustSucceed = false, string $failureMessage = '命令执行失败'): string
     {
         if (! $this->canExec()) {
@@ -760,8 +853,10 @@ class UpdateController extends Controller
             $this->shell('git config --global --add safe.directory '.escapeshellarg($base).' 2>/dev/null');
 
             // 2. 修复 .git 目录权限(解决 insufficient permission)
-            //    宝塔: .git 属主可能是 root, PHP-FPM 以 www 运行 → chmod 放开读写
-            $this->shell('chmod -R u+rwX,go+rwX '.escapeshellarg($base.'/.git').' 2>/dev/null');
+            //    宝塔: .git 属主可能是 root, PHP-FPM 以 www 运行 → chmod 放开读写。
+            //    安全(M-10):不再对 others 放开(go+rwX 会让共享主机任意本地用户可写
+            //    .git/config 注入 core.fsmonitor 等命令,借下次更新提权),仅限属主与同组。
+            $this->shell('chmod -R u+rwX,g+rwX '.escapeshellarg($base.'/.git').' 2>/dev/null');
 
             // 3. 如果当前用户不是目录属主(如 www 运行但属主是 root),
             //    尝试 chown(可能需要 sudo/root,失败则跳过,chmod 通常已够用)

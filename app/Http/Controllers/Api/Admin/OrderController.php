@@ -100,6 +100,17 @@ class OrderController extends Controller
         $orders = $query->orderByDesc('id')
             ->paginate($request->integer('pageSize', 15));
 
+        // 安全(低危):列表不回传 extra 中的查询密码/访问凭证哈希(可离线爆破)
+        $orders->getCollection()->transform(function ($order) {
+            if (is_array($order->extra)) {
+                $order->extra = collect($order->extra)
+                    ->except(['query_password', 'access_token_hash'])
+                    ->all();
+            }
+
+            return $order;
+        });
+
         return response()->json($orders);
     }
 
@@ -303,18 +314,33 @@ class OrderController extends Controller
     }
 
     /**
-     * 清理无用订单(超时未支付的 pending 订单物理删除)。
+     * 清理无用订单(超时未支付的 pending 订单关闭后物理删除)。
+     * 安全(M-1):必须先走 OrderService::closeOrder(释放锁定卡密 + 回滚优惠券)
+     * 再删除——此前直接物理删除会把 locked 卡密变成永久锁死的孤儿(cards.order_id
+     * 无外键),已核销优惠券也不回滚,造成不可自愈的库存损耗。
      */
-    public function clear(Request $request): JsonResponse
+    public function clear(Request $request, OrderService $service): JsonResponse
     {
-        $minutes = (int) (app(StorefrontConfig::class)::get('order_close_minutes') ?? 15);
+        $minutes = (int) (StorefrontConfig::get('order_close_minutes') ?? 15);
         $cutoff = now()->subMinutes($minutes);
 
-        $count = Order::where('status', 'pending')
+        $ids = Order::where('status', 'pending')
             ->where('created_at', '<', $cutoff)
-            ->delete();
+            ->pluck('id');
 
-        return response()->json(['cleared' => $count]);
+        $closed = 0;
+        foreach ($ids as $id) {
+            try {
+                $service->closeOrder((int) $id);
+                $closed++;
+            } catch (\RuntimeException) {
+                // 状态已被并发改变(如支付回调置 paid)→ 跳过,不删除
+            }
+        }
+
+        $deleted = Order::whereIn('id', $ids)->where('status', 'closed')->delete();
+
+        return response()->json(['cleared' => $deleted, 'closed' => $closed]);
     }
 
     private function statusText(string $status): string

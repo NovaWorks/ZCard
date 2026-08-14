@@ -28,7 +28,7 @@ class SupplyOrderApiTest extends TestCase
     {
         StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache']);
         $merchant = $this->makeMerchant();
-        $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'ak', 'api_secret' => Crypt::encryptString('sk'), 'balance' => 100000, 'status' => 'active']);
+        $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'ak', 'api_secret' => Crypt::encryptString('sk'), 'balance' => 100000, 'status' => 'active', 'approved' => true]);
         $product = Product::create([
             'merchant_id' => $merchant->id, 'name' => 'P', 'slug' => 'p1', 'price' => 500,
             'factory_price' => 500, 'stock_type' => 'card', 'status' => 1,
@@ -59,7 +59,7 @@ class SupplyOrderApiTest extends TestCase
     {
         StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache']);
         $merchant = $this->makeMerchant();
-        $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'ak', 'api_secret' => Crypt::encryptString('sk'), 'balance' => 100, 'status' => 'active']);
+        $account = SupplierAccount::create(['name' => 'A', 'api_key' => 'ak', 'api_secret' => Crypt::encryptString('sk'), 'balance' => 100, 'status' => 'active', 'approved' => true]);
         $product = Product::create(['merchant_id' => $merchant->id, 'name' => 'P', 'slug' => 'p2', 'price' => 500, 'factory_price' => 500, 'stock_type' => 'card', 'status' => 1]);
         Card::create(['product_id' => $product->id, 'content' => 'C', 'content_hash' => hash('sha256', 'C'), 'status' => Card::STATUS_UNUSED]);
 

@@ -2,8 +2,12 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Dashboard;
+use App\Filament\Pages\PaymentChannels;
+use App\Filament\Pages\StorefrontSettings;
 use App\Http\Middleware\ForcePasswordChange;
+use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -25,7 +29,8 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('filament')
-            ->login()
+            // 自定义登录页:补账号级失败锁定(M-7),与 API 登录共享锁定键
+            ->login(Login::class)
             ->brandName('ZCard')
             // 主色亮蓝 #009EF7（P1-A.1）；darkMode 默认启用，右上角自动渲染明暗切换按钮
             ->colors([
@@ -40,7 +45,7 @@ class AdminPanelProvider extends PanelProvider
                 '系统',
             ])
             ->plugins([
-                \BezhanSalleh\FilamentShield\FilamentShieldPlugin::make()
+                FilamentShieldPlugin::make()
                     ->navigationGroup('系统')
                     ->navigationIcon('heroicon-o-shield-check')
                     ->navigationLabel('角色权限'),
@@ -49,8 +54,8 @@ class AdminPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
                 Dashboard::class,
-                \App\Filament\Pages\StorefrontSettings::class,
-                \App\Filament\Pages\PaymentChannels::class,
+                StorefrontSettings::class,
+                PaymentChannels::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([])

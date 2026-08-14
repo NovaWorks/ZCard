@@ -14,7 +14,8 @@ class CardImportController extends Controller
     {
         $data = $request->validate([
             'product_id' => 'required|integer|exists:products,id',
-            'content' => 'required|string',
+            // 低危(DoS):限制单次导入体积(队列 Job 全量载入内存逐行加密,超大文本可耗尽 worker)
+            'content' => 'required|string|max:1048576',
             'format' => 'nullable|in:single,multi',
             'delimiter' => 'nullable|string',
         ]);
@@ -31,6 +32,7 @@ class CardImportController extends Controller
         );
 
         $fresh = $import->fresh();
+
         return response()->json([
             'import_id' => $import->id,
             'status' => $fresh->status,
@@ -44,6 +46,7 @@ class CardImportController extends Controller
     public function status(int $id): JsonResponse
     {
         $import = CardImport::findOrFail($id);
+
         return response()->json([
             'import_id' => $import->id,
             'status' => $import->status,
@@ -56,6 +59,7 @@ class CardImportController extends Controller
     public function revoke(int $id, CardImportService $service): JsonResponse
     {
         $deleted = $service->revokeImport($id);
+
         return response()->json(['import_id' => $id, 'revoked_cards' => $deleted]);
     }
 }

@@ -36,4 +36,9 @@ class SupplyApiException extends RuntimeException
     {
         return new self('price_not_configured', __('messages.supply_api.price_not_configured'), 400);
     }
+
+    public static function orderNotCancelable(): self
+    {
+        return new self('order_not_cancelable', __('messages.supply_api.order_not_cancelable'), 409);
+    }
 }

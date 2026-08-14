@@ -50,20 +50,29 @@ class InstallController extends Controller
     }
 
     /**
-     * 安装来源防护(安全审计 M7)。
+     * 安装来源防护(安全审计 M7 + M-6 收紧)。
      * 安装向导可创建超级管理员并重写 .env,未安装期间暴露公网 = 可被外部抢先接管。
-     * 部署者在 .env 配置 ZCARD_INSTALL_ALLOWED_IPS(逗号分隔,支持 IP 或 CIDR)后,
-     * 只有来自白名单 IP 的请求才能调用安装接口;未配置时保持默认行为(不阻断),
-     * 但每次安装尝试都会写入安全审计日志。
+     * - 配置 ZCARD_INSTALL_ALLOWED_IPS(逗号分隔,支持 IP 或 CIDR)→ 仅白名单可调安装接口;
+     * - 未配置时默认仅允许回环地址(本机向导/SSH 隧道),公网部署需显式配置白名单;
+     * - 每次安装尝试都写入安全审计日志。
      */
     private function assertInstallAllowed(Request $request): void
     {
         $allowed = trim((string) env('ZCARD_INSTALL_ALLOWED_IPS', ''));
+        $ip = (string) $request->ip();
+
         if ($allowed === '') {
-            return;
+            // 默认拒绝公网(倒置安全):全新部署在完成安装前一旦公网可达,
+            // 任何人可抢先 /install 接管整站。回环(本机/SSH 端口转发)始终放行。
+            if ($ip === '127.0.0.1' || $ip === '::1' || $this->ipInCidr($ip, '127.0.0.0/8')) {
+                SecurityAudit::record($request, 'install.allowed_loopback', InstallController::class);
+
+                return;
+            }
+            SecurityAudit::record($request, 'install.blocked_default_loopback_only', InstallController::class);
+            abort(403, '安装接口默认仅允许本机访问;公网安装请在 .env 配置 ZCARD_INSTALL_ALLOWED_IPS 白名单后重试');
         }
 
-        $ip = (string) $request->ip();
         foreach (array_map('trim', explode(',', $allowed)) as $entry) {
             if ($entry === '' || str_contains($entry, '/') === false) {
                 if ($entry === $ip) {
@@ -77,6 +86,7 @@ class InstallController extends Controller
             }
         }
 
+        SecurityAudit::record($request, 'install.blocked_not_in_whitelist', InstallController::class);
         abort(403, '安装向导已限制为特定来源 IP');
     }
 
@@ -148,6 +158,10 @@ class InstallController extends Controller
             ]);
         }
 
+        // 安全(V-5):环境指纹(php_version/扩展/目录可写性)也走安装来源防护,
+        // 且不再向匿名调用方回显精确版本(布尔化,削减侦察面)
+        $this->assertInstallAllowed(request());
+
         $checks = [
             ['name' => 'PHP >= 8.3', 'passed' => version_compare(PHP_VERSION, '8.3.0', '>=')],
             ['name' => 'PDO MySQL', 'passed' => extension_loaded('pdo_mysql')],
@@ -171,7 +185,6 @@ class InstallController extends Controller
 
         return response()->json([
             'installed' => false,
-            'php_version' => PHP_VERSION,
             'checks' => $checks,
             'writable' => $writable,
             'all_passed' => $allPassed,
@@ -247,6 +260,15 @@ class InstallController extends Controller
             'admin_password' => 'required|string|min:10|max:72',
         ]);
 
+        // 安全(M-6):与 testDb 同口径,run() 同样拒绝内网 DB 地址(防借安装向导
+        // 探测内网)。Docker/内网数据库部署在 .env 配置 ZCARD_INSTALL_ALLOW_PRIVATE_DB=true 豁免。
+        if (! env('ZCARD_INSTALL_ALLOW_PRIVATE_DB', false) && ! $this->isPublicDbHost((string) $data['db_host'])) {
+            return response()->json([
+                'success' => false,
+                'message' => '数据库地址不允许为内网/回环地址(内网/Docker 部署请在 .env 配置 ZCARD_INSTALL_ALLOW_PRIVATE_DB=true)',
+            ], 422);
+        }
+
         try {
             // Step 0: 修复关键目录权限(composer install 用 root 跑时,目录属主是 root,
             // 而 PHP-FPM 以 www 用户运行 → 不可写 → 500)。这里尝试自动 chmod 修复。
@@ -258,6 +280,16 @@ class InstallController extends Controller
             $this->writeEnv('DB_DATABASE', $data['db_database']);
             $this->writeEnv('DB_USERNAME', $data['db_username']);
             $this->writeEnv('DB_PASSWORD', $data['db_password'] ?? '');
+
+            // 安全(M-6):安装即生产——.env.example 的 local+debug 默认值会被照抄进生产,
+            // 异常页泄露堆栈/env/SQL。安装完成时强制收敛为生产配置。
+            $this->writeEnv('APP_ENV', 'production');
+            $this->writeEnv('APP_DEBUG', 'false');
+            $this->writeEnv('LOG_LEVEL', 'error');
+            // HTTPS 部署时收紧会话 Cookie(低危);HTTP 本地开发不受影响
+            if ($request->isSecure()) {
+                $this->writeEnv('SESSION_SECURE_COOKIE', 'true');
+            }
 
             // Step 2: APP_KEY
             if (empty(config('app.key'))) {

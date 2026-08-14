@@ -110,7 +110,8 @@ class SecurityAuditFixTest extends TestCase
     public function test_admin_cannot_modify_own_balance_via_user_update(): void
     {
         $admin = $this->makeAdmin();
-        $admin->update(['balance' => 1000]);
+        // balance 已不在 fillable(安全加固:余额只走 BillService),测试用 forceFill 直改
+        $admin->forceFill(['balance' => 1000])->save();
 
         $this->actingAs($admin, 'sanctum')
             ->putJson('/api/admin/users/'.$admin->id, ['balance' => 0])

@@ -550,6 +550,8 @@
     "docStep3": "调用接口: POST /api/supply/ping 测试连接; GET /api/supply/products 拉取商品",
     "docStep4": "下单调用 POST /api/supply/orders,货款从供货余额扣减,余额不足时需先充值",
     "created": "已开通 API 对接凭证",
+    "pendingApproval": "待管理员审核",
+    "pendingApprovalTip": "供货账号已创建,等待站点管理员审核。审核通过前调用供货 API 会被拒绝;通过后可在此查看 App Key。",
     "regenerateConfirm": "重置 App Key 后旧密钥立即失效,确认重置?",
     "regenerated": "App Key 已重置",
     "copied": "已复制"

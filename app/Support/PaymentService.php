@@ -126,6 +126,12 @@ class PaymentService
             $payload['recharge_id'] = $original->id;
         } elseif ($original instanceof Order) {
             $payload['order_id'] = $original->id;
+            // 同单同通道重复发起支付:旧 pending 流水标记 superseded,防止用户按旧金额
+            // 完成付款后,回调按「最新流水」核对金额误判 amount mismatch(付款不确认)。
+            Payment::where('order_id', $original->id)
+                ->where('channel', $channel->code)
+                ->where('status', 'pending')
+                ->update(['status' => 'superseded']);
         } else {
             throw new \RuntimeException('不支持的 Payable 类型: '.get_class($original));
         }
@@ -202,6 +208,12 @@ class PaymentService
 
         $result = $driver->pay($payable, $config);
 
+        // 同主单同通道旧 pending 聚合流水置 superseded(同 createPayment 逻辑)
+        Payment::where('order_id', $main->id)
+            ->where('channel', $channel->code)
+            ->where('status', 'pending')
+            ->update(['status' => 'superseded']);
+
         Payment::create([
             'order_id' => $main->id,
             'order_ids' => $orders->pluck('id')->all(),
@@ -219,18 +231,26 @@ class PaymentService
 
     public function handleCallback(string $channelCode, Request $request): string
     {
-        $channel = PaymentChannel::where('code', $channelCode)->first();
+        // orderBy 保证多商户同 code 场景下密钥选取确定性(当前单商户,防御未来)
+        $channel = PaymentChannel::where('code', $channelCode)->orderBy('id')->first();
         if (! $channel) {
             return $this->callbackFailure('channel not found', ['channel' => $channelCode]);
         }
 
-        // 安全兜底:凭据未配置则拒绝(防空 key 伪造签名,参考 acg-faka payCredentialConfigured)
+        try {
+            $driver = $this->resolveDriver($channel);
+        } catch (\RuntimeException $e) {
+            return $this->callbackFailure('driver missing', ['channel' => $channelCode]);
+        }
+
+        // 安全兜底:凭据未配置则拒绝(防空 key 伪造签名,参考 acg-faka payCredentialConfigured)。
+        // H-3 修复:改用驱动自声明的凭据键(getCredentialKeys),OkPay(merchant_token)、
+        // TokenPay(notify_secret)等非默认键名不再被误判为「未配置」→ 收款不发货。
         $config = $channel->config ?? [];
-        if (! $this->credentialsConfigured($config)) {
+        if (! $this->credentialsConfigured($config, $driver->getCredentialKeys())) {
             return $this->callbackFailure('credentials not configured', ['channel' => $channelCode]);
         }
 
-        $driver = $this->resolveDriver($channel);
         $data = $driver->verifyCallback($request, $config);
 
         if (! $data) {
@@ -398,6 +418,7 @@ class PaymentService
                     (int) $locked->amount,
                     Bill::TYPE_INCOME,
                     __('messages.recharge.credit', ['no' => $locked->recharge_no]),
+                    countAsRecharge: true, // 真实充值才计累计充值/会员升级(M-3)
                 );
             }
 
@@ -414,9 +435,10 @@ class PaymentService
 
     private function callbackFailure(string $reason, array $context = []): string
     {
+        // 对外统一返回 fail(不回显原因,消除通道配置/订单号存在性探测 oracle),细节只进日志。
         Log::warning('支付回调处理失败', ['reason' => $reason, ...$context]);
 
-        return 'fail: '.$reason;
+        return 'fail';
     }
 
     private function resolveDriver(PaymentChannel $channel): PaymentDriver
@@ -492,12 +514,13 @@ class PaymentService
 
     /**
      * 检查凭据是否已配置(至少有一个敏感字段非空)。
-     * 参考自 acg-faka payCredentialConfigured,防止空 key 伪造签名。
+     * 键列表由各驱动 getCredentialKeys() 自声明,防止遗漏非默认键名
+     * (安全审计 H-3:OkPay/TokenPay 曾被硬编码列表漏掉导致收款不发货)。
+     *
+     * @param  array  $sensitiveKeys  驱动自声明的凭据键
      */
-    private function credentialsConfigured(array $config): bool
+    private function credentialsConfigured(array $config, array $sensitiveKeys): bool
     {
-        $sensitiveKeys = ['key', 'secret', 'secret_key', 'private_key', 'public_key',
-            'app_secret', 'api_key', 'api_token', 'client_secret', 'webhook_secret', 'mch_secret_key'];
         foreach ($sensitiveKeys as $k) {
             if (! empty($config[$k])) {
                 return true;

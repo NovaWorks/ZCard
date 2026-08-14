@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Support\BillService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -72,7 +73,9 @@ class UserController extends Controller
             'points' => 'nullable|integer|min:0',
             'pid' => 'nullable|integer|min:0',
             'group_id' => 'nullable|integer|min:0',
-            'balance' => 'nullable|integer',
+            // 安全(H-6):不再接受 balance 直写(v1.12.88 只修了 update 路径,store 仍可
+            // 凭空造余额且无流水)。初始余额在创建成功后走 BillService 流水入账。
+            'balance' => 'nullable|integer|min:0',
             'roles' => 'nullable|array',
             'roles.*' => 'string|exists:roles,name',
         ]);
@@ -89,8 +92,19 @@ class UserController extends Controller
             'points' => $data['points'] ?? 0,
             'pid' => $data['pid'] ?? 0,
             'group_id' => $data['group_id'] ?? 0,
-            'balance' => $data['balance'] ?? 0,
         ]);
+
+        // 初始余额走流水(有 bill 记录、有操作管理员,可对账),新建的是新用户故无自肥风险
+        if (! empty($data['balance']) && (int) $data['balance'] > 0) {
+            BillService::record(
+                $user->id,
+                (int) $data['balance'],
+                Bill::TYPE_INCOME,
+                '管理员开户初始余额',
+                null,
+                $request->user()->id,
+            );
+        }
 
         if (! empty($data['roles'])) {
             $user->assignRole($data['roles']);
@@ -150,6 +164,18 @@ class UserController extends Controller
             }
         }
 
+        // 安全(低危):pid 祖先链环检测——A↔B 互为上级会造成分销佣金环形多发
+        if (array_key_exists('pid', $data) && (int) $data['pid'] > 0 && (int) $data['pid'] !== (int) $user->pid) {
+            $ancestor = User::find((int) $data['pid']);
+            $hops = 0;
+            while ($ancestor && $hops++ < 100) {
+                if ($ancestor->id === $user->id) {
+                    throw ValidationException::withMessages(['pid' => ['上级推荐链不能形成环']]);
+                }
+                $ancestor = $ancestor->pid > 0 ? User::find($ancestor->pid) : null;
+            }
+        }
+
         $user->update([
             'username' => $data['username'] ?? $user->username,
             'email' => $data['email'] ?? $user->email,
@@ -176,6 +202,8 @@ class UserController extends Controller
                 $user->forceFill(['password_changed_at' => now()])->save();
             }
             $user->tokens()->delete();
+            // 安全(M-12):改密/禁用/改权同时吊销全部会话,被盗 Cookie 一并失效
+            DB::table('sessions')->where('user_id', $user->id)->delete();
         }
 
         return response()->json($user->fresh()->load(['roles', 'userGroup', 'parent']));

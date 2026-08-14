@@ -2,29 +2,18 @@
 
 namespace App\Payment\Drivers;
 
+use App\Payment\AbstractPaymentDriver;
 use App\Payment\Contracts\Payable;
-use App\Payment\Contracts\PaymentDriver;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Route;
 
 /**
  * OKPay 虚拟货币支付驱动(https://api.okaypay.me/shop)。
  * 支持 USDT / TRX 链上收款,POST /payLink 创建订单,回调 form/JSON + MD5 验签。
  */
-class OkPayDriver implements PaymentDriver
+class OkPayDriver extends AbstractPaymentDriver
 {
-    protected function namedUrl(string $name, array $params = []): string
-    {
-        $route = Route::getRoutes()->getByName($name);
-        if ($route) {
-            return $route->uri() ? url(route($name, $params, false)) : url(route($name, $params, false));
-        }
-
-        return url($name);
-    }
-
     /** OKPay 签名:参数(含 id,去 sign/空值)按 key 排序 → key=value&…&token=TOKEN → md5 大写 */
     protected function sign(array $params, string $token): string
     {
@@ -181,5 +170,11 @@ class OkPayDriver implements PaymentDriver
     public function getSupportedCurrencies(): array
     {
         return ['USDT', 'TRX'];
+    }
+
+    /** 核心验签凭据:商户 Token(不在历史默认键列表内,H-3 必须自声明) */
+    public function getCredentialKeys(): array
+    {
+        return ['merchant_token'];
     }
 }

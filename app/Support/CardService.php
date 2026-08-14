@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Card;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -24,6 +25,7 @@ class CardService
         if (empty($productIds)) {
             return [];
         }
+
         return Card::whereIn('product_id', $productIds)
             ->where('status', Card::STATUS_UNUSED)
             ->select('product_id', DB::raw('count(*) as cnt'))
@@ -44,6 +46,7 @@ class CardService
         foreach ($cards as $card) {
             $lines[] = $card->plainContent();
         }
+
         return implode("\n", $lines);
     }
 
@@ -52,7 +55,7 @@ class CardService
      * 返回 [行数组, 总数]。每行: [id, product_name, content, status, card_type, note, created_at]。
      *
      * @param  array  $filters  筛选条件(同 CardController::buildQuery 的入参)
-     * @param  int    $limit    单次最多导出条数(防止内存爆炸)
+     * @param  int  $limit  单次最多导出条数(防止内存爆炸)
      * @return array{0: array<int, array>, 1: int}
      */
     public function exportFiltered(array $filters = [], int $limit = 50000): array
@@ -69,14 +72,14 @@ class CardService
         $rows = [];
         foreach ($cards as $card) {
             $rows[] = [
-                'id'           => $card->id,
-                'product_name' => $card->product?->name ?? ('#' . $card->product_id),
-                'content'      => $card->plainContent(),
-                'status'       => $card->status,
-                'card_type'    => $card->card_type ?? '',
-                'note'         => $card->note ?? '',
-                'created_at'   => (string) $card->created_at,
-                'used_at'      => $card->used_at ? (string) $card->used_at : '',
+                'id' => $card->id,
+                'product_name' => $card->product?->name ?? ('#'.$card->product_id),
+                'content' => $card->plainContent(),
+                'status' => $card->status,
+                'card_type' => $card->card_type ?? '',
+                'note' => $card->note ?? '',
+                'created_at' => (string) $card->created_at,
+                'used_at' => $card->used_at ? (string) $card->used_at : '',
             ];
         }
 
@@ -87,46 +90,44 @@ class CardService
      * 对查询构造器应用通用筛选(product_id/status/keyword/note/owner_id/card_type/日期范围)。
      * keyword 仅匹配 content_hash 的前缀(SHA256 的 hex 不暴露明文),不做明文 LIKE。
      *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
-     * @param  array                                   $filters
-     * @return void
+     * @param  Builder  $query
      */
     public function applyFilters($query, array $filters): void
     {
-        if (!empty($filters['product_id'])) {
+        if (! empty($filters['product_id'])) {
             $query->where('product_id', $filters['product_id']);
         }
-        if (!empty($filters['status'])) {
+        if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
-        if (!empty($filters['card_type'])) {
+        if (! empty($filters['card_type'])) {
             $query->where('card_type', $filters['card_type']);
         }
         if (isset($filters['note']) && $filters['note'] !== '' && $filters['note'] !== null) {
-            $query->where('note', 'like', '%' . $filters['note'] . '%');
+            $query->where('note', 'like', '%'.$filters['note'].'%');
         }
         if (array_key_exists('owner_id', $filters) && $filters['owner_id'] !== '' && $filters['owner_id'] !== null) {
             $query->where('owner_id', $filters['owner_id']);
         }
         // keyword: 我们以 content_hash 的前缀做匹配(管理员常见做法是贴卡密让系统定位)。
         // 注意:这里直接用明文做精确 hash 匹配,而非 LIKE,避免泄漏明文长度信息。
-        if (!empty($filters['keyword'])) {
-            $hash = \App\Support\CardCipher::hash((string) $filters['keyword']);
+        if (! empty($filters['keyword'])) {
+            $hash = CardCipher::hash((string) $filters['keyword']);
             $query->where('content_hash', $hash);
         }
-        if (!empty($filters['date_from'])) {
+        if (! empty($filters['date_from'])) {
             $query->where('created_at', '>=', $filters['date_from']);
         }
-        if (!empty($filters['date_to'])) {
-            $query->where('created_at', '<=', $filters['date_to'] . ' 23:59:59');
+        if (! empty($filters['date_to'])) {
+            $query->where('created_at', '<=', $filters['date_to'].' 23:59:59');
         }
     }
 
-    /** 批量禁用(unused → disabled) */
+    /** 批量禁用(unused → disabled;锁定中的卡需先解锁,防止破坏在途订单绑定) */
     public function disable(array $cardIds): int
     {
         return Card::whereIn('id', $cardIds)
-            ->whereIn('status', [Card::STATUS_UNUSED, Card::STATUS_LOCKED])
+            ->where('status', Card::STATUS_UNUSED)
             ->update(['status' => Card::STATUS_DISABLED]);
     }
 
@@ -146,12 +147,13 @@ class CardService
             ->update(['status' => Card::STATUS_LOCKED, 'locked_at' => now()]);
     }
 
-    /** 批量解锁(locked → unused) */
+    /** 批量解锁(locked → unused)。安全(M-2):必须同时解除订单绑定,
+     * 否则旧订单付款后按 order_id 找到这张「已归池」的卡,与新订单产生绑定错乱。 */
     public function unlock(array $cardIds): int
     {
         return Card::whereIn('id', $cardIds)
             ->where('status', Card::STATUS_LOCKED)
-            ->update(['status' => Card::STATUS_UNUSED, 'locked_at' => null]);
+            ->update(['status' => Card::STATUS_UNUSED, 'locked_at' => null, 'order_id' => null]);
     }
 
     /** 将卡密标记为已出售(unused/locked/disabled → used) */
@@ -192,10 +194,10 @@ class CardService
         $total = (clone $base)->count();
 
         return [
-            'total'    => $total,
-            'unused'   => (int) ($rows[Card::STATUS_UNUSED] ?? 0),
-            'locked'   => (int) ($rows[Card::STATUS_LOCKED] ?? 0),
-            'used'     => (int) ($rows[Card::STATUS_USED] ?? 0),
+            'total' => $total,
+            'unused' => (int) ($rows[Card::STATUS_UNUSED] ?? 0),
+            'locked' => (int) ($rows[Card::STATUS_LOCKED] ?? 0),
+            'used' => (int) ($rows[Card::STATUS_USED] ?? 0),
             'disabled' => (int) ($rows[Card::STATUS_DISABLED] ?? 0),
         ];
     }

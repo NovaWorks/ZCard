@@ -42,12 +42,15 @@ class ZCardDriver implements SupplyDriver
      * SupplyAuth::handle() 的 md5($request->getContent()) 严格对齐。
      * 调用方不要预先 md5(曾因此变成双重哈希,导致恒定 invalid_signature)。
      */
-    private function signedHeaders(string $method, string $path, string $rawBody = ''): array
+    private function signedHeaders(string $method, string $path, string $rawBody = '', array $query = []): array
     {
         $creds = $this->credentials();
         $ts = (string) time();
         $nonce = 'zcard_'.uniqid();
-        $ss = HmacSigner::buildSignString($method, $path, $ts, $nonce, md5($rawBody));
+        // v1.12.90+ 起新口径:签名串追加 query md5 段(上游服务端双口径兼容验签)。
+        // query 构建必须与实际发送字节一致(HTTP 客户端按 http_build_query 默认风格)。
+        $rawQuery = $query === [] ? '' : http_build_query($query);
+        $ss = HmacSigner::buildSignStringWithQuery($method, $path, $rawQuery, $ts, $nonce, md5($rawBody));
 
         return [
             'X-Supply-Key' => $creds['api_key'],
@@ -90,7 +93,7 @@ class ZCardDriver implements SupplyDriver
     ): array {
         $path = '/api/supply/products';
         $query = ['page' => $page];
-        $data = $this->getJson($path, $query, $this->signedHeaders('GET', $path));
+        $data = $this->getJson($path, $query, $this->signedHeaders('GET', $path, '', $query));
         // 构建分类 code → name 映射,让商品预览/导入能显示上游真实分类名而非"分类 #id"
         $catNames = [];
         try {

@@ -11,7 +11,7 @@ class SupplierAccount extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'user_id', 'name', 'api_key', 'api_secret', 'balance', 'status', 'contact', 'remark',
+        'user_id', 'name', 'api_key', 'api_secret', 'balance', 'status', 'approved', 'contact', 'remark',
     ];
 
     // api_secret 由服务层 Crypt::encryptString 加密存储,中间件手动解密(不用 cast 避免双重加密)
@@ -21,6 +21,7 @@ class SupplierAccount extends Model
     {
         return [
             'balance' => 'integer',
+            'approved' => 'boolean',
         ];
     }
 
@@ -46,5 +47,11 @@ class SupplierAccount extends Model
     public function isActive(): bool
     {
         return $this->status === self::STATUS_ACTIVE;
+    }
+
+    /** 审核通过才允许调用供货 API(自助开通默认待审核,管理员审核或后台开启自动通过) */
+    public function isApproved(): bool
+    {
+        return $this->approved;
     }
 }

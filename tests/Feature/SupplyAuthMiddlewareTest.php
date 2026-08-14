@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Models\SupplierAccount;
 use App\Supply\HmacSigner;
 use App\Support\StorefrontConfig;
-use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class SupplyAuthMiddlewareTest extends TestCase
 {
@@ -15,7 +15,7 @@ class SupplyAuthMiddlewareTest extends TestCase
     private function signedHeaders(SupplierAccount $account, string $method, string $path, string $body = ''): array
     {
         $ts = (string) time();
-        $nonce = 'n' . uniqid();
+        $nonce = 'n'.uniqid();
         $signString = HmacSigner::buildSignString($method, $path, $ts, $nonce, md5($body));
         // 测试里 api_secret 存明文(不走加密),getRawOriginal 取明文算签名
         $sig = HmacSigner::sign($account->getRawOriginal('api_secret'), $signString);
@@ -32,7 +32,7 @@ class SupplyAuthMiddlewareTest extends TestCase
     {
         StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache']);
         $account = SupplierAccount::create([
-            'name' => 'A', 'api_key' => 'ak1', 'api_secret' => 'sk1', 'balance' => 10000, 'status' => 'active',
+            'name' => 'A', 'api_key' => 'ak1', 'api_secret' => 'sk1', 'balance' => 10000, 'status' => 'active', 'approved' => true,
         ]);
 
         $headers = $this->signedHeaders($account, 'POST', '/api/supply/ping', '[]');
@@ -53,7 +53,7 @@ class SupplyAuthMiddlewareTest extends TestCase
     {
         StorefrontConfig::setMany(['supply_enabled' => true, 'supply_nonce_store' => 'cache']);
         $account = SupplierAccount::create([
-            'name' => 'A', 'api_key' => 'ak1', 'api_secret' => 'sk1', 'status' => 'active',
+            'name' => 'A', 'api_key' => 'ak1', 'api_secret' => 'sk1', 'status' => 'active', 'approved' => true,
         ]);
 
         $resp = $this->withHeaders([
@@ -70,10 +70,10 @@ class SupplyAuthMiddlewareTest extends TestCase
     {
         StorefrontConfig::setMany(['supply_enabled' => true, 'supply_timestamp_skew' => 300]);
         $account = SupplierAccount::create([
-            'name' => 'A', 'api_key' => 'ak1', 'api_secret' => 'sk1', 'status' => 'active',
+            'name' => 'A', 'api_key' => 'ak1', 'api_secret' => 'sk1', 'status' => 'active', 'approved' => true,
         ]);
         $oldTs = (string) (time() - 600); // 超 300s 窗口
-        $nonce = 'n' . uniqid();
+        $nonce = 'n'.uniqid();
         $signString = HmacSigner::buildSignString('POST', '/api/supply/ping', $oldTs, $nonce, md5(''));
         $sig = HmacSigner::sign('sk1', $signString);
 

@@ -77,6 +77,9 @@ class StorefrontConfig
             ],
             'trade_captcha' => true,
             'order_close_minutes' => 15,
+            // 慢支付通道(USDT 链上)未结流水的关单宽限分钟(安全审计 H-8):
+            // 到账常超常规关单时间,宽限期内不自动关单,防止付款成功但订单已关、永不发货。
+            'slow_channel_close_grace_minutes' => 60,
             'contact_type' => 'email',
             'guest_checkout' => true,
             'require_contact' => true,
@@ -89,8 +92,9 @@ class StorefrontConfig
             'username_min_length' => 3,
             'forget_type' => 'email',
 
-            // 卡密加密(默认关闭:明文存储,正常导入;开启需填密钥,加密存储)
-            'card_encryption_enabled' => false,
+            // 卡密加密(M-9:密钥存在时默认开启——安装器已写入 CARD_ENCRYPTION_KEY,
+            // 明文落库会随 DB 备份/注入直接泄露库存;后台仍可显式关闭)
+            'card_encryption_enabled' => (bool) env('CARD_ENCRYPTION_KEY'),
             // 卡密加密密钥(存 Crypt 密文;开启时必填;变更会导致已加密卡密无法解密)
             'card_encryption_key' => '',
 
@@ -221,6 +225,9 @@ class StorefrontConfig
             'supply_nonce_store' => 'cache',      // 防重放存储: cache|redis|database(原 ZCARD_SUPPLY_NONCE_STORE)
             'supply_rate_limit' => 60,            // 供货API限流: 每账号每分钟(原 ZCARD_SUPPLY_RATE_LIMIT)
             'supply_timestamp_skew' => 300,       // 签名时间窗口秒(原 ZCARD_SUPPLY_TS_SKEW)
+            // 自助供货自动审核(安全审计 H-2):true=注册用户自助开通即审核通过(注册即享供货价);
+            // false=需管理员在后台审核通过后才能调用供货 API。默认关(先审后用)。
+            'supply_auto_approve' => false,
         ];
     }
 
@@ -274,7 +281,11 @@ class StorefrontConfig
                 return $item;
             }, is_array($widget['links'] ?? null) ? $widget['links'] : []);
             // 原始安装代码由同源 JS 端点返回，公开 JSON 只告诉前端是否启用原生客服。
-            $widget['script_configured'] = trim((string) ($widget['script'] ?? '')) !== '';
+            // 修复(2026-08-14):script_configured 以「编译结果非空」为准,而非「脚本非空」——
+            // 否则脚本被白名单整段丢弃时,前端进入原生模式却加载到空 JS,连兜底链接浮窗都不渲染,
+            // 表现为「后台填了客服代码,前台什么都不显示」。编译被丢弃时回退 links 模式。
+            $compiled = ServiceWidgetScript::compile($widget, StorefrontConfig::get('service_widget_allowed_hosts'));
+            $widget['script_configured'] = trim($compiled) !== '';
             unset($widget['script']);
             $config['service_widget'] = $widget;
         }
@@ -317,6 +328,7 @@ class StorefrontConfig
         'supply_rate_limit' => [1, 60000],
         'supply_timestamp_skew' => [30, 86400],
         'order_close_minutes' => [1, 1440],
+        'slow_channel_close_grace_minutes' => [5, 1440],
         'recharge_max_amount' => [0.01, null],
         'username_min_length' => [1, 30],
     ];

@@ -14,6 +14,7 @@ use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\SupplyAuth;
 use App\Http\Middleware\SupplyRateLimit;
 use App\Http\Middleware\TrackVisitor;
+use App\Http\Middleware\VerifyCsrfForSessionAuth;
 use App\Models\SupplySource;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -55,6 +56,9 @@ return Application::configure(basePath: dirname(__DIR__))
             MaintenanceMiddleware::class,
             ResolveSubsite::class,
         ]);
+        // 安全(H-7):会话认证的写请求在非第一方来源(Origin/Referer 不在 stateful
+        // 域名内)时强制 CSRF token,补齐 ValidateCsrfToken 仅 stateful 生效的缺口。
+        $middleware->api(append: [VerifyCsrfForSessionAuth::class]);
         // 确保 StatefulApi 域配置存在(Sanctum SPA 认证也需要)
         $middleware->statefulApi();
 
