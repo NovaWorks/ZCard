@@ -1,1 +1,1 @@
-pnpm --dir sysadmin run lint:lint-staged
+(cd sysadmin && corepack pnpm run lint:lint-staged)

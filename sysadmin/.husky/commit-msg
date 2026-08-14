@@ -1,2 +1,6 @@
-f="$(pwd)/$1"
-pnpm --dir sysadmin exec commitlint --edit "$f"
+case "$1" in
+  /*) commit_msg_file="$1" ;;
+  *) commit_msg_file="$(pwd)/$1" ;;
+esac
+
+(cd sysadmin && corepack pnpm exec commitlint --edit "$commit_msg_file")
