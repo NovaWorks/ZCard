@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\Bill;
 use App\Models\Card;
 use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\SupplierAccount;
+use App\Models\SupplyOrder;
 use App\Models\SupplySource;
 use App\Models\User;
 use App\Supply\UpstreamOrderService;
@@ -86,5 +89,141 @@ class UpstreamOrderServiceTest extends TestCase
         $this->assertSame('delivered', $fresh->delivery_status);
         $this->assertSame('<p>上游付款后教程</p>', $fresh->instructions_snapshot);
         $this->assertDatabaseHas('order_deliveries', ['order_id' => $order->id, 'card_content' => 'CARD-Z']);
+    }
+
+    public function test_timeout_auto_refund_returns_balance_payment_once(): void
+    {
+        $user = User::factory()->create(['balance' => 0]);
+        $merchant = $this->makeMerchant();
+        $source = SupplySource::create([
+            'name' => 'S',
+            'driver' => 'zcard',
+            'base_url' => 'https://x.com',
+            'credentials' => [],
+            'settings' => ['failure_action' => 'auto_refund'],
+            'status' => 'active',
+        ]);
+        $product = Product::create([
+            'merchant_id' => $merchant->id,
+            'name' => 'P',
+            'slug' => 'refund-balance',
+            'price' => 500,
+            'stock_type' => 'card',
+            'status' => 1,
+            'upstream_source_id' => $source->id,
+        ]);
+        $order = Order::create([
+            'order_no' => 'REFUND-BALANCE',
+            'merchant_id' => $merchant->id,
+            'user_id' => $user->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'amount' => 500,
+            'status' => 'paid',
+            'delivery_status' => 'pending',
+            'payment_channel' => 'balance',
+        ]);
+
+        $service = app(UpstreamOrderService::class);
+        $service->handleTimeout($order, $source);
+        $service->handleTimeout($order->fresh(), $source);
+
+        $this->assertSame(500, (int) $user->fresh()->balance);
+        $this->assertSame('refunded', $order->fresh()->status);
+        $this->assertSame('failed', $order->fresh()->delivery_status);
+        $this->assertSame(1, Bill::where('order_id', $order->id)->where('type', Bill::TYPE_INCOME)->count());
+    }
+
+    public function test_timeout_auto_refund_restores_downstream_supplier_balance_once(): void
+    {
+        $merchant = $this->makeMerchant();
+        $source = SupplySource::create([
+            'name' => 'S',
+            'driver' => 'zcard',
+            'base_url' => 'https://x.com',
+            'credentials' => [],
+            'settings' => ['failure_action' => 'auto_refund'],
+            'status' => 'active',
+        ]);
+        $product = Product::create([
+            'merchant_id' => $merchant->id,
+            'name' => 'P',
+            'slug' => 'refund-supplier',
+            'price' => 500,
+            'stock_type' => 'card',
+            'status' => 1,
+            'upstream_source_id' => $source->id,
+        ]);
+        $account = SupplierAccount::create([
+            'user_id' => User::factory()->create()->id,
+            'name' => 'Downstream',
+            'api_key' => 'refund_supplier_key',
+            'api_secret' => 'secret',
+            'balance' => 0,
+            'status' => 'active',
+            'approved' => true,
+        ]);
+        $order = Order::create([
+            'order_no' => 'REFUND-SUPPLIER',
+            'merchant_id' => $merchant->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'amount' => 500,
+            'status' => 'paid',
+            'delivery_status' => 'pending',
+            'source' => 'supply',
+        ]);
+        SupplyOrder::create([
+            'supplier_account_id' => $account->id,
+            'order_id' => $order->id,
+            'downstream_order_no' => 'DOWNSTREAM-REFUND',
+            'fulfillment_mode' => 'async',
+        ]);
+
+        $service = app(UpstreamOrderService::class);
+        $service->handleTimeout($order, $source);
+        $service->handleTimeout($order->fresh(), $source);
+
+        $this->assertSame(500, (int) $account->fresh()->balance);
+        $this->assertSame('closed', $order->fresh()->status);
+        $this->assertSame('failed', $order->fresh()->delivery_status);
+        $this->assertDatabaseCount('supplier_ledger_entries', 1);
+    }
+
+    public function test_timeout_does_not_claim_external_gateway_payment_was_refunded(): void
+    {
+        $merchant = $this->makeMerchant();
+        $source = SupplySource::create([
+            'name' => 'S',
+            'driver' => 'zcard',
+            'base_url' => 'https://x.com',
+            'credentials' => [],
+            'settings' => ['failure_action' => 'auto_refund'],
+            'status' => 'active',
+        ]);
+        $product = Product::create([
+            'merchant_id' => $merchant->id,
+            'name' => 'P',
+            'slug' => 'refund-gateway',
+            'price' => 500,
+            'stock_type' => 'card',
+            'status' => 1,
+            'upstream_source_id' => $source->id,
+        ]);
+        $order = Order::create([
+            'order_no' => 'REFUND-GATEWAY',
+            'merchant_id' => $merchant->id,
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'amount' => 500,
+            'status' => 'paid',
+            'delivery_status' => 'pending',
+            'payment_channel' => 'epay',
+        ]);
+
+        app(UpstreamOrderService::class)->handleTimeout($order, $source);
+
+        $this->assertSame('paid', $order->fresh()->status);
+        $this->assertSame('failed', $order->fresh()->delivery_status);
     }
 }
