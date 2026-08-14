@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\EnsureInstalled;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
@@ -19,6 +20,7 @@ class EnsureInstalledMiddlewareTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->withMiddleware(EnsureInstalled::class);
         $this->lockFile = storage_path('app/installed');
     }
 
