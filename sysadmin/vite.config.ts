@@ -15,15 +15,20 @@ export default ({ mode }: { mode: string }) => {
   const root = process.cwd()
   const env = loadEnv(mode, root)
   const { VITE_VERSION, VITE_PORT, VITE_BASE_URL, VITE_API_URL, VITE_API_PROXY_URL } = env
+  const baseUrl = VITE_BASE_URL || (mode === 'production' ? '/admin/' : '/')
+  const apiUrl = VITE_API_URL || '/api'
+  const appVersion = VITE_VERSION || '3.0.2'
 
-  console.log(`🚀 API_URL = ${VITE_API_URL}`)
-  console.log(`🚀 VERSION = ${VITE_VERSION}`)
+  console.log(`🚀 API_URL = ${apiUrl}`)
+  console.log(`🚀 VERSION = ${appVersion}`)
 
   return defineConfig({
     define: {
-      __APP_VERSION__: JSON.stringify(VITE_VERSION)
+      __APP_VERSION__: JSON.stringify(appVersion),
+      'import.meta.env.VITE_API_URL': JSON.stringify(apiUrl)
     },
-    base: VITE_BASE_URL,
+    // 生产构建没有提交 .env.production,必须与 outDir 保持 /admin/ 路径一致。
+    base: baseUrl,
     server: {
       port: Number(VITE_PORT),
       proxy: {
