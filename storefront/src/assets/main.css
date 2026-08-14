@@ -61,8 +61,8 @@ body {
 /* 链接过渡 */
 a, button { transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease; }
 
-/* 路由激活态(router-link-active)统一主色 */
-.router-link-active { color: var(--color-primary); }
+/* 仅精确匹配的路由使用主色，避免父路由覆盖按钮自身的文字颜色 */
+.router-link-exact-active { color: var(--color-primary); }
 
 /* 滚动条美化 */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
