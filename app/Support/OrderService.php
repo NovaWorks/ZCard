@@ -369,61 +369,54 @@ class OrderService
         $minutes = (int) (StorefrontConfig::get('order_close_minutes') ?? 15);
         $cutoff = now()->subMinutes($minutes);
 
-        $expired = Order::where('status', 'pending')
-            ->where('created_at', '<', $cutoff)
-            ->get();
-
         $count = 0;
-        foreach ($expired as $order) {
+        $grace = (int) (StorefrontConfig::get('slow_channel_close_grace_minutes') ?: 60);
+        $slowPaymentCutoff = now()->subMinutes(max(5, $grace));
+
+        Order::where('status', 'pending')
+            ->where('created_at', '<', $cutoff)
             // 安全(H-8):慢支付通道(USDT 链上)到账常超过常规关单时间;存在未结慢通道
-            // 支付流水且流水仍在宽限期内的订单顺延关闭,防止「用户已转账、订单已被关、
-            // 卡已释放被他人买走 → 付款成功永不发货」的资损场景。
-            if ($this->hasActiveSlowChannelPayment($order->id)) {
-                continue;
-            }
+            // 支付流水且流水仍在宽限期内的订单顺延关闭。使用批次子查询避免逐单查询。
+            ->whereDoesntHave('payments', function ($query) use ($slowPaymentCutoff) {
+                $query->whereIn('channel', self::SLOW_CHANNELS)
+                    ->where('status', 'pending')
+                    ->where('created_at', '>', $slowPaymentCutoff);
+            })
+            ->select('id')
+            ->chunkById(200, function ($expired) use (&$count) {
+                foreach ($expired as $order) {
+                    $closed = DB::transaction(function () use ($order) {
+                        // 安全(M-7):行锁后复检状态——支付回调可能在关单瞬间把订单置为 paid,
+                        // 未复检会导致"已付款订单被翻成 closed、付款不发卡"。
+                        $locked = Order::whereKey($order->id)->lockForUpdate()->first();
+                        if (! $locked || $locked->status !== 'pending') {
+                            return false;
+                        }
+                        $locked->update(['status' => 'closed', 'closed_at' => now()]);
+                        Card::where('order_id', $locked->id)
+                            ->where('status', Card::STATUS_LOCKED)
+                            ->update([
+                                'status' => Card::STATUS_UNUSED,
+                                'locked_at' => null,
+                                'order_id' => null,
+                            ]);
+                        CouponService::release($locked->id);
 
-            $closed = DB::transaction(function () use ($order) {
-                // 安全(M-7):行锁后复检状态——支付回调可能在关单瞬间把订单置为 paid,
-                // 未复检会导致"已付款订单被翻成 closed、付款不发卡"。
-                $locked = Order::whereKey($order->id)->lockForUpdate()->first();
-                if (! $locked || $locked->status !== 'pending') {
-                    return false;
+                        return true;
+                    });
+
+                    if ($closed) {
+                        $count++;
+                    }
                 }
-                $locked->update(['status' => 'closed', 'closed_at' => now()]);
-                Card::where('order_id', $locked->id)
-                    ->where('status', Card::STATUS_LOCKED)
-                    ->update([
-                        'status' => Card::STATUS_UNUSED,
-                        'locked_at' => null,
-                        'order_id' => null,
-                    ]);
-                CouponService::release($locked->id);
-
-                return true;
-            });
-
-            if ($closed) {
-                $count++;
             }
-        }
+            );
 
         return $count;
     }
 
     /** 慢支付通道列表(链上到账通常 >15 分钟) */
     public const SLOW_CHANNELS = ['usdt', 'okpay', 'tokenpay', 'epusdt', 'bepusdt'];
-
-    /** 是否存在仍在宽限期内的未结慢通道支付流水 */
-    private function hasActiveSlowChannelPayment(int $orderId): bool
-    {
-        $grace = (int) (StorefrontConfig::get('slow_channel_close_grace_minutes') ?: 60);
-
-        return Payment::where('order_id', $orderId)
-            ->whereIn('channel', self::SLOW_CHANNELS)
-            ->where('status', 'pending')
-            ->where('created_at', '>', now()->subMinutes(max(5, $grace)))
-            ->exists();
-    }
 
     /** 后台手动关闭 */
     public function closeOrder(int $orderId): Order
