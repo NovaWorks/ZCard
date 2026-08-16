@@ -297,6 +297,27 @@ class SecurityHardeningV11290Test extends TestCase
             ->assertOk();
     }
 
+    public function test_same_origin_session_write_skips_csrf_check(): void
+    {
+        $user = User::factory()->create(['status' => 1]);
+        $session = [
+            Auth::guard('web')->getName() => $user->id,
+            'password_hash_web' => $user->getAuthPassword(),
+            '_token' => 'sec-test-token',
+        ];
+
+        // 同源写请求(浏览器 Sec-Fetch-Site: same-origin):即使 Origin 不在 stateful
+        // 域名内,也应与 PreventRequestForgery 同口径放行,不要求 CSRF token。
+        // 复现:线上 APP_URL/SANCTUM_STATEFUL_DOMAINS 未配真实域名时,同源后台写请求
+        // 被 VerifyCsrfForSessionAuth 误判为跨站 → 419 CSRF token mismatch。
+        $this->withSession($session)
+            ->postJson('/api/auth/logout', [], [
+                'Origin' => 'https://kmigo.com',
+                'Sec-Fetch-Site' => 'same-origin',
+            ])
+            ->assertOk();
+    }
+
     // ── H-5 更新通道密码复验 ─────────────────────────────────────────
 
     public function test_update_run_requires_password_confirmation(): void

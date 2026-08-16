@@ -34,7 +34,8 @@ class VerifyCsrfForSessionAuth
                 && $request->hasSession()
                 && auth()->guard('web')->user() !== null
                 && $this->hasBrowserOrigin($request)
-                && ! $this->fromFirstPartyFrontend($request);
+                && ! $this->fromFirstPartyFrontend($request)
+                && ! $this->isSameOriginRequest($request);
 
             if ($needsGuard && ! $this->tokensMatch($request)) {
                 return response()->json(['message' => 'CSRF token mismatch'], 419);
@@ -49,6 +50,19 @@ class VerifyCsrfForSessionAuth
     {
         return $request->headers->get('origin') !== null
             || $request->headers->get('referer') !== null;
+    }
+
+    /**
+     * 同源写请求无需 CSRF 校验。
+     *
+     * Sec-Fetch-Site 头由浏览器控制,跨站攻击者的请求只会带 cross-site/same-site,
+     * 无法伪造为 same-origin,因此与 PreventRequestForgery::hasValidOrigin 同口径,
+     * 把它作为「第一方同源」的可靠信号放行。这能消除对 SANCTUM_STATEFUL_DOMAINS /
+     * APP_URL 配置正确性的依赖(线上域名未配进 stateful 时,同源后台写请求不再被误判)。
+     */
+    private function isSameOriginRequest(Request $request): bool
+    {
+        return $request->header('Sec-Fetch-Site') === 'same-origin';
     }
 
     /** 与 Sanctum EnsureFrontendRequestsAreStateful::fromFrontend 同口径 */
