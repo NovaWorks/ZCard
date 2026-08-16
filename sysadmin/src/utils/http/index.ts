@@ -65,12 +65,25 @@ const axiosInstance = axios.create({
 
 /** 请求拦截器 */
 axiosInstance.interceptors.request.use(
-  (request: InternalAxiosRequestConfig) => {
+  async (request: InternalAxiosRequestConfig) => {
     const { accessToken } = useUserStore()
     // ZCard Sanctum: Bearer token 格式
     if (accessToken) request.headers.set('Authorization', `Bearer ${accessToken}`)
     // 标识管理端来源:后端据此对登录/注册跳过图形验证码(sysadmin 用滑块+限流防暴力)
     request.headers.set('X-Client', 'sysadmin')
+
+    // 会话认证写请求的 CSRF 守卫(与 storefront request.ts 同口径):
+    // 页面刷新后内存 token 丢失,登录态靠 HttpOnly 会话 Cookie 恢复,写请求将走
+    // Sanctum stateful / VerifyCsrfForSessionAuth 的 CSRF 校验。非只读请求先确保
+    // XSRF-TOKEN Cookie 存在(axios 会自动带 X-XSRF-TOKEN 头);Cookie 已存在则跳过。
+    const method = (request.method || 'get').toLowerCase()
+    if (!['get', 'head', 'options'].includes(method) && !document.cookie.includes('XSRF-TOKEN')) {
+      try {
+        await fetch('/sanctum/csrf-cookie', { credentials: 'include' })
+      } catch {
+        // 忽略:同源 Cookie 不可用时按 Bearer 模式处理
+      }
+    }
 
     if (request.data && !(request.data instanceof FormData) && !request.headers['Content-Type']) {
       request.headers.set('Content-Type', 'application/json')
