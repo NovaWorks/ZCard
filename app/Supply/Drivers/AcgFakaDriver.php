@@ -90,7 +90,7 @@ class AcgFakaDriver implements SupplyDriver
         }
         // 响应不是预期 JSON 结构(可能是 WAF 拦截返回 HTML)
         if (! isset($data['code'])) {
-            throw UpstreamRequestException::invalidResponse($url, $resp->body());
+            throw UpstreamRequestException::fromInvalidResponse($url, $resp);
         }
 
         return $data;
@@ -178,7 +178,7 @@ class AcgFakaDriver implements SupplyDriver
                 }
                 $data = $resp->json();
                 if (! is_array($data) || ! isset($data['code'])) {
-                    throw UpstreamRequestException::invalidResponse($stockUrl, $resp->body());
+                    throw UpstreamRequestException::fromInvalidResponse($stockUrl, $resp);
                 }
                 if ((int) $data['code'] !== 200) {
                     throw UpstreamRequestException::business($stockUrl, (string) ($data['msg'] ?? '库存查询失败'));
