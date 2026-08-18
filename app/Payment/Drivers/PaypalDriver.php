@@ -4,6 +4,7 @@ namespace App\Payment\Drivers;
 
 use App\Payment\AbstractPaymentDriver;
 use App\Payment\Contracts\Payable;
+use App\Payment\FiatAmount;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -55,6 +56,12 @@ class PaypalDriver extends AbstractPaymentDriver
     public function pay(Payable $order, array $config): PaymentResult
     {
         $token = $this->accessToken($config);
+        $currency = strtoupper($config['target_currency'] ?? 'USD');
+        $amount = FiatAmount::convertFromBase(
+            $order->getPayableAmount(),
+            $config['exchange_rate'] ?? '1',
+            $currency
+        );
 
         $returnUrl = $this->namedUrl('payment.return', ['code' => 'paypal']).'?order_no='.$order->getPayableKey();
         $cancelUrl = $this->namedUrl('payment.cancel', ['code' => 'paypal']).'?order_no='.$order->getPayableKey();
@@ -65,8 +72,8 @@ class PaypalDriver extends AbstractPaymentDriver
                 [
                     'reference_id' => $order->getPayableKey(),
                     'amount' => [
-                        'currency_code' => 'USD',
-                        'value' => bcdiv((string) $order->getPayableAmount(), '100', 2), // 分→元
+                        'currency_code' => $currency,
+                        'value' => FiatAmount::formatMinor($amount, $currency),
                     ],
                 ],
             ],
@@ -82,7 +89,7 @@ class PaypalDriver extends AbstractPaymentDriver
         $links = $res->json('links') ?? [];
         foreach ($links as $link) {
             if (($link['rel'] ?? null) === 'approve') {
-                return PaymentResult::redirect($link['href']);
+                return PaymentResult::redirect($link['href'], $currency, $amount);
             }
         }
 
@@ -93,10 +100,10 @@ class PaypalDriver extends AbstractPaymentDriver
                 ? 'https://www.sandbox.paypal.com'
                 : 'https://www.paypal.com';
 
-            return PaymentResult::redirect($host.'/checkoutnow?token='.$orderId);
+            return PaymentResult::redirect($host.'/checkoutnow?token='.$orderId, $currency, $amount);
         }
 
-        return PaymentResult::redirect('');
+        return PaymentResult::redirect('', $currency, $amount);
     }
 
     public function verifyCallback(Request $request, array $config): ?array
@@ -125,12 +132,16 @@ class PaypalDriver extends AbstractPaymentDriver
         }
 
         $unit = $data['purchase_units'][0] ?? [];
-        $amountStr = $unit['payments']['captures'][0]['amount']['value'] ?? null;
+        $captureAmount = $unit['payments']['captures'][0]['amount'] ?? [];
+        $currency = strtoupper($config['target_currency'] ?? 'USD');
+        if (strtoupper((string) ($captureAmount['currency_code'] ?? '')) !== $currency) {
+            return null;
+        }
 
         return [
             'channel_order_no' => $data['id'] ?? null,
             'out_trade_no' => $unit['reference_id'] ?? null,
-            'amount' => $amountStr !== null ? (int) round(bcmul((string) $amountStr, '100', 3)) : null, // 元→分
+            'amount' => FiatAmount::fromMajor($captureAmount['value'] ?? null, $currency),
             'raw' => $data,
         ];
     }

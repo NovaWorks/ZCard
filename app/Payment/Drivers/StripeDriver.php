@@ -2,8 +2,9 @@
 
 namespace App\Payment\Drivers;
 
-use App\Payment\Contracts\Payable;
 use App\Payment\AbstractPaymentDriver;
+use App\Payment\Contracts\Payable;
+use App\Payment\FiatAmount;
 use App\Payment\PaymentResult;
 use Illuminate\Http\Request;
 use Stripe\Checkout\Session;
@@ -12,19 +13,25 @@ use Stripe\Webhook;
 
 class StripeDriver extends AbstractPaymentDriver
 {
-        public function pay(Payable $order, array $config): PaymentResult
+    public function pay(Payable $order, array $config): PaymentResult
     {
         Stripe::setApiKey($config['secret_key'] ?? '');
+        $currency = strtoupper($config['target_currency'] ?? ($config['currency'] ?? 'USD'));
+        $amount = FiatAmount::convertFromBase(
+            $order->getPayableAmount(),
+            $config['exchange_rate'] ?? '1',
+            $currency
+        );
 
         $session = Session::create([
             'payment_method_types' => ['card'],
             'line_items' => [[
                 'price_data' => [
-                    'currency' => strtolower($config['currency'] ?? 'usd'),
+                    'currency' => strtolower($currency),
                     'product_data' => [
                         'name' => $order->getPayableKey(),
                     ],
-                    'unit_amount' => (int) $order->getPayableAmount(), // Stripe 用分,order->amount 已是分
+                    'unit_amount' => $amount,
                 ],
                 'quantity' => 1,
             ]],
@@ -34,7 +41,7 @@ class StripeDriver extends AbstractPaymentDriver
             'cancel_url' => $this->namedUrl('payment.cancel', ['code' => 'stripe']).'?order_no='.$order->getPayableKey(),
         ]);
 
-        return PaymentResult::redirect($session->url);
+        return PaymentResult::redirect($session->url, $currency, $amount);
     }
 
     public function verifyCallback(Request $request, array $config): ?array
@@ -58,6 +65,11 @@ class StripeDriver extends AbstractPaymentDriver
 
         $session = $event->data->object ?? null;
         if (! $session) {
+            return null;
+        }
+
+        $currency = strtoupper($config['target_currency'] ?? ($config['currency'] ?? 'USD'));
+        if (strtoupper((string) ($session->currency ?? '')) !== $currency) {
             return null;
         }
 

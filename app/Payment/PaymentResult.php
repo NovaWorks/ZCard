@@ -5,7 +5,9 @@ namespace App\Payment;
 class PaymentResult
 {
     const TYPE_REDIRECT = 'redirect';
+
     const TYPE_QRCODE = 'qrcode';
+
     const TYPE_FORM = 'form';
 
     public function __construct(
@@ -17,9 +19,17 @@ class PaymentResult
         public ?int $amountSent = null,
     ) {}
 
-    public static function redirect(string $url): static
-    {
-        return new static(self::TYPE_REDIRECT, redirectUrl: $url);
+    public static function redirect(
+        string $url,
+        ?string $currencySent = null,
+        ?int $amountSent = null,
+    ): static {
+        return new static(
+            self::TYPE_REDIRECT,
+            redirectUrl: $url,
+            currencySent: $currencySent,
+            amountSent: $amountSent,
+        );
     }
 
     public static function qrcode(string $content): static
