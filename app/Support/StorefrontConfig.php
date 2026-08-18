@@ -37,7 +37,7 @@ class StorefrontConfig
         'brand_slogan', 'brand_slogan_en', 'brand_secure', 'brand_secure_en',
         'brand_privacy', 'brand_privacy_en', 'footer_about', 'footer_links',
         'footer_contact', 'footer_social', 'footer_help_links', 'footer_copyright',
-        'service_widget',
+        'service_widget', 'analytics',
         'cash_min', 'cash_fee', 'cash_type_alipay', 'cash_type_wechat', 'cash_type_usdt',
         'base_currency', 'default_display_currency', 'enabled_languages', 'default_language',
         'distribution_enabled', 'subsite_enabled',
@@ -146,8 +146,18 @@ class StorefrontConfig
                 ['title' => '购买须知', 'title_en' => 'Purchase Guide', 'url' => ''],
             ],
             'footer_copyright' => '© 2026 ZCard · 现代化插件制自动发卡系统',
-            // 第三方统计代码(百度统计/Google Analytics 等,原样注入到页面底部)
+            // 【已弃用,仅用于迁移】v1.12.55 起不再下发/注入,由下方结构化的 analytics 取代。
+            // 存量数据由迁移搬入 analytics.script(保持关闭,需管理员确认白名单后手动启用)。
             'footer_analytics' => '',
+
+            // 站点统计代码(issue #39):GA4/百度统计等安装代码,经受信域名白名单编译后
+            // 由同源端点 /api/settings/analytics-script 下发,CSP 仅在启用时按白名单放宽。
+            'analytics' => [
+                'enabled' => false,
+                'script' => '',
+            ],
+            // 统计脚本受信域名白名单:脚本内引用的外部主机必须在此列表(默认含 GA4/百度统计官方域名)。
+            'analytics_allowed_hosts' => AnalyticsScript::DEFAULT_ALLOWED_HOSTS,
 
             // 右下角在线客服浮窗(issue #7)
             // script:Chatwoot/Crisp 等第三方客服代码,原样注入;links:可跳转的客服链接列表
@@ -288,6 +298,17 @@ class StorefrontConfig
             $widget['script_configured'] = trim($compiled) !== '';
             unset($widget['script']);
             $config['service_widget'] = $widget;
+        }
+
+        // 统计代码同理(issue #39):公开配置只告诉前端"是否有可执行的统计脚本",
+        // 原始脚本一律不下发,由同源端点在编译后返回。
+        $analytics = $config['analytics'] ?? null;
+        if (is_array($analytics)) {
+            $compiled = AnalyticsScript::compile($analytics, StorefrontConfig::get('analytics_allowed_hosts'));
+            $config['analytics'] = [
+                'enabled' => (bool) filter_var($analytics['enabled'] ?? false, FILTER_VALIDATE_BOOL),
+                'script_configured' => trim($compiled) !== '',
+            ];
         }
 
         return $config;

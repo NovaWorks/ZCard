@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\AnalyticsScript;
 use App\Support\HtmlContentSanitizer;
 use App\Support\ServiceWidgetScript;
 use App\Support\StorefrontConfig;
@@ -34,6 +35,18 @@ class StorefrontSettingsController extends Controller
     {
         $allowedHosts = StorefrontConfig::get('service_widget_allowed_hosts');
         $script = ServiceWidgetScript::compile(StorefrontConfig::get('service_widget'), $allowedHosts);
+
+        return response($script, 200, [
+            'Content-Type' => 'application/javascript; charset=UTF-8',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+        ]);
+    }
+
+    /** 返回同源统计脚本(issue #39),兼容 GA4/百度统计官方完整安装代码。 */
+    public function analyticsScript(): Response
+    {
+        $allowedHosts = StorefrontConfig::get('analytics_allowed_hosts');
+        $script = AnalyticsScript::compile(StorefrontConfig::get('analytics'), $allowedHosts);
 
         return response($script, 200, [
             'Content-Type' => 'application/javascript; charset=UTF-8',

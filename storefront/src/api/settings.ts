@@ -71,6 +71,8 @@ export interface StorefrontSettings {
   sms_enabled: boolean
   cash_min: number
   cash_fee: number
+  // 站点统计(issue #39):只下发是否有可执行脚本,原始统计代码由同源端点编译后返回
+  analytics?: { enabled: boolean; script_configured: boolean }
   // 多语言/多货币
   base_currency: string
   default_display_currency: string

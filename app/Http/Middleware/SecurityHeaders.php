@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\AnalyticsScript;
 use App\Support\ServiceWidgetScript;
 use App\Support\StorefrontConfig;
 use Closure;
@@ -23,6 +24,7 @@ class SecurityHeaders
         // 商城与正式后台 SPA 使用严格 CSP。
         if (! $request->is('filament', 'filament/*')) {
             $widgetOrigins = [];
+            $analyticsOrigins = [];
             if (! $request->is('api/*', 'admin', 'admin/*', 'install', 'install/*')) {
                 try {
                     $allowedHosts = StorefrontConfig::get('service_widget_allowed_hosts');
@@ -30,12 +32,18 @@ class SecurityHeaders
                         StorefrontConfig::get('service_widget'),
                         $allowedHosts,
                     );
+                    // 统计代码(issue #39):仅在「已启用且脚本非空」时放行,未启用不额外放宽 CSP。
+                    $analyticsOrigins = AnalyticsScript::allowedOrigins(
+                        StorefrontConfig::get('analytics'),
+                        StorefrontConfig::get('analytics_allowed_hosts'),
+                    );
                 } catch (\Throwable) {
                     // 安装前或数据库暂不可用时保持最严格 CSP，不能影响错误页正常返回。
                 }
             }
 
-            $externalSources = $widgetOrigins === [] ? '' : ' '.implode(' ', $widgetOrigins);
+            $scriptOrigins = array_values(array_unique(array_merge($widgetOrigins, $analyticsOrigins)));
+            $externalSources = $scriptOrigins === [] ? '' : ' '.implode(' ', $scriptOrigins);
             // 安全(低危):wss 只放行客服白名单主机的 WebSocket(裸 wss: 允许连任意
             // WS 服务器外发数据,绕过 connect-src 白名单的初衷)。注意 Crisp 的实时
             // 通道在独立子域名 client.relay.crisp.chat,已包含在默认白名单中。

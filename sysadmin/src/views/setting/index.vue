@@ -84,8 +84,25 @@
                 </div>
               </div>
             </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.analyticsEnabled')">
+              <ElSwitch v-model="form.analyticsEnabled" />
+              <span class="form-tip">{{ t('zcard.setting.analyticsEnabledTip') }}</span>
+            </ElFormItem>
             <ElFormItem :label="t('zcard.setting.footerAnalytics')">
-              <ElInput v-model="form.footer_analytics" type="textarea" :rows="5" :placeholder="t('zcard.setting.footerAnalyticsPlaceholder')" />
+              <ElInput
+                v-model="form.analyticsScript"
+                type="textarea"
+                :rows="6"
+                :placeholder="t('zcard.setting.footerAnalyticsPlaceholder')"
+              />
+              <span class="form-tip">{{ t('zcard.setting.analyticsScriptTip') }}</span>
+            </ElFormItem>
+            <ElFormItem :label="t('zcard.setting.analyticsAllowedHosts')">
+              <ElInput
+                v-model="form.analyticsAllowedHosts"
+                :placeholder="t('zcard.setting.analyticsAllowedHostsPlaceholder')"
+              />
+              <span class="form-tip">{{ t('zcard.setting.analyticsAllowedHostsTip') }}</span>
             </ElFormItem>
           </ElForm>
         </ElTabPane>
@@ -565,7 +582,10 @@
     brand_privacy_en: string
     footer_copyright: string
     footer_about: string
-    footer_analytics: string
+    /** 统计代码(issue #39):结构化配置,取代已弃用的 footer_analytics */
+    analyticsEnabled: boolean
+    analyticsScript: string
+    analyticsAllowedHosts: string
     footerLinksJson: string
     footerContactJson: string
     footerSocialJson: string
@@ -676,7 +696,9 @@
     brand_privacy_en: '',
     footer_copyright: '',
     footer_about: '',
-    footer_analytics: '',
+    analyticsEnabled: false,
+    analyticsScript: '',
+    analyticsAllowedHosts: '',
     footerLinksJson: '[]',
     footerContactJson: '[]',
     footerSocialJson: '[]',
@@ -889,7 +911,6 @@
         brand_privacy_en: coerce(data.brand_privacy_en, d.brand_privacy_en),
         footer_copyright: coerce(data.footer_copyright, d.footer_copyright),
         footer_about: coerce(data.footer_about, d.footer_about),
-        footer_analytics: coerce(data.footer_analytics, d.footer_analytics),
         category_nav_style: coerce(data.category_nav_style, d.category_nav_style),
         list_default_view: coerce(data.list_default_view, d.list_default_view),
         grid_columns: Number(coerce(data.grid_columns, d.grid_columns)),
@@ -967,6 +988,15 @@
       form.footerSocialJson = toText(data.footer_social)
       form.footerHelpLinksJson = toText(data.footer_help_links)
       form.hotTagCategoriesJson = toText(data.hot_tag_categories)
+      // 统计代码(issue #39):结构化配置;旧 footer_analytics 由数据库迁移搬入,此处不再回显旧字段
+      const analytics: any = data.analytics || {}
+      form.analyticsEnabled = !!analytics.enabled
+      form.analyticsScript = analytics.script || ''
+      form.analyticsAllowedHosts = Array.isArray(data.analytics_allowed_hosts)
+        ? data.analytics_allowed_hosts.join(',')
+        : typeof data.analytics_allowed_hosts === 'string'
+          ? data.analytics_allowed_hosts
+          : ''
       const sw: any = data.service_widget || {}
       form.serviceWidgetEnabled = !!sw.enabled
       form.serviceWidgetTitle = sw.title || ''
@@ -1027,6 +1057,11 @@
         // 原样提交字符串,由后端统一解析(兼容逗号/空格/分号分隔、自动去协议头、
         // 自动拆分被点号连串的域名、剔除非法项;全部非法时回退默认官方域名)。
         service_widget_allowed_hosts: form.serviceWidgetAllowedHosts.trim(),
+        analytics: {
+          enabled: !!form.analyticsEnabled,
+          script: form.analyticsScript
+        } as any,
+        analytics_allowed_hosts: form.analyticsAllowedHosts.trim(),
       }
       delete (payload as any).footerLinksJson
       delete (payload as any).footerContactJson
@@ -1039,6 +1074,9 @@
       delete (payload as any).serviceWidgetLinksJson
       delete (payload as any).serviceWidgetScript
       delete (payload as any).serviceWidgetAllowedHosts
+      delete (payload as any).analyticsEnabled
+      delete (payload as any).analyticsScript
+      delete (payload as any).analyticsAllowedHosts
       // 卡密加密密钥:仅在填写时提交(留空=保持原值);回显值为脱敏占位,不得覆盖
       if (cardEncryptionKey.value.trim()) {
         payload.card_encryption_key = cardEncryptionKey.value.trim()
@@ -1054,6 +1092,15 @@
           duration: 10000,
           showClose: true,
           message: t('zcard.setting.serviceScriptDroppedWarning'),
+        })
+      }
+      // 统计脚本被白名单整段丢弃 → 前台不会有任何统计请求(issue #39 的静默失效正是这个后果),必须提示
+      if ((res as any)?.analytics_script_dropped) {
+        ElMessage({
+          type: 'warning',
+          duration: 10000,
+          showClose: true,
+          message: t('zcard.setting.analyticsScriptDroppedWarning')
         })
       }
     } catch (e) {

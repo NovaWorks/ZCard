@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Card;
+use App\Support\AnalyticsScript;
 use App\Support\ServiceWidgetScript;
 use App\Support\StorefrontConfig;
 use Illuminate\Http\JsonResponse;
@@ -76,6 +77,18 @@ class SettingController extends Controller
             $compiled = ServiceWidgetScript::compile($widget, StorefrontConfig::get('service_widget_allowed_hosts'));
             if (trim($compiled) === '') {
                 $all['service_widget_script_dropped'] = true;
+            }
+        }
+
+        // 统计代码同样检测(issue #39):已启用且脚本非空却编译为空 = 引用域名不在白名单被整段丢弃,
+        // 前台不会产生任何统计请求。必须显式提示,避免重演「保存成功但静默失效」。
+        $analytics = is_array($kv['analytics'] ?? null) ? $kv['analytics'] : null;
+        if ($analytics
+            && filter_var($analytics['enabled'] ?? false, FILTER_VALIDATE_BOOL)
+            && trim((string) ($analytics['script'] ?? '')) !== '') {
+            $compiled = AnalyticsScript::compile($analytics, StorefrontConfig::get('analytics_allowed_hosts'));
+            if (trim($compiled) === '') {
+                $all['analytics_script_dropped'] = true;
             }
         }
 

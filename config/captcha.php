@@ -33,6 +33,37 @@ return [
         'lines' => 2,
         'fontColors' => ['#2563eb', '#111827', '#dc2626', '#16a34a'],
     ],
+    // 注册(register)/登录(login)场景:参数必须与 trade 一致。
+    // 缺失时 mews 的 configure() 不做任何事,直接沿用类默认值(length=5、width=120),
+    // 5 个字符画在 120px 画布上会把最后一位裁出边界 —— 用户照着看不全的图输入,
+    // 必然反复提示「验证码错误」。register 段同时服务前台注册页与找回密码页。
+    'register' => [
+        'length' => 4,
+        'width' => 120,
+        'height' => 36,
+        'quality' => 90,
+        'math' => false,
+        'expire' => 600,
+        'encrypt' => false,
+        'bgImage' => false,
+        'bgColor' => '#ffffff',
+        'lines' => 2,
+        'fontColors' => ['#2563eb', '#111827', '#dc2626', '#16a34a'],
+    ],
+    'login' => [
+        'length' => 4,
+        'width' => 120,
+        'height' => 36,
+        'quality' => 90,
+        'math' => false,
+        'expire' => 600,
+        'encrypt' => false,
+        'bgImage' => false,
+        'bgColor' => '#ffffff',
+        'lines' => 2,
+        'fontColors' => ['#2563eb', '#111827', '#dc2626', '#16a34a'],
+    ],
+
     'flat' => [
         'length' => 6,
         'fontColors' => ['#2c3e50', '#c0392b', '#16a085', '#c0392b', '#8e44ad', '#303f9f', '#f57c00', '#795548'],
