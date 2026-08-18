@@ -63,6 +63,7 @@ class TradeCaptchaTest extends TestCase
             'product_id' => $product->id,
             'qty' => 1,
             'contact' => 'captcha@example.com',
+            'password' => 'query-secret', // 游客下单强制设查询密码(order_query_password 默认开启)
             'captcha' => '1234',
             'captcha_key' => 'captcha-key',
         ])->assertCreated();

@@ -9,7 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 import { formatMoney } from '@/utils/money'
 import AppIcon from '@/components/AppIcon.vue'
 import PayBrandIcon from '@/components/PayBrandIcon.vue'
-import { getOrderAccessToken } from '@/utils/orderAccess'
+import { accessTokensForKeyword, getOrderAccessToken } from '@/utils/orderAccess'
 import { navigateToPaymentUrl, submitPaymentForm } from '@/utils/paymentNavigation'
 
 const route = useRoute()
@@ -154,7 +154,7 @@ function startPolling() {
         found = Array.isArray(mine) ? mine.find(o => o.order_no === orderNo) ?? null : null
       }
       if (!found) {
-        const list = await queryOrders(orderNo, undefined, getOrderAccessToken(orderNo))
+        const list = await queryOrders(orderNo, undefined, accessTokensForKeyword(orderNo))
         found = Array.isArray(list) ? list.find(o => o.order_no === orderNo) ?? null : null
       }
       if (found?.status === 'paid') {

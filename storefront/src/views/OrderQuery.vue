@@ -7,7 +7,7 @@ import { formatMoney } from '@/utils/money'
 import { usePreferencesStore } from '@/stores/preferences'
 import AppIcon from '@/components/AppIcon.vue'
 import OrderInstructions from '@/components/OrderInstructions.vue'
-import { getOrderAccessToken } from '@/utils/orderAccess'
+import { accessTokensForKeyword } from '@/utils/orderAccess'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -70,7 +70,7 @@ async function search() {
     results.value = await queryOrders(
       normalizedKeyword,
       password.value || undefined,
-      getOrderAccessToken(normalizedKeyword),
+      accessTokensForKeyword(normalizedKeyword),
     )
   } catch (e: any) {
     // 后端未找到返回 200 + 空数组,走空状态;只有真正的网络/服务器错误才进这里

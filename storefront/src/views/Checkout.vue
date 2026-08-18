@@ -72,6 +72,12 @@ const selectedChannelId = ref<number | null>(null)
 const selectedPayType = ref<string | undefined>(undefined)
 const submitting = ref(false)
 
+/**
+ * 查询密码是否必填:开启该功能且以游客身份下单时必填。
+ * 登录用户可在「我的订单」凭账号读取卡密,不受此限制。
+ */
+const queryPasswordRequired = computed(() => !!settings.config?.order_query_password && !auth.isLoggedIn)
+
 // 下单验证码
 const needCaptcha = computed(() => !!settings.config?.trade_captcha)
 const captchaSrc = ref('')
@@ -300,6 +306,10 @@ async function submit() {
     err.value = t('order.checkout.guestOnlyHint'); return
   }
   if (!contact.value.trim()) { err.value = t('order.checkout.fillContact'); return }
+  // 游客订单的另一条读取凭证只存在本浏览器,换设备即失效 → 查询密码开启时必填
+  if (queryPasswordRequired.value && password.value.trim().length < 6) {
+    err.value = t('order.checkout.fillQueryPassword'); return
+  }
   if (needCaptcha.value && !captcha.value) {
     err.value = t('common.validation.fillCaptcha'); return
   }
@@ -349,7 +359,7 @@ async function doSubmit() {
         coupon_code: couponCode.value.trim() || undefined,
         extra: undefined,
       })
-      res.orders.forEach((order) => storeOrderAccessToken(order.order_no, order.access_token))
+      res.orders.forEach((order) => storeOrderAccessToken(order.order_no, order.access_token, contact.value))
       if (isBalance) {
         await balanceBatchPay(res.order_ids)
         cart.clear()
@@ -378,7 +388,7 @@ async function doSubmit() {
         coupon_code: couponCode.value.trim() || undefined,
         extra: { ...controlValues.value },
       } as any)
-      storeOrderAccessToken(res.order_no, res.access_token)
+      storeOrderAccessToken(res.order_no, res.access_token, contact.value)
       if (isBalance) {
         await balancePay(res.order_no)
         router.push({ path: '/pay/result', query: { order_no: res.order_no } })
@@ -555,8 +565,10 @@ const selectPaymentOption = (channel: PaymentChannel, payType?: string) => {
               :placeholder="contactIsPhone ? t('order.checkout.phonePlaceholder') : t('order.checkout.emailPlaceholder')"
               class="w-full px-3 py-2 border border-border rounded-field text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition" />
             <div v-if="settings.config?.order_query_password" class="mt-2">
-              <input v-model="password" type="password" :placeholder="t('order.checkout.queryPasswordPlaceholder')"
+              <input v-model="password" type="password"
+                :placeholder="queryPasswordRequired ? t('order.checkout.queryPasswordRequiredPlaceholder') : t('order.checkout.queryPasswordPlaceholder')"
                 class="w-full px-3 py-2 border border-border rounded-field text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition" />
+              <p v-if="queryPasswordRequired" class="mt-1 text-xs text-ink-muted">{{ t('order.checkout.queryPasswordHint') }}</p>
             </div>
             <div v-if="needCaptcha" class="mt-2 flex gap-2">
               <input v-model="captcha" type="text" :placeholder="t('common.validation.fillCaptcha')" maxlength="6"

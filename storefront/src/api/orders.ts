@@ -37,12 +37,15 @@ export const createBatchOrders = (data: {
 export const mockPay = (orderNo: string) =>
   request.post<unknown, { order_no: string; status: string; delivered: boolean }>(`/orders/${orderNo}/mock-pay`)
 
-/** 单关键字智能查询历史订单(订单号 OR 联系方式) */
-export const queryOrders = (keyword: string, password?: string, accessToken?: string) =>
+/**
+ * 单关键字智能查询历史订单(订单号 OR 联系方式)。
+ * accessTokens 为本机持有的访问凭证:按联系方式查单时可能命中多笔订单,一次带上由服务端逐笔比对。
+ */
+export const queryOrders = (keyword: string, password?: string, accessTokens?: string[]) =>
   request.post<unknown, OrderDetail[]>('/orders/query', {
     keyword,
     password,
-    access_token: accessToken,
+    access_tokens: accessTokens?.length ? accessTokens : undefined,
   })
 
 export const getMyOrders = () => request.get<unknown, OrderDetail[]>('/orders/mine')

@@ -28,6 +28,7 @@ return [
     'order.above_max_order' => '该商品单次最多购买 :max 件',
     'order.purchase_limit_exceeded' => '该商品限购 :limit 件,已超出可购数量',
     'order.sku_unavailable' => '所选规格不可用或已下架',
+    'order.query_password_required' => '请设置查询密码(至少 6 位),否则换设备或清除浏览器数据后将无法查看卡密',
 
     'review.order_not_found' => '订单不存在或未支付',
     'review.already_reviewed' => '该订单已评价',

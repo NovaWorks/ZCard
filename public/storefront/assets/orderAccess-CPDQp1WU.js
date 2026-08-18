@@ -1,1 +1,0 @@
-var e=`zcard_order_access:`;function t(t,n){!t||!n||sessionStorage.setItem(`${e}${t}`,n)}function n(t){if(t)return sessionStorage.getItem(`${e}${t}`)||void 0}function r(e){return e.reduce((e,t)=>{let r=n(t.order_no);return r&&(e[String(t.id)]=r),e},{})}export{r as n,t as r,n as t};

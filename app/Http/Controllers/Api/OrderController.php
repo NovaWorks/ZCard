@@ -16,26 +16,27 @@ class OrderController extends Controller
 {
     public function create(Request $request, OrderService $service): JsonResponse
     {
+        // 游客下单限制
+        // 注意:本路由不在 auth:sanctum 组内,$request->user() 默认走 web guard(session),
+        // 无法解析 storefront 发送的 Bearer token → 恒为 null(登录用户也被当游客)。
+        // 必须显式用 sanctum guard 解析,否则订单 user_id 恒为空,"我的订单"查不到。
+        $user = $this->activeUser($request);
+
         $data = $request->validate([
             'product_id' => 'required|integer|exists:products,id',
             'sku_id' => 'nullable|integer',
             'qty' => 'required|integer|min:1|max:100',
             'card_id' => 'nullable|integer', // 靓号自选:客户选定的具体卡密
             'contact' => 'required|string|max:150',
-            'password' => 'nullable|string|min:6|max:50',
+            'password' => $this->queryPasswordRules($user),
             'captcha' => 'nullable|string',
             'captcha_key' => 'nullable|string|max:255',
             'coupon_code' => 'nullable|string|max:32',
             'extra' => 'nullable|array',
             'display_currency' => 'nullable|string|size:3',
-        ]);
+        ], ['password.required' => __('messages.order.query_password_required')]);
 
-        // 游客下单限制
-        // 注意:本路由不在 auth:sanctum 组内,$request->user() 默认走 web guard(session),
-        // 无法解析 storefront 发送的 Bearer token → 恒为 null(登录用户也被当游客)。
-        // 必须显式用 sanctum guard 解析,否则订单 user_id 恒为空,"我的订单"查不到。
         $guestCheckout = StorefrontConfig::get('guest_checkout') ?? true;
-        $user = $this->activeUser($request);
         if (! $guestCheckout && ! $user) {
             return response()->json(['message' => __('messages.guest_only')], 403);
         }
@@ -76,6 +77,22 @@ class OrderController extends Controller
         }
     }
 
+    /**
+     * 查询密码校验规则。
+     *
+     * 游客订单的另一条读取凭证(access_token)只存在下单浏览器里,换设备/清缓存即失效;
+     * 因此开启「查询密码」时对游客强制必填,否则该订单一旦离开原浏览器就再也查不到卡密。
+     * 登录用户走 user_id 授权,不受此限制。
+     *
+     * @return array<int, string>
+     */
+    private function queryPasswordRules(?User $user): array
+    {
+        $required = ! $user && (bool) StorefrontConfig::get('order_query_password');
+
+        return [$required ? 'required' : 'nullable', 'string', 'min:6', 'max:50'];
+    }
+
     /** 从 User-Agent 检测下单设备 */
     private function detectDevice(Request $request): string
     {
@@ -99,6 +116,8 @@ class OrderController extends Controller
     /** 购物车批量下单:多个商品各创建一张订单(一个事务,任一失败整体回滚) */
     public function batch(Request $request, OrderService $service): JsonResponse
     {
+        $user = $this->activeUser($request);
+
         $data = $request->validate([
             'items' => 'required|array|min:1|max:20',
             'items.*.product_id' => 'required|integer|exists:products,id',
@@ -106,16 +125,15 @@ class OrderController extends Controller
             'items.*.qty' => 'required|integer|min:1|max:100',
             'items.*.card_id' => 'nullable|integer', // 靓号自选:该商品项选定的卡密
             'contact' => 'required|string|max:150',
-            'password' => 'nullable|string|min:6|max:50',
+            'password' => $this->queryPasswordRules($user),
             'captcha' => 'nullable|string',
             'captcha_key' => 'nullable|string|max:255',
             'coupon_code' => 'nullable|string|max:32',
             'extra' => 'nullable|array',
             'display_currency' => 'nullable|string|size:3',
-        ]);
+        ], ['password.required' => __('messages.order.query_password_required')]);
 
         $guestCheckout = StorefrontConfig::get('guest_checkout') ?? true;
-        $user = $this->activeUser($request);
         if (! $guestCheckout && ! $user) {
             return response()->json(['message' => __('messages.guest_only')], 403);
         }
@@ -197,7 +215,11 @@ class OrderController extends Controller
         $data = $request->validate([
             'keyword' => 'required|string|max:150',
             'password' => 'nullable|string|max:50',
+            // access_token 为按订单号查单时的单个凭证;access_tokens 为按联系方式查单时
+            // 浏览器持有的一批凭证(前端无法预知命中哪几笔,只能一起提交,见 utils/orderAccess.ts)
             'access_token' => 'nullable|string|size:64',
+            'access_tokens' => 'nullable|array|max:'.OrderService::MAX_ACCESS_TOKENS,
+            'access_tokens.*' => 'string|size:64',
         ]);
 
         // 安全(M-9→低危加强):按关键字(不含 IP)计数锁定——纯 IP 维度可被代理池重置;
@@ -210,7 +232,10 @@ class OrderController extends Controller
         $result = $service->searchOrders(
             $data['keyword'],
             $data['password'] ?? null,
-            $data['access_token'] ?? null,
+            array_merge(
+                array_filter([$data['access_token'] ?? null]),
+                $data['access_tokens'] ?? [],
+            ),
             $this->activeUser($request)?->id,
         );
 

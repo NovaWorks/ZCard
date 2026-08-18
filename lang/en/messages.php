@@ -28,6 +28,7 @@ return [
     'order.above_max_order' => 'Maximum :max item(s) per order for this product.',
     'order.purchase_limit_exceeded' => 'Purchase limit of :limit item(s) exceeded for this product.',
     'order.sku_unavailable' => 'The selected option is unavailable or off-shelf.',
+    'order.query_password_required' => 'Please set a lookup password (at least 6 characters); otherwise you will not be able to view the codes from another device or after clearing browser data.',
 
     'review.order_not_found' => 'Order does not exist or is unpaid.',
     'review.already_reviewed' => 'This order has already been reviewed.',

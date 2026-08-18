@@ -18,6 +18,9 @@ use Illuminate\Support\Str;
 
 class OrderService
 {
+    /** 单次查单最多比对的访问凭证数(浏览器一般只持有个位数订单凭证) */
+    public const MAX_ACCESS_TOKENS = 20;
+
     /**
      * 创建订单:锁卡 → 建 order(pending)。
      *
@@ -473,12 +476,13 @@ class OrderService
      * 搜索订单:单关键字智能匹配 order_no 或 contact,返回历史订单列表。
      * 每一笔结果都必须通过本人登录态、随机访问凭证或查询密码之一授权。
      *
+     * @param  string|array<int, string>|null  $accessToken  单个凭证,或浏览器持有的一批凭证(按联系方式查单时会一次带多个)
      * @return array{orders: array<int, array>, matched: int} orders=已授权订单;matched=关键字命中的订单总数(含未授权,供上层做爆破计数)
      */
     public function searchOrders(
         string $keyword,
         ?string $password = null,
-        ?string $accessToken = null,
+        string|array|null $accessToken = null,
         ?int $userId = null,
     ): array {
         $kw = trim($keyword);
@@ -521,11 +525,17 @@ class OrderService
         return ['orders' => $mapped, 'matched' => $matched];
     }
 
-    /** 校验订单对象级访问权限：本人登录态、随机访问凭证或订单查询密码三选一。 */
+    /**
+     * 校验订单对象级访问权限：本人登录态、随机访问凭证或订单查询密码三选一。
+     *
+     * @param  string|array<int, string>|null  $accessToken  允许传入多个凭证:按联系方式查单时,
+     *                                                       浏览器无法预知命中哪几笔订单,只能把本机持有的凭证一起提交,
+     *                                                       由服务端逐笔比对(凭证本就属于提交者,不构成越权面)。
+     */
     public function canAccessOrder(
         Order $order,
         ?int $userId = null,
-        ?string $accessToken = null,
+        string|array|null $accessToken = null,
         ?string $password = null,
     ): bool {
         if ($userId !== null && $order->user_id !== null && (int) $order->user_id === $userId) {
@@ -534,10 +544,11 @@ class OrderService
 
         $extra = is_array($order->extra) ? $order->extra : [];
         $storedTokenHash = (string) ($extra['access_token_hash'] ?? '');
-        if ($storedTokenHash !== '' && $accessToken !== null && $accessToken !== '') {
-            $providedTokenHash = hash('sha256', $accessToken);
-            if (hash_equals($storedTokenHash, $providedTokenHash)) {
-                return true;
+        if ($storedTokenHash !== '') {
+            foreach ($this->normalizeAccessTokens($accessToken) as $token) {
+                if (hash_equals($storedTokenHash, hash('sha256', $token))) {
+                    return true;
+                }
             }
         }
 
@@ -547,6 +558,22 @@ class OrderService
             && $password !== null
             && $password !== ''
             && Hash::check($password, $storedPasswordHash);
+    }
+
+    /**
+     * 把凭证入参归一成非空字符串数组(去重),同时限制单次比对上限,避免被当成哈希计算放大器。
+     *
+     * @param  string|array<int, mixed>|null  $accessToken
+     * @return array<int, string>
+     */
+    private function normalizeAccessTokens(string|array|null $accessToken): array
+    {
+        $tokens = is_array($accessToken) ? $accessToken : [$accessToken];
+
+        return array_slice(array_values(array_unique(array_filter(
+            array_map(fn ($token) => is_string($token) ? trim($token) : '', $tokens),
+            fn ($token) => $token !== '',
+        ))), 0, self::MAX_ACCESS_TOKENS);
     }
 
     /** 订单详情(含发货卡密) */

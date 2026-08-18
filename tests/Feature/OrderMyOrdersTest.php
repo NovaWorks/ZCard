@@ -99,6 +99,7 @@ class OrderMyOrdersTest extends TestCase
             'product_id' => $p->id,
             'qty' => 1,
             'contact' => 'guest@test.com',
+            'password' => 'query-secret', // 游客下单强制设查询密码(order_query_password 默认开启)
         ]);
         $resp->assertStatus(201);
         $orderNo = $resp->json('order_no');

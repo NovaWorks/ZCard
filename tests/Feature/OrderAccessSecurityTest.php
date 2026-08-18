@@ -250,4 +250,69 @@ class OrderAccessSecurityTest extends TestCase
             ],
         ])->assertOk()->assertJsonPath('type', 'redirect');
     }
+
+    /**
+     * 回归:按联系方式查单时,前端无法预知命中哪几笔订单,只能带上本机持有的一批凭证。
+     * 此前接口只接受单个 access_token,导致「用邮箱/手机号查单」必然返回空 —— 客户付款后看不到卡密。
+     */
+    public function test_contact_lookup_accepts_multiple_access_tokens(): void
+    {
+        $firstToken = str_repeat('7', 64);
+        $secondToken = str_repeat('8', 64);
+        $this->paidOrder('ORD-MULTI-1', 'buyer@example.com', $firstToken);
+        $this->paidOrder('ORD-MULTI-2', 'buyer@example.com', $secondToken);
+        $this->paidOrder('ORD-MULTI-OTHER', 'buyer@example.com', str_repeat('9', 64));
+
+        $response = $this->postJson('/api/orders/query', [
+            'keyword' => 'buyer@example.com',
+            'access_tokens' => [$firstToken, $secondToken],
+        ])->assertOk()->assertJsonCount(2);
+
+        $this->assertEqualsCanonicalizing(
+            ['ORD-MULTI-1', 'ORD-MULTI-2'],
+            array_column($response->json(), 'order_no'),
+        );
+        // 未持有凭证的那笔仍然读不到,凭证不会互相串号
+        $this->assertNotContains('ORD-MULTI-OTHER', array_column($response->json(), 'order_no'));
+    }
+
+    public function test_access_tokens_payload_is_bounded(): void
+    {
+        $this->postJson('/api/orders/query', [
+            'keyword' => 'buyer@example.com',
+            'access_tokens' => array_fill(0, 21, str_repeat('7', 64)),
+        ])->assertStatus(422)->assertJsonValidationErrors('access_tokens');
+    }
+
+    /**
+     * 游客订单的 access_token 只存在下单浏览器里,换设备即失效;
+     * 开启查询密码时必须强制设置,否则订单离开原浏览器后无法再读取卡密。
+     */
+    public function test_guest_must_set_query_password_when_feature_enabled(): void
+    {
+        StorefrontConfig::setMany(['order_query_password' => true]);
+        Cache::flush();
+
+        $this->postJson('/api/orders', [
+            'product_id' => $this->product->id,
+            'qty' => 1,
+            'contact' => 'no-password@example.com',
+        ])->assertStatus(422)->assertJsonValidationErrors('password');
+
+        $this->postJson('/api/orders', [
+            'product_id' => $this->product->id,
+            'qty' => 1,
+            'contact' => 'with-password@example.com',
+            'password' => 'query-secret',
+        ])->assertCreated();
+
+        // 登录用户凭账号即可读取订单,不受强制约束
+        $user = User::factory()->create();
+        $this->withToken($user->createToken('checkout')->plainTextToken)
+            ->postJson('/api/orders', [
+                'product_id' => $this->product->id,
+                'qty' => 1,
+                'contact' => 'member@example.com',
+            ])->assertCreated();
+    }
 }
