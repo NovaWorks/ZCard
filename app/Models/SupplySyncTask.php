@@ -32,12 +32,17 @@ class SupplySyncTask extends Model
 
     public const SCOPE_STATUS = 'status';
 
+    public const CANCEL_TRIGGER_ADMIN = 'admin';
+
+    public const CANCEL_TRIGGER_SYSTEM = 'system';
+
     protected $fillable = [
         'supply_source_id', 'mode', 'scope', 'force_reprice', 'status', 'total_products', 'processed_products',
         'created_count', 'updated_count', 'price_updated_count', 'manual_price_skipped_count',
         'hidden_count', 'deleted_count', 'error', 'error_code', 'error_context',
         'started_at', 'heartbeat_at', 'current_stage', 'current_page', 'stage_current', 'stage_total',
-        'cancel_requested_at',
+        'cancel_requested_at', 'cancel_requested_by', 'cancel_requested_by_name',
+        'cancel_request_ip', 'cancel_reason', 'cancel_trigger',
         'worker_version', 'finished_at',
     ];
 

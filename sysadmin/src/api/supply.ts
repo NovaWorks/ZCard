@@ -117,6 +117,11 @@ export interface SupplySyncTask {
   stage_current: number
   stage_total: number
   cancel_requested_at: string | null
+  cancel_requested_by: number | null
+  cancel_requested_by_name: string | null
+  cancel_request_ip: string | null
+  cancel_reason: string | null
+  cancel_trigger: 'admin' | 'system' | null
   worker_version: string | null
   finished_at: string | null
   created_at: string
@@ -138,11 +143,11 @@ export const getSupplySyncTasks = (id: number) =>
     url: `/admin/supply-sources/${id}/sync-tasks`
   })
 
-/** 取消进行中的同步任务 */
-export const cancelSupplySync = (id: number, taskId?: number) =>
+/** 取消进行中的同步任务，并记录可选原因 */
+export const cancelSupplySync = (id: number, taskId?: number, reason?: string) =>
   request.post<{ ok: boolean; task: SupplySyncTask }>({
     url: `/admin/supply-sources/${id}/sync-cancel`,
-    data: taskId ? { task_id: taskId } : {}
+    data: { task_id: taskId, reason: reason || undefined }
   })
 
 export interface SupplySyncTaskWithSource extends SupplySyncTask {
@@ -166,6 +171,10 @@ export interface SupplyQueueStatus {
   heartbeat_at: number | null
   connection: string
   healthy: boolean
+  status: 'healthy' | 'busy' | 'unavailable'
+  probe_healthy: boolean
+  active_task_id: number | null
+  active_task_heartbeat_at: number | null
   app_version: string
   worker_version: string | null
   worker_started_at: number | null

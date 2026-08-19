@@ -15,6 +15,7 @@ use App\Supply\SupplySyncService;
 use App\Supply\SupplySyncTaskState;
 use App\Support\AppHelper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -251,25 +252,91 @@ class SupplySyncTaskTest extends TestCase
         $this->assertSame(SupplySyncTask::STATUS_CANCELLED, $task->status);
     }
 
+    public function test_running_task_observes_cancel_request_within_ten_products(): void
+    {
+        $source = $this->makeSource();
+        $task = SupplySyncTask::create([
+            'supply_source_id' => $source->id,
+            'mode' => 'full',
+            'status' => SupplySyncTask::STATUS_QUEUED,
+        ]);
+        $items = [];
+        for ($i = 1; $i <= 25; $i++) {
+            $items[] = new UpstreamProduct(
+                code: "CANCEL-{$i}",
+                name: "商品 {$i}",
+                price: 100,
+                factoryPrice: 100,
+            );
+        }
+
+        $driver = $this->createMock(SupplyDriver::class);
+        $driver->method('listProducts')->willReturn([
+            'items' => $items,
+            'total' => 25,
+            'page' => 1,
+            'has_more' => false,
+        ]);
+        $manager = $this->createMock(SupplyManager::class);
+        $manager->method('driver')->willReturn($driver);
+
+        $processed = 0;
+        $sync = $this->createMock(SupplySyncService::class);
+        $sync->method('upsertProduct')->willReturnCallback(
+            function () use (&$processed, $task): ?Product {
+                $processed++;
+                if ($processed === 10) {
+                    $task->update(['status' => SupplySyncTask::STATUS_CANCELLING]);
+                }
+
+                return new Product;
+            },
+        );
+
+        (new SyncSupplySourceProducts($source->id, 'full', $task->id))->handle($manager, $sync);
+
+        $this->assertSame(10, $processed, '取消请求后最多再处理当前 10 件批次');
+        $this->assertSame(SupplySyncTask::STATUS_CANCELLED, $task->fresh()->status);
+    }
+
     public function test_sync_cancel_api_marks_running_task_cancelling_and_is_idempotent(): void
     {
         $source = $this->makeSource();
-        SupplySyncTask::create([
+        $task = SupplySyncTask::create([
             'supply_source_id' => $source->id,
             'mode' => 'incremental',
             'status' => SupplySyncTask::STATUS_RUNNING,
         ]);
 
         $resp = $this->withHeaders($this->adminHeaders())
-            ->postJson("/api/admin/supply-sources/{$source->id}/sync-cancel");
+            ->withServerVariables(['REMOTE_ADDR' => '203.0.113.42'])
+            ->postJson("/api/admin/supply-sources/{$source->id}/sync-cancel", [
+                'reason' => '误选了全量同步',
+            ]);
         $resp->assertOk();
         $this->assertSame('cancelling', $resp->json('task.status'));
         $this->assertNotNull($resp->json('task.cancel_requested_at'));
+        $firstAudit = $task->fresh()->only([
+            'cancel_requested_by',
+            'cancel_requested_by_name',
+            'cancel_request_ip',
+            'cancel_reason',
+            'cancel_trigger',
+        ]);
+        $this->assertNotNull($firstAudit['cancel_requested_by']);
+        $this->assertNotEmpty($firstAudit['cancel_requested_by_name']);
+        $this->assertSame('203.0.113.42', $firstAudit['cancel_request_ip']);
+        $this->assertSame('误选了全量同步', $firstAudit['cancel_reason']);
+        $this->assertSame(SupplySyncTask::CANCEL_TRIGGER_ADMIN, $firstAudit['cancel_trigger']);
 
-        // 重复点击取消保持幂等，仍返回同一取消中任务。
+        // 重复点击取消保持幂等，且不得用第二位管理员覆盖首次审计。
         $again = $this->withHeaders($this->adminHeaders())
-            ->postJson("/api/admin/supply-sources/{$source->id}/sync-cancel");
+            ->withServerVariables(['REMOTE_ADDR' => '198.51.100.7'])
+            ->postJson("/api/admin/supply-sources/{$source->id}/sync-cancel", [
+                'reason' => '覆盖首次原因',
+            ]);
         $again->assertOk()->assertJsonPath('task.status', 'cancelling');
+        $this->assertSame($firstAudit, $task->fresh()->only(array_keys($firstAudit)));
     }
 
     public function test_sync_cancel_api_can_cancel_selected_queued_task_immediately(): void
@@ -368,8 +435,60 @@ class SupplySyncTaskTest extends TestCase
         $resp->assertOk();
         $this->assertNotNull($resp->json('heartbeat_at'), '探针执行后应有心跳');
         $this->assertTrue($resp->json('healthy'));
+        $this->assertSame('healthy', $resp->json('status'));
+        $this->assertTrue($resp->json('probe_healthy'));
         $this->assertTrue($resp->json('version_match'));
         $this->assertSame(AppHelper::version(), $resp->json('worker_version'));
+    }
+
+    public function test_queue_status_uses_active_task_heartbeat_when_probe_is_blocked(): void
+    {
+        Cache::forget('queue:heartbeat');
+        $source = $this->makeSource();
+        $task = SupplySyncTask::create([
+            'supply_source_id' => $source->id,
+            'mode' => 'full',
+            'status' => SupplySyncTask::STATUS_RUNNING,
+            'started_at' => now()->subMinute(),
+            'heartbeat_at' => now(),
+            'worker_version' => AppHelper::version(),
+        ]);
+
+        $resp = $this->withHeaders($this->adminHeaders())
+            ->getJson('/api/admin/supply-sources/sync-queue-status');
+
+        $resp->assertOk()
+            ->assertJsonPath('healthy', true)
+            ->assertJsonPath('status', 'busy')
+            ->assertJsonPath('probe_healthy', false)
+            ->assertJsonPath('active_task_id', $task->id)
+            ->assertJsonPath('worker_version', AppHelper::version())
+            ->assertJsonPath('version_match', true);
+        $this->assertNotNull($resp->json('active_task_heartbeat_at'));
+    }
+
+    public function test_stale_task_heartbeat_does_not_hide_unavailable_worker(): void
+    {
+        Cache::forget('queue:heartbeat');
+        config()->set('zcard.supply.sync_stale_seconds', 90);
+        $source = $this->makeSource();
+        SupplySyncTask::create([
+            'supply_source_id' => $source->id,
+            'mode' => 'full',
+            'status' => SupplySyncTask::STATUS_RUNNING,
+            'started_at' => now()->subMinutes(5),
+            'heartbeat_at' => now()->subMinutes(5),
+            'worker_version' => AppHelper::version(),
+        ]);
+
+        $this->withHeaders($this->adminHeaders())
+            ->getJson('/api/admin/supply-sources/sync-queue-status')
+            ->assertOk()
+            ->assertJsonPath('healthy', false)
+            ->assertJsonPath('status', 'unavailable')
+            ->assertJsonPath('probe_healthy', false)
+            ->assertJsonPath('active_task_id', null)
+            ->assertJsonPath('version_match', false);
     }
 
     public function test_updating_markup_percent_dispatches_full_sync(): void

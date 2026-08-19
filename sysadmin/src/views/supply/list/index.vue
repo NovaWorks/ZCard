@@ -318,10 +318,29 @@
       @closed="stopAllTasksPolling"
     >
       <!-- 队列状态横幅 -->
-      <div v-if="queueChecked" class="queue-banner" :class="queueHealthy && queueVersionMatch ? 'queue-ok' : 'queue-down'">
+      <div
+        v-if="queueChecked"
+        class="queue-banner"
+        :class="
+          queueHealthy && queueVersionMatch
+            ? queueState === 'busy'
+              ? 'queue-busy'
+              : 'queue-ok'
+            : 'queue-down'
+        "
+      >
         <template v-if="queueHealthy && queueVersionMatch">
-          <ArtSvgIcon icon="ri:checkbox-circle-line" class="queue-icon" />
-          <span>{{ t('zcard.supply.queueOk', { conn: queueConnection }) }}</span>
+          <ArtSvgIcon
+            :icon="queueState === 'busy' ? 'ri:loader-4-line' : 'ri:checkbox-circle-line'"
+            class="queue-icon"
+          />
+          <span>
+            {{
+              queueState === 'busy'
+                ? t('zcard.supply.queueBusy', { id: queueActiveTaskId || '—' })
+                : t('zcard.supply.queueOk', { conn: queueConnection })
+            }}
+          </span>
         </template>
         <template v-else>
           <ArtSvgIcon icon="ri:alert-line" class="queue-icon" />
@@ -379,6 +398,12 @@
           <div v-if="task.current_stage" class="task-runtime-meta">
             <span>{{ t('zcard.supply.taskStage') }}: {{ taskStageText(task.current_stage) }}</span>
             <span v-if="task.heartbeat_at">{{ t('zcard.supply.taskLastActivity') }}: {{ formatTime(task.heartbeat_at) }}</span>
+          </div>
+          <div v-if="task.cancel_requested_at" class="task-cancel-audit">
+            <span>{{ taskCancelAuditText(task) }}</span>
+            <span v-if="task.cancel_reason">
+              {{ t('zcard.supply.taskCancelReason', { reason: task.cancel_reason }) }}
+            </span>
           </div>
           <div v-if="task.error" class="task-error">
             <ElTag v-if="task.error_code" type="danger" size="small">{{ task.error_code }}</ElTag>
@@ -569,6 +594,12 @@
             </span>
             <span v-if="activeTask.heartbeat_at">{{ t('zcard.supply.taskLastActivity') }}: {{ formatTime(activeTask.heartbeat_at) }}</span>
             <span v-if="activeTask.worker_version">worker v{{ activeTask.worker_version }}</span>
+          </div>
+          <div v-if="activeTask.cancel_requested_at" class="task-cancel-audit">
+            <span>{{ taskCancelAuditText(activeTask) }}</span>
+            <span v-if="activeTask.cancel_reason">
+              {{ t('zcard.supply.taskCancelReason', { reason: activeTask.cancel_reason }) }}
+            </span>
           </div>
 
           <!-- 计数 -->
@@ -1240,9 +1271,11 @@
 
   const handleCancelTask = async (task: SupplySyncTask) => {
     if (!taskSource.value) return
+    const reason = await promptCancelReason()
+    if (reason === null) return
     cancellingTaskId.value = task.id
     try {
-      await cancelSupplySync(taskSource.value.id, task.id)
+      await cancelSupplySync(taskSource.value.id, task.id, reason)
       await loadTasks(taskSource.value.id)
       startTaskPolling(taskSource.value.id)
       ElMessage.success(t('zcard.supply.taskCancelled'))
@@ -1254,9 +1287,11 @@
   }
 
   const handleCancelAllTask = async (task: SupplySyncTaskWithSource) => {
+    const reason = await promptCancelReason()
+    if (reason === null) return
     cancellingTaskId.value = task.id
     try {
-      await cancelSupplySync(task.supply_source_id, task.id)
+      await cancelSupplySync(task.supply_source_id, task.id, reason)
       await loadAllTasks()
       ElMessage.success(t('zcard.supply.taskCancelled'))
     } catch {
@@ -1277,6 +1312,8 @@
   const allTasks = ref<SupplySyncTaskWithSource[]>([])
   const queueChecked = ref(false)
   const queueHealthy = ref(false)
+  const queueState = ref<'healthy' | 'busy' | 'unavailable'>('unavailable')
+  const queueActiveTaskId = ref<number | null>(null)
   const queueVersionMatch = ref(false)
   const queueConnection = ref('')
   const queueAppVersion = ref('')
@@ -1309,6 +1346,8 @@
       await probeSyncQueue()
       const st = await getSyncQueueStatus()
       queueHealthy.value = !!st.healthy
+      queueState.value = st.status || (st.healthy ? 'healthy' : 'unavailable')
+      queueActiveTaskId.value = st.active_task_id || null
       queueVersionMatch.value = !!st.version_match
       queueConnection.value = st.connection || ''
       queueAppVersion.value = st.app_version || ''
@@ -1316,6 +1355,8 @@
       queueChecked.value = true
     } catch {
       queueHealthy.value = false
+      queueState.value = 'unavailable'
+      queueActiveTaskId.value = null
       queueVersionMatch.value = false
       queueChecked.value = true
     }
@@ -1332,7 +1373,10 @@
       // 队列心跳持续刷新(worker 正常时每次 probe 会更新)
       probeSyncQueue().then(() => getSyncQueueStatus()).then((st) => {
         queueHealthy.value = !!st.healthy
+        queueState.value = st.status || (st.healthy ? 'healthy' : 'unavailable')
+        queueActiveTaskId.value = st.active_task_id || null
         queueVersionMatch.value = !!st.version_match
+        queueConnection.value = st.connection || ''
         queueAppVersion.value = st.app_version || ''
         queueWorkerVersion.value = st.worker_version || null
         queueChecked.value = true
@@ -1401,6 +1445,46 @@
     if (typeof context.http_status === 'number') parts.push(`HTTP ${context.http_status}`)
     if (typeof context.endpoint === 'string' && context.endpoint) parts.push(context.endpoint)
     return parts.join(' · ')
+  }
+
+  /** 取消前二次确认并收集可选原因，便于事后审计。 */
+  const promptCancelReason = async (): Promise<string | null> => {
+    try {
+      const { value } = await ElMessageBox.prompt(
+        t('zcard.supply.taskCancelConfirm'),
+        t('zcard.supply.taskCancelConfirmTitle'),
+        {
+          type: 'warning',
+          inputPlaceholder: t('zcard.supply.taskCancelReasonPlaceholder'),
+          inputValidator: (input: string) =>
+            input.length <= 500 || t('zcard.supply.taskCancelReasonTooLong')
+        }
+      )
+      return typeof value === 'string' ? value.trim() : ''
+    } catch {
+      return null
+    }
+  }
+
+  /** 把后端持久化的取消操作者、入口、IP 和时间展示在任务详情。 */
+  const taskCancelAuditText = (task: SupplySyncTask): string => {
+    const actor =
+      task.cancel_requested_by_name ||
+      (task.cancel_requested_by
+        ? `#${task.cancel_requested_by}`
+        : t('zcard.supply.taskCancelActorSystem'))
+    const trigger =
+      task.cancel_trigger === 'admin'
+        ? t('zcard.supply.taskCancelTriggerAdmin')
+        : task.cancel_trigger === 'system'
+          ? t('zcard.supply.taskCancelTriggerSystem')
+          : t('zcard.supply.taskCancelTriggerUnknown')
+    return t('zcard.supply.taskCancelAudit', {
+      actor,
+      time: formatTime(task.cancel_requested_at),
+      trigger,
+      ip: task.cancel_request_ip || '—'
+    })
   }
 
   /** 任务类型(scope)标签文案与颜色 */
@@ -2193,6 +2277,15 @@
   color: var(--el-text-color-secondary);
   font-size: 12px;
 }
+.task-cancel-audit {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 6px 0;
+  color: var(--el-color-warning);
+  font-size: 12px;
+  word-break: break-word;
+}
 .task-done {
   margin: 6px 0;
   font-size: 12px;
@@ -2246,6 +2339,11 @@
   background: var(--el-color-success-light-9);
   border: 1px solid var(--el-color-success-light-5);
   color: var(--el-color-success);
+}
+.queue-banner.queue-busy {
+  background: var(--el-color-warning-light-9);
+  border: 1px solid var(--el-color-warning-light-5);
+  color: var(--el-color-warning);
 }
 .queue-banner.queue-down {
   background: var(--el-color-danger-light-9);

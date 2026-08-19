@@ -249,7 +249,10 @@ class SupplySourceController extends Controller
         SupplySource $supplySource,
         SupplySyncTaskState $states,
     ): JsonResponse {
-        $data = $request->validate(['task_id' => 'sometimes|integer|min:1']);
+        $data = $request->validate([
+            'task_id' => 'sometimes|integer|min:1',
+            'reason' => 'sometimes|nullable|string|max:500',
+        ]);
         $task = SupplySyncTask::where('supply_source_id', $supplySource->id)
             ->when(isset($data['task_id']), fn ($query) => $query->whereKey($data['task_id']))
             ->whereIn('status', [
@@ -263,7 +266,18 @@ class SupplySourceController extends Controller
             return response()->json(['ok' => false, 'message' => '没有进行中的同步任务'], 404);
         }
 
-        $task = $states->requestCancel($task);
+        $actor = $request->user();
+        $actorName = $actor?->name ?: $actor?->username ?: $actor?->email;
+        $task = $states->requestCancel($task, [
+            'cancel_requested_by' => $actor?->getAuthIdentifier(),
+            // 保留快照，账号后续改名或删除也不影响历史审计。
+            'cancel_requested_by_name' => $actorName,
+            'cancel_request_ip' => $request->ip(),
+            'cancel_reason' => isset($data['reason']) && trim($data['reason']) !== ''
+                ? trim($data['reason'])
+                : null,
+            'cancel_trigger' => SupplySyncTask::CANCEL_TRIGGER_ADMIN,
+        ]);
 
         return response()->json(['ok' => true, 'task' => $task]);
     }
@@ -306,19 +320,40 @@ class SupplySourceController extends Controller
         $heartbeat = Cache::get('queue:heartbeat');
         $connection = config('queue.default');
         $timestamp = is_array($heartbeat) ? ($heartbeat['timestamp'] ?? null) : $heartbeat;
-        $workerVersion = is_array($heartbeat) ? ($heartbeat['worker_version'] ?? null) : null;
+        $probeWorkerVersion = is_array($heartbeat) ? ($heartbeat['worker_version'] ?? null) : null;
         $workerStartedAt = is_array($heartbeat) ? ($heartbeat['worker_started_at'] ?? null) : null;
         $appVersion = AppHelper::version();
+        $now = now();
+        $probeHealthy = $timestamp !== null && ($now->timestamp - (int) $timestamp) <= 20;
+
+        // 单 worker 执行大型同步时无法同时消费探针，但同步任务自身仍持续写心跳。
+        // 使用与任务看门狗一致的阈值，把这种情况识别为 busy，而不是误报 worker 未启动。
+        $taskHeartbeatThreshold = max(90, (int) config('zcard.supply.sync_stale_seconds', 120));
+        $activeTask = SupplySyncTask::query()
+            ->whereIn('status', [SupplySyncTask::STATUS_RUNNING, SupplySyncTask::STATUS_CANCELLING])
+            ->whereNotNull('heartbeat_at')
+            ->latest('heartbeat_at')
+            ->first(['id', 'heartbeat_at', 'worker_version']);
+        $taskHealthy = $activeTask?->heartbeat_at !== null
+            && $activeTask->heartbeat_at->gte($now->copy()->subSeconds($taskHeartbeatThreshold));
+        $busy = ! $probeHealthy && $taskHealthy;
+        $healthy = $probeHealthy || $taskHealthy;
+        $workerVersion = $probeHealthy ? $probeWorkerVersion : ($activeTask?->worker_version ?? $probeWorkerVersion);
+        $status = $probeHealthy ? 'healthy' : ($busy ? 'busy' : 'unavailable');
 
         return response()->json([
             'ok' => true,
             'heartbeat_at' => $timestamp !== null ? (int) $timestamp : null,
             'connection' => $connection,
-            'healthy' => $timestamp !== null && (now()->timestamp - (int) $timestamp) <= 20,
+            'healthy' => $healthy,
+            'status' => $status,
+            'probe_healthy' => $probeHealthy,
+            'active_task_id' => $taskHealthy ? $activeTask?->id : null,
+            'active_task_heartbeat_at' => $taskHealthy ? $activeTask?->heartbeat_at?->timestamp : null,
             'app_version' => $appVersion,
             'worker_version' => $workerVersion,
             'worker_started_at' => $workerStartedAt,
-            'version_match' => is_string($workerVersion) && hash_equals($appVersion, $workerVersion),
+            'version_match' => $healthy && is_string($workerVersion) && hash_equals($appVersion, $workerVersion),
         ]);
     }
 

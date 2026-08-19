@@ -76,26 +76,38 @@ class SupplySyncTaskState
         return false;
     }
 
-    public function requestCancel(SupplySyncTask $task): SupplySyncTask
+    /**
+     * 请求取消任务。审计字段只在首次状态转换时写入，重复请求不得覆盖首位操作者。
+     *
+     * @param  array<string, int|string|null>  $audit
+     */
+    public function requestCancel(SupplySyncTask $task, array $audit = []): SupplySyncTask
     {
         $now = now();
+        $audit = array_intersect_key($audit, array_flip([
+            'cancel_requested_by',
+            'cancel_requested_by_name',
+            'cancel_request_ip',
+            'cancel_reason',
+            'cancel_trigger',
+        ]));
         if ($task->status === SupplySyncTask::STATUS_QUEUED) {
             SupplySyncTask::whereKey($task->id)
                 ->where('status', SupplySyncTask::STATUS_QUEUED)
-                ->update([
+                ->update(array_merge([
                     'status' => SupplySyncTask::STATUS_CANCELLED,
                     'cancel_requested_at' => $now,
                     'current_stage' => 'cancelled',
                     'finished_at' => $now,
-                ]);
+                ], $audit));
         } elseif ($task->status === SupplySyncTask::STATUS_RUNNING) {
             SupplySyncTask::whereKey($task->id)
                 ->where('status', SupplySyncTask::STATUS_RUNNING)
-                ->update([
+                ->update(array_merge([
                     'status' => SupplySyncTask::STATUS_CANCELLING,
                     'cancel_requested_at' => $now,
                     'current_stage' => 'cancelling',
-                ]);
+                ], $audit));
         }
 
         return $task->fresh();
