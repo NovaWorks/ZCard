@@ -69,6 +69,10 @@ class SupplySyncTaskState
         }
 
         $status = SupplySyncTask::whereKey($task->id)->value('status');
+        // MariaDB 写入相同值时可返回 0；任务仍在运行就表示本次心跳有效。
+        if ($status === SupplySyncTask::STATUS_RUNNING) {
+            return true;
+        }
         if ($status === SupplySyncTask::STATUS_CANCELLING) {
             $this->finishCancelled($task);
         }
