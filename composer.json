@@ -1,10 +1,19 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "novaworks/zcard",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
-    "license": "MIT",
+    "description": "Open-source automatic card vending and digital goods platform with bidirectional upstream and downstream supply integrations.",
+    "keywords": [
+        "automatic-card-vending",
+        "digital-goods",
+        "dujiao-next",
+        "faka",
+        "laravel",
+        "supply-api",
+        "virtual-goods",
+        "zcard"
+    ],
+    "license": "Apache-2.0",
     "require": {
         "php": "^8.3",
         "bezhansalleh/filament-shield": "^4.3",

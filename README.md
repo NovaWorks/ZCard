@@ -4,10 +4,14 @@
   </a>
 </p>
 
-<h1 align="center">ZCard — 现代化自动发卡 / 虚拟商品销售系统</h1>
+<h1 align="center">ZCard — 双向上下游自动发卡 / 虚拟商品销售系统</h1>
 
 <p align="center">
-  <strong>Laravel 13 · Vue 3 · Filament v5 · Element Plus · 多货币 · 多语言 · 三级分销 · 分站 · API-First</strong>
+  <strong>既能对接 ACG-Faka、Dujiao Next、其他 ZCard 自动拿货，也能开放供货 API 向下游供货</strong>
+</p>
+
+<p align="center">
+  Laravel 13 · Vue 3 · 双向货源 · 自动发卡 · 多货币 · 多语言 · 三级分销 · 分站 · API-First
 </p>
 
 <p align="center">
@@ -16,16 +20,52 @@
 <span><img src="https://img.shields.io/badge/Vue-3-42B883?logo=vue.js&logoColor=white" alt="Vue 3"></span>
 <span><img src="https://img.shields.io/badge/MySQL-8.0+-4479A1?logo=mysql&logoColor=white" alt="MySQL 8.0+"></span>
 <span><img src="https://img.shields.io/badge/Redis-6.0+-DC382D?logo=redis&logoColor=white" alt="Redis"></span>
-<span><img src="https://img.shields.io/badge/License-MIT-green" alt="MIT"></span>
+<a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-green" alt="Apache License 2.0"></a>
+</p>
+
+<p align="center">
+  <em>Open-source automatic card vending, digital goods storefront and bidirectional upstream/downstream supply platform.</em>
 </p>
 
 ---
 
-## 法律声明
+## 核心差异：双向上下游货源网络
 
-> 本程序基于 MIT 协议开源，完全免费，初衷是为开发者提供学习与研究机会。未取得合法资质，严禁将本程序用于任何商业用途，尤其是禁止利用本程序搭建平台进行商品销售。
->
-> 使用本程序即表示您已充分理解并同意本法律声明的所有内容。
+ZCard 不只是一个面向顾客的发卡商城。它同时实现了**下游拿货端**和**上游供货端**，可以把多个发卡系统串成自动同步、自动下单、自动交付的供货网络。
+
+```text
+ACG-Faka / Dujiao Next / 另一套 ZCard
+                    ↓ 商品同步、自动拿货
+              ZCard（作为下游）
+                    ↓ 本站零售，也可继续开放供货
+              ZCard（作为上游）
+                    ↓ HMAC 供货 API
+              其他 ZCard / 下游系统
+```
+
+| 角色 | 已实现能力 |
+|---|---|
+| **作为下游拿货** | 可同时配置多个上游货源；兼容 **ACG-Faka（异次元发卡）**、**Dujiao Next（独角数卡 Next）** 和 **ZCard**；支持连接测试、商品预览/勾选导入、分类映射、全量/增量同步、定时采集、价格同步、上下架同步、库存同步与本地自由定价；顾客付款后可同步拿货，失败自动转队列重试。 |
+| **作为上游供货** | 提供完整的 `/api/supply/*` 供货 API；支持下游账号申请/审核、`api_key + api_secret`、预存余额、充值与调整账本、商品级/SKU 级专属供货价、商品/库存查询、幂等下单、查单、未发货订单取消退款和异步回调。 |
+| **ZCard 互联** | 内置 ZCard 驱动与 ZCard 供货协议，一套 ZCard 可从另一套 ZCard 拿货；同一实例也可以同时经营零售、接入外部货源并向自己的下游供货。 |
+
+### 已支持的货源协议
+
+| 系统 | 对接方向 | 鉴权 | 商品与履约 |
+|---|---|---|---|
+| **ACG-Faka / 异次元发卡** | ZCard 作为下游 | MD5 参数签名 | 商品拉取、库存查询、下单拿卡、订单查询；同步交付 |
+| **Dujiao Next / 独角数卡 Next** | ZCard 作为下游 | HMAC-SHA256 | 分类/商品分页、库存、下单、查单、取消与签名回调 |
+| **ZCard** | 双向 | HMAC-SHA256 + timestamp + nonce | 商品、库存、幂等下单、查单、取消退款、回调；支持 ZCard-to-ZCard 级联 |
+
+> 上游商品同步、定时任务和异步拿货依赖 Laravel Queue；自动调度还需要 Laravel Scheduler。生产配置见下方“常用命令”和[部署安装指南](docs/部署安装指南.md)。
+
+---
+
+## 法律与合规
+
+ZCard 原创代码按 **Apache License 2.0** 开源，许可证允许在遵守其条款的前提下进行商业使用、修改和分发，具体以 [`LICENSE`](LICENSE) 和 [`NOTICE`](NOTICE) 为准。
+
+软件许可不等于经营许可，也不替使用者对商品来源、消费者权益、支付、税务、数据与隐私等事项作合规背书。部署和运营者应自行取得所在国家或地区要求的资质并遵守适用法律；本项目按“原样”提供，不提供任何明示或默示担保。仓库内第三方组件继续适用其各自许可证，例如 `sysadmin/` 所基于的 Art Design Pro 适用其保留的 MIT License。
 
 ---
 
@@ -216,17 +256,52 @@ composer install
 
 ## 功能总览
 
+### 🔄 双向上下游 / 货源对接
+
+#### 作为下游：从其他平台自动拿货
+
+- **3 个真实驱动**：ACG-Faka、Dujiao Next、ZCard，驱动通过自描述配置表单接入，支持同时管理多个货源
+- **商品接入**：测试连接与余额、实时预览、按商品勾选导入、上游分类映射；支持全量/增量采集，以及价格、库存、上下架状态的独立同步
+- **定时同步**：采集商品、同步价格、同步上下架可分别设置启停、执行间隔和时间窗口；可配置请求间隔，降低触发上游限流的风险
+- **本地运营权**：同步上游成本、库存和商品资料；新商品支持比例加价、固定加价、平价或待定价；手动售价默认受保护，也可显式强制重算
+- **自动履约**：订单支付后向上游幂等下单；支持同步拿货、异步拿货和同步失败自动转队列重试；卡密与交付说明写入本地订单
+- **任务可观测**：同步任务记录进度、处理数量和错误诊断；支持取消、防重复派发、worker 心跳探测与失联任务回收
+
+#### 作为上游：向其他系统开放供货
+
+- **供货账号**：用户可在个人中心申请 API 凭证，支持管理员审核或自动通过；密钥可查看/重置，凭据加密保存
+- **预存与账本**：管理员充值/调账，下游下单原子扣减预存余额；每笔充值、扣费、退款都有余额快照和幂等流水
+- **灵活供货价**：按下游账号配置商品级或 SKU 级专属价，未配置时回退到商品成本价；未配置有效供货价时拒绝发货
+- **完整 API**：连通测试、分类列表、商品列表/详情、库存、创建订单、查询订单、取消未发货订单；自动卡密、固定内容、人工发货和上游转供均可形成履约结果
+- **交易安全**：四头 HMAC-SHA256 签名、时间窗口、nonce 防重放、账号/IP 双重限流、回调 URL SSRF 防护、下游订单号幂等、数据库行锁防超卖
+- **取消与退款**：未发货供货单可事务内关闭、释放库存并退回下游余额；已发货订单不可取消
+
+对外供货端点：
+
+```text
+POST /api/supply/ping
+GET  /api/supply/categories
+GET  /api/supply/products
+GET  /api/supply/products/{id}
+GET  /api/supply/products/{id}/stock
+POST /api/supply/orders
+GET  /api/supply/orders/{id}
+POST /api/supply/orders/{id}/cancel
+POST /api/supply/callback              # 接收上游异步履约回调
+```
+
 ### 🛒 商品与卡密
 
 - **商品管理**：分类（树形+图标+排序拖拽）、多 SKU、会员等级定价、最低/最高起购、限购、精选/热标签、虚拟销量与虚拟评价、自定义购买控件
-- **卡密系统**：应用层 **AES 加密**存储 + sha256 去重（去重可按商品开关）；批量导入（≤5000 同步、>5000 入队列），导入批次可撤销
+- **卡密系统**：可启用独立密钥的应用层 **AES-256-CBC 加密**存储，明文 sha256 用于去重（去重可按商品开关）；批量导入（≤5000 同步、>5000 入队列），导入批次可撤销
 - **库存防超卖**：下单时 `lockForUpdate` 行锁，付款失败/订单超时自动释放
+- **4 类履约**：本地自动卡密、固定内容、人工发货、上游自动拿货；订单保存履约类型与交付内容快照
 
 ### 💳 订单与支付
 
-- **自动发卡**：付款成功即刻发货（同步事务），支持"标记已用/物理删除"两种模式，邮件+短信通知
+- **自动发卡**：付款成功即刻发货（同步事务），支持“标记已用/物理删除”两种模式，邮件+短信通知
 - **游客下单**：无需注册，订单查询支持订单号/联系方式 + 查询密码
-- **9 大支付通道**（全部真实实现）：
+- **11 个支付驱动**（全部有真实驱动实现）：
 
   | 通道 | 支持货币 |
   |---|---|
@@ -234,8 +309,11 @@ composer install
   | PayPal | USD/EUR/GBP |
   | Stripe | USD/EUR/GBP/CNY/JPY |
   | 易支付 / 码支付 | CNY |
-  | USDT (TRC20) | USDT |
+  | USDT（多链静态收款） | USDT |
   | EpuSdt | CNY/USD |
+  | BEpusdt | CNY/USD/EUR/GBP/JPY，可配置多种加密货币 |
+  | OKPay | USDT/TRX |
+  | TokenPay | USDT |
 
 ### 💰 多货币
 
@@ -284,7 +362,7 @@ composer install
 ### 🔒 安全
 
 - RBAC 权限守卫（super_admin / merchant / user）
-- AES-256 卡密加密存储
+- 可选 AES-256-CBC 卡密加密存储，密钥与 `APP_KEY` 解耦
 - 支付回调凭据校验 + 金额核对 + 幂等
 - 认证端点限流（登录/注册 5次/分）
 - 图形验证码
@@ -322,7 +400,10 @@ ZCard/
 │   ├── Http/Controllers/Api/      API 控制器（Admin + 前台 + 安装向导）
 │   ├── Http/Middleware/           中间件（显示货币/语言/维护模式/RBAC/分站解析）
 │   ├── Models/                    数据模型
-│   ├── Payment/                   支付契约 + 9 个驱动
+│   ├── Payment/                   支付契约 + 11 个驱动
+│   ├── Supply/                    双向货源：3 个上游驱动 + 对外供货协议/服务
+│   ├── Jobs/                      商品同步、上游拿货、批量导入等队列任务
+│   ├── Listeners/                 支付后发货、上游拿货、分销与分站结算
 │   └── Support/                   业务服务（CurrencyService/OrderService/CommissionService 等）
 ├── database/migrations/           数据库迁移
 ├── lang/                          后端多语言（zh_CN / en）
@@ -343,9 +424,11 @@ ZCard/
 | `php artisan zcard:install` | 交互式安装（提示输入数据库+管理员） |
 | `php artisan zcard:install --skip-db` | 跳过数据库交互（使用已有 .env） |
 | `php artisan migrate` | 运行数据库迁移 |
-| `php artisan test` | 运行测试（56 passed） |
+| `php artisan test` | 运行 PHPUnit 测试 |
 | `php artisan tinker` | Tinker REPL |
 | `php artisan queue:work` | **生产必配**：队列消费进程（见下方「⚠️ 必须启动队列进程」） |
+| `php artisan schedule:work` | 本地持续运行调度器；生产环境应配置每分钟执行 `schedule:run` |
+| `php artisan supply:scheduled-sync` | 立即检查各货源计划，并派发已到期的采集/价格/上下架同步任务 |
 | `cd storefront && pnpm build` | 重新编译前台（开发时） |
 | `cd sysadmin && pnpm build` | 重新编译后台（开发时） |
 
@@ -354,6 +437,7 @@ ZCard/
 > 下列功能依赖后台队列（`QUEUE_CONNECTION=database`，任务存在数据库表中）：
 >
 > - **上游货源拿货**：顾客下单支付后，异步拿货任务 `FetchFromUpstream` 由队列消费（货源为 `async` 模式、或同步拿货失败自动转异步时**必依赖队列**）。**队列不运行 = 订单已支付但永远拿不到上游卡密**。
+> - **上游商品同步**：手动全量/增量同步、强制定价重算和定时同步由 `SyncSupplySourceProducts` 消费。
 > - **大批量卡密导入**（>5000 条走 `ImportCardsJob`）
 > - 其他异步任务
 >
@@ -369,6 +453,12 @@ ZCard/
 > 重启一次 PHP-FPM 和 Supervisor。
 >
 > 验证：`ps aux | grep queue:work` 应有进程；后台「全部同步任务」会同时显示队列健康和 worker 版本。
+>
+> 自动采集、价格同步、上下架同步还要求服务器每分钟运行 Laravel Scheduler：
+>
+> ```cron
+> * * * * * cd /path/to/ZCard && php artisan schedule:run >> /dev/null 2>&1
+> ```
 
 ---
 
@@ -385,8 +475,10 @@ ZCard/
 ## 路线图
 
 ### ✅ 已完成
+- 双向上下游货源网络：ACG-Faka / Dujiao Next / ZCard 拿货 + ZCard 对外供货 API
+- 多货源商品预览/导入/定时同步、自动拿货、同步任务监控、供货账号/专属价/预存账本
 - 商品/卡密/SKU/库存防超卖
-- 9 大支付通道
+- 11 个支付驱动
 - 多货币 + 多语言
 - 三级分销 + 分站/白标店铺
 - 优惠券 / 仪表盘 / RBAC / 短信 / 评价审核
@@ -407,4 +499,8 @@ ZCard/
 
 ---
 
-*开源协议：MIT。本项目仅供学习研究，请遵守当地法律法规。*
+## 开源许可
+
+ZCard 原创代码采用 [Apache License 2.0](LICENSE) 发布，版权与归属说明见 [NOTICE](NOTICE)。Apache-2.0 允许商业使用、修改和分发，但分发时须保留许可证、版权与 NOTICE，并对修改作出显著说明。
+
+第三方代码与依赖继续适用其各自许可证；例如 `sysadmin/` 中保留的 Art Design Pro 代码适用 [`sysadmin/LICENSE`](sysadmin/LICENSE) 所列 MIT License。使用本软件不免除部署者遵守当地法律法规和取得必要经营资质的责任。

@@ -1,6 +1,15 @@
 {
     "$schema": "https://www.schemastore.org/package.json",
+    "name": "zcard",
     "private": true,
+    "description": "Open-source automatic card vending and bidirectional digital-goods supply platform.",
+    "license": "Apache-2.0",
+    "keywords": [
+        "automatic-card-vending",
+        "digital-goods",
+        "supply-api",
+        "virtual-goods"
+    ],
     "type": "module",
     "scripts": {
         "build": "vite build",
