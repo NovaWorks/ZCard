@@ -16,6 +16,7 @@ use App\Supply\SupplySyncTaskState;
 use App\Support\AppHelper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -103,6 +104,90 @@ class SupplySyncTaskTest extends TestCase
         $this->assertNotNull($task->heartbeat_at);
         $this->assertSame('completed', $task->current_stage);
         $this->assertSame(AppHelper::version(), $task->worker_version);
+    }
+
+    public function test_heartbeat_accepts_zero_affected_rows_when_task_is_still_running(): void
+    {
+        $source = $this->makeSource();
+        $now = now()->startOfSecond();
+        $this->travelTo($now);
+        $task = SupplySyncTask::create([
+            'supply_source_id' => $source->id,
+            'mode' => 'full',
+            'status' => SupplySyncTask::STATUS_RUNNING,
+            'started_at' => $now,
+            'heartbeat_at' => $now,
+            'current_stage' => 'saving_products',
+            'processed_products' => 10,
+        ]);
+
+        // 模拟 MariaDB changed-rows 语义：字段值未变化时 UPDATE 返回 0。
+        DB::statement('PRAGMA count_changes = ON');
+        try {
+            $this->assertTrue(app(SupplySyncTaskState::class)->heartbeat(
+                $task,
+                'saving_products',
+                ['processed_products' => 10],
+            ));
+            $this->assertSame(SupplySyncTask::STATUS_RUNNING, $task->fresh()->status);
+        } finally {
+            DB::statement('PRAGMA count_changes = OFF');
+            $this->travelBack();
+        }
+    }
+
+    public function test_duplicate_heartbeat_at_ten_item_boundary_does_not_cancel_task(): void
+    {
+        $source = $this->makeSource();
+        $task = SupplySyncTask::create([
+            'supply_source_id' => $source->id,
+            'mode' => 'full',
+            'status' => SupplySyncTask::STATUS_QUEUED,
+        ]);
+        $items = [];
+        for ($i = 1; $i <= 11; $i++) {
+            $items[] = new UpstreamProduct(
+                code: "HEARTBEAT-{$i}",
+                name: "商品 {$i}",
+                price: 100,
+                factoryPrice: 100,
+            );
+        }
+
+        $driver = $this->createMock(SupplyDriver::class);
+        $driver->method('listProducts')->willReturn([
+            'items' => $items,
+            'total' => 11,
+            'page' => 1,
+            'has_more' => false,
+        ]);
+        $manager = $this->createMock(SupplyManager::class);
+        $manager->method('driver')->willReturn($driver);
+        $states = new class extends SupplySyncTaskState
+        {
+            private int $tenItemHeartbeats = 0;
+
+            public function heartbeat(SupplySyncTask $task, string $stage, array $progress = []): bool
+            {
+                $result = parent::heartbeat($task, $stage, $progress);
+                if (($progress['processed_products'] ?? null) === 10 && ++$this->tenItemHeartbeats === 1) {
+                    // 下一次调用是处理第 11 件前的同阶段、同进度心跳。
+                    DB::statement('PRAGMA count_changes = ON');
+                }
+
+                return $result;
+            }
+        };
+
+        try {
+            (new SyncSupplySourceProducts($source->id, 'full', $task->id))
+                ->handle($manager, app(SupplySyncService::class), $states);
+        } finally {
+            DB::statement('PRAGMA count_changes = OFF');
+        }
+
+        $this->assertSame(SupplySyncTask::STATUS_SUCCESS, $task->fresh()->status);
+        $this->assertSame(11, (int) $task->fresh()->processed_products);
     }
 
     public function test_full_sync_soft_deletes_explicitly_inactive_and_missing_products(): void

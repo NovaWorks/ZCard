@@ -62,13 +62,19 @@ class SupplySyncTaskState
         $payload['heartbeat_at'] = now();
         $payload['current_stage'] = $stage;
 
-        if (SupplySyncTask::whereKey($task->id)
+        $updated = SupplySyncTask::whereKey($task->id)
             ->where('status', SupplySyncTask::STATUS_RUNNING)
-            ->update($payload) === 1) {
+            ->update($payload);
+        if ($updated === 1) {
             return true;
         }
 
         $status = SupplySyncTask::whereKey($task->id)->value('status');
+        // MariaDB 默认返回实际变更行数；同一秒内写入相同阶段和进度时可能为 0。
+        // 此时条件仍匹配 running，不能把“没有字段变化”误判成任务被取消。
+        if ($status === SupplySyncTask::STATUS_RUNNING) {
+            return true;
+        }
         if ($status === SupplySyncTask::STATUS_CANCELLING) {
             $this->finishCancelled($task);
         }
