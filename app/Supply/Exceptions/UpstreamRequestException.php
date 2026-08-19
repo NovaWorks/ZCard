@@ -2,6 +2,7 @@
 
 namespace App\Supply\Exceptions;
 
+use Illuminate\Http\Client\Response;
 use RuntimeException;
 use Throwable;
 
@@ -56,7 +57,22 @@ class UpstreamRequestException extends RuntimeException
         return new self(
             'UPSTREAM_INVALID_RESPONSE',
             '上游返回了非 JSON 内容，可能被 WAF、Cloudflare 或登录页拦截',
-            ['endpoint' => self::safeEndpoint($url), 'response_preview' => self::safePreview($body)],
+            self::invalidResponseContext($url, $body),
+        );
+    }
+
+    /** 保留排障所需的响应元数据，但不持久化响应头全集或正文全文。 */
+    public static function fromInvalidResponse(string $url, Response $response): self
+    {
+        return new self(
+            'UPSTREAM_INVALID_RESPONSE',
+            '上游返回了非 JSON 内容，可能被 WAF、Cloudflare 或登录页拦截',
+            self::invalidResponseContext($url, $response->body(), [
+                'http_status' => $response->status(),
+                'content_type' => self::safeHeader($response->header('Content-Type')),
+                'cf_ray' => self::safeHeader($response->header('CF-Ray'), 100),
+                'location' => self::safeLocation($response->header('Location')),
+            ]),
         );
     }
 
@@ -77,6 +93,46 @@ class UpstreamRequestException extends RuntimeException
         }
 
         return ($parts['scheme'] ?? 'https').'://'.($parts['host'] ?? '').($parts['path'] ?? '');
+    }
+
+    private static function safeLocation(?string $location): ?string
+    {
+        if ($location === null || $location === '') {
+            return null;
+        }
+
+        $parts = parse_url($location);
+        if (! is_array($parts)) {
+            return null;
+        }
+
+        $path = $parts['path'] ?? '/';
+        if (! isset($parts['host'])) {
+            return str_starts_with($path, '/') ? $path : null;
+        }
+
+        return ($parts['scheme'] ?? 'https').'://'.$parts['host'].$path;
+    }
+
+    private static function safeHeader(?string $value, int $limit = 160): ?string
+    {
+        $value = trim(preg_replace('/[^\x20-\x7E]/', '', (string) $value) ?? '');
+
+        return $value === '' ? null : mb_substr($value, 0, $limit);
+    }
+
+    private static function invalidResponseContext(string $url, string $body, array $metadata = []): array
+    {
+        return array_filter([
+            'endpoint' => self::safeEndpoint($url),
+            'http_status' => $metadata['http_status'] ?? null,
+            'content_type' => $metadata['content_type'] ?? null,
+            'cf_ray' => $metadata['cf_ray'] ?? null,
+            'location' => $metadata['location'] ?? null,
+            'body_bytes' => strlen($body),
+            'body_sha256' => hash('sha256', $body),
+            'response_preview' => self::safePreview($body),
+        ], static fn (mixed $value): bool => $value !== null && $value !== '');
     }
 
     private static function safePreview(string $body): ?string

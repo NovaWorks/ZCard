@@ -71,7 +71,7 @@ trait MakesHttpRequests
         }
         $json = $resp->json();
         if (! is_array($json)) {
-            throw UpstreamRequestException::invalidResponse($url, $resp->body());
+            throw UpstreamRequestException::fromInvalidResponse($url, $resp);
         }
 
         return $json;
@@ -93,7 +93,7 @@ trait MakesHttpRequests
         }
         $json = $resp->json();
         if (! is_array($json)) {
-            throw UpstreamRequestException::invalidResponse($url, $resp->body());
+            throw UpstreamRequestException::fromInvalidResponse($url, $resp);
         }
 
         return $json;
