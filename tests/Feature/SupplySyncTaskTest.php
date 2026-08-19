@@ -15,6 +15,7 @@ use App\Supply\SupplySyncService;
 use App\Supply\SupplySyncTaskState;
 use App\Support\AppHelper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Spatie\Permission\Models\Role;
@@ -103,6 +104,76 @@ class SupplySyncTaskTest extends TestCase
         $this->assertNotNull($task->heartbeat_at);
         $this->assertSame('completed', $task->current_stage);
         $this->assertSame(AppHelper::version(), $task->worker_version);
+    }
+
+    public function test_running_task_accepts_repeated_identical_heartbeats_within_same_second(): void
+    {
+        Carbon::setTestNow('2026-08-19 12:34:56');
+
+        try {
+            $source = $this->makeSource();
+            $task = SupplySyncTask::create([
+                'supply_source_id' => $source->id,
+                'mode' => 'full',
+                'status' => SupplySyncTask::STATUS_RUNNING,
+                'heartbeat_at' => now(),
+                'current_stage' => 'saving_products',
+                'current_page' => 1,
+                'processed_products' => 10,
+            ]);
+            $states = app(SupplySyncTaskState::class);
+            $progress = ['current_page' => 1, 'processed_products' => 10];
+
+            $this->assertTrue($states->heartbeat($task, 'saving_products', $progress));
+            $this->assertTrue($states->heartbeat($task, 'saving_products', $progress));
+            $this->assertSame(SupplySyncTask::STATUS_RUNNING, $task->fresh()->status);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_job_does_not_cancel_itself_after_ten_products_in_same_second(): void
+    {
+        Carbon::setTestNow('2026-08-19 12:34:56');
+
+        try {
+            $source = $this->makeSource();
+            $task = SupplySyncTask::create([
+                'supply_source_id' => $source->id,
+                'mode' => 'full',
+                'status' => SupplySyncTask::STATUS_QUEUED,
+            ]);
+            $items = [];
+            for ($i = 1; $i <= 11; $i++) {
+                $items[] = new UpstreamProduct(
+                    code: "HEARTBEAT-{$i}",
+                    name: "商品 {$i}",
+                    price: 100,
+                    factoryPrice: 100,
+                );
+            }
+
+            $driver = $this->createMock(SupplyDriver::class);
+            $driver->method('listProducts')->willReturn([
+                'items' => $items,
+                'total' => 11,
+                'page' => 1,
+                'has_more' => false,
+            ]);
+            $manager = $this->createMock(SupplyManager::class);
+            $manager->method('driver')->willReturn($driver);
+
+            (new SyncSupplySourceProducts($source->id, 'full', $task->id))
+                ->handle($manager, app(SupplySyncService::class));
+
+            $task->refresh();
+            $this->assertSame(SupplySyncTask::STATUS_SUCCESS, $task->status);
+            $this->assertSame(11, (int) $task->processed_products);
+            $this->assertSame(11, (int) $task->created_count);
+            $this->assertNull($task->cancel_requested_at);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_full_sync_soft_deletes_explicitly_inactive_and_missing_products(): void
