@@ -459,6 +459,32 @@
             </div>
             <div class="field-help">{{ t('zcard.supply.scheduleRequestDelayTip') }}</div>
           </ElFormItem>
+          <ElFormItem :label="t('zcard.supply.stockConcurrency')">
+            <ElInputNumber
+              v-model="scheduleForm.stock_concurrency"
+              :min="1"
+              :max="10"
+              :precision="0"
+              controls-position="right"
+              style="width: 160px"
+            />
+            <div class="field-help">{{ t('zcard.supply.stockConcurrencyTip') }}</div>
+          </ElFormItem>
+          <ElFormItem :label="t('zcard.supply.stockRequestDelay')">
+            <div class="input-with-unit">
+              <ElInputNumber
+                v-model="scheduleForm.stock_request_delay_ms"
+                :min="0"
+                :max="10000"
+                :step="50"
+                :precision="0"
+                controls-position="right"
+                style="width: 160px"
+              />
+              <span class="unit">ms</span>
+            </div>
+            <div class="field-help">{{ t('zcard.supply.stockRequestDelayTip') }}</div>
+          </ElFormItem>
 
           <ElDivider content-position="left">{{ t('zcard.supply.scheduleTasksTitle') }}</ElDivider>
           <div class="schedule-task-list">

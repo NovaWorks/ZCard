@@ -2,6 +2,7 @@
 
 namespace App\Supply\Exceptions;
 
+use Illuminate\Http\Client\Response;
 use RuntimeException;
 use Throwable;
 
@@ -36,6 +37,18 @@ class UpstreamRequestException extends RuntimeException
         ], $retryable);
     }
 
+    /** 从完整响应构造 HTTP 异常，保留脱敏诊断元数据。 */
+    public static function fromResponse(string $url, Response $response): self
+    {
+        $error = self::fromHttp($url, $response->status(), $response->body());
+
+        return $error->withContext(self::responseContext(
+            $url,
+            $response->body(),
+            self::responseMetadata($response),
+        ));
+    }
+
     public static function fromConnection(string $url, Throwable $e): self
     {
         $raw = $e->getMessage();
@@ -56,7 +69,30 @@ class UpstreamRequestException extends RuntimeException
         return new self(
             'UPSTREAM_INVALID_RESPONSE',
             '上游返回了非 JSON 内容，可能被 WAF、Cloudflare 或登录页拦截',
-            ['endpoint' => self::safeEndpoint($url), 'response_preview' => self::safePreview($body)],
+            self::responseContext($url, $body),
+        );
+    }
+
+    /** 非 JSON 响应可能是瞬时网关/WAF 页面，库存补查可对其做有界重试。 */
+    public static function fromInvalidResponse(string $url, Response $response, bool $retryable = false): self
+    {
+        return new self(
+            'UPSTREAM_INVALID_RESPONSE',
+            '上游返回了非 JSON 内容，可能被 WAF、Cloudflare 或登录页拦截',
+            self::responseContext($url, $response->body(), self::responseMetadata($response)),
+            $retryable,
+        );
+    }
+
+    /** 返回带额外诊断上下文的新异常，避免修改 readonly 属性。 */
+    public function withContext(array $context): self
+    {
+        return new self(
+            $this->errorCode,
+            $this->getMessage(),
+            array_merge($this->context, $context),
+            $this->retryable,
+            $this->getPrevious(),
         );
     }
 
@@ -77,6 +113,54 @@ class UpstreamRequestException extends RuntimeException
         }
 
         return ($parts['scheme'] ?? 'https').'://'.($parts['host'] ?? '').($parts['path'] ?? '');
+    }
+
+    /** @return array<string, int|string> */
+    private static function responseMetadata(Response $response): array
+    {
+        return array_filter([
+            'http_status' => $response->status(),
+            'content_type' => self::safeHeader($response->header('Content-Type')),
+            'cf_ray' => self::safeHeader($response->header('CF-Ray'), 100),
+            'location' => self::safeLocation($response->header('Location')),
+        ], static fn (mixed $value): bool => $value !== null && $value !== '');
+    }
+
+    /** @param array<string, mixed> $metadata */
+    private static function responseContext(string $url, string $body, array $metadata = []): array
+    {
+        return array_filter(array_merge([
+            'endpoint' => self::safeEndpoint($url),
+            'body_bytes' => strlen($body),
+            'body_sha256' => hash('sha256', $body),
+            'response_preview' => self::safePreview($body),
+        ], $metadata), static fn (mixed $value): bool => $value !== null && $value !== '');
+    }
+
+    private static function safeLocation(?string $location): ?string
+    {
+        if ($location === null || $location === '') {
+            return null;
+        }
+
+        $parts = parse_url($location);
+        if (! is_array($parts)) {
+            return null;
+        }
+
+        $path = $parts['path'] ?? '/';
+        if (! isset($parts['host'])) {
+            return str_starts_with($path, '/') ? $path : null;
+        }
+
+        return ($parts['scheme'] ?? 'https').'://'.$parts['host'].$path;
+    }
+
+    private static function safeHeader(?string $value, int $limit = 160): ?string
+    {
+        $value = trim(preg_replace('/[^\x20-\x7E]/', '', (string) $value) ?? '');
+
+        return $value === '' ? null : mb_substr($value, 0, $limit);
     }
 
     private static function safePreview(string $body): ?string

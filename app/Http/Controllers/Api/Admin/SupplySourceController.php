@@ -596,6 +596,15 @@ class SupplySourceController extends Controller
             'settings' => 'sometimes|nullable|array',
         ]);
 
+        // 单独校验库存补查配置，避免 Laravel 的嵌套 validated 结果裁掉 settings 里的定价等兄弟键。
+        $schedule = $data['settings']['schedule'] ?? null;
+        if (is_array($schedule)) {
+            validator($schedule, [
+                'stock_concurrency' => 'sometimes|integer|min:1|max:10',
+                'stock_request_delay_ms' => 'sometimes|integer|min:0|max:10000',
+            ])->validate();
+        }
+
         // 安全(低危,纵深防御):上游地址禁止指向内网/环回——管理员凭据被盗或 CSRF
         // 时,服务端会向 base_url 发请求(SSRF 面)。与下游回调 CallbackUrlGuard 同口径:
         // 校验域名全部解析记录为公网;本机自建上游请通过内网穿透等公网入口对接。

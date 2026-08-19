@@ -16,6 +16,8 @@ use App\Models\SupplySyncTask;
  * {
  *   "enabled": true,            // 定时任务总开关
  *   "request_delay": 0,         // 每次请求上游间隔(秒),0=不限(防止上游限流)
+ *   "stock_concurrency": 3,     // ACG-Faka 库存补查并发数(1-10)
+ *   "stock_request_delay_ms": 200, // 库存补查批次间隔(毫秒,独立于商品分页)
  *   "collect": { "enabled": true, "mode": "incremental", "interval": 360, "windows": [] },
  *   "price":   { "enabled": true, "interval": 30,  "windows": [] },
  *   "status":  { "enabled": true, "interval": 60,  "windows": [] }

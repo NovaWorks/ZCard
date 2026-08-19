@@ -258,6 +258,10 @@ export interface SupplySchedule {
   enabled: boolean
   /** 每次请求上游间隔(秒),0=不限 */
   request_delay: number
+  /** ACG-Faka 库存补查并发数 */
+  stock_concurrency: number
+  /** ACG-Faka 库存补查批次间隔(毫秒) */
+  stock_request_delay_ms: number
   collect: TaskSchedule
   price: TaskSchedule
   status: TaskSchedule
@@ -267,6 +271,8 @@ export interface SupplySchedule {
 export const defaultSupplySchedule = (): SupplySchedule => ({
   enabled: true,
   request_delay: 0,
+  stock_concurrency: 3,
+  stock_request_delay_ms: 200,
   collect: { enabled: true, mode: 'incremental', interval: 360, windows: [] },
   price: { enabled: true, interval: 30, windows: [] },
   status: { enabled: true, interval: 60, windows: [] }
@@ -281,7 +287,12 @@ export const readSupplySchedule = (settings: Record<string, any> | null): Supply
   // 旧版只开了 auto_sync:保持每小时增量采集,价格/上下架关闭
   if (!raw || typeof raw !== 'object') {
     if (s.auto_sync) {
-      return { ...def, collect: { ...def.collect, interval: 60 }, price: disabled(def.price), status: disabled(def.status) }
+      return {
+        ...def,
+        collect: { ...def.collect, interval: 60 },
+        price: disabled(def.price),
+        status: disabled(def.status)
+      }
     }
     return def
   }
@@ -297,7 +308,16 @@ export const readSupplySchedule = (settings: Record<string, any> | null): Supply
   }
   return {
     enabled: raw.enabled ?? def.enabled,
-    request_delay: typeof raw.request_delay === 'number' && raw.request_delay >= 0 ? raw.request_delay : 0,
+    request_delay:
+      typeof raw.request_delay === 'number' && raw.request_delay >= 0 ? raw.request_delay : 0,
+    stock_concurrency:
+      typeof raw.stock_concurrency === 'number' && raw.stock_concurrency >= 1
+        ? Math.min(10, Math.floor(raw.stock_concurrency))
+        : def.stock_concurrency,
+    stock_request_delay_ms:
+      typeof raw.stock_request_delay_ms === 'number' && raw.stock_request_delay_ms >= 0
+        ? Math.min(10000, Math.floor(raw.stock_request_delay_ms))
+        : def.stock_request_delay_ms,
     collect: task('collect', def.collect),
     price: task('price', def.price),
     status: task('status', def.status)

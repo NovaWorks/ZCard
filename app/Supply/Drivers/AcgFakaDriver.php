@@ -18,6 +18,17 @@ class AcgFakaDriver implements SupplyDriver
 {
     use MakesHttpRequests;
 
+    private const DEFAULT_STOCK_CONCURRENCY = 3;
+
+    private const DEFAULT_STOCK_REQUEST_DELAY_MS = 200;
+
+    private const STOCK_MAX_ATTEMPTS = 3;
+
+    private const STOCK_RETRY_BACKOFF_MS = 250;
+
+    /** 900 秒 Job 中最多允许 600 秒用于主动限速，剩余时间留给 HTTP 与落库。 */
+    private const STOCK_THROTTLE_BUDGET_MS = 600_000;
+
     private const PRODUCT_ID_TOKEN = '__UPSTREAM_PRODUCT_ID__';
 
     private const CATEGORY_ID_TOKEN = '__UPSTREAM_CATEGORY_ID__';
@@ -90,7 +101,7 @@ class AcgFakaDriver implements SupplyDriver
         }
         // 响应不是预期 JSON 结构(可能是 WAF 拦截返回 HTML)
         if (! isset($data['code'])) {
-            throw UpstreamRequestException::invalidResponse($url, $resp->body());
+            throw UpstreamRequestException::fromInvalidResponse($url, $resp);
         }
 
         return $data;
@@ -134,7 +145,8 @@ class AcgFakaDriver implements SupplyDriver
         }
 
         // 同步模式:items 接口只对「卡密自动发货」商品返回 stock,
-        // 手动发货商品(-1)需逐个调 /shared/commodity/stock 补查真实库存(并发 10)。
+        // 手动发货商品(-1)需逐个调 /shared/commodity/stock 补查真实库存。
+        // 并发和批次间隔由 schedule.stock_* 独立控制，不复用商品分页 request_delay。
         if ($fetchStock) {
             $this->fillMissingStocks($items, $progress);
         }
@@ -142,83 +154,149 @@ class AcgFakaDriver implements SupplyDriver
         return ['items' => $items, 'total' => count($items), 'page' => 1, 'has_more' => false];
     }
 
-    /** 并发补查缺失库存(仅同步 Job 调用;预览不查避免 4000+ 商品超时) */
+    /**
+     * 分批补查缺失库存(仅同步 Job 调用;预览不查避免大目录超时)。
+     *
+     * 每批只重试失败商品，429/5xx/连接异常/非 JSON 网关页面最多重试 3 次；
+     * 业务错误和 4xx 配置错误立即失败，避免把未知库存误当成无限库存。
+     */
     private function fillMissingStocks(array &$items, ?callable $progress = null): void
     {
         $missing = [];
-        foreach ($items as $dto) {
+        $itemIndexes = [];
+        foreach ($items as $index => $dto) {
             if ($dto->stockQuantity === -1) {
                 $missing[] = $dto;
+                $itemIndexes[(string) $dto->code] = $index;
             }
         }
         if (empty($missing)) {
             return;
         }
 
-        $chunks = array_chunk($missing, 10);
+        [$concurrency, $requestDelayMs] = $this->stockFetchOptions(count($missing));
+        $chunks = array_chunk($missing, $concurrency);
+        $chunkCount = count($chunks);
+        $stockUrl = $this->baseUrl().'/shared/commodity/stock';
         $completed = 0;
+        $stockValues = [];
         if ($progress !== null) {
             $progress('fetching_stock', 0, count($missing));
         }
-        foreach ($chunks as $chunk) {
-            $stockValues = [];
-            $stockUrl = $this->baseUrl().'/shared/commodity/stock';
-            $responses = Http::pool(fn ($pool) => collect($chunk)->map(
-                fn ($dto) => $pool->as($dto->code)->asForm()
-                    ->connectTimeout($this->connectTimeout())
-                    ->timeout($this->requestTimeout())
-                    ->post($stockUrl, $this->signedParams(['code' => $dto->code]))
-            ));
-            foreach ($responses as $code => $resp) {
-                if ($resp instanceof ConnectionException) {
-                    throw UpstreamRequestException::fromConnection($stockUrl, $resp);
-                }
-                if (! $resp->successful()) {
-                    throw UpstreamRequestException::fromHttp($stockUrl, $resp->status(), $resp->body());
-                }
-                $data = $resp->json();
-                if (! is_array($data) || ! isset($data['code'])) {
-                    throw UpstreamRequestException::invalidResponse($stockUrl, $resp->body());
-                }
-                if ((int) $data['code'] !== 200) {
-                    throw UpstreamRequestException::business($stockUrl, (string) ($data['msg'] ?? '库存查询失败'));
-                }
-                $stockValues[$code] = (int) ($data['data']['stock'] ?? -1);
-            }
 
-            foreach ($chunk as $dto) {
-                if (isset($stockValues[$dto->code])) {
-                    // UpstreamProduct 为 readonly,不能 clone 后赋值
-                    // (PHP 8.3 不允许,8.4+ 才支持)→ 重新构造 DTO 并替换,兼容 8.3/8.4/8.5
-                    $rebuilt = new UpstreamProduct(
-                        code: $dto->code,
-                        name: $dto->name,
-                        price: $dto->price,
-                        factoryPrice: $dto->factoryPrice,
-                        categoryCode: $dto->categoryCode,
-                        categoryName: $dto->categoryName,
-                        description: $dto->description,
-                        cover: $dto->cover,
-                        images: $dto->images,
-                        isActive: $dto->isActive,
-                        skus: $dto->skus,
-                        stockQuantity: $stockValues[$dto->code],
-                        // 兼容在线更新前已驻留 worker 内存的旧 DTO 定义。
-                        productUrl: property_exists($dto, 'productUrl') ? $dto->productUrl : null,
-                    );
-                    foreach ($items as $i => $it) {
-                        if ($it->code === $dto->code) {
-                            $items[$i] = $rebuilt;
-                            break;
+        foreach ($chunks as $chunkIndex => $chunk) {
+            $pending = collect($chunk)->keyBy(fn (UpstreamProduct $dto) => (string) $dto->code)->all();
+
+            for ($attempt = 1; $attempt <= self::STOCK_MAX_ATTEMPTS && $pending !== []; $attempt++) {
+                $requestItems = $pending;
+                $responses = Http::pool(fn ($pool) => collect($requestItems)->map(
+                    fn (UpstreamProduct $dto, string $code) => $pool->as($code)->asForm()
+                        ->connectTimeout($this->connectTimeout())
+                        ->timeout($this->requestTimeout())
+                        ->post($stockUrl, $this->signedParams(['code' => $dto->code]))
+                ));
+                $pending = [];
+
+                foreach ($responses as $code => $response) {
+                    try {
+                        $stockValues[$code] = $this->stockFromResponse($stockUrl, $response);
+                    } catch (UpstreamRequestException $error) {
+                        $error = $error->withContext([
+                            'product_code' => mb_substr((string) $code, 0, 100),
+                            'attempt' => $attempt,
+                            'max_attempts' => self::STOCK_MAX_ATTEMPTS,
+                        ]);
+                        if (! $error->retryable || $attempt >= self::STOCK_MAX_ATTEMPTS) {
+                            throw $error;
                         }
+                        $pending[$code] = $requestItems[$code];
                     }
                 }
+
+                if ($pending !== []) {
+                    $backoffMs = self::STOCK_RETRY_BACKOFF_MS * (2 ** ($attempt - 1));
+                    usleep($backoffMs * 1000);
+                }
             }
+
             $completed += count($chunk);
             if ($progress !== null) {
                 $progress('fetching_stock', $completed, count($missing));
             }
+
+            if ($requestDelayMs > 0 && $chunkIndex < $chunkCount - 1) {
+                usleep($requestDelayMs * 1000);
+            }
         }
+
+        foreach ($missing as $dto) {
+            if (array_key_exists($dto->code, $stockValues)) {
+                // UpstreamProduct 为 readonly,不能 clone 后赋值
+                // (PHP 8.3 不允许,8.4+ 才支持)→ 重新构造 DTO 并替换,兼容 8.3/8.4/8.5
+                $rebuilt = new UpstreamProduct(
+                    code: $dto->code,
+                    name: $dto->name,
+                    price: $dto->price,
+                    factoryPrice: $dto->factoryPrice,
+                    categoryCode: $dto->categoryCode,
+                    categoryName: $dto->categoryName,
+                    description: $dto->description,
+                    cover: $dto->cover,
+                    images: $dto->images,
+                    isActive: $dto->isActive,
+                    skus: $dto->skus,
+                    stockQuantity: $stockValues[$dto->code],
+                    // 兼容在线更新前已驻留 worker 内存的旧 DTO 定义。
+                    productUrl: property_exists($dto, 'productUrl') ? $dto->productUrl : null,
+                );
+                $items[$itemIndexes[(string) $dto->code]] = $rebuilt;
+            }
+        }
+    }
+
+    /** @return array{0:int, 1:int} */
+    private function stockFetchOptions(int $itemCount): array
+    {
+        $schedule = $this->source->settings['schedule'] ?? [];
+        $schedule = is_array($schedule) ? $schedule : [];
+        $concurrency = min(10, max(1, (int) ($schedule['stock_concurrency'] ?? self::DEFAULT_STOCK_CONCURRENCY)));
+        $requestDelayMs = min(10_000, max(0, (int) ($schedule['stock_request_delay_ms'] ?? self::DEFAULT_STOCK_REQUEST_DELAY_MS)));
+        $chunks = (int) ceil($itemCount / $concurrency);
+        $throttleMs = max(0, $chunks - 1) * $requestDelayMs;
+
+        if ($throttleMs > self::STOCK_THROTTLE_BUDGET_MS) {
+            throw new UpstreamRequestException(
+                'STOCK_SYNC_BUDGET_EXCEEDED',
+                '库存补查限速配置预计等待超过 600 秒，请提高并发数或缩短库存请求间隔',
+                [
+                    'items' => $itemCount,
+                    'stock_concurrency' => $concurrency,
+                    'stock_request_delay_ms' => $requestDelayMs,
+                    'estimated_throttle_seconds' => (int) ceil($throttleMs / 1000),
+                ],
+            );
+        }
+
+        return [$concurrency, $requestDelayMs];
+    }
+
+    private function stockFromResponse(string $stockUrl, mixed $response): int
+    {
+        if ($response instanceof ConnectionException) {
+            throw UpstreamRequestException::fromConnection($stockUrl, $response);
+        }
+        if (! $response->successful()) {
+            throw UpstreamRequestException::fromResponse($stockUrl, $response);
+        }
+        $data = $response->json();
+        if (! is_array($data) || ! isset($data['code'])) {
+            throw UpstreamRequestException::fromInvalidResponse($stockUrl, $response, retryable: true);
+        }
+        if ((int) $data['code'] !== 200) {
+            throw UpstreamRequestException::business($stockUrl, (string) ($data['msg'] ?? '库存查询失败'));
+        }
+
+        return (int) ($data['data']['stock'] ?? -1);
     }
 
     /** 生成带签名的请求参数(供并发补查库存复用) */
