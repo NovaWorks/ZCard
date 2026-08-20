@@ -55,6 +55,29 @@ class SupplySourceAdminTest extends TestCase
         $this->assertStringNotContainsString('sk_secret', $raw);
     }
 
+    public function test_source_response_keeps_base_url_visible_for_editing(): void
+    {
+        StorefrontConfig::setMany(['supply_enabled' => true]);
+        $source = SupplySource::create([
+            'name' => '主站',
+            'driver' => 'dujiao_next',
+            'base_url' => 'https://upstream.example.com',
+            'credentials' => [
+                'base_url' => 'https://upstream.example.com',
+                'api_key' => 'key_secret',
+            ],
+            'status' => 'active',
+        ]);
+
+        $response = $this->withToken($this->adminToken())
+            ->getJson("/api/admin/supply-sources/{$source->id}");
+
+        $response->assertOk()
+            ->assertJsonPath('base_url', 'https://upstream.example.com')
+            ->assertJsonPath('credentials.base_url', 'https://upstream.example.com');
+        $this->assertStringStartsWith('••••', $response->json('credentials.api_key'));
+    }
+
     public function test_update_credentials_merges_keeping_secrets(): void
     {
         StorefrontConfig::setMany(['supply_enabled' => true]);

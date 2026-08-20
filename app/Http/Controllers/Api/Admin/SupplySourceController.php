@@ -623,7 +623,9 @@ class SupplySourceController extends Controller
     private function maskCredentials(SupplySource $source): SupplySource
     {
         $creds = $source->credentials ?? [];
-        $nonSensitiveKeys = ['app_id', 'merchant_id', 'pid'];
+        // base_url 是编辑表单必需的公开站点地址，不属于凭据；若脱敏，前端会将
+        // 以 •••• 开头的值当作敏感占位并清空，导致每次编辑都要重新填写。
+        $nonSensitiveKeys = ['base_url', 'app_id', 'merchant_id', 'pid'];
         foreach ($creds as $key => $val) {
             if (is_string($val) && strlen($val) > 4
                 && ! in_array(strtolower((string) $key), $nonSensitiveKeys, true)) {

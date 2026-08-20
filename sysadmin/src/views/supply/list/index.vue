@@ -1093,7 +1093,9 @@
     const obj: Record<string, any> = {}
     const masked = new Set<string>()
     currentSchemaFields.value.forEach((f) => {
-      const v = row.credentials?.[f.key]
+      // 站点地址有独立的顶层字段，以它作为编辑回填真理源；同时兼容旧接口曾将
+      // credentials.base_url 错误脱敏为 ••••.com、进而被下方逻辑清空的记录。
+      const v = f.key === 'base_url' ? row.base_url : row.credentials?.[f.key]
       // 脱敏值(以 •• 开头)视为已设过,留空不改
       if (typeof v === 'string' && v.startsWith('••••')) {
         obj[f.key] = ''
