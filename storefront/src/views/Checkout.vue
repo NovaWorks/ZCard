@@ -17,7 +17,13 @@ import { orderAccessTokensById, storeOrderAccessToken } from '@/utils/orderAcces
 import { navigateToPaymentUrl, submitPaymentForm } from '@/utils/paymentNavigation'
 
 interface ControlField {
-  type: string; label: string; name: string; required: boolean; options?: string[]
+  type: string
+  label: string
+  name: string
+  required: boolean
+  options?: string[]
+  option_labels?: Record<string, string>
+  placeholder?: string
 }
 
 const route = useRoute()
@@ -64,7 +70,10 @@ const couponCode = ref('')
 const couponDiscount = ref(0)
 const couponMsg = ref('')
 const couponChecking = ref(false)
-const controlValues = ref<Record<string, string>>({})
+const controlValues = ref<Record<string, any>>({})
+
+const controlOptionLabel = (field: ControlField, option: string) =>
+  field.option_labels?.[option] || option
 
 // 支付渠道
 const channels = ref<PaymentChannel[]>([])
@@ -142,6 +151,12 @@ onMounted(async () => {
 async function loadSingle(slug: string) {
   try {
     singleProduct.value = await getProduct(slug)
+    controlValues.value = Object.fromEntries(
+      ((singleProduct.value as any).control_config || []).map((field: ControlField) => [
+        field.name,
+        field.type === 'checkbox' ? [] : '',
+      ]),
+    )
     selectedSku.value = route.query.sku ? Number(route.query.sku) : (singleProduct.value.skus?.[0]?.id ?? null)
     const sku = singleProduct.value.skus?.find((s) => s.id === selectedSku.value)
     const qty = route.query.qty ? Number(route.query.qty) : 1
@@ -315,7 +330,9 @@ async function submit() {
   }
   // 单品模式:校验必填控件
   for (const f of controlFields.value) {
-    if (f.required && !(controlValues.value[f.name]?.trim())) {
+    const value = controlValues.value[f.name]
+    const empty = Array.isArray(value) ? value.length === 0 : !String(value ?? '').trim()
+    if (f.required && empty) {
       err.value = t('order.checkout.fillField', { name: f.label })
       return
     }
@@ -541,15 +558,21 @@ const selectPaymentOption = (channel: PaymentChannel, payType?: string) => {
         <div v-if="!isCartMode && controlFields.length" class="bg-white rounded-card border border-border p-4 space-y-3">
           <div v-for="f in controlFields" :key="f.name">
             <label class="text-xs font-semibold text-ink-soft">{{ f.label }} <span v-if="f.required" class="text-danger">*</span></label>
-            <select v-if="f.type === 'select'" v-model="controlValues[f.name]"
+            <select v-if="f.type === 'select' || f.type === 'radio'" v-model="controlValues[f.name]"
               class="w-full mt-1 px-3 py-2 border border-border rounded-field text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition bg-white">
               <option value="">{{ t('order.checkout.selectPlaceholder') }}</option>
-              <option v-for="opt in (f.options || [])" :key="opt" :value="opt">{{ opt }}</option>
+              <option v-for="opt in (f.options || [])" :key="opt" :value="opt">{{ controlOptionLabel(f, opt) }}</option>
             </select>
+            <div v-else-if="f.type === 'checkbox'" class="mt-2 flex flex-wrap gap-3">
+              <label v-for="opt in (f.options || [])" :key="opt" class="inline-flex items-center gap-1.5 text-sm text-ink-soft">
+                <input v-model="controlValues[f.name]" type="checkbox" :value="opt" class="rounded border-border text-primary focus:ring-primary/30" />
+                <span>{{ controlOptionLabel(f, opt) }}</span>
+              </label>
+            </div>
             <textarea v-else-if="f.type === 'textarea'" v-model="controlValues[f.name]" rows="3"
-              :placeholder="t('order.checkout.inputPlaceholder', { name: f.label })"
+              :placeholder="f.placeholder || t('order.checkout.inputPlaceholder', { name: f.label })"
               class="w-full mt-1 px-3 py-2 border border-border rounded-field text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition"></textarea>
-            <input v-else v-model="controlValues[f.name]" :type="f.type" :placeholder="t('order.checkout.inputPlaceholder', { name: f.label })"
+            <input v-else v-model="controlValues[f.name]" :type="f.type" :placeholder="f.placeholder || t('order.checkout.inputPlaceholder', { name: f.label })"
               class="w-full mt-1 px-3 py-2 border border-border rounded-field text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition" />
           </div>
         </div>

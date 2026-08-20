@@ -255,6 +255,19 @@
             <ElOption :label="t('zcard.supply.failureAutoRefund')" value="auto_refund" />
           </ElSelect>
         </ElFormItem>
+        <ElFormItem :label="t('zcard.supply.requestTimeout')">
+          <div class="input-with-unit">
+            <ElInputNumber
+              v-model="formData.settings.timeout"
+              :min="5"
+              :max="60"
+              :precision="0"
+              controls-position="right"
+            />
+            <span class="unit">{{ t('zcard.supply.seconds') }}</span>
+          </div>
+          <div class="field-help">{{ t('zcard.supply.requestTimeoutTip') }}</div>
+        </ElFormItem>
         <ElFormItem :label="t('zcard.supply.pricingMode')">
           <ElSelect v-model="formData.settings.default_pricing_mode" style="width: 100%">
             <ElOption :label="t('zcard.supply.pricingPercent')" value="percent" />
@@ -1020,6 +1033,7 @@
     stock_mode: 'synced',
     fulfillment_mode: 'sync',
     failure_action: 'manual',
+    timeout: 60,
     default_pricing_mode: 'percent',
     default_markup_percent: 10,
     default_markup_amount: 0,
@@ -1112,6 +1126,7 @@
       stock_mode: rs.stock_mode || 'synced',
       fulfillment_mode: rs.fulfillment_mode || 'sync',
       failure_action: rs.failure_action || 'manual',
+      timeout: Number(rs.timeout) || 60,
       default_pricing_mode: rs.default_pricing_mode || 'percent',
       default_markup_percent: rs.default_markup_percent ?? 10,
       auto_sync_price: rs.auto_sync_price ?? true,

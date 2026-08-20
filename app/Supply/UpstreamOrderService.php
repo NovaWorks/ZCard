@@ -5,6 +5,7 @@ namespace App\Supply;
 use App\Jobs\FetchFromUpstream;
 use App\Models\Card;
 use App\Models\Order;
+use App\Models\ProductSku;
 use App\Models\SupplySource;
 use App\Support\CardCipher;
 use App\Support\FulfillmentService;
@@ -66,13 +67,27 @@ class UpstreamOrderService
             $upstream = $driver->getOrder($order->upstream_order_id);
         } else {
             $product = $order->product;
+            $skuId = data_get($order->extra, 'sku_id');
+            $sku = $skuId
+                ? ProductSku::where('product_id', $product->id)->find($skuId)
+                : null;
             $upstream = $driver->createOrder([
                 'product_code' => $product->upstream_product_code,
+                'sku_code' => $sku?->upstream_sku_code,
                 'quantity' => $order->quantity,
                 'downstream_order_no' => $order->order_no, // 幂等
+                'contact' => $order->contact,
+                'device' => $order->create_device,
+                'card_id' => (int) data_get($order->extra, 'card_id', 0),
+                'extra' => (array) data_get($order->extra, 'control', []),
                 'callback_url' => rtrim(config('app.url'), '/').'/api/supply/callback',
             ]);
-            $order->update(['upstream_order_id' => $upstream->id, 'upstream_source_id' => $source->id]);
+            $order->update(array_filter([
+                'upstream_order_id' => $upstream->id,
+                'upstream_source_id' => $source->id,
+                // 上游 trade 返回的是本次真实扣款，覆盖同步目录中的估算成本。
+                'cost' => $upstream->amount > 0 ? $upstream->amount : null,
+            ], fn ($value) => $value !== null));
         }
 
         // 已发卡?

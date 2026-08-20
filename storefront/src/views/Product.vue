@@ -271,6 +271,11 @@ function confirmPremium() {
 
 function addToCart() {
   if (!product.value) return
+  // 动态控件值必须在单品结算页填写，购物车批量下单无法为每个商品安全绑定控件值。
+  if (product.value.control_config?.length) {
+    buy()
+    return
+  }
   if (isPremium.value) {
     openPremiumPick('cart')
     return
@@ -421,6 +426,7 @@ function buy() {
         <!-- 购买操作:加入购物车 + 立即购买 -->
         <div class="flex gap-2 mt-4">
           <button
+            v-if="!product.control_config?.length"
             @click="addToCart"
             class="flex-1 bg-white border-2 border-primary text-primary font-bold py-3 rounded-card hover:bg-primary-light transition"
           >{{ addedFeedback ? t('product.detail.addedToCart') : t('product.detail.addToCart') }}</button>

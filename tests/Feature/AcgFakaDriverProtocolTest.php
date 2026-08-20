@@ -66,6 +66,41 @@ class AcgFakaDriverProtocolTest extends TestCase
         $this->assertSame(['CARD-A'], $o->fulfillment->cards);
     }
 
+    public function test_request_uses_manual_signature_without_uploading_app_key(): void
+    {
+        Http::fake(['*' => Http::response([
+            'code' => 200,
+            'data' => ['shopName' => '上游', 'balance' => '1.00'],
+        ])]);
+
+        $this->driver()->ping();
+        $form = $this->lastRequest()->data();
+
+        $this->assertSame('8', (string) ($form['app_id'] ?? ''));
+        $this->assertArrayNotHasKey('app_key', $form, 'app_key 只能在本地签名，禁止上传');
+        $this->assertSame(md5('app_id=8&key=kkk'), $form['sign'] ?? null);
+    }
+
+    public function test_default_request_timeout_is_sixty_seconds(): void
+    {
+        $source = SupplySource::create([
+            'name' => 'timeout',
+            'driver' => SupplySource::DRIVER_ACG_FAKA,
+            'base_url' => 'https://timeout.test',
+            'credentials' => ['app_id' => '8', 'app_key' => 'kkk'],
+            'status' => 'active',
+        ]);
+        $driver = new class($source) extends AcgFakaDriver
+        {
+            public function exposedTimeout(): int
+            {
+                return $this->requestTimeout();
+            }
+        };
+
+        $this->assertSame(60, $driver->exposedTimeout());
+    }
+
     public function test_create_order_splits_multiple_cards(): void
     {
         Http::fake(['*' => Http::response([
@@ -131,8 +166,8 @@ class AcgFakaDriverProtocolTest extends TestCase
             'code' => 200,
             'data' => [[
                 'id' => 5, 'name' => '分类', 'children' => [
-                    ['code' => 'A', 'name' => '自动发货', 'price' => '10.00', 'factory_price' => '8.00', 'stock' => 42],
-                    ['code' => 'B', 'name' => '手动发货', 'price' => '20.00', 'factory_price' => '15.00'],
+                    ['code' => 'A', 'name' => '自动发货', 'price' => '10.00', 'user_price' => '9.00', 'factory_price' => '8.00', 'stock' => 42],
+                    ['code' => 'B', 'name' => '手动发货', 'price' => '20.00', 'user_price' => '18.00', 'factory_price' => '15.00'],
                 ],
             ]],
         ], 200)]);
@@ -142,7 +177,86 @@ class AcgFakaDriverProtocolTest extends TestCase
         $this->assertSame(42, $items[0]->stockQuantity, 'items 带 stock 时应透传');
         $this->assertSame(-1, $items[1]->stockQuantity, '不带 stock 视为无限');
         $this->assertSame(1000, $items[0]->price);
-        $this->assertSame(800, $items[0]->factoryPrice);
+        $this->assertSame(900, $items[0]->factoryPrice, '拿货价必须读取手册定义的 user_price，不能读取上游站长成本');
+    }
+
+    public function test_complex_product_maps_race_sku_and_widgets(): void
+    {
+        Http::fake(['*' => Http::response([
+            'code' => 200,
+            'data' => [[
+                'id' => 5,
+                'name' => '分类',
+                'children' => [[
+                    'code' => 'COMPLEX',
+                    'name' => '复杂商品',
+                    'price' => '10.00',
+                    'user_price' => '8.00',
+                    'minimum' => 2,
+                    'maximum' => 5,
+                    'contact_type' => 1,
+                    'config' => "[category]\n美区=12.00\n港区=11.00\n[sku]\n时长.月卡=1.00\n时长.年卡=5.00",
+                    'widget' => json_encode([[
+                        'type' => 'select',
+                        'name' => 'role',
+                        'cn' => '角色',
+                        'placeholder' => '请选择角色',
+                        'dict' => '战士=warrior,法师=mage',
+                        'regex' => '^(warrior|mage)$',
+                        'error' => '角色无效',
+                    ]], JSON_UNESCAPED_UNICODE),
+                ]],
+            ]],
+        ])]);
+
+        $product = $this->driver()->listProducts(null, 1)['items'][0];
+
+        $this->assertCount(4, $product->skus);
+        $this->assertSame(1300, $product->skus[0]['price']);
+        $this->assertSame(['race' => '美区', 'sku' => ['时长' => '月卡']], json_decode($product->skus[0]['code'], true));
+        $this->assertSame(['warrior', 'mage'], $product->controls[0]['options']);
+        $this->assertSame(['warrior' => '战士', 'mage' => '法师'], $product->controls[0]['option_labels']);
+        $this->assertSame(2, $product->minOrder);
+        $this->assertSame(5, $product->maxOrder);
+        $this->assertSame('phone', $product->contactType);
+    }
+
+    public function test_stock_and_trade_restore_complex_selection_and_controls(): void
+    {
+        $requests = [];
+        Http::fake(function (ClientRequest $request) use (&$requests) {
+            $requests[] = $request;
+            if (str_ends_with($request->url(), '/stock')) {
+                return Http::response(['code' => 200, 'data' => ['stock' => 6]]);
+            }
+
+            return Http::response([
+                'code' => 200,
+                'data' => ['amount' => '8.88', 'tradeNo' => 'T-COMPLEX', 'secret' => 'CARD'],
+            ]);
+        });
+        $code = json_encode(['race' => '美区', 'sku' => ['时长' => '年卡']], JSON_UNESCAPED_UNICODE);
+
+        $this->assertSame(6, $this->driver()->getStock('COMPLEX', $code));
+        $order = $this->driver()->createOrder([
+            'product_code' => 'COMPLEX',
+            'sku_code' => $code,
+            'quantity' => 1,
+            'downstream_order_no' => 'ORD-COMPLEX',
+            'contact' => 'buyer@example.com',
+            'extra' => ['role' => 'mage', 'shared_code' => 'ATTACK'],
+        ]);
+
+        $stock = $requests[0]->data();
+        $trade = $requests[1]->data();
+        $this->assertSame('美区', $stock['race']);
+        $this->assertSame(['时长' => '年卡'], $stock['sku']);
+        $this->assertSame('美区', $trade['race']);
+        $this->assertSame(['时长' => '年卡'], $trade['sku']);
+        $this->assertSame('mage', $trade['role']);
+        $this->assertSame('COMPLEX', $trade['shared_code'], '动态控件不得覆盖协议保留字段');
+        $this->assertArrayNotHasKey('app_key', $trade);
+        $this->assertSame(888, $order->amount);
     }
 
     public function test_list_products_uses_real_public_share_url_instead_of_api_code(): void

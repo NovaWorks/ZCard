@@ -344,4 +344,45 @@ class SupplySyncServiceTest extends TestCase
         $this->assertNull($result);
         $this->assertSame(0, $source->products()->count());
     }
+
+    public function test_sync_persists_upstream_skus_controls_and_limits(): void
+    {
+        $source = $this->makeSource(['default_pricing_mode' => 'percent', 'default_markup_percent' => 10]);
+        $service = app(SupplySyncService::class);
+        $skuCode = json_encode(['race' => '美区', 'sku' => ['时长' => '月卡']], JSON_UNESCAPED_UNICODE);
+
+        $product = $service->upsertProduct($source, new UpstreamProduct(
+            code: 'UP_COMPLEX',
+            name: '复杂商品',
+            price: 1000,
+            factoryPrice: 800,
+            skus: [[
+                'code' => $skuCode,
+                'name' => '美区 / 时长: 月卡',
+                'price' => 1200,
+                'stock_quantity' => 5,
+                'is_active' => true,
+            ]],
+            controls: [[
+                'type' => 'text', 'label' => '角色名', 'name' => 'role', 'required' => true,
+            ]],
+            minOrder: 2,
+            maxOrder: 5,
+            contactType: 'phone',
+        ));
+
+        $this->assertSame([['type' => 'text', 'label' => '角色名', 'name' => 'role', 'required' => true]], $product->control_config);
+        $this->assertSame(2, (int) $product->min_order);
+        $this->assertSame(5, (int) $product->max_order);
+        $this->assertSame('phone', $product->contact_type);
+        $this->assertCount(1, $product->skus);
+        $this->assertSame($skuCode, $product->skus[0]->upstream_sku_code);
+        $this->assertSame(1320, (int) $product->skus[0]->price);
+
+        // 上游删除规格后只停用上游 SKU，不影响可能存在的本地手工 SKU。
+        $service->upsertProduct($source, new UpstreamProduct(
+            code: 'UP_COMPLEX', name: '复杂商品', price: 1000, factoryPrice: 800, skus: [],
+        ));
+        $this->assertFalse((bool) $product->skus[0]->fresh()->status);
+    }
 }

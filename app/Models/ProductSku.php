@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ProductSku extends Model
 {
     protected $fillable = [
-        'product_id', 'name', 'price', 'stock_type', 'sort', 'status',
+        'product_id', 'upstream_sku_code', 'name', 'price', 'stock_type', 'sort', 'status',
     ];
 
     protected function casts(): array

@@ -7,6 +7,7 @@ class UpstreamProduct
 {
     /**
      * @param  array<int, array{code:?string, name:string, price:int, stock_quantity:int, is_active:bool}>  $skus
+     * @param  array<int, array<string, mixed>>  $controls
      */
     public function __construct(
         public readonly string $code,
@@ -22,5 +23,9 @@ class UpstreamProduct
         public readonly array $skus = [],        // 见 @param
         public readonly int $stockQuantity = -1, // -1=无限
         public readonly ?string $productUrl = null, // 上游公开商品页(驱动确认后的真实链接)
+        public readonly array $controls = [],    // 顾客下单时需要填写的上游动态字段
+        public readonly int $minOrder = 1,
+        public readonly int $maxOrder = 0,
+        public readonly string $contactType = 'email',
     ) {}
 }

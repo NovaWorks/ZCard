@@ -39,6 +39,13 @@ class OrderService
             ->where('hide', false)
             ->findOrFail($productId);
 
+        // 动态控件只接受商品声明过的字段，并在本站先完成必填/选项/正则校验。
+        // 对接上游商品时，这些值会随订单快照传给货源驱动。
+        $customer['extra'] = $this->validateControlValues(
+            is_array($product->control_config) ? $product->control_config : [],
+            is_array($customer['extra'] ?? null) ? $customer['extra'] : [],
+        );
+
         $userId = $customer['user_id'] ?? null;
         if ($product->only_user && ! $userId) {
             throw new \RuntimeException(__('messages.order.member_only'));
@@ -173,6 +180,7 @@ class OrderService
 
             $extra = array_merge(
                 $skuId ? ['sku_id' => $skuId, 'sku_name' => $product->skus->firstWhere('id', $skuId)?->name] : [],
+                $cardId ? ['card_id' => (int) $cardId] : [],
                 ['control' => $customer['extra'] ?? []],
             );
 
@@ -265,6 +273,84 @@ class OrderService
 
             return $order;
         });
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $fields
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function validateControlValues(array $fields, array $input): array
+    {
+        $clean = [];
+        foreach ($fields as $field) {
+            if (! is_array($field)) {
+                continue;
+            }
+            $name = is_scalar($field['name'] ?? null) ? (string) $field['name'] : '';
+            if (! preg_match('/^[A-Za-z][A-Za-z0-9_]{0,31}$/D', $name)) {
+                continue;
+            }
+
+            $label = is_scalar($field['label'] ?? null) && trim((string) $field['label']) !== ''
+                ? trim((string) $field['label'])
+                : $name;
+            $value = $input[$name] ?? null;
+            $isEmpty = $value === null || $value === '' || $value === [];
+            if (! empty($field['required']) && $isEmpty) {
+                throw new \RuntimeException("请填写{$label}");
+            }
+            if ($isEmpty) {
+                continue;
+            }
+
+            if (is_array($value)) {
+                if (count($value) > 50) {
+                    throw new \RuntimeException("{$label}选择项过多");
+                }
+                $value = array_values(array_map(static function (mixed $item) use ($label): string {
+                    if (! is_scalar($item) || mb_strlen((string) $item) > 500) {
+                        throw new \RuntimeException("{$label}格式不正确");
+                    }
+
+                    return trim((string) $item);
+                }, $value));
+            } elseif (is_scalar($value)) {
+                $value = trim((string) $value);
+                if (mb_strlen($value) > 2000) {
+                    throw new \RuntimeException("{$label}内容过长");
+                }
+            } else {
+                throw new \RuntimeException("{$label}格式不正确");
+            }
+
+            $options = array_values(array_filter(
+                is_array($field['options'] ?? null) ? $field['options'] : [],
+                'is_scalar',
+            ));
+            if ($options !== []) {
+                $selected = is_array($value) ? $value : [$value];
+                foreach ($selected as $option) {
+                    if (! in_array((string) $option, array_map('strval', $options), true)) {
+                        throw new \RuntimeException("{$label}选项无效");
+                    }
+                }
+            }
+
+            $regex = is_scalar($field['regex'] ?? null) ? trim((string) $field['regex']) : '';
+            if ($regex !== '' && is_string($value)) {
+                $pattern = '#'.str_replace('#', '\\#', $regex).'#u';
+                $matched = @preg_match($pattern, $value);
+                if ($matched !== 1) {
+                    $message = is_scalar($field['error'] ?? null) ? trim((string) $field['error']) : '';
+                    throw new \RuntimeException($message !== '' ? $message : "{$label}格式不正确");
+                }
+            }
+
+            $clean[$name] = $value;
+        }
+
+        return $clean;
     }
 
     /**

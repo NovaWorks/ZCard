@@ -54,35 +54,27 @@ class AcgFakaDriver implements SupplyDriver
     }
 
     /**
-     * acg-faka MD5 签名(完全对齐官方 Str::generateSignature + 客户端 Shared::post):
-     * 参数(含 app_id、app_key,去掉 sign/空值)ksort → http_build_query → urldecode
-     * → 末尾接 &key=app_key → md5。
-     *
-     * 官方客户端 post() 会把 app_id + app_key 都放入 body 再签名,服务端 unsafePost()
-     * 收到同样参数用数据库 app_key 重算,两边一致。故此处保持与官方完全相同的行为。
+     * acg-faka 手册签名：业务参数 + app_id（不上传 app_key），去掉 sign/空字符串后
+     * ksort → http_build_query → urldecode → 末尾接 &key=app_key → md5。
      */
     private function sign(array $params): string
     {
         $creds = $this->credentials();
         $params['app_id'] = $creds['app_id'];
-        $params['app_key'] = $creds['app_key'];
-        unset($params['sign']);
+        unset($params['sign'], $params['app_key']);
         ksort($params);
-        $params = array_filter($params, fn ($v) => $v !== '' && $v !== null);
+        $params = array_filter($params, fn ($v) => $v !== '');
 
         return md5(urldecode(http_build_query($params)).'&key='.$creds['app_key']);
     }
 
     private function signedPost(string $path, array $params): array
     {
-        $creds = $this->credentials();
-        // 与官方客户端 Shared::post 一致:app_id + app_key + sign 都放入 body
-        $params['app_id'] = $creds['app_id'];
-        $params['app_key'] = $creds['app_key'];
-        $params['sign'] = $this->sign($params);
+        $params = $this->signedParams($params);
         $url = $this->baseUrl().$path;
         try {
             $resp = Http::asForm()
+                ->withoutRedirecting()
                 ->connectTimeout($this->connectTimeout())
                 ->timeout($this->requestTimeout())
                 ->post($url, $params);
@@ -191,6 +183,7 @@ class AcgFakaDriver implements SupplyDriver
                 $requestItems = $pending;
                 $responses = Http::pool(fn ($pool) => collect($requestItems)->map(
                     fn (UpstreamProduct $dto, string $code) => $pool->as($code)->asForm()
+                        ->withoutRedirecting()
                         ->connectTimeout($this->connectTimeout())
                         ->timeout($this->requestTimeout())
                         ->post($stockUrl, $this->signedParams(['code' => $dto->code]))
@@ -248,6 +241,10 @@ class AcgFakaDriver implements SupplyDriver
                     stockQuantity: $stockValues[$dto->code],
                     // 兼容在线更新前已驻留 worker 内存的旧 DTO 定义。
                     productUrl: property_exists($dto, 'productUrl') ? $dto->productUrl : null,
+                    controls: property_exists($dto, 'controls') ? $dto->controls : [],
+                    minOrder: property_exists($dto, 'minOrder') ? $dto->minOrder : 1,
+                    maxOrder: property_exists($dto, 'maxOrder') ? $dto->maxOrder : 0,
+                    contactType: property_exists($dto, 'contactType') ? $dto->contactType : 'email',
                 );
                 $items[$itemIndexes[(string) $dto->code]] = $rebuilt;
             }
@@ -304,7 +301,7 @@ class AcgFakaDriver implements SupplyDriver
     {
         $creds = $this->credentials();
         $params['app_id'] = $creds['app_id'];
-        $params['app_key'] = $creds['app_key'];
+        unset($params['app_key']);
         $params['sign'] = $this->sign($params);
 
         return $params;
@@ -319,7 +316,12 @@ class AcgFakaDriver implements SupplyDriver
 
     public function getStock(string $code, ?string $skuCode = null): int
     {
-        $data = $this->signedPost('/shared/commodity/stock', ['code' => $code]);
+        $selection = $this->decodeSkuCode($skuCode);
+        $data = $this->signedPost('/shared/commodity/stock', array_filter([
+            'code' => $code,
+            'race' => $selection['race'],
+            'sku' => $selection['sku'],
+        ], fn ($value) => $value !== '' && $value !== []));
 
         return (int) ($data['data']['stock'] ?? -1);
     }
@@ -345,13 +347,28 @@ class AcgFakaDriver implements SupplyDriver
 
     public function createOrder(array $params): UpstreamOrder
     {
-        $data = $this->signedPost('/shared/commodity/trade', [
+        $selection = $this->decodeSkuCode($params['sku_code'] ?? null);
+        $body = [
             'shared_code' => $params['product_code'],
             'num' => $params['quantity'],
             'contact' => $params['contact'] ?? '',
             'request_no' => $params['downstream_order_no'],
-            'card_id' => 0,
-        ]);
+            'card_id' => (int) ($params['card_id'] ?? 0),
+            'race' => $selection['race'],
+            'sku' => $selection['sku'],
+        ];
+
+        // 动态控件字段由顾客下单 extra 原样透传，但不得覆盖协议保留字段。
+        $reserved = array_fill_keys(array_merge(array_keys($body), ['app_id', 'app_key', 'sign']), true);
+        foreach (($params['extra'] ?? []) as $key => $value) {
+            if (! is_string($key) || ! preg_match('/^[A-Za-z][A-Za-z0-9_]{0,31}$/D', $key)
+                || isset($reserved[$key]) || (! is_scalar($value) && ! is_array($value))) {
+                continue;
+            }
+            $body[$key] = $value;
+        }
+
+        $data = $this->signedPost('/shared/commodity/trade', $body);
         $d = $data['data'] ?? [];
         $cards = $this->splitSecret($d['secret'] ?? null);
         $fulfillment = $cards ? new UpstreamFulfillment(status: 'delivered', cards: $cards) : null;
@@ -400,11 +417,16 @@ class AcgFakaDriver implements SupplyDriver
 
     private function mapProduct(array $p, $categoryId = null, ?string $categoryName = null): UpstreamProduct
     {
+        $publicPrice = $this->yuanToFen($p['price'] ?? 0);
+        // 手册定义 user_price 为当前会员/代理价；factory_price 是上游站长自己的成本，
+        // 不能作为我们的拿货成本。最终精确成本还会以上游 trade 返回 amount 回写。
+        $memberPrice = $this->yuanToFen($p['user_price'] ?? 0);
+
         return new UpstreamProduct(
             code: $p['code'] ?? (string) ($p['id'] ?? ''),
             name: $p['name'] ?? '',
-            price: isset($p['price']) ? (int) round((float) $p['price'] * 100) : 0,
-            factoryPrice: isset($p['factory_price']) ? (int) round((float) $p['factory_price'] * 100) : 0,
+            price: $publicPrice,
+            factoryPrice: $memberPrice > 0 ? $memberPrice : $publicPrice,
             categoryCode: $categoryId !== null ? (string) $categoryId : ($p['category_id'] ?? null),
             categoryName: $categoryName,
             description: $p['description'] ?? ($p['introduce'] ?? null),
@@ -415,7 +437,224 @@ class AcgFakaDriver implements SupplyDriver
             // 手动发货商品不带 → 按无限(-1)处理。不读的话预览面板会把所有商品显示成无限库存。
             stockQuantity: isset($p['stock']) ? (int) $p['stock'] : -1,
             productUrl: $this->productUrl($p, $categoryId),
+            skus: $this->mapSkus($p, $publicPrice),
+            controls: $this->mapControls($p['widget'] ?? null),
+            minOrder: max(1, (int) ($p['minimum'] ?? 1)),
+            maxOrder: max(0, (int) ($p['maximum'] ?? 0)),
+            contactType: match ((int) ($p['contact_type'] ?? 0)) {
+                1 => 'phone',
+                2 => 'email',
+                default => 'none',
+            },
         );
+    }
+
+    private function yuanToFen(mixed $amount): int
+    {
+        return is_numeric($amount) ? (int) round((float) $amount * 100) : 0;
+    }
+
+    /** @return array{race:string, sku:array<string, string>} */
+    private function decodeSkuCode(?string $skuCode): array
+    {
+        if ($skuCode === null || $skuCode === '') {
+            return ['race' => '', 'sku' => []];
+        }
+
+        $decoded = json_decode($skuCode, true);
+        if (! is_array($decoded)) {
+            throw new \UnexpectedValueException('ACG-Faka 上游规格编码无效，请重新同步该商品');
+        }
+
+        $sku = [];
+        foreach (($decoded['sku'] ?? []) as $key => $value) {
+            if (is_string($key) && is_scalar($value)) {
+                $sku[$key] = (string) $value;
+            }
+        }
+
+        return [
+            'race' => is_scalar($decoded['race'] ?? null) ? (string) $decoded['race'] : '',
+            'sku' => $sku,
+        ];
+    }
+
+    /**
+     * 把 ACG 的 race + 多维 sku 展开为本站一维 SKU；code 保存原始选择，拿货时再还原。
+     *
+     * @return array<int, array{code:string, name:string, price:int, stock_quantity:int, is_active:bool}>
+     */
+    private function mapSkus(array $product, int $basePrice): array
+    {
+        $config = $this->parseConfig($product['config'] ?? null);
+        $races = is_array($config['category'] ?? null) ? $config['category'] : [];
+        $dimensions = is_array($config['sku'] ?? null) ? $config['sku'] : [];
+
+        $variants = [[
+            'race' => '',
+            'sku' => [],
+            'parts' => [],
+            'price' => $basePrice,
+        ]];
+
+        if ($races !== []) {
+            $variants = [];
+            foreach ($races as $race => $price) {
+                if (! is_scalar($price)) {
+                    continue;
+                }
+                $variants[] = [
+                    'race' => (string) $race,
+                    'sku' => [],
+                    'parts' => [(string) $race],
+                    'price' => $this->yuanToFen($price),
+                ];
+            }
+        }
+
+        foreach ($dimensions as $dimension => $options) {
+            if (! is_array($options) || $options === []) {
+                continue;
+            }
+            $expanded = [];
+            foreach ($variants as $variant) {
+                foreach ($options as $option => $premium) {
+                    if (! is_scalar($premium)) {
+                        continue;
+                    }
+                    $next = $variant;
+                    $next['sku'][(string) $dimension] = (string) $option;
+                    $next['parts'][] = (string) $dimension.': '.(string) $option;
+                    $next['price'] += $this->yuanToFen($premium);
+                    $expanded[] = $next;
+                }
+            }
+            if ($expanded !== []) {
+                $variants = $expanded;
+            }
+        }
+
+        // 没有 race/sku 的普通商品继续使用商品级价格，不制造多余 SKU。
+        if ($races === [] && $dimensions === []) {
+            return [];
+        }
+
+        return array_map(static function (array $variant): array {
+            ksort($variant['sku']);
+
+            return [
+                'code' => json_encode([
+                    'race' => $variant['race'],
+                    'sku' => $variant['sku'],
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'name' => implode(' / ', $variant['parts']),
+                'price' => max(0, (int) $variant['price']),
+                'stock_quantity' => -1,
+                'is_active' => true,
+            ];
+        }, $variants);
+    }
+
+    /** @return array<string, mixed> */
+    private function parseConfig(mixed $raw): array
+    {
+        if (is_array($raw)) {
+            return $raw;
+        }
+        if (! is_string($raw) || trim($raw) === '') {
+            return [];
+        }
+
+        $result = [];
+        $section = null;
+        foreach (preg_split('/[\r\n]+/', trim($raw)) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            if (preg_match('/^\[(.+)]$/', $line, $match)) {
+                $section = $match[1];
+                $result[$section] ??= [];
+
+                continue;
+            }
+            if ($section === null || ! str_contains($line, '=')) {
+                continue;
+            }
+            [$path, $value] = explode('=', $line, 2);
+            $keys = array_values(array_filter(explode('.', trim($path)), fn ($key) => $key !== ''));
+            if ($keys === []) {
+                continue;
+            }
+            $target = &$result[$section];
+            foreach ($keys as $index => $key) {
+                if ($index === array_key_last($keys)) {
+                    $target[$key] = trim($value);
+                } else {
+                    $target[$key] ??= [];
+                    if (! is_array($target[$key])) {
+                        $target[$key] = [];
+                    }
+                    $target = &$target[$key];
+                }
+            }
+            unset($target);
+        }
+
+        return $result;
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function mapControls(mixed $raw): array
+    {
+        $widgets = is_string($raw) ? json_decode($raw, true) : $raw;
+        if (! is_array($widgets)) {
+            return [];
+        }
+
+        $controls = [];
+        foreach (array_slice($widgets, 0, 32) as $widget) {
+            if (! is_array($widget) || ($widget['type'] ?? '') === 'custom') {
+                continue;
+            }
+            $name = is_scalar($widget['name'] ?? null) ? trim((string) $widget['name']) : '';
+            $type = is_scalar($widget['type'] ?? null) ? (string) $widget['type'] : 'text';
+            if (! preg_match('/^[A-Za-z][A-Za-z0-9_]{0,31}$/D', $name)
+                || ! in_array($type, ['text', 'password', 'number', 'select', 'checkbox', 'radio', 'textarea'], true)) {
+                continue;
+            }
+
+            $options = [];
+            $labels = [];
+            foreach (explode(',', (string) ($widget['dict'] ?? '')) as $pair) {
+                $parts = array_map('trim', explode('=', $pair, 2));
+                if (count($parts) !== 2 || $parts[0] === '' || $parts[1] === '') {
+                    continue;
+                }
+                [$label, $value] = $parts;
+                $options[] = $value;
+                $labels[$value] = $label;
+            }
+
+            $control = [
+                'type' => $type,
+                'label' => is_scalar($widget['cn'] ?? null) ? trim(strip_tags((string) $widget['cn'])) : $name,
+                'name' => $name,
+                'required' => true,
+                'placeholder' => is_scalar($widget['placeholder'] ?? null) ? trim(strip_tags((string) $widget['placeholder'])) : '',
+            ];
+            if ($options !== []) {
+                $control['options'] = array_values(array_unique($options));
+                $control['option_labels'] = $labels;
+            }
+            if (is_scalar($widget['regex'] ?? null) && trim((string) $widget['regex']) !== '') {
+                $control['regex'] = trim((string) $widget['regex']);
+                $control['error'] = is_scalar($widget['error'] ?? null) ? trim(strip_tags((string) $widget['error'])) : '';
+            }
+            $controls[] = $control;
+        }
+
+        return $controls;
     }
 
     /**

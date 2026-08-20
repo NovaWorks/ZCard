@@ -25,6 +25,7 @@ export interface Product {
   description?: string; images?: string[]; category?: { id: number; name: string; slug: string }
   skus?: Sku[]; virtual_reviews?: { rating?: number; count?: number; list?: any[] }
   min_order?: number; max_order?: number; stock_type?: string; delivery_mode?: string
+  control_config?: Array<Record<string, any>>
   /** 购买选择方式: general=常规, premium=靓号自选 */
   pick_type?: 'general' | 'premium'
   premium_numbers?: PremiumNumbers

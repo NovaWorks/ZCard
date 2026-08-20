@@ -15,7 +15,7 @@ trait MakesHttpRequests
 {
     protected function requestTimeout(): int
     {
-        return min(60, max(5, (int) ($this->source->settings['timeout'] ?? 30)));
+        return min(60, max(5, (int) ($this->source->settings['timeout'] ?? 60)));
     }
 
     protected function connectTimeout(): int

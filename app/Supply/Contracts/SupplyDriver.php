@@ -60,7 +60,7 @@ interface SupplyDriver
     /**
      * 下单拿货。
      *
-     * @param  array{product_code:string,sku_code:?string,quantity:int,downstream_order_no:string,contact:?string,callback_url:?string}  $params
+     * @param  array{product_code:string,sku_code:?string,quantity:int,downstream_order_no:string,contact:?string,callback_url:?string,card_id?:int,device?:string,extra?:array}  $params
      */
     public function createOrder(array $params): UpstreamOrder;
 

@@ -554,8 +554,8 @@ class SupplySourceController extends Controller
         $appId = $creds['app_id'] ?? '';
         $appKey = $creds['app_key'] ?? '';
 
-        // 构造与 AcgFakaDriver 完全一致的签名
-        $params = ['app_id' => $appId, 'app_key' => $appKey];
+        // 按 ACG-Faka 手册构造签名：app_key 仅在本地参与签名，不上传给上游。
+        $params = ['app_id' => $appId];
         unset($params['sign']);
         ksort($params);
         $params = array_filter($params, fn ($v) => $v !== '' && $v !== null);
@@ -563,7 +563,8 @@ class SupplySourceController extends Controller
         $params['sign'] = $sign;
 
         $url = $baseUrl.'/shared/commodity/items';
-        $resp = Http::asForm()->timeout(60)->post($url, $params);
+        $timeout = min(60, max(5, (int) (($supplySource->settings ?? [])['timeout'] ?? 60)));
+        $resp = Http::asForm()->withoutRedirecting()->timeout($timeout)->post($url, $params);
 
         return response()->json([
             'request' => [
@@ -595,6 +596,12 @@ class SupplySourceController extends Controller
             'status' => 'sometimes|in:active,disabled',
             'settings' => 'sometimes|nullable|array',
         ]);
+
+        if (isset($data['settings']) && is_array($data['settings'])) {
+            validator($data['settings'], [
+                'timeout' => 'sometimes|integer|min:5|max:60',
+            ])->validate();
+        }
 
         // 单独校验库存补查配置，避免 Laravel 的嵌套 validated 结果裁掉 settings 里的定价等兄弟键。
         $schedule = $data['settings']['schedule'] ?? null;

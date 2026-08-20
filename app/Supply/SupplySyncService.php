@@ -4,6 +4,7 @@ namespace App\Supply;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductSku;
 use App\Models\SupplySource;
 use App\Supply\Dto\UpstreamProduct;
 use Illuminate\Database\QueryException;
@@ -85,6 +86,10 @@ class SupplySyncService
                 'category_id' => $this->resolveCategoryId($source, $dto->categoryCode, $dto->categoryName, $categoryMap),
                 'upstream_synced_at' => now(),
                 'hide' => $existing->hide,
+                'control_config' => property_exists($dto, 'controls') ? $dto->controls : ($existing->control_config ?? []),
+                'min_order' => property_exists($dto, 'minOrder') ? max(1, $dto->minOrder) : $existing->min_order,
+                'max_order' => property_exists($dto, 'maxOrder') ? max(0, $dto->maxOrder) : $existing->max_order,
+                'contact_type' => property_exists($dto, 'contactType') ? $dto->contactType : $existing->contact_type,
             ];
             // 临时探测失败时保留上次已确认链接，不用 null 覆盖正确数据。
             $productUrl = $this->upstreamProductUrl($dto);
@@ -121,8 +126,9 @@ class SupplySyncService
                 }
             }
             $existing->update($update);
+            $this->syncUpstreamSkus($source, $existing, $dto, $pricing);
 
-            return $existing->fresh();
+            return $existing->fresh('skus');
         }
 
         // 新建:按定价规则算初始 price
@@ -131,14 +137,17 @@ class SupplySyncService
         // 唯一索引(merchant_id+slug)冲突终极兜底:极少数情况下(如并发/边缘数据)
         // uniqueSlug 检查后仍撞库,捕获后换随机后缀重试一次,保证导入不中断。
         try {
-            return $this->createProduct($source, $dto, $price, $pricing, $categoryMap);
+            $product = $this->createProduct($source, $dto, $price, $pricing, $categoryMap);
         } catch (QueryException $e) {
             if (! str_contains($e->getMessage(), 'Duplicate entry')) {
                 throw $e;
             }
+            $product = $this->createProduct($source, $dto, $price, $pricing, $categoryMap, unique: true);
         }
 
-        return $this->createProduct($source, $dto, $price, $pricing, $categoryMap, unique: true);
+        $this->syncUpstreamSkus($source, $product, $dto, $pricing);
+
+        return $product->fresh('skus');
     }
 
     /**
@@ -248,7 +257,49 @@ class SupplySyncService
             'upstream_product_url' => $this->upstreamProductUrl($dto),
             'stock_cache' => $dto->stockQuantity, // 上游库存缓存(-1=无限)
             'upstream_synced_at' => now(),
+            'control_config' => property_exists($dto, 'controls') ? $dto->controls : [],
+            'min_order' => property_exists($dto, 'minOrder') ? max(1, $dto->minOrder) : 1,
+            'max_order' => property_exists($dto, 'maxOrder') ? max(0, $dto->maxOrder) : 0,
+            'contact_type' => property_exists($dto, 'contactType') ? $dto->contactType : 'email',
         ]);
+    }
+
+    /**
+     * 同步上游规格。只管理带 upstream_sku_code 的记录，避免覆盖运营手工创建的本地 SKU。
+     */
+    private function syncUpstreamSkus(SupplySource $source, Product $product, UpstreamProduct $dto, ?array $pricing): void
+    {
+        if (! property_exists($dto, 'skus')) {
+            return;
+        }
+
+        $seen = [];
+        foreach ($dto->skus as $index => $sku) {
+            if (! is_array($sku) || ! is_scalar($sku['code'] ?? null) || (string) $sku['code'] === '') {
+                continue;
+            }
+            $code = (string) $sku['code'];
+            $seen[] = $code;
+            $upstreamPrice = max(0, (int) ($sku['price'] ?? 0));
+            $price = $this->computeInitialPrice($source, $upstreamPrice, $upstreamPrice, $pricing) ?? 0;
+
+            ProductSku::updateOrCreate(
+                ['product_id' => $product->id, 'upstream_sku_code' => $code],
+                [
+                    'name' => mb_substr((string) ($sku['name'] ?? $code), 0, 60),
+                    'price' => $price,
+                    'stock_type' => null,
+                    'sort' => $index,
+                    'status' => (bool) ($sku['is_active'] ?? true),
+                ],
+            );
+        }
+
+        $obsolete = ProductSku::where('product_id', $product->id)->whereNotNull('upstream_sku_code');
+        if ($seen !== []) {
+            $obsolete->whereNotIn('upstream_sku_code', $seen);
+        }
+        $obsolete->update(['status' => false]);
     }
 
     private function shouldSyncPublicDescription(SupplySource $source): bool

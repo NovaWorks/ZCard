@@ -6,11 +6,14 @@ use App\Models\Card;
 use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductSku;
 use App\Models\SupplySource;
 use App\Models\User;
 use App\Supply\UpstreamOrderService;
 use App\Support\StorefrontConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request as ClientRequest;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class UpstreamOrderServiceTest extends TestCase
@@ -86,5 +89,53 @@ class UpstreamOrderServiceTest extends TestCase
         $this->assertSame('delivered', $fresh->delivery_status);
         $this->assertSame('<p>上游付款后教程</p>', $fresh->instructions_snapshot);
         $this->assertDatabaseHas('order_deliveries', ['order_id' => $order->id, 'card_content' => 'CARD-Z']);
+    }
+
+    public function test_fetch_passes_order_snapshot_and_replaces_estimated_cost_with_actual_amount(): void
+    {
+        StorefrontConfig::setMany(['supply_enabled' => true]);
+        $merchant = $this->makeMerchant();
+        $source = SupplySource::create([
+            'name' => 'ACG', 'driver' => 'acg_faka', 'base_url' => 'https://acg.test',
+            'credentials' => ['app_id' => '8', 'app_key' => 'secret'], 'status' => 'active',
+        ]);
+        $product = Product::create([
+            'merchant_id' => $merchant->id, 'name' => 'P', 'slug' => 'p4', 'price' => 1200,
+            'factory_price' => 800, 'stock_type' => 'card', 'fulfillment_type' => 'upstream',
+            'status' => 1, 'upstream_source_id' => $source->id, 'upstream_product_code' => 'UP4',
+        ]);
+        $skuCode = json_encode(['race' => '美区', 'sku' => ['时长' => '年卡']], JSON_UNESCAPED_UNICODE);
+        $sku = ProductSku::create([
+            'product_id' => $product->id, 'upstream_sku_code' => $skuCode,
+            'name' => '美区 / 年卡', 'price' => 1200, 'status' => true,
+        ]);
+        $order = Order::create([
+            'order_no' => 'O4', 'merchant_id' => $merchant->id, 'product_id' => $product->id,
+            'quantity' => 1, 'amount' => 1200, 'cost' => 800, 'status' => 'paid',
+            'delivery_status' => 'pending', 'fulfillment_type_snapshot' => 'upstream',
+            'contact' => 'buyer@example.com', 'create_device' => 'win',
+            'extra' => ['sku_id' => $sku->id, 'control' => ['role' => 'mage']], 'paid_at' => now(),
+        ]);
+        $sent = null;
+        Http::fake(function (ClientRequest $request) use (&$sent) {
+            $sent = $request;
+
+            return Http::response([
+                'code' => 200,
+                'data' => ['amount' => '8.88', 'tradeNo' => 'ACG-T4', 'secret' => 'CARD-4'],
+            ]);
+        });
+
+        app(UpstreamOrderService::class)->fetchFromUpstream($order, $source);
+
+        $form = $sent->data();
+        $this->assertSame('美区', $form['race']);
+        $this->assertSame(['时长' => '年卡'], $form['sku']);
+        $this->assertSame('buyer@example.com', $form['contact']);
+        $this->assertSame('mage', $form['role']);
+        $fresh = $order->fresh();
+        $this->assertSame(888, (int) $fresh->cost);
+        $this->assertSame('ACG-T4', $fresh->upstream_order_id);
+        $this->assertSame('delivered', $fresh->delivery_status);
     }
 }
