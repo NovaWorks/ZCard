@@ -78,6 +78,30 @@ class SupplySourceAdminTest extends TestCase
         $this->assertStringStartsWith('••••', $response->json('credentials.api_key'));
     }
 
+    public function test_debug_products_request_uses_sixty_second_timeout(): void
+    {
+        StorefrontConfig::setMany(['supply_enabled' => true]);
+        $source = SupplySource::create([
+            'name' => 'ACG 上游',
+            'driver' => 'acg_faka',
+            'base_url' => 'https://upstream.example.com',
+            'credentials' => ['app_id' => 'merchant', 'app_key' => 'secret'],
+            'status' => 'active',
+        ]);
+        $timeout = null;
+        Http::fake(function ($request, array $options) use (&$timeout) {
+            $timeout = $options['timeout'] ?? null;
+
+            return Http::response(['code' => 200, 'data' => []]);
+        });
+
+        $this->withToken($this->adminToken())
+            ->getJson("/api/admin/supply-sources/{$source->id}/products/debug")
+            ->assertOk();
+
+        $this->assertSame(60, $timeout);
+    }
+
     public function test_update_credentials_merges_keeping_secrets(): void
     {
         StorefrontConfig::setMany(['supply_enabled' => true]);

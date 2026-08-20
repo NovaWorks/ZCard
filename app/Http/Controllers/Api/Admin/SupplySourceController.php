@@ -563,7 +563,7 @@ class SupplySourceController extends Controller
         $params['sign'] = $sign;
 
         $url = $baseUrl.'/shared/commodity/items';
-        $resp = Http::asForm()->timeout(30)->post($url, $params);
+        $resp = Http::asForm()->timeout(60)->post($url, $params);
 
         return response()->json([
             'request' => [
