@@ -79,6 +79,85 @@ class AcgFakaStockFetchTest extends TestCase
         $this->assertSame(5, $byCode['C2']->stockQuantity);
     }
 
+    public function test_missing_stock_route_falls_back_once_to_legacy_item_for_entire_catalog(): void
+    {
+        $codes = ['C1', 'C2', 'C3', 'C4', 'C5'];
+        $stockRequests = 0;
+        $itemRequests = [];
+        Http::fake(function (Request $request) use ($codes, &$stockRequests, &$itemRequests) {
+            if (str_ends_with($request->url(), '/items')) {
+                return Http::response($this->itemsResponse($codes));
+            }
+            if (str_ends_with($request->url(), '/stock')) {
+                $stockRequests++;
+
+                return Http::response(
+                    '<script>document.write(atob("NDA0IE5vdCBGb3VuZA=="))</script>',
+                    200,
+                    ['Content-Type' => 'text/html; charset=UTF-8'],
+                );
+            }
+            if (str_ends_with($request->url(), '/item')) {
+                $data = $request->data();
+                $code = (string) ($data['code'] ?? '');
+                $itemRequests[] = $code;
+                $this->assertSame('aid', $data['app_id'] ?? null);
+                $this->assertArrayNotHasKey('app_key', $data);
+                $signing = ['app_id' => 'aid', 'code' => $code];
+                ksort($signing);
+                $this->assertSame(
+                    md5(urldecode(http_build_query($signing)).'&key=key'),
+                    $data['sign'] ?? null,
+                );
+
+                return Http::response([
+                    'code' => 200,
+                    'data' => ['stock' => (int) substr($code, 1) * 10],
+                ]);
+            }
+
+            return Http::response('unexpected endpoint', 500);
+        });
+        $progress = [];
+        $source = $this->makeSource(['schedule' => [
+            'stock_concurrency' => 2,
+            'stock_request_delay_ms' => 0,
+        ]]);
+
+        $result = (new AcgFakaDriver($source))->listProducts(
+            null,
+            1,
+            fetchStock: true,
+            progress: function (string $stage, int $current, int $total) use (&$progress): void {
+                $progress[] = [$stage, $current, $total];
+            },
+        );
+
+        $this->assertSame(1, $stockRequests, '确认旧版后不得让后续商品重复请求不存在的 stock 路由');
+        $this->assertSame($codes, $itemRequests);
+        $this->assertSame([0, 2, 4, 5], array_column($progress, 1));
+        $this->assertSame([10, 20, 30, 40, 50], collect($result['items'])->pluck('stockQuantity')->all());
+    }
+
+    public function test_realtime_stock_falls_back_to_item_when_stock_route_returns_http_404(): void
+    {
+        Http::fake([
+            'https://up.example.com/shared/commodity/stock' => Http::response('not found', 404),
+            'https://up.example.com/shared/commodity/item' => Http::response([
+                'code' => 200,
+                'data' => ['stock' => 12],
+            ]),
+        ]);
+
+        $stock = (new AcgFakaDriver($this->makeSource()))->getStock('C1');
+
+        $this->assertSame(12, $stock);
+        $this->assertSame([
+            'https://up.example.com/shared/commodity/stock',
+            'https://up.example.com/shared/commodity/item',
+        ], Http::recorded()->map(fn (array $entry) => $entry[0]->url())->all());
+    }
+
     public function test_stock_endpoint_block_is_not_silently_treated_as_unlimited_stock(): void
     {
         $stockRequests = 0;
@@ -191,7 +270,7 @@ class AcgFakaStockFetchTest extends TestCase
     public function test_persistent_html_stock_response_exhausts_bounded_retries_with_safe_diagnostics(): void
     {
         $stockRequests = 0;
-        $html = '<html><title>404 Not Found</title> token=secret-value</html>';
+        $html = '<html><title>Temporary gateway failure</title> token=secret-value</html>';
         Http::fake(function (Request $request) use (&$stockRequests, $html) {
             if (str_ends_with($request->url(), '/items')) {
                 return Http::response($this->itemsResponse(['C1']));
@@ -220,9 +299,12 @@ class AcgFakaStockFetchTest extends TestCase
             $this->assertSame('https://login.example.com/challenge', $e->context['location']);
             $this->assertSame(strlen($html), $e->context['body_bytes']);
             $this->assertSame(hash('sha256', $html), $e->context['body_sha256']);
-            $this->assertStringContainsString('404 Not Found', $e->context['response_preview']);
+            $this->assertStringContainsString('Temporary gateway failure', $e->context['response_preview']);
             $this->assertStringNotContainsString('secret-value', $e->context['response_preview']);
             $this->assertStringNotContainsString('location-secret', json_encode($e->context));
+            $this->assertFalse(Http::recorded()->contains(
+                fn (array $entry) => str_ends_with($entry[0]->url(), '/item'),
+            ), '普通网关 HTML 不得误降级到旧版 item 接口');
         }
     }
 

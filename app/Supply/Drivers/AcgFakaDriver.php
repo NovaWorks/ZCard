@@ -10,6 +10,7 @@ use App\Supply\Dto\UpstreamOrder;
 use App\Supply\Dto\UpstreamProduct;
 use App\Supply\Exceptions\UpstreamRequestException;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -36,6 +37,9 @@ class AcgFakaDriver implements SupplyDriver
     private bool $productUrlTemplateResolved = false;
 
     private ?string $productUrlTemplate = null;
+
+    /** 旧于 3.1.3 的 ACG-Faka 没有 /shared/commodity/stock。 */
+    private bool $legacyStockEndpoint = false;
 
     public function __construct(public readonly SupplySource $source) {}
 
@@ -70,6 +74,7 @@ class AcgFakaDriver implements SupplyDriver
 
     private function signedPost(string $path, array $params): array
     {
+        $businessParams = $params;
         $params = $this->signedParams($params);
         $url = $this->baseUrl().$path;
         try {
@@ -80,6 +85,16 @@ class AcgFakaDriver implements SupplyDriver
                 ->post($url, $params);
         } catch (ConnectionException $e) {
             throw UpstreamRequestException::fromConnection($url, $e);
+        }
+
+        // ACG-Faka 3.1.3 才新增实时库存接口；旧版的 item 详情已包含商品级 stock。
+        // 仅在明确识别为路由 404 时降级，WAF/网关临时 HTML 仍保留原错误，避免误判。
+        if ($path === '/shared/commodity/stock' && $this->isStockEndpointUnavailable($resp)) {
+            $this->legacyStockEndpoint = true;
+
+            return $this->signedPost('/shared/commodity/item', [
+                'code' => (string) ($businessParams['code'] ?? ''),
+            ]);
         }
 
         if (! $resp->successful()) {
@@ -136,8 +151,8 @@ class AcgFakaDriver implements SupplyDriver
             }
         }
 
-        // 同步模式:items 接口只对「卡密自动发货」商品返回 stock,
-        // 手动发货商品(-1)需逐个调 /shared/commodity/stock 补查真实库存。
+        // 同步模式:items 接口只对「卡密自动发货」商品返回 stock。
+        // 手动发货商品(-1)优先调 /stock；旧于 3.1.3 的上游自动降级到 /item。
         // 并发和批次间隔由 schedule.stock_* 独立控制，不复用商品分页 request_delay。
         if ($fetchStock) {
             $this->fillMissingStocks($items, $progress);
@@ -176,7 +191,24 @@ class AcgFakaDriver implements SupplyDriver
             $progress('fetching_stock', 0, count($missing));
         }
 
+        // 先用第一个商品探测一次能力：新版继续走 stock；明确 404 的旧版切到 item。
+        // 避免大型目录里的每个商品都重复撞一次不存在的路由。
+        $probe = $chunks[0][0];
+        $stockValues[(string) $probe->code] = $this->fetchSingleStockWithRetries(
+            $probe,
+            $stockUrl,
+            allowLegacyFallback: true,
+        );
+        if ($this->legacyStockEndpoint) {
+            $stockUrl = $this->baseUrl().'/shared/commodity/item';
+        }
+
         foreach ($chunks as $chunkIndex => $chunk) {
+            $prefilled = 0;
+            if ($chunkIndex === 0) {
+                array_shift($chunk);
+                $prefilled = 1;
+            }
             $pending = collect($chunk)->keyBy(fn (UpstreamProduct $dto) => (string) $dto->code)->all();
 
             for ($attempt = 1; $attempt <= self::STOCK_MAX_ATTEMPTS && $pending !== []; $attempt++) {
@@ -212,7 +244,7 @@ class AcgFakaDriver implements SupplyDriver
                 }
             }
 
-            $completed += count($chunk);
+            $completed += count($chunk) + $prefilled;
             if ($progress !== null) {
                 $progress('fetching_stock', $completed, count($missing));
             }
@@ -294,6 +326,75 @@ class AcgFakaDriver implements SupplyDriver
         }
 
         return (int) ($data['data']['stock'] ?? -1);
+    }
+
+    private function fetchSingleStockWithRetries(
+        UpstreamProduct $dto,
+        string $url,
+        bool $allowLegacyFallback = false,
+    ): int {
+        for ($attempt = 1; $attempt <= self::STOCK_MAX_ATTEMPTS; $attempt++) {
+            try {
+                $response = Http::asForm()
+                    ->withoutRedirecting()
+                    ->connectTimeout($this->connectTimeout())
+                    ->timeout($this->requestTimeout())
+                    ->post($url, $this->signedParams(['code' => $dto->code]));
+            } catch (ConnectionException $e) {
+                $error = UpstreamRequestException::fromConnection($url, $e);
+                $response = null;
+            }
+
+            if ($response instanceof Response) {
+                if ($allowLegacyFallback && $this->isStockEndpointUnavailable($response)) {
+                    $this->legacyStockEndpoint = true;
+
+                    return $this->fetchSingleStockWithRetries(
+                        $dto,
+                        $this->baseUrl().'/shared/commodity/item',
+                    );
+                }
+
+                try {
+                    return $this->stockFromResponse($url, $response);
+                } catch (UpstreamRequestException $exception) {
+                    $error = $exception;
+                }
+            }
+
+            $error = $error->withContext([
+                'product_code' => mb_substr((string) $dto->code, 0, 100),
+                'attempt' => $attempt,
+                'max_attempts' => self::STOCK_MAX_ATTEMPTS,
+            ]);
+            if (! $error->retryable || $attempt >= self::STOCK_MAX_ATTEMPTS) {
+                throw $error;
+            }
+
+            $backoffMs = self::STOCK_RETRY_BACKOFF_MS * (2 ** ($attempt - 1));
+            usleep($backoffMs * 1000);
+        }
+
+        throw new \LogicException('库存补查重试流程异常');
+    }
+
+    /** 只识别明确的 404 页面，不把普通 WAF/Cloudflare HTML 当作旧版本。 */
+    private function isStockEndpointUnavailable(Response $response): bool
+    {
+        if ($response->status() === 404) {
+            return true;
+        }
+        if ($response->status() !== 200
+            || ! str_contains(strtolower((string) $response->header('Content-Type')), 'text/html')) {
+            return false;
+        }
+
+        $body = $response->body();
+        $plain = html_entity_decode(strip_tags($body), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        return (bool) preg_match('/\b404\s+Not\s+Found\b/i', $plain)
+            // 部分旧站用 JS + Base64 包装 404 页面；这是 "404 Not Found" 的稳定片段。
+            || str_contains($body, 'NDA0IE5vdCBGb3VuZA');
     }
 
     /** 生成带签名的请求参数(供并发补查库存复用) */
