@@ -145,14 +145,17 @@
   })
 
   // 图形验证码(后台开启登录验证码时显示并校验)
+  // 走无状态接口：返回 base64 图片 + key，提交时配对校验，不依赖 Session Cookie
   const captchaEnabled = ref(false)
   const captchaSrc = ref('')
+  const captchaKey = ref('')
   const loadCaptcha = async () => {
     try {
-      const res = await fetch(`/api/captcha/config?scene=login&t=${Date.now()}`)
+      const res = await fetch(`/api/captcha/login?t=${Date.now()}`)
       const data = await res.json()
       captchaEnabled.value = !!data.enabled
       captchaSrc.value = data.src || ''
+      captchaKey.value = data.key || ''
       if (!data.enabled) {
         formData.captcha = ''
         isPassing.value = true
@@ -192,9 +195,9 @@
 
       loading.value = true
 
-      // ZCard 登录（email + password [+ captcha]），userStore.login 已存储 token 和用户信息
+      // ZCard 登录（email + password [+ captcha + captcha_key]），userStore.login 已存储 token 和用户信息
       const { email, password, captcha } = formData
-      await userStore.login(email, password, captchaEnabled.value ? captcha : undefined)
+      await userStore.login(email, password, captchaEnabled.value ? captcha : undefined, captchaEnabled.value ? captchaKey.value : undefined)
 
       // 登录成功处理
       showLoginSuccessNotice()

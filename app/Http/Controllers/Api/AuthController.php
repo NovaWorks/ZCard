@@ -35,6 +35,8 @@ class AuthController extends Controller
             'email' => 'required|email|max:255|unique:users,email',
             'password' => 'required|string|min:8|max:72',
             'captcha' => 'nullable|string',
+            // 无状态验证码 key:与 /api/captcha/{scene} 返回的 key 配对校验
+            'captcha_key' => 'nullable|string',
             'referrer' => 'nullable|string|max:50',
         ];
 
@@ -50,7 +52,7 @@ class AuthController extends Controller
 
         // 安全(M-12):验证码校验先于唯一性校验——否则未过验证码即可枚举账号/邮箱。
         if (CaptchaService::isEnabled('register')) {
-            if (! CaptchaService::verify('register', $request->input('captcha') ?? null)) {
+            if (! CaptchaService::verify('register', $request->input('captcha') ?? null, $request->input('captcha_key'))) {
                 throw ValidationException::withMessages([
                     'captcha' => [__('messages.captcha_error')],
                 ]);
@@ -101,11 +103,13 @@ class AuthController extends Controller
             'email' => 'required|string|max:255',
             'password' => 'required|string',
             'captcha' => 'nullable|string',
+            // 无状态验证码 key:与 /api/captcha/{scene} 返回的 key 配对校验
+            'captcha_key' => 'nullable|string',
         ]);
 
         // 登录验证码校验(前台与后台共用;后台登录页在开启时同样显示并输入验证码)
         if (CaptchaService::isEnabled('login')) {
-            if (! CaptchaService::verify('login', $data['captcha'] ?? null)) {
+            if (! CaptchaService::verify('login', $data['captcha'] ?? null, $data['captcha_key'] ?? null)) {
                 throw ValidationException::withMessages([
                     'captcha' => [__('messages.captcha_error')],
                 ]);
@@ -271,11 +275,12 @@ class AuthController extends Controller
         $data = $request->validate([
             'email' => 'required|email|max:255',
             'captcha' => 'nullable|string',
+            'captcha_key' => 'nullable|string',
         ]);
 
         // 图形验证码校验(找回密码场景;注册或登录任一开启即要求,防换 IP 灌验证码邮件)
         if (CaptchaService::isEnabled('register') || CaptchaService::isEnabled('login')) {
-            if (! CaptchaService::verify('register', $data['captcha'] ?? null)) {
+            if (! CaptchaService::verify('register', $data['captcha'] ?? null, $data['captcha_key'] ?? null)) {
                 throw ValidationException::withMessages([
                     'captcha' => [__('messages.auth.captcha_error')],
                 ]);

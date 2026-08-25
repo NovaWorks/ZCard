@@ -187,8 +187,7 @@
           </ElSelect>
         </ElFormItem>
         <ElFormItem :label="t('zcard.user.balance')" prop="balance">
-          <ElInputNumber v-model="formData.balance" :min="0" :step="100" style="width: 100%" />
-          <div class="form-hint">¥{{ formatPrice(formData.balance || 0) }}</div>
+          <ElInputNumber v-model="formData.balance" :min="0" :step="1" :precision="2" style="width: 100%" />
           <div class="form-hint">{{ t('zcard.user.balanceHint') }}</div>
         </ElFormItem>
         <ElFormItem :label="t('zcard.user.points')" prop="points">
@@ -458,7 +457,8 @@
       phone: row.phone || '',
       qq: row.qq || '',
       group_id: row.group_id || undefined,
-      balance: Number(row.balance) || 0,
+      // 后端余额以「分」存储，表单以「元」展示与输入(与账单管理调账口径一致)
+      balance: (Number(row.balance) || 0) / 100,
       points: Number(row.points) || 0,
       pid: Number(row.pid) || 0,
       status: row.status ?? 1
@@ -486,7 +486,8 @@
       phone: formData.phone || null,
       qq: formData.qq || null,
       group_id: formData.group_id ?? 0,
-      balance: Number(formData.balance) || 0,
+      // 元 → 分：后端余额以「分」整数入账，改动会生成账单流水
+      balance: Math.round((Number(formData.balance) || 0) * 100),
       points: Number(formData.points) || 0,
       pid: Number(formData.pid) || 0,
       status: formData.status

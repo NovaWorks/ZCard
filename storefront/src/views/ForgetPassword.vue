@@ -24,11 +24,21 @@ const countdown = ref(0)
 
 const needCaptcha = computed(() => !!settings.config?.captcha_register)
 const captchaSrc = ref('')
+const captchaKey = ref('')
 
-const refreshCaptcha = () => {
-  captchaSrc.value = `${request.defaults?.baseURL || '/api'}/captcha/register?${Date.now()}`
+// 该端点返回 JSON {key, src(base64)}，必须解析后取 src，不能把 URL 直接当图片
+const refreshCaptcha = async () => {
+  try {
+    const res = await fetch(`${request.defaults?.baseURL || '/api'}/captcha/register?${Date.now()}`)
+    const data = await res.json()
+    captchaSrc.value = data.src || ''
+    captchaKey.value = data.key || ''
+  } catch {
+    captchaSrc.value = ''
+    captchaKey.value = ''
+  }
 }
-watch(needCaptcha, (v) => { if (v && !captchaSrc.value) refreshCaptcha() })
+watch(needCaptcha, (v) => { if (v && !captchaSrc.value) refreshCaptcha() }, { immediate: true })
 
 const startCountdown = () => {
   countdown.value = 60
@@ -48,6 +58,7 @@ async function handleSendCode() {
     const res = await sendResetCode({
       email: email.value,
       captcha: needCaptcha.value ? captcha.value : undefined,
+      captcha_key: needCaptcha.value ? captchaKey.value : undefined,
     })
     msg.value = res.message || t('auth.forget.codeSent')
     step.value = 2

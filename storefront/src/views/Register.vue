@@ -27,23 +27,22 @@ const registerOpen = computed(() => settings.config?.register_open !== false)
 const needCaptcha = computed(() => !!settings.config?.captcha_register)
 const minLen = computed(() => settings.config?.username_min_length || 3)
 const captchaSrc = ref('')
+const captchaKey = ref('')
 
 const refreshCaptcha = async () => {
   try {
     const res = await fetch(`${request.defaults?.baseURL || '/api'}/captcha/register?${Date.now()}`)
     const data = await res.json()
     captchaSrc.value = data.src || ''
+    captchaKey.value = data.key || ''
   } catch {
     captchaSrc.value = ''
+    captchaKey.value = ''
   }
 }
 
-onMounted(() => {
-  if (needCaptcha.value) refreshCaptcha()
-})
-
-// 监听验证码开关变化
-watch(needCaptcha, (v) => { if (v && !captchaSrc.value) refreshCaptcha() })
+// 监听验证码开关变化(immediate:settings 缓存同步恢复时 watch 注册前已是 true)
+watch(needCaptcha, (v) => { if (v && !captchaSrc.value) refreshCaptcha() }, { immediate: true })
 
 async function submit() {
   err.value = ''
@@ -74,6 +73,7 @@ async function submit() {
       email: email.value,
       password: password.value,
       captcha: needCaptcha.value ? captcha.value : undefined,
+      captcha_key: needCaptcha.value ? captchaKey.value : undefined,
       referrer: referrer.value || undefined,
     } as any)
     authStore.setAuth(res.token, res.user)

@@ -34,12 +34,29 @@ class AcgFakaDriver implements SupplyDriver
 
     private const CATEGORY_ID_TOKEN = '__UPSTREAM_CATEGORY_ID__';
 
+    /**
+     * 库存查询候选接口，探测顺序 = 协议演进顺序：
+     * - stock：3.1.3+ 实时库存，参数 code（可带 race/sku），返回 data.stock；
+     * - item：3.1.3 之前的旧版，商品详情自带 stock，参数 code；
+     * - inventory：出海同款版(acg-3.1.1Max)与标准新版均有，参数 sharedCode（可带 race），返回 data.count。
+     * 出海同款版没有 stock 路由、item 只认 sharedCode，且对不存在的路由返回
+     * HTTP 200 的 JS/Base64 包装 404 页（非 404 状态码），因此必须逐候选探测。
+     */
+    private const STOCK_SPECS = [
+        'stock' => ['path' => '/shared/commodity/stock', 'code_param' => 'code', 'field' => 'stock', 'supports_race' => true, 'supports_sku' => true],
+        'item' => ['path' => '/shared/commodity/item', 'code_param' => 'code', 'field' => 'stock', 'supports_race' => false, 'supports_sku' => false],
+        'inventory' => ['path' => '/shared/commodity/inventory', 'code_param' => 'sharedCode', 'field' => 'count', 'supports_race' => true, 'supports_sku' => false],
+    ];
+
     private bool $productUrlTemplateResolved = false;
 
     private ?string $productUrlTemplate = null;
 
-    /** 旧于 3.1.3 的 ACG-Faka 没有 /shared/commodity/stock。 */
-    private bool $legacyStockEndpoint = false;
+    /** 已识别的库存接口形态（stock/item/inventory），同一驱动实例内只探测一次。 */
+    private ?string $stockMode = null;
+
+    /** 商品详情参数名（标准版 code / 出海同款版 sharedCode），探测成功后缓存。 */
+    private ?string $itemParamName = null;
 
     public function __construct(public readonly SupplySource $source) {}
 
@@ -74,7 +91,6 @@ class AcgFakaDriver implements SupplyDriver
 
     private function signedPost(string $path, array $params): array
     {
-        $businessParams = $params;
         $params = $this->signedParams($params);
         $url = $this->baseUrl().$path;
         try {
@@ -85,16 +101,6 @@ class AcgFakaDriver implements SupplyDriver
                 ->post($url, $params);
         } catch (ConnectionException $e) {
             throw UpstreamRequestException::fromConnection($url, $e);
-        }
-
-        // ACG-Faka 3.1.3 才新增实时库存接口；旧版的 item 详情已包含商品级 stock。
-        // 仅在明确识别为路由 404 时降级，WAF/网关临时 HTML 仍保留原错误，避免误判。
-        if ($path === '/shared/commodity/stock' && $this->isStockEndpointUnavailable($resp)) {
-            $this->legacyStockEndpoint = true;
-
-            return $this->signedPost('/shared/commodity/item', [
-                'code' => (string) ($businessParams['code'] ?? ''),
-            ]);
         }
 
         if (! $resp->successful()) {
@@ -152,8 +158,9 @@ class AcgFakaDriver implements SupplyDriver
         }
 
         // 同步模式:items 接口只对「卡密自动发货」商品返回 stock。
-        // 手动发货商品(-1)优先调 /stock；旧于 3.1.3 的上游自动降级到 /item。
-        // 并发和批次间隔由 schedule.stock_* 独立控制，不复用商品分页 request_delay。
+        // 手动发货商品(-1)按 stock → item → inventory 顺序探测补查:
+        // 旧于 3.1.3 的上游降级到 item,出海同款版(无 stock、item 只认 sharedCode)
+        // 降级到 inventory。并发和批次间隔由 schedule.stock_* 独立控制,不复用商品分页 request_delay。
         if ($fetchStock) {
             $this->fillMissingStocks($items, $progress);
         }
@@ -184,24 +191,20 @@ class AcgFakaDriver implements SupplyDriver
         [$concurrency, $requestDelayMs] = $this->stockFetchOptions(count($missing));
         $chunks = array_chunk($missing, $concurrency);
         $chunkCount = count($chunks);
-        $stockUrl = $this->baseUrl().'/shared/commodity/stock';
         $completed = 0;
         $stockValues = [];
         if ($progress !== null) {
             $progress('fetching_stock', 0, count($missing));
         }
 
-        // 先用第一个商品探测一次能力：新版继续走 stock；明确 404 的旧版切到 item。
+        // 先用第一个商品探测一次能力：新版走 stock；404 的旧版切到 item；
+        // 出海同款版（无 stock 路由、item 只认 sharedCode）切到 inventory。
         // 避免大型目录里的每个商品都重复撞一次不存在的路由。
         $probe = $chunks[0][0];
-        $stockValues[(string) $probe->code] = $this->fetchSingleStockWithRetries(
-            $probe,
-            $stockUrl,
-            allowLegacyFallback: true,
-        );
-        if ($this->legacyStockEndpoint) {
-            $stockUrl = $this->baseUrl().'/shared/commodity/item';
-        }
+        $stockValues[(string) $probe->code] = $this->stockQuery($probe->code);
+        $stockSpec = self::STOCK_SPECS[$this->stockMode];
+        $stockUrl = $this->baseUrl().$stockSpec['path'];
+        $stockField = $stockSpec['field'];
 
         foreach ($chunks as $chunkIndex => $chunk) {
             $prefilled = 0;
@@ -218,13 +221,13 @@ class AcgFakaDriver implements SupplyDriver
                         ->withoutRedirecting()
                         ->connectTimeout($this->connectTimeout())
                         ->timeout($this->requestTimeout())
-                        ->post($stockUrl, $this->signedParams(['code' => $dto->code]))
+                        ->post($stockUrl, $this->signedParams($this->stockParams($this->stockMode, $code)))
                 ));
                 $pending = [];
 
                 foreach ($responses as $code => $response) {
                     try {
-                        $stockValues[$code] = $this->stockFromResponse($stockUrl, $response);
+                        $stockValues[$code] = $this->stockFromResponse($stockUrl, $response, $stockField);
                     } catch (UpstreamRequestException $error) {
                         $error = $error->withContext([
                             'product_code' => mb_substr((string) $code, 0, 100),
@@ -309,7 +312,7 @@ class AcgFakaDriver implements SupplyDriver
         return [$concurrency, $requestDelayMs];
     }
 
-    private function stockFromResponse(string $stockUrl, mixed $response): int
+    private function stockFromResponse(string $stockUrl, mixed $response, string $field = 'stock'): int
     {
         if ($response instanceof ConnectionException) {
             throw UpstreamRequestException::fromConnection($stockUrl, $response);
@@ -325,61 +328,162 @@ class AcgFakaDriver implements SupplyDriver
             throw UpstreamRequestException::business($stockUrl, (string) ($data['msg'] ?? '库存查询失败'));
         }
 
-        return (int) ($data['data']['stock'] ?? -1);
+        return (int) ($data['data'][$field] ?? -1);
     }
 
-    private function fetchSingleStockWithRetries(
-        UpstreamProduct $dto,
-        string $url,
-        bool $allowLegacyFallback = false,
-    ): int {
+    /** @return array<string, int|string> */
+    private function stockRetryContext(string $code, int $attempt): array
+    {
+        return [
+            'product_code' => mb_substr($code, 0, 100),
+            'attempt' => $attempt,
+            'max_attempts' => self::STOCK_MAX_ATTEMPTS,
+        ];
+    }
+
+    /** @param array<string, string> $sku */
+    private function stockParams(string $mode, string $code, ?string $race = null, array $sku = []): array
+    {
+        $spec = self::STOCK_SPECS[$mode];
+        $params = [$spec['code_param'] => $code];
+        if ($spec['supports_race'] && $race !== null && $race !== '') {
+            $params['race'] = $race;
+        }
+        if ($spec['supports_sku'] && $sku !== []) {
+            $params['sku'] = $sku;
+        }
+
+        return $params;
+    }
+
+    /** @param array<string, string> $sku */
+    private function stockQuery(string $code, ?string $race = null, array $sku = []): int
+    {
+        if ($this->stockMode !== null) {
+            return $this->requestStockWithRetries($this->stockMode, $code, $race, $sku);
+        }
+
+        return $this->probeStockQuery($code, $race, $sku);
+    }
+
+    /** @param array<string, string> $sku */
+    private function requestStockWithRetries(string $mode, string $code, ?string $race, array $sku): int
+    {
+        $spec = self::STOCK_SPECS[$mode];
+        $url = $this->baseUrl().$spec['path'];
         for ($attempt = 1; $attempt <= self::STOCK_MAX_ATTEMPTS; $attempt++) {
             try {
                 $response = Http::asForm()
                     ->withoutRedirecting()
                     ->connectTimeout($this->connectTimeout())
                     ->timeout($this->requestTimeout())
-                    ->post($url, $this->signedParams(['code' => $dto->code]));
+                    ->post($url, $this->signedParams($this->stockParams($mode, $code, $race, $sku)));
             } catch (ConnectionException $e) {
-                $error = UpstreamRequestException::fromConnection($url, $e);
-                $response = null;
-            }
-
-            if ($response instanceof Response) {
-                if ($allowLegacyFallback && $this->isStockEndpointUnavailable($response)) {
-                    $this->legacyStockEndpoint = true;
-
-                    return $this->fetchSingleStockWithRetries(
-                        $dto,
-                        $this->baseUrl().'/shared/commodity/item',
-                    );
+                $error = UpstreamRequestException::fromConnection($url, $e)
+                    ->withContext($this->stockRetryContext($code, $attempt));
+                if (! $error->retryable || $attempt >= self::STOCK_MAX_ATTEMPTS) {
+                    throw $error;
                 }
+                usleep(self::STOCK_RETRY_BACKOFF_MS * (2 ** ($attempt - 1)) * 1000);
 
-                try {
-                    return $this->stockFromResponse($url, $response);
-                } catch (UpstreamRequestException $exception) {
-                    $error = $exception;
+                continue;
+            }
+
+            try {
+                return $this->stockFromResponse($url, $response, $spec['field']);
+            } catch (UpstreamRequestException $exception) {
+                $error = $exception->withContext($this->stockRetryContext($code, $attempt));
+                if (! $error->retryable || $attempt >= self::STOCK_MAX_ATTEMPTS) {
+                    throw $error;
                 }
+                usleep(self::STOCK_RETRY_BACKOFF_MS * (2 ** ($attempt - 1)) * 1000);
             }
-
-            $error = $error->withContext([
-                'product_code' => mb_substr((string) $dto->code, 0, 100),
-                'attempt' => $attempt,
-                'max_attempts' => self::STOCK_MAX_ATTEMPTS,
-            ]);
-            if (! $error->retryable || $attempt >= self::STOCK_MAX_ATTEMPTS) {
-                throw $error;
-            }
-
-            $backoffMs = self::STOCK_RETRY_BACKOFF_MS * (2 ** ($attempt - 1));
-            usleep($backoffMs * 1000);
         }
 
-        throw new \LogicException('库存补查重试流程异常');
+        throw new \LogicException('库存查询重试流程异常');
     }
 
-    /** 只识别明确的 404 页面，不把普通 WAF/Cloudflare HTML 当作旧版本。 */
-    private function isStockEndpointUnavailable(Response $response): bool
+    /**
+     * 探测并锁定库存接口形态，返回探测商品的库存。
+     *
+     * 候选按协议演进顺序逐个尝试：路由不存在（HTTP 404，或 JS/Base64 包装的
+     * 200 404 页）自动降级到下一候选；出海同款版的 item 只认 sharedCode，
+     * 用 code 请求会报“不能为空”，这类参数名不符也换候选再试。
+     * 真实业务错误（密钥错误/商品不存在/停售）对所有候选一致，立即失败——
+     * 避免继续探测后误锁 inventory 模式（其手动发货商品 count 恒 0，见 v1.14.8）。
+     * 全部候选都不可用时优先抛业务错误（比“接口不存在”更可诊断），否则抛首个路由级错误。
+     *
+     * @param  array<string, string>  $sku
+     */
+    private function probeStockQuery(string $code, ?string $race, array $sku): int
+    {
+        $routeError = null;
+        $businessError = null;
+
+        foreach (self::STOCK_SPECS as $mode => $spec) {
+            $url = $this->baseUrl().$spec['path'];
+
+            for ($attempt = 1; $attempt <= self::STOCK_MAX_ATTEMPTS; $attempt++) {
+                try {
+                    $response = Http::asForm()
+                        ->withoutRedirecting()
+                        ->connectTimeout($this->connectTimeout())
+                        ->timeout($this->requestTimeout())
+                        ->post($url, $this->signedParams($this->stockParams($mode, $code, $race, $sku)));
+                } catch (ConnectionException $e) {
+                    throw UpstreamRequestException::fromConnection($url, $e)
+                        ->withContext($this->stockRetryContext($code, $attempt));
+                }
+
+                // 路由不存在：404 状态码，或 200 的 HTML 404 页 → 换下一候选
+                if ($this->isRouteUnavailable($response)) {
+                    $routeError ??= $response->status() === 404
+                        ? UpstreamRequestException::fromResponse($url, $response)
+                        : UpstreamRequestException::fromInvalidResponse($url, $response);
+
+                    continue 2;
+                }
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    if (is_array($data) && isset($data['code'])) {
+                        if ((int) $data['code'] === 200) {
+                            $this->stockMode = $mode;
+
+                            return (int) ($data['data'][$spec['field']] ?? -1);
+                        }
+                        // 路由存在但被业务拒绝：参数名不符(不能为空/缺少参数)换候选；
+                        // 真实业务错误(密钥错误/商品不存在/停售)立即失败，防止误锁
+                        // inventory 模式后把手动发货商品全部记为零库存。
+                        $businessError = UpstreamRequestException::business($url, (string) ($data['msg'] ?? '库存查询失败'));
+                        if (! preg_match('/不能为空|缺少参数|参数错误/u', $businessError->getMessage())) {
+                            throw $businessError;
+                        }
+
+                        continue 2;
+                    }
+                    $error = UpstreamRequestException::fromInvalidResponse($url, $response, retryable: true);
+                } else {
+                    $error = UpstreamRequestException::fromResponse($url, $response);
+                }
+
+                $error = $error->withContext($this->stockRetryContext($code, $attempt));
+                if (! $error->retryable || $attempt >= self::STOCK_MAX_ATTEMPTS) {
+                    throw $error;
+                }
+                usleep(self::STOCK_RETRY_BACKOFF_MS * (2 ** ($attempt - 1)) * 1000);
+            }
+        }
+
+        if ($businessError !== null) {
+            throw $businessError;
+        }
+
+        throw $routeError ?? new \LogicException('库存接口探测流程异常');
+    }
+
+    /** 只识别明确的“路由不存在”信号（404 状态码或 404 页面），不把普通 WAF/Cloudflare HTML 当作旧版本。 */
+    private function isRouteUnavailable(Response $response): bool
     {
         if ($response->status() === 404) {
             return true;
@@ -390,11 +494,34 @@ class AcgFakaDriver implements SupplyDriver
         }
 
         $body = $response->body();
-        $plain = html_entity_decode(strip_tags($body), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if ($this->htmlContains404($body)) {
+            return true;
+        }
 
-        return (bool) preg_match('/\b404\s+Not\s+Found\b/i', $plain)
-            // 部分旧站用 JS + Base64 包装 404 页面；这是 "404 Not Found" 的稳定片段。
-            || str_contains($body, 'NDA0IE5vdCBGb3VuZA');
+        // 部分旧站（如出海同款版）用 JS + Base64 包装 404 页面，正文没有明文
+        // “404 Not Found”；解码页面内的 Base64 片段后再识别。
+        if (preg_match_all('/[A-Za-z0-9+\/]{16,}={0,2}/', $body, $blobs)) {
+            foreach (array_slice($blobs[0], 0, 32) as $blob) {
+                $decoded = base64_decode($blob, true);
+                if ($decoded === false || $decoded === '' || ! mb_check_encoding($decoded, 'UTF-8')) {
+                    continue;
+                }
+                if ($this->htmlContains404($decoded)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function htmlContains404(string $html): bool
+    {
+        $plain = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // 不用 \b 边界：出海版 404 页的 Base64 载荷带 hex 前缀，strip_tags 后
+        // “404”可能与前一段十六进制字符直接相连（…c67a6404 Not Found）。
+        return (bool) preg_match('/404\s+Not\s+Found/i', $plain);
     }
 
     /** 生成带签名的请求参数(供并发补查库存复用) */
@@ -410,21 +537,54 @@ class AcgFakaDriver implements SupplyDriver
 
     public function getProduct(string $code): ?UpstreamProduct
     {
-        $data = $this->signedPost('/shared/commodity/item', ['code' => $code]);
+        $data = $this->itemQuery($code);
 
         return isset($data['data']) ? $this->mapProduct($data['data']) : null;
+    }
+
+    /**
+     * 商品详情参数名存在两代协议：标准版 code、出海同款版(3.1.1) sharedCode。
+     * 按已识别的库存模式排序探测；仅业务错误（参数名不符会报“不能为空”）时换名
+     * 重试，网络/HTTP 层错误与参数名无关，直接抛出。
+     */
+    private function itemQuery(string $code): array
+    {
+        if ($this->itemParamName !== null) {
+            return $this->signedPost('/shared/commodity/item', [$this->itemParamName => $code]);
+        }
+
+        // 库存模式为 inventory = 出海同款版 → 优先 sharedCode
+        $names = $this->stockMode === 'inventory' ? ['sharedCode', 'code'] : ['code', 'sharedCode'];
+        $errors = [];
+        foreach ($names as $name) {
+            try {
+                $data = $this->signedPost('/shared/commodity/item', [$name => $code]);
+                $this->itemParamName = $name;
+
+                return $data;
+            } catch (UpstreamRequestException $e) {
+                if ($e->errorCode !== 'UPSTREAM_BUSINESS_ERROR') {
+                    throw $e;
+                }
+                $errors[] = $e;
+            }
+        }
+
+        // “对接CODE不能为空”这类参数名报错不如“商品不存在”这类真实业务错误可诊断
+        foreach ($errors as $error) {
+            if (! preg_match('/不能为空|缺少参数|参数错误/u', $error->getMessage())) {
+                throw $error;
+            }
+        }
+
+        throw $errors[0];
     }
 
     public function getStock(string $code, ?string $skuCode = null): int
     {
         $selection = $this->decodeSkuCode($skuCode);
-        $data = $this->signedPost('/shared/commodity/stock', array_filter([
-            'code' => $code,
-            'race' => $selection['race'],
-            'sku' => $selection['sku'],
-        ], fn ($value) => $value !== '' && $value !== []));
 
-        return (int) ($data['data']['stock'] ?? -1);
+        return $this->stockQuery($code, $selection['race'], $selection['sku']);
     }
 
     /**

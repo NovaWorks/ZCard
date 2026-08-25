@@ -36,6 +36,9 @@ class TradeCaptchaTest extends TestCase
             ->assertExactJson([
                 'key' => 'captcha-key',
                 'src' => 'data:image/jpeg;base64,ZmFrZQ==',
+                // 登录页一次请求即可拿到「是否启用」，省掉 /captcha/config 单独查询
+                // (trade_captcha 在 StorefrontConfig 默认开启)
+                'enabled' => true,
             ]);
     }
 

@@ -310,7 +310,8 @@ Route::post('/coupons/validate', [CouponController::class, 'validateCode'])
     ->middleware('throttle:10,1')->name('api.coupons.validate');
 
 Route::get('/captcha/{scene?}', function (Request $request, $scene = 'default') {
-    return response()->json(CaptchaService::create($scene));
+    // 同时返回开关状态：登录页(前台/后台)一次请求即可拿到「是否启用 + 图片 + key」
+    return response()->json(CaptchaService::create($scene) + ['enabled' => CaptchaService::isEnabled($scene)]);
 })->name('api.captcha.src');
 
 // 卡密导入与库存(管理类,需 Sanctum token)— API-first:Filament 和 API 共用 Service 层

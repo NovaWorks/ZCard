@@ -91,4 +91,38 @@ class AdminLoginCaptchaTest extends TestCase
 
         $resp->assertOk();
     }
+
+    /** 无状态 key 模式：/api/captcha/{scene} 返回 enabled + 图片 + key，登录凭 key+code 校验 */
+    public function test_stateless_captcha_endpoint_and_login_flow(): void
+    {
+        $this->seedBase();
+        $user = User::factory()->create(['password' => bcrypt('password123')]);
+
+        $captchaResp = $this->getJson('/api/captcha/login');
+        $captchaResp->assertOk();
+        $captchaResp->json('enabled') === true || $this->fail('captcha endpoint must expose enabled flag');
+        $this->assertNotEmpty($captchaResp->json('key'));
+        $this->assertStringStartsWith('data:image', (string) $captchaResp->json('src'));
+
+        // 错误验证码：真 check_api 校验失败 → 422
+        $wrong = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'password123',
+            'captcha' => 'wrong-code',
+            'captcha_key' => $captchaResp->json('key'),
+        ]);
+        $wrong->assertStatus(422);
+        $wrong->assertJsonValidationErrors('captcha');
+
+        // 正确验证码：mock check_api 通过(mews/captcha 方法名为 snake_case)
+        Captcha::shouldReceive('check_api')->andReturn(true);
+        $ok = $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'password123',
+            'captcha' => '123456',
+            'captcha_key' => $captchaResp->json('key'),
+        ]);
+        $ok->assertOk();
+        $this->assertNotEmpty($ok->json('token'));
+    }
 }

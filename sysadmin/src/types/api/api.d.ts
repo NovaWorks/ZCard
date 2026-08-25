@@ -67,6 +67,7 @@ declare namespace Api {
       email: string
       password: string
       captcha?: string
+      captcha_key?: string
     }
 
     /** 登录响应（ZCard Sanctum: 直接返回 { token, user }） */

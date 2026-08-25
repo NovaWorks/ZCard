@@ -22,18 +22,23 @@ const loading = ref(false)
 
 const needCaptcha = computed(() => !!settings.config?.captcha_login)
 const captchaSrc = ref('')
+const captchaKey = ref('')
 
 const refreshCaptcha = async () => {
   try {
     const res = await fetch(`${request.defaults?.baseURL || '/api'}/captcha/login?${Date.now()}`)
     const data = await res.json()
     captchaSrc.value = data.src || ''
+    captchaKey.value = data.key || ''
   } catch {
     captchaSrc.value = ''
+    captchaKey.value = ''
   }
 }
 
-watch(needCaptcha, (v) => { if (v && !captchaSrc.value) refreshCaptcha() })
+// immediate:settings 从 localStorage 同步恢复时 watch 注册前 needCaptcha 已为 true,
+// 不加 immediate 回调永不触发 → 验证码图片不显示
+watch(needCaptcha, (v) => { if (v && !captchaSrc.value) refreshCaptcha() }, { immediate: true })
 
 async function submit() {
   err.value = ''
@@ -51,6 +56,8 @@ async function submit() {
       email: email.value,
       password: password.value,
       captcha: needCaptcha.value ? captcha.value : undefined,
+      // 无状态 key:后端凭 key+code 校验,不依赖 Session
+      captcha_key: needCaptcha.value ? captchaKey.value : undefined,
     } as any)
     authStore.setAuth(res.token, res.user)
     // 安全:redirect 只接受站内相对路径(以单个 / 开头、不含 // 与 :),防开放重定向。

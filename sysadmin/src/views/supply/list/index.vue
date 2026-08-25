@@ -694,7 +694,9 @@
       top="4vh"
       destroy-on-close
     >
-      <div v-loading="previewLoading" class="preview-wrap">
+      <!-- 遮罩只套住依赖上游数据的分类映射/商品列表;定价策略区必须随时可编辑,
+           否则上游慢/失败时(预览请求最长 120s)loading 遮罩会把定价输入框一起锁死 -->
+      <div class="preview-wrap">
         <div v-if="previewError" class="preview-error">{{ previewError }}</div>
         <template v-else>
           <div class="preview-toolbar">
@@ -774,8 +776,9 @@
             </div>
           </div>
 
-          <!-- 分类映射:上游分类 → 本地分类 -->
-          <div class="preview-map">
+          <div v-loading="previewLoading" class="preview-data">
+            <!-- 分类映射:上游分类 → 本地分类 -->
+            <div class="preview-map">
             <div class="map-head">
               <span class="map-title">{{ t('zcard.supply.categoryMapTitle') }}</span>
               <ElButton
@@ -913,9 +916,10 @@
                 </div>
               </ElCheckboxGroup>
             </div>
-            <div v-if="previewCategories.length === 0" class="preview-empty">{{
+            <div v-if="previewCategories.length === 0 && !previewLoading" class="preview-empty">{{
               t('zcard.supply.noProducts')
             }}</div>
+            </div>
           </div>
         </template>
       </div>
