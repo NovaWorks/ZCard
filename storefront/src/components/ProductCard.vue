@@ -15,6 +15,8 @@ const prefs = usePreferencesStore()
 const view = computed(() => settings.effectiveView)
 /** 靓号自选:显示最低价起 */
 const isPremium = computed(() => (props.product.pick_type ?? 'general') === 'premium')
+/** 缺货:stock 为 0 时展示售罄态(-1/未知为不限量) */
+const soldOut = computed(() => props.product.stock === 0)
 const priceText = computed(() => {
   const cur = prefs.currencyOf(props.product.display_currency)
   const min = props.product.premium_min_price_display ?? props.product.premium_min_price
@@ -29,9 +31,12 @@ function go() { router.push(`/product/${props.product.slug}`) }
   <!-- 网格 / 双栏 -->
   <div v-if="view !== 'list'" @click="go"
     class="group cursor-pointer bg-white rounded-card border border-border overflow-hidden hover:border-primary/40 hover:shadow-card-hover transition-all duration-200">
-    <div class="aspect-square bg-gradient-to-br from-primary-soft to-primary-light flex items-center justify-center text-primary/40 text-xs overflow-hidden">
+    <div class="aspect-square bg-gradient-to-br from-primary-soft to-primary-light flex items-center justify-center text-primary/40 text-xs overflow-hidden relative">
       <img v-if="product.cover" :src="product.cover" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
       <span v-else class="font-medium">{{ t('common.noImage') }}</span>
+      <div v-if="soldOut" class="absolute inset-0 bg-black/40 flex items-center justify-center">
+        <span class="bg-white/95 text-ink text-[10px] font-bold px-3 py-0.5 rounded-full shadow">{{ t('common.soldOut') }}</span>
+      </div>
     </div>
     <div class="p-2.5">
       <div class="text-xs font-medium text-ink line-clamp-2 min-h-[2rem] leading-snug">{{ product.name }}</div>
@@ -59,6 +64,7 @@ function go() { router.push(`/product/${props.product.slug}`) }
         <span v-if="settings.config?.show_stock" class="text-[10px] text-ink-muted">{{ t('common.stock') }} {{ stockText(product.stock, t('product.detail.stockPlenty')) }}</span>
       </div>
     </div>
-    <button class="bg-primary text-white text-xs px-3 py-1.5 rounded-field hover:bg-primary-hover transition">{{ t('common.buy') }}</button>
+    <button v-if="soldOut" disabled class="bg-surface-subtle text-ink-muted text-xs px-3 py-1.5 rounded-field cursor-not-allowed flex-shrink-0">{{ t('common.soldOut') }}</button>
+    <button v-else class="bg-primary text-white text-xs px-3 py-1.5 rounded-field hover:bg-primary-hover transition">{{ t('common.buy') }}</button>
   </div>
 </template>

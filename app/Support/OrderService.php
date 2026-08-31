@@ -75,6 +75,19 @@ class OrderService
         }
 
         $fulfillmentType = $product->resolvedFulfillmentType();
+
+        // 缺货拦截:上游商品在付款前依据同步缓存拒单,避免顾客付款后才在上游拿货失败
+        // (付款成功但发不出货)。缓存未知(null)或 -1(上游不限量)仍放行,由付款后的
+        // 上游拿货流程兜底;自动卡密在下单事务内锁卡校验;固定/人工发货不限量。
+        if ($fulfillmentType === Product::FULFILLMENT_UPSTREAM) {
+            $cachedStock = $product->stock_cache;
+            if ($cachedStock !== null && (int) $cachedStock >= 0 && (int) $cachedStock < $qty) {
+                throw new InsufficientStockException(
+                    __('messages.insufficient_stock', ['need' => $qty, 'have' => (int) $cachedStock]),
+                );
+            }
+        }
+
         $premium = $fulfillmentType === Product::FULFILLMENT_AUTO_CARD
             && ($product->pick_type ?? 'general') === 'premium';
         $cardId = $customer['card_id'] ?? null;

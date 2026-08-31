@@ -191,6 +191,8 @@ const selectedPremium = ref<{ card_id: number; number: string; price: number; pr
 const pendingAction = ref<'cart' | 'buy' | null>(null)
 
 const isPremium = computed(() => (product.value?.pick_type ?? 'general') === 'premium')
+/** 缺货:stock 为 0 时禁止下单(stock 为 -1/未知表示不限量,不拦) */
+const soldOut = computed(() => product.value?.stock === 0)
 /** 详情页展示价:靓号自选用最低价(¥X起),其余用 SKU/商品价 */
 const displayPrice = computed(() => {
   if (!product.value) return 0
@@ -270,7 +272,7 @@ function confirmPremium() {
 }
 
 function addToCart() {
-  if (!product.value) return
+  if (!product.value || soldOut.value) return
   // 动态控件值必须在单品结算页填写，购物车批量下单无法为每个商品安全绑定控件值。
   if (product.value.control_config?.length) {
     buy()
@@ -297,7 +299,7 @@ function addToCart() {
   addedTimer = setTimeout(() => { addedFeedback.value = false }, 2000)
 }
 function buy() {
-  if (!product.value) return
+  if (!product.value || soldOut.value) return
   if (isPremium.value) {
     openPremiumPick('buy')
     return
@@ -321,9 +323,13 @@ function buy() {
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <!-- 左:配图 -->
       <div>
-        <div @click="openLightbox" class="aspect-square rounded-card border border-border bg-gradient-to-br from-primary-soft to-primary-light flex items-center justify-center overflow-hidden cursor-zoom-in">
+        <div @click="openLightbox" class="relative aspect-square rounded-card border border-border bg-gradient-to-br from-primary-soft to-primary-light flex items-center justify-center overflow-hidden cursor-zoom-in">
           <img v-if="galleryImages[currentImg]" :src="galleryImages[currentImg]" class="w-full h-full object-cover" />
           <span v-else class="text-primary/40">{{ t('common.noImage') }}</span>
+          <!-- 缺货遮罩:仅提示,不阻止查看详情 -->
+          <div v-if="soldOut" class="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <span class="bg-white/95 text-ink text-sm font-bold px-5 py-1.5 rounded-full shadow">{{ t('common.soldOut') }}</span>
+          </div>
         </div>
         <div class="flex gap-2 mt-2">
           <div v-for="(img, i) in galleryImages" :key="i" @click="currentImg = i"
@@ -423,17 +429,18 @@ function buy() {
           </div>
         </div>
 
-        <!-- 购买操作:加入购物车 + 立即购买 -->
+        <!-- 购买操作:加入购物车 + 立即购买(缺货时禁用,只留一个灰置按钮) -->
         <div class="flex gap-2 mt-4">
           <button
-            v-if="!product.control_config?.length"
+            v-if="!soldOut && !product.control_config?.length"
             @click="addToCart"
             class="flex-1 bg-white border-2 border-primary text-primary font-bold py-3 rounded-card hover:bg-primary-light transition"
           >{{ addedFeedback ? t('product.detail.addedToCart') : t('product.detail.addToCart') }}</button>
           <button
             @click="buy"
-            class="flex-1 bg-gradient-to-r from-primary to-primary-hover text-white font-bold py-3 rounded-card shadow-md hover:shadow-pop transition"
-          >{{ t('product.detail.buyNow') }}</button>
+            :disabled="soldOut"
+            :class="['flex-1 font-bold py-3 rounded-card transition', soldOut ? 'bg-surface-subtle border border-border text-ink-muted cursor-not-allowed' : 'bg-gradient-to-r from-primary to-primary-hover text-white shadow-md hover:shadow-pop']"
+          >{{ soldOut ? t('common.soldOut') : t('product.detail.buyNow') }}</button>
         </div>
 
         <!-- 写评价入口:登录 + 购买过该商品且未评价 + 后台允许评价 -->
