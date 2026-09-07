@@ -371,6 +371,9 @@
     "update": {
       "title": "Online Update"
     },
+    "migration": {
+      "title": "Data Migration"
+    },
     "supply": {
       "title": "Supply Sources"
     },
@@ -1838,6 +1841,40 @@
       "statPaid": "Paid Amount",
       "statTotal": "Total Amount",
       "statClosed": "Closed Amount"
+    },
+    "migration": {
+      "title": "1.x to 2.0 Data Migration",
+      "desc": "Source-side (1.x) migration console: preflight checks, 2.0 command generation, key bundle export. Data is moved by the 2.0 zcard migrate-from-v1 command, read-only against this site.",
+      "ready": "Ready to migrate",
+      "notReady": "Blocked",
+      "recheck": "Re-check",
+      "downloadKeys": "Download key bundle",
+      "currentVersion": "Current version",
+      "cardKeyFrom": "Card key source",
+      "cardKeySettings": "Admin settings",
+      "cardKeyEnv": ".env file",
+      "preflightTitle": "Source preflight",
+      "statUsers": "Users",
+      "statProducts": "Products",
+      "statCards": "Cards",
+      "statOrders": "Orders",
+      "statPayments": "Payments",
+      "statBills": "Bills",
+      "pendingTitle": "Pending transactions",
+      "pendingDesc": "{orders} pending orders / {payments} pending payments. Let them close or resolve manually before the cutover window.",
+      "stepsTitle": "Cutover steps and commands",
+      "cmd_dry_run": "Dry-run (no writes)",
+      "cmd_run": "Full migration (all phases)",
+      "cmd_phases_main_first": "Main site first (skip reseller P6)",
+      "cmd_verify": "Post-migration verify",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyFailed": "Copy failed",
+      "keysTitle": "Download key bundle",
+      "keysConfirm": "The bundle contains APP_KEY, the card encryption key and DB credentials. Store it securely (chmod 600 recommended) and delete it after migration. Continue?",
+      "keysConfirmBtn": "Download",
+      "keysDownloaded": "Key bundle downloaded",
+      "notesTitle": "Notes"
     }
   }
 }

@@ -371,6 +371,9 @@
     "update": {
       "title": "在线更新"
     },
+    "migration": {
+      "title": "数据迁移"
+    },
     "supply": {
       "title": "货源管理"
     },
@@ -1838,6 +1841,40 @@
       "statPaid": "已支付金额",
       "statTotal": "充值总额",
       "statClosed": "已关闭金额"
+    },
+    "migration": {
+      "title": "1.x → 2.0 数据迁移",
+      "desc": "本页是源端(1.x)迁移控制台：自检迁移条件、生成 2.0 侧执行命令、导出密钥包。真正搬数据由 2.0 的 zcard migrate-from-v1 命令完成，全程只读本站数据库。",
+      "ready": "迁移条件就绪",
+      "notReady": "存在阻断项",
+      "recheck": "重新检测",
+      "downloadKeys": "下载密钥包",
+      "currentVersion": "当前版本",
+      "cardKeyFrom": "卡密钥匙来源",
+      "cardKeySettings": "后台配置",
+      "cardKeyEnv": ".env 配置",
+      "preflightTitle": "源端自检",
+      "statUsers": "用户",
+      "statProducts": "商品",
+      "statCards": "卡密",
+      "statOrders": "订单",
+      "statPayments": "支付记录",
+      "statBills": "余额流水",
+      "pendingTitle": "存在在途订单",
+      "pendingDesc": "待付款订单 {orders} 笔 / 待确认支付 {payments} 笔。切换窗口前应等待其自然关闭或人工处理，避免迁移期间产生状态分叉。",
+      "stepsTitle": "切换流程与命令",
+      "cmd_dry_run": "演练预检（不写库）",
+      "cmd_run": "正式迁移（全阶段）",
+      "cmd_phases_main_first": "主站先行（跳过分站域 P6）",
+      "cmd_verify": "迁移后校验",
+      "copy": "复制",
+      "copied": "已复制",
+      "copyFailed": "复制失败",
+      "keysTitle": "下载密钥包",
+      "keysConfirm": "密钥包含 APP_KEY、卡密加密钥匙与数据库连接凭据。请妥善保管（建议 600 权限），迁移完成后立即删除。确定下载？",
+      "keysConfirmBtn": "确认下载",
+      "keysDownloaded": "密钥包已下载",
+      "notesTitle": "注意事项"
     }
   }
 }

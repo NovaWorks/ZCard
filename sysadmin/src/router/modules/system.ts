@@ -11,7 +11,7 @@ export const systemRoutes: AppRouteRecord = {
   meta: {
     title: 'menus.system_group.title',
     icon: 'ri:settings-3-line',
-    roles: ['R_SUPER', 'R_ADMIN'],
+    roles: ['R_SUPER', 'R_ADMIN']
   },
   children: [
     {
@@ -21,8 +21,8 @@ export const systemRoutes: AppRouteRecord = {
       meta: {
         title: 'menus.setting.title',
         icon: 'ri:settings-line',
-        keepAlive: false,
-      },
+        keepAlive: false
+      }
     },
     {
       path: '/currencymgt/index',
@@ -31,8 +31,8 @@ export const systemRoutes: AppRouteRecord = {
       meta: {
         title: 'menus.currency.title',
         icon: 'ri:coins-line',
-        keepAlive: false,
-      },
+        keepAlive: false
+      }
     },
     {
       path: '/subsitemgt/index',
@@ -41,8 +41,8 @@ export const systemRoutes: AppRouteRecord = {
       meta: {
         title: 'menus.subsite.title',
         icon: 'ri:global-line',
-        keepAlive: false,
-      },
+        keepAlive: false
+      }
     },
     {
       path: '/updatemgt/index',
@@ -51,8 +51,18 @@ export const systemRoutes: AppRouteRecord = {
       meta: {
         title: 'menus.update.title',
         icon: 'ri:download-cloud-2-line',
-        keepAlive: false,
-      },
+        keepAlive: false
+      }
+    },
+    {
+      path: '/migrationmgt/index',
+      name: 'MigrationIndex',
+      component: '/migration/index',
+      meta: {
+        title: 'menus.migration.title',
+        icon: 'ri:database-2-line',
+        keepAlive: false
+      }
     },
     {
       path: '/supplymgt/index',
@@ -61,8 +71,8 @@ export const systemRoutes: AppRouteRecord = {
       meta: {
         title: 'menus.supply.title',
         icon: 'ri:plug-line',
-        keepAlive: false,
-      },
+        keepAlive: false
+      }
     },
     {
       path: '/suppliermgt/index',
@@ -71,8 +81,8 @@ export const systemRoutes: AppRouteRecord = {
       meta: {
         title: 'menus.supplierAccount.title',
         icon: 'ri:key-2-line',
-        keepAlive: false,
-      },
+        keepAlive: false
+      }
     },
     {
       path: '/mediamgt/index',
@@ -81,8 +91,8 @@ export const systemRoutes: AppRouteRecord = {
       meta: {
         title: 'menus.media.title',
         icon: 'ri:image-2-line',
-        keepAlive: false,
-      },
-    },
-  ],
+        keepAlive: false
+      }
+    }
+  ]
 }

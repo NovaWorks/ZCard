@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Admin\CurrencyController as AdminCurrencyController
 use App\Http\Controllers\Api\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Api\Admin\MediaCategoryController as AdminMediaCategoryController;
 use App\Http\Controllers\Api\Admin\MediaController as AdminMediaController;
+use App\Http\Controllers\Api\Admin\MigrationController as AdminMigrationController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\PaymentChannelController as AdminPaymentChannelController;
 use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
@@ -124,6 +125,11 @@ Route::middleware(['auth:sanctum', 'active.user', 'admin.role', 'audit.admin'])-
     Route::post('update/run', [AdminUpdateController::class, 'update']);
     Route::post('update/rollback', [AdminUpdateController::class, 'rollback']);
     Route::get('update/log', [AdminUpdateController::class, 'getLog']);
+
+    // 1.x → 2.0 数据迁移(源端自检/命令生成/密钥包导出;真正搬数据由 2.0 的 migrate-from-v1 执行)
+    Route::get('migration/preflight', [AdminMigrationController::class, 'preflight']);
+    Route::get('migration/command', [AdminMigrationController::class, 'command']);
+    Route::get('migration/keys', [AdminMigrationController::class, 'keys']);
 
     // stats/batch 必须在 apiResource 之前(否则 stats 被当成 {product} 参数)
     Route::get('products/stats', [AdminProductController::class, 'stats']);
